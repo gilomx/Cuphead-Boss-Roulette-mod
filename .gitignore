@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+
+# IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local packages and logs
+packages/
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Built release artifacts
+*.dll
+*.pdb
+*.zip
