@@ -4,7 +4,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>Gilomx.CupheadBossRoulette</RootNamespace>
     <AssemblyName>Gilomx.CupheadBossRoulette</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <CupheadDir Condition="'$(CupheadDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Cuphead</CupheadDir>
     <RestoreAdditionalProjectSources>https://api.nuget.org/v3/index.json;https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
   </PropertyGroup>
@@ -27,6 +27,10 @@
       <HintPath>$(CupheadDir)\Cuphead_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(CupheadDir)\Cuphead_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
       <HintPath>$(CupheadDir)\Cuphead_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
@@ -41,6 +45,14 @@
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(CupheadDir)\Cuphead_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestWWWModule">
+      <HintPath>$(CupheadDir)\Cuphead_Data\Managed\UnityEngine.UnityWebRequestWWWModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(CupheadDir)\Cuphead_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

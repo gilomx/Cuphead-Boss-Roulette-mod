@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using BepInEx;
@@ -12,19 +13,38 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.1.0";
+        public const string PluginVersion = "0.2.0";
+
+        private const float DesignWidth = 1280f;
+        private const float DesignHeight = 720f;
+        private static readonly Color Ink = new Color(0.075f, 0.065f, 0.055f);
+        private static readonly Color Red = new Color(0.67f, 0.12f, 0.10f);
+        private static readonly Color Cream = new Color(0.94f, 0.87f, 0.70f);
+        private static readonly Color Gold = new Color(0.94f, 0.72f, 0.19f);
 
         private readonly System.Random random = new System.Random();
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
-        private Rect window = new Rect(80f, 55f, 760f, 570f);
-        private GUIStyle titleStyle;
-        private GUIStyle centeredStyle;
-        private GUIStyle resultStyle;
-        private GUIStyle hintStyle;
+        private readonly float[] pulseUntil = new float[6];
         private ConfigEntry<KeyboardShortcut> toggleShortcut;
         private ConfigEntry<KeyboardShortcut> spinShortcut;
         private ConfigEntry<bool> autoLoad;
         private ConfigEntry<float> loadDelay;
+        private GameTheme theme;
+        private AudioSource audioSource;
+        private AudioClip spinClip;
+        private AudioClip selectionClip;
+        private AudioClip openClip;
+        private AudioClip closeClip;
+        private GUIStyle titleStyle;
+        private GUIStyle subtitleStyle;
+        private GUIStyle bossStyle;
+        private GUIStyle bodyStyle;
+        private GUIStyle smallStyle;
+        private GUIStyle cardTitleStyle;
+        private GUIStyle buttonStyle;
+        private GUIStyle buttonActiveStyle;
+        private GUIStyle challengeStyle;
+        private Font stylesFont;
         private bool visible = true;
         private bool uglyMode;
         private bool running;
@@ -37,8 +57,16 @@ namespace Gilomx.CupheadBossRoulette
         private int revealed;
         private Level.Mode difficulty = Level.Mode.Normal;
         private RouletteResult result = new RouletteResult();
-        private RouletteResult forced = new RouletteResult { Boss = 0, Weapon1 = 0, Weapon2 = 1, Super = 0, Charm = 0, Modifier = 6 };
-        private string status = "F7 para girar";
+        private RouletteResult forced = new RouletteResult
+        {
+            Boss = 0,
+            Weapon1 = 0,
+            Weapon2 = 1,
+            Super = 0,
+            Charm = 0,
+            Modifier = 6
+        };
+        private string status = "PULSA F7 PARA GIRAR";
         private string activeChallenge = "";
 
         private string AssetsDirectory
@@ -52,23 +80,24 @@ namespace Gilomx.CupheadBossRoulette
             spinShortcut = Config.Bind("Controles", "Girar", new KeyboardShortcut(KeyCode.F7), "Inicia un giro.");
             autoLoad = Config.Bind("Juego", "CargarAutomaticamente", true, "Carga el jefe al finalizar el giro.");
             loadDelay = Config.Bind("Juego", "DemoraAntesDeCargar", 1.25f, "Segundos entre el resultado final y la carga.");
+            theme = new GameTheme();
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.volume = 0.45f;
+            StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion + " listo. F6 abre/cierra; F7 gira.");
         }
 
         private void Update()
         {
             if (toggleShortcut.Value.IsDown())
-                visible = !visible;
-
+                SetVisible(!visible);
             if (spinShortcut.Value.IsDown())
                 StartRoulette();
-
-            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.I))
+            if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.I))
                 secretVisible = !secretVisible;
-
             if (running)
                 UpdateSpin();
-
             if (pendingLoad && Time.realtimeSinceStartup >= loadAt)
             {
                 pendingLoad = false;
@@ -76,21 +105,35 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private void SetVisible(bool value)
+        {
+            if (visible == value)
+                return;
+            visible = value;
+            PlayOneShot(visible ? openClip : closeClip, 0.65f);
+        }
+
         private void StartRoulette()
         {
             if (running || pendingLoad)
                 return;
-
             if (!visible)
-                visible = true;
+                SetVisible(true);
 
             result = forceSelection ? Copy(forced) : CreateRandomResult();
             revealed = 0;
             ticker = 0;
             spinStartedAt = Time.realtimeSinceStartup;
             running = true;
-            status = "Girando...";
+            status = "¡LA RULETA ESTÁ GIRANDO!";
             activeChallenge = "";
+            if (spinClip != null)
+            {
+                audioSource.clip = spinClip;
+                audioSource.loop = true;
+                audioSource.volume = 0.45f;
+                audioSource.Play();
+            }
         }
 
         private RouletteResult CreateRandomResult()
@@ -101,8 +144,6 @@ namespace Gilomx.CupheadBossRoulette
             do weapon2 = random.Next(RouletteData.Weapons.Length - 1);
             while (weapon2 == weapon1);
 
-            // Reproduce literalmente las probabilidades de la web: el 20 % fuerza
-            // "Nada"; la rama restante todavÃ­a puede caer en "Nada".
             var super = random.NextDouble() < 0.2
                 ? RouletteData.Supers.Length - 1
                 : random.Next(RouletteData.Supers.Length);
@@ -134,15 +175,23 @@ namespace Gilomx.CupheadBossRoulette
             var elapsed = Time.realtimeSinceStartup - spinStartedAt;
             ticker = (int)(elapsed / 0.07f);
             var fields = uglyMode ? 6 : 5;
-
+            var oldRevealed = revealed;
             if (elapsed >= 5f)
                 revealed = Math.Min(fields, (int)(elapsed - 5f) + 1);
+
+            if (revealed > oldRevealed)
+            {
+                for (var i = oldRevealed; i < revealed; i++)
+                    pulseUntil[i] = Time.realtimeSinceStartup + 0.38f;
+                PlayOneShot(selectionClip, 0.9f);
+            }
 
             if (revealed < fields)
                 return;
 
             running = false;
-            status = autoLoad.Value ? "Resultado listo. Cargando combate..." : "Resultado listo";
+            StopSpinAudio();
+            status = autoLoad.Value ? "¡RESULTADO LISTO! PREPARANDO COMBATE..." : "¡RESULTADO LISTO!";
             if (autoLoad.Value)
             {
                 pendingLoad = true;
@@ -156,14 +205,13 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (!PlayerData.Initialized || PlayerData.Data == null)
                 {
-                    status = "Selecciona primero una partida guardada.";
-                    Logger.LogWarning(status);
+                    status = "SELECCIONA PRIMERO UNA PARTIDA GUARDADA";
+                    Logger.LogWarning("Selecciona primero una partida guardada.");
                     return;
                 }
-
                 if (SceneLoader.CurrentlyLoading)
                 {
-                    status = "Cuphead ya estÃ¡ cargando otra escena.";
+                    status = "CUPHEAD YA ESTÁ CARGANDO OTRA ESCENA";
                     return;
                 }
 
@@ -172,14 +220,13 @@ namespace Gilomx.CupheadBossRoulette
                 Level.SetCurrentMode(difficulty);
                 activeChallenge = uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "";
                 visible = false;
-
                 var boss = RouletteData.Bosses[result.Boss];
                 Logger.LogInfo("Cargando " + boss.Character + " (" + boss.Level + ")");
                 SceneLoader.LoadLevel(boss.Level, SceneLoader.Transition.Iris, SceneLoader.Icon.None);
             }
             catch (Exception exception)
             {
-                status = "No se pudo cargar el combate. Revisa LogOutput.log.";
+                status = "NO SE PUDO CARGAR. REVISA LOGOUTPUT.LOG";
                 Logger.LogError(exception);
                 visible = true;
             }
@@ -201,94 +248,188 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OnGUI()
         {
+            theme.Refresh();
             EnsureStyles();
 
+            var scale = Mathf.Min(Screen.width / DesignWidth, Screen.height / DesignHeight);
+            var offsetX = (Screen.width - DesignWidth * scale) * 0.5f;
+            var offsetY = (Screen.height - DesignHeight * scale) * 0.5f;
+            var previousMatrix = GUI.matrix;
+            var previousColor = GUI.color;
+            GUI.matrix = Matrix4x4.TRS(
+                new Vector3(offsetX, offsetY, 0f),
+                Quaternion.identity,
+                new Vector3(scale, scale, 1f));
+
             if (!string.IsNullOrEmpty(activeChallenge) && activeChallenge != "Nada")
-            {
-                GUI.Box(new Rect(Screen.width / 2f - 170f, 12f, 340f, 38f), "RETO: " + activeChallenge, resultStyle);
-            }
+                DrawChallengeBanner();
 
-            if (!visible)
-            {
-                GUI.Label(new Rect(12f, Screen.height - 30f, 300f, 22f), "F6 Â· Abrir ruleta", hintStyle);
-                return;
-            }
+            if (visible)
+                DrawRoulette();
+            else
+                GUI.Label(new Rect(24f, 672f, 250f, 28f), "F6  ABRIR RULETA", smallStyle);
 
-            window = GUI.Window(GetInstanceID(), window, DrawWindow, "RULETA DE JEFES Â· CUPHEAD");
+            GUI.color = previousColor;
+            GUI.matrix = previousMatrix;
         }
 
-        private void DrawWindow(int id)
+        private void DrawRoulette()
         {
+            GUI.color = new Color(0f, 0f, 0f, 0.72f);
+            GUI.DrawTexture(new Rect(0f, 0f, DesignWidth, DesignHeight), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            var panel = new Rect(55f, 28f, 1170f, 664f);
+            theme.DrawPaper(panel);
+            GUI.BeginGroup(panel);
+
+            GUI.color = Ink;
+            GUI.DrawTexture(new Rect(22f, 18f, 1126f, 61f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(35f, 17f, 1100f, 58f), "CUPHEAD · BOSS ROULETTE", titleStyle);
+            GUI.Label(new Rect(35f, 76f, 1100f, 30f), "¡EL DESTINO DECIDE TU PRÓXIMO COMBATE!", subtitleStyle);
+
             var bossIndex = DisplayIndex(0, result.Boss, RouletteData.Bosses.Length, 0);
             var boss = RouletteData.Bosses[bossIndex];
-
-            GUI.Label(new Rect(20f, 28f, 720f, 30f), boss.Character, titleStyle);
-            GUI.Label(new Rect(20f, 58f, 720f, 24f), boss.Fight, centeredStyle);
-            DrawTexture(new Rect(320f, 88f, 120f, 120f), boss.Image);
-
-            var planeHint = boss.IsPlane && revealed > 0 ? "JEFE DE AVIÃ“N Â· el armamento terrestre no se usa en este combate" : "";
-            GUI.Label(new Rect(20f, 210f, 720f, 22f), planeHint, hintStyle);
+            DrawBossPanel(boss);
 
             var weapon1 = DisplayIndex(1, result.Weapon1, RouletteData.Weapons.Length, 0);
             var weapon2 = DisplayIndex(2, result.Weapon2, RouletteData.Weapons.Length, RouletteData.Weapons.Length / 2);
             var super = DisplayIndex(3, result.Super, RouletteData.Supers.Length, RouletteData.Supers.Length / 3);
             var charm = DisplayIndex(4, result.Charm, RouletteData.Charms.Length, RouletteData.Charms.Length / 4);
 
-            DrawCard(20f, 240f, "ARMA A", RouletteData.Weapons[weapon1].Name, RouletteData.Weapons[weapon1].Image);
-            DrawCard(165f, 240f, "ARMA B", RouletteData.Weapons[weapon2].Name, RouletteData.Weapons[weapon2].Image);
-            DrawCard(310f, 240f, "SÃšPER", RouletteData.Supers[super].Name, RouletteData.Supers[super].Image);
-            DrawCard(455f, 240f, "AMULETO", RouletteData.Charms[charm].Name, RouletteData.Charms[charm].Image);
+            DrawEquipmentCard(new Rect(360f, 127f, 225f, 151f), "ARMA A",
+                RouletteData.Weapons[weapon1].Name, RouletteData.Weapons[weapon1].Image,
+                RouletteData.Weapons[weapon1].NativeSprite, 1);
+            DrawEquipmentCard(new Rect(607f, 127f, 225f, 151f), "ARMA B",
+                RouletteData.Weapons[weapon2].Name, RouletteData.Weapons[weapon2].Image,
+                RouletteData.Weapons[weapon2].NativeSprite, 2);
+            DrawEquipmentCard(new Rect(854f, 127f, 225f, 151f), "SÚPER",
+                RouletteData.Supers[super].Name, RouletteData.Supers[super].Image,
+                RouletteData.Supers[super].NativeSprite, 3);
+
+            var charmRect = uglyMode
+                ? new Rect(484f, 302f, 225f, 151f)
+                : new Rect(607f, 302f, 225f, 151f);
+            DrawEquipmentCard(charmRect, "AMULETO",
+                RouletteData.Charms[charm].Name, RouletteData.Charms[charm].Image,
+                RouletteData.Charms[charm].NativeSprite, 4);
 
             if (uglyMode)
             {
                 var rollingModifier = CurrentRollingModifier(bossIndex);
                 var modifier = DisplayIndex(5, result.Modifier, RouletteData.Modifiers.Length, rollingModifier - ticker);
-                DrawCard(600f, 240f, "RETO", RouletteData.Modifiers[modifier].Name, RouletteData.Modifiers[modifier].Image);
+                DrawEquipmentCard(new Rect(731f, 302f, 225f, 151f), "RETO",
+                    RouletteData.Modifiers[modifier].Name, RouletteData.Modifiers[modifier].Image,
+                    null, 5);
             }
 
-            GUI.Label(new Rect(20f, 390f, 150f, 22f), "Dificultad:", centeredStyle);
-            if (GUI.Toggle(new Rect(175f, 390f, 90f, 24f), difficulty == Level.Mode.Easy, "Simple"))
-                difficulty = Level.Mode.Easy;
-            if (GUI.Toggle(new Rect(270f, 390f, 90f, 24f), difficulty == Level.Mode.Normal, "Normal"))
-                difficulty = Level.Mode.Normal;
-            if (GUI.Toggle(new Rect(365f, 390f, 90f, 24f), difficulty == Level.Mode.Hard, "Experto"))
-                difficulty = Level.Mode.Hard;
-            uglyMode = GUI.Toggle(new Rect(500f, 390f, 220f, 24f), uglyMode, " Modo feo (retos)");
-
-            GUI.Label(new Rect(20f, 420f, 720f, 25f), status, centeredStyle);
-            GUI.enabled = !running && !pendingLoad;
-            if (GUI.Button(new Rect(220f, 452f, 200f, 42f), "GIRAR Â· F7"))
-                StartRoulette();
-            if (GUI.Button(new Rect(430f, 452f, 110f, 42f), "CERRAR"))
-                visible = false;
-            GUI.enabled = true;
-
+            DrawBottomControls();
             if (secretVisible)
-                DrawSecretPanel();
-
-            GUI.Label(new Rect(20f, 535f, 720f, 20f), "F6 abrir/cerrar Â· F7 girar Â· Ctrl+I selecciÃ³n forzada", hintStyle);
-            GUI.DragWindow(new Rect(0f, 0f, 760f, 28f));
+                DrawSecretStrip();
+            GUI.EndGroup();
         }
 
-        private void DrawCard(float x, float y, string heading, string value, string image)
+        private void DrawBossPanel(BossEntry boss)
         {
-            GUI.Box(new Rect(x, y, 130f, 140f), "");
-            GUI.Label(new Rect(x + 5f, y + 5f, 120f, 20f), heading, hintStyle);
-            DrawTexture(new Rect(x + 37f, y + 30f, 56f, 56f), image);
-            GUI.Label(new Rect(x + 5f, y + 92f, 120f, 40f), value, centeredStyle);
+            var rect = PulseRect(new Rect(43f, 127f, 274f, 326f), 0);
+            GUI.color = new Color(0.12f, 0.10f, 0.08f, 0.20f);
+            GUI.DrawTexture(new Rect(rect.x + 7f, rect.y + 8f, rect.width, rect.height), Texture2D.whiteTexture);
+            GUI.color = Cream;
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GameTheme.DrawBorder(rect, Ink, 4f);
+            DrawTexture(new Rect(rect.x + 22f, rect.y + 19f, rect.width - 44f, 218f), boss.Image);
+            GUI.color = Red;
+            GUI.DrawTexture(new Rect(rect.x + 12f, rect.y + 246f, rect.width - 24f, 3f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 251f, rect.width - 20f, 39f), boss.Character.ToUpperInvariant(), bossStyle);
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 287f, rect.width - 20f, 28f), boss.Fight.ToUpperInvariant(), smallStyle);
         }
 
-        private void DrawSecretPanel()
+        private void DrawEquipmentCard(Rect baseRect, string heading, string value, string fallbackImage, string nativeSprite, int field)
         {
-            GUI.Box(new Rect(15f, 500f, 730f, 32f), "");
-            forceSelection = GUI.Toggle(new Rect(25f, 505f, 145f, 22f), forceSelection, " Forzar resultado");
-            if (!forceSelection)
-                return;
+            var rect = PulseRect(baseRect, field);
+            GUI.color = new Color(0.12f, 0.10f, 0.08f, 0.22f);
+            GUI.DrawTexture(new Rect(rect.x + 6f, rect.y + 7f, rect.width, rect.height), Texture2D.whiteTexture);
+            GUI.color = new Color(0.91f, 0.82f, 0.63f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GameTheme.DrawBorder(rect, Ink, 4f);
 
-            if (GUI.Button(new Rect(175f, 504f, 28f, 24f), "â€¹")) forced.Boss = Wrap(forced.Boss - 1, RouletteData.Bosses.Length);
-            GUI.Label(new Rect(205f, 505f, 250f, 22f), RouletteData.Bosses[forced.Boss].Character, centeredStyle);
-            if (GUI.Button(new Rect(458f, 504f, 28f, 24f), "â€º")) forced.Boss = Wrap(forced.Boss + 1, RouletteData.Bosses.Length);
-            if (GUI.Button(new Rect(500f, 504f, 225f, 24f), "Copiar equipo visible"))
+            GUI.color = Red;
+            GUI.DrawTexture(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, 31f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(rect.x + 8f, rect.y + 3f, rect.width - 16f, 32f), heading, cardTitleStyle);
+
+            var iconRect = new Rect(rect.x + 15f, rect.y + 45f, 75f, 75f);
+            GUI.color = new Color(0.98f, 0.94f, 0.82f);
+            GUI.DrawTexture(iconRect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            if (!theme.DrawSprite(nativeSprite, iconRect, Color.white))
+                DrawTexture(iconRect, fallbackImage);
+
+            GUI.Label(new Rect(rect.x + 96f, rect.y + 46f, rect.width - 106f, 73f), value.ToUpperInvariant(), bodyStyle);
+            GUI.Label(new Rect(rect.x + 13f, rect.y + 124f, rect.width - 26f, 20f),
+                revealed > field ? "SELECCIONADO" : "GIRANDO...", smallStyle);
+        }
+
+        private void DrawBottomControls()
+        {
+            GUI.Label(new Rect(40f, 473f, 170f, 31f), "DIFICULTAD", cardTitleStyle);
+            DrawModeButton(new Rect(210f, 469f, 132f, 38f), "SIMPLE", Level.Mode.Easy);
+            DrawModeButton(new Rect(351f, 469f, 132f, 38f), "NORMAL", Level.Mode.Normal);
+            DrawModeButton(new Rect(492f, 469f, 132f, 38f), "EXPERTO", Level.Mode.Hard);
+
+            if (GUI.Button(new Rect(657f, 469f, 208f, 38f),
+                uglyMode ? "✓  MODO FEO" : "MODO FEO", uglyMode ? buttonActiveStyle : buttonStyle))
+                uglyMode = !uglyMode;
+            if (GUI.Button(new Rect(878f, 469f, 214f, 38f),
+                autoLoad.Value ? "✓  CARGA AUTO" : "CARGA AUTO", autoLoad.Value ? buttonActiveStyle : buttonStyle))
+                autoLoad.Value = !autoLoad.Value;
+
+            GUI.Label(new Rect(42f, 518f, 1050f, 31f), status, subtitleStyle);
+            GUI.enabled = !running && !pendingLoad;
+            var spinRect = new Rect(385f, 558f, 287f, 58f);
+            if (GUI.Button(spinRect, "¡GIRAR!   F7", buttonActiveStyle))
+                StartRoulette();
+            GUI.enabled = true;
+            if (GUI.Button(new Rect(688f, 558f, 148f, 58f), "CERRAR", buttonStyle))
+                SetVisible(false);
+
+            if (spinRect.Contains(Event.current.mousePosition))
+                theme.DrawSprite("hand_cursor_boil_0001", new Rect(spinRect.x - 59f, spinRect.y + 4f, 54f, 54f), Color.white);
+
+            GUI.Label(new Rect(35f, 625f, 1100f, 24f),
+                "F6  ABRIR/CERRAR     ·     F7  GIRAR     ·     CTRL+I  SELECCIÓN FORZADA", smallStyle);
+        }
+
+        private void DrawModeButton(Rect rect, string label, Level.Mode mode)
+        {
+            if (GUI.Button(rect, (difficulty == mode ? "✓  " : "") + label,
+                difficulty == mode ? buttonActiveStyle : buttonStyle))
+                difficulty = mode;
+        }
+
+        private void DrawSecretStrip()
+        {
+            var rect = new Rect(35f, 516f, 1100f, 108f);
+            GUI.color = new Color(0.93f, 0.84f, 0.66f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GameTheme.DrawBorder(rect, Ink, 3f);
+            GUI.Label(new Rect(15f, 8f, 200f, 28f), "MENÚ SECRETO", cardTitleStyle);
+            if (GUI.Button(new Rect(216f, 7f, 210f, 31f),
+                forceSelection ? "✓ RESULTADO FIJO" : "RESULTADO FIJO",
+                forceSelection ? buttonActiveStyle : buttonStyle))
+                forceSelection = !forceSelection;
+
+            if (GUI.Button(new Rect(441f, 7f, 47f, 31f), "‹", buttonStyle))
+                forced.Boss = Wrap(forced.Boss - 1, RouletteData.Bosses.Length);
+            GUI.Label(new Rect(494f, 7f, 355f, 31f), RouletteData.Bosses[forced.Boss].Character.ToUpperInvariant(), bodyStyle);
+            if (GUI.Button(new Rect(855f, 7f, 47f, 31f), "›", buttonStyle))
+                forced.Boss = Wrap(forced.Boss + 1, RouletteData.Bosses.Length);
+            if (GUI.Button(new Rect(915f, 7f, 168f, 31f), "COPIAR EQUIPO", buttonStyle))
             {
                 forced.Weapon1 = result.Weapon1;
                 forced.Weapon2 = result.Weapon2;
@@ -296,6 +437,30 @@ namespace Gilomx.CupheadBossRoulette
                 forced.Charm = result.Charm;
                 forced.Modifier = result.Modifier;
             }
+            GUI.Label(new Rect(18f, 47f, 1060f, 47f),
+                "El jefe se elige con las flechas. «Copiar equipo» fija las opciones visibles de la ruleta.",
+                bodyStyle);
+        }
+
+        private void DrawChallengeBanner()
+        {
+            var rect = new Rect(408f, 18f, 464f, 53f);
+            GUI.color = Ink;
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GameTheme.DrawBorder(rect, Gold, 3f);
+            GUI.Label(rect, "RETO: " + activeChallenge.ToUpperInvariant(), challengeStyle);
+        }
+
+        private Rect PulseRect(Rect rect, int field)
+        {
+            if (field < 0 || field >= pulseUntil.Length || Time.realtimeSinceStartup >= pulseUntil[field])
+                return rect;
+            var remaining = pulseUntil[field] - Time.realtimeSinceStartup;
+            var amount = Mathf.Sin((0.38f - remaining) / 0.38f * Mathf.PI) * 0.075f;
+            var width = rect.width * (1f + amount);
+            var height = rect.height * (1f + amount);
+            return new Rect(rect.center.x - width * 0.5f, rect.center.y - height * 0.5f, width, height);
         }
 
         private int DisplayIndex(int field, int finalIndex, int length, int offset)
@@ -343,43 +508,123 @@ namespace Gilomx.CupheadBossRoulette
                 Logger.LogWarning("No se pudo cargar " + path + ": " + exception.Message);
                 texture = null;
             }
-
             textures[relativePath] = texture;
             return texture;
         }
 
+        private IEnumerator LoadAudio()
+        {
+            yield return StartCoroutine(LoadClip("sounds/spin.mp3", AudioType.MPEG, clip => spinClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/selection.mp3", AudioType.MPEG, clip => selectionClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/abrir.mp3", AudioType.MPEG, clip => openClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/cerrar.mp3", AudioType.MPEG, clip => closeClip = clip));
+        }
+
+        private IEnumerator LoadClip(string relativePath, AudioType type, Action<AudioClip> assign)
+        {
+            var path = Path.Combine(AssetsDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path))
+                yield break;
+
+            var www = new WWW("file:///" + path.Replace('\\', '/'));
+            yield return www;
+            if (string.IsNullOrEmpty(www.error))
+            {
+                var clip = www.GetAudioClip(false, false, type);
+                if (clip != null)
+                    assign(clip);
+            }
+            else
+            {
+                Logger.LogWarning("No se pudo cargar audio " + relativePath + ": " + www.error);
+            }
+            www.Dispose();
+        }
+
+        private void PlayOneShot(AudioClip clip, float volume)
+        {
+            if (clip != null && audioSource != null)
+                audioSource.PlayOneShot(clip, volume);
+        }
+
+        private void StopSpinAudio()
+        {
+            if (audioSource == null)
+                return;
+            audioSource.Stop();
+            audioSource.loop = false;
+            audioSource.clip = null;
+        }
+
         private void EnsureStyles()
         {
-            if (titleStyle != null)
+            if (titleStyle != null && stylesFont == theme.TitleFont)
                 return;
 
-            titleStyle = new GUIStyle(GUI.skin.label)
+            stylesFont = theme.TitleFont;
+            titleStyle = NewStyle(theme.TitleFont, 34, TextAnchor.MiddleCenter, Color.white, FontStyle.Normal);
+            subtitleStyle = NewStyle(theme.BodyFont, 18, TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
+            bossStyle = NewStyle(theme.TitleFont, 25, TextAnchor.MiddleCenter, Ink, FontStyle.Normal);
+            bodyStyle = NewStyle(theme.BodyFont, 17, TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
+            smallStyle = NewStyle(theme.BodyFont, 13, TextAnchor.MiddleCenter, Ink, FontStyle.Normal);
+            cardTitleStyle = NewStyle(theme.TitleFont, 19, TextAnchor.MiddleCenter, Color.white, FontStyle.Normal);
+            challengeStyle = NewStyle(theme.TitleFont, 22, TextAnchor.MiddleCenter, Gold, FontStyle.Normal);
+
+            buttonStyle = NewStyle(theme.TitleFont, 17, TextAnchor.MiddleCenter, Ink, FontStyle.Normal);
+            buttonStyle.normal.background = MakeButtonTexture(new Color(0.90f, 0.81f, 0.62f));
+            buttonStyle.hover.background = MakeButtonTexture(new Color(0.98f, 0.90f, 0.70f));
+            buttonStyle.active.background = MakeButtonTexture(new Color(0.78f, 0.68f, 0.50f));
+            buttonStyle.border = new RectOffset(4, 4, 4, 4);
+
+            buttonActiveStyle = NewStyle(theme.TitleFont, 17, TextAnchor.MiddleCenter, Color.white, FontStyle.Normal);
+            buttonActiveStyle.normal.background = MakeButtonTexture(Red);
+            buttonActiveStyle.hover.background = MakeButtonTexture(new Color(0.78f, 0.17f, 0.13f));
+            buttonActiveStyle.active.background = MakeButtonTexture(new Color(0.52f, 0.08f, 0.07f));
+            buttonActiveStyle.border = new RectOffset(4, 4, 4, 4);
+        }
+
+        private static GUIStyle NewStyle(Font font, int size, TextAnchor alignment, Color color, FontStyle style)
+        {
+            var result = new GUIStyle(GUI.skin.label)
             {
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = 24,
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = new Color(1f, 0.86f, 0.28f) }
+                font = font,
+                fontSize = size,
+                alignment = alignment,
+                fontStyle = style,
+                wordWrap = true
             };
-            centeredStyle = new GUIStyle(GUI.skin.label)
+            result.normal.textColor = color;
+            result.hover.textColor = color;
+            result.active.textColor = color;
+            return result;
+        }
+
+        private Texture2D MakeButtonTexture(Color color)
+        {
+            var texture = new Texture2D(8, 8, TextureFormat.ARGB32, false);
+            for (var y = 0; y < 8; y++)
+            for (var x = 0; x < 8; x++)
             {
-                alignment = TextAnchor.MiddleCenter,
-                wordWrap = true,
-                fontSize = 14,
-                normal = { textColor = Color.white }
-            };
-            resultStyle = new GUIStyle(GUI.skin.box)
+                var border = x == 0 || x == 7 || y == 0 || y == 7;
+                texture.SetPixel(x, y, border ? Ink : color);
+            }
+            texture.Apply(false, true);
+            texture.filterMode = FilterMode.Point;
+            textures["__button_" + textures.Count] = texture;
+            return texture;
+        }
+
+        private void OnDestroy()
+        {
+            StopSpinAudio();
+            if (theme != null)
+                theme.Dispose();
+            foreach (var texture in textures.Values)
             {
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = 18,
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = new Color(1f, 0.86f, 0.28f) }
-            };
-            hintStyle = new GUIStyle(GUI.skin.label)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = 12,
-                normal = { textColor = new Color(0.82f, 0.82f, 0.82f) }
-            };
+                if (texture != null)
+                    Destroy(texture);
+            }
+            textures.Clear();
         }
 
         private static int Wrap(int value, int length)
@@ -402,4 +647,3 @@ namespace Gilomx.CupheadBossRoulette
         }
     }
 }
-
