@@ -11,7 +11,10 @@ terminar el giro, el mod equipa el resultado y carga directamente el combate.
 
 - `F6`: abrir o cerrar la ruleta.
 - `F7`: girar.
-- `Ctrl+I`: mostrar la selección forzada.
+- `←` `→`: recorrer dificultad y modo feo.
+- `↑` `↓`: cambiar entre las opciones y `¡GIRAR!`.
+- `Enter`: seleccionar.
+- `Esc`: cerrar la tarjeta.
 
 El giro dura cinco segundos y después detiene, uno por segundo, jefe, armas,
 súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.

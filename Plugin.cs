@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +13,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.3.0";
+        public const string PluginVersion = "0.4.0";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -46,10 +46,11 @@ namespace Gilomx.CupheadBossRoulette
         private GUIStyle challengeStyle;
         private Font stylesFont;
         private bool visible = true;
+        private float cardVisibility = 1f;
+        private int navigationIndex = 4;
+        private int lastSettingsIndex = 1;
         private bool uglyMode;
         private bool running;
-        private bool secretVisible;
-        private bool forceSelection;
         private bool pendingLoad;
         private float spinStartedAt;
         private float loadAt;
@@ -57,16 +58,7 @@ namespace Gilomx.CupheadBossRoulette
         private int revealed;
         private Level.Mode difficulty = Level.Mode.Normal;
         private RouletteResult result = new RouletteResult();
-        private RouletteResult forced = new RouletteResult
-        {
-            Boss = 0,
-            Weapon1 = 0,
-            Weapon2 = 1,
-            Super = 0,
-            Charm = 0,
-            Modifier = 6
-        };
-        private string status = "PULSA F7 PARA GIRAR";
+        private string status = "PULSA ENTER PARA GIRAR";
         private string activeChallenge = "";
 
         private string AssetsDirectory
@@ -90,26 +82,106 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Update()
         {
+            cardVisibility = Mathf.MoveTowards(cardVisibility, visible ? 1f : 0f,
+                Time.unscaledDeltaTime / 0.42f);
+
             if (toggleShortcut.Value.IsDown())
                 SetVisible(!visible);
             if (spinShortcut.Value.IsDown())
                 StartRoulette();
-            if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.I))
-                secretVisible = !secretVisible;
+            if (visible && cardVisibility > 0.72f && !running && !pendingLoad)
+                HandleCardNavigation();
             if (running)
                 UpdateSpin();
             if (pendingLoad && Time.realtimeSinceStartup >= loadAt)
             {
-                pendingLoad = false;
-                LoadResult();
+                if (visible)
+                {
+                    SetVisible(false);
+                    loadAt = Time.realtimeSinceStartup + 0.43f;
+                }
+                else if (cardVisibility <= 0.01f)
+                {
+                    pendingLoad = false;
+                    LoadResult();
+                }
             }
         }
 
+        private void HandleCardNavigation()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                SetVisible(false);
+                return;
+            }
+
+            var moved = false;
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (navigationIndex == 4)
+                    navigationIndex = lastSettingsIndex;
+                moved = true;
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (navigationIndex < 4)
+                {
+                    lastSettingsIndex = navigationIndex;
+                    navigationIndex = 4;
+                }
+                moved = true;
+            }
+            else if (Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                if (navigationIndex == 4)
+                    navigationIndex = lastSettingsIndex;
+                navigationIndex = Wrap(navigationIndex - 1, 4);
+                lastSettingsIndex = navigationIndex;
+                moved = true;
+            }
+            else if (Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                if (navigationIndex == 4)
+                    navigationIndex = lastSettingsIndex;
+                navigationIndex = Wrap(navigationIndex + 1, 4);
+                lastSettingsIndex = navigationIndex;
+                moved = true;
+            }
+
+            if (moved)
+                PlayOneShot(selectionClip, 0.45f);
+
+            if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter))
+                return;
+
+            switch (navigationIndex)
+            {
+                case 0:
+                    difficulty = Level.Mode.Easy;
+                    break;
+                case 1:
+                    difficulty = Level.Mode.Normal;
+                    break;
+                case 2:
+                    difficulty = Level.Mode.Hard;
+                    break;
+                case 3:
+                    uglyMode = !uglyMode;
+                    break;
+                default:
+                    StartRoulette();
+                    break;
+            }
+            PlayOneShot(selectionClip, 0.65f);
+        }
         private void SetVisible(bool value)
         {
             if (visible == value)
                 return;
             visible = value;
+            if (visible)
+                navigationIndex = 4;
             PlayOneShot(visible ? openClip : closeClip, 0.65f);
         }
 
@@ -120,7 +192,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!visible)
                 SetVisible(true);
 
-            result = forceSelection ? Copy(forced) : CreateRandomResult();
+            result = CreateRandomResult();
             revealed = 0;
             ticker = 0;
             spinStartedAt = Time.realtimeSinceStartup;
@@ -219,7 +291,6 @@ namespace Gilomx.CupheadBossRoulette
                 ApplyLoadout(PlayerId.PlayerTwo);
                 Level.SetCurrentMode(difficulty);
                 activeChallenge = uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "";
-                visible = false;
                 var boss = RouletteData.Bosses[result.Boss];
                 Logger.LogInfo("Cargando " + boss.Character + " (" + boss.Level + ")");
                 SceneLoader.LoadLevel(boss.Level, SceneLoader.Transition.Iris, SceneLoader.Icon.None);
@@ -228,7 +299,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 status = "NO SE PUDO CARGAR. REVISA LOGOUTPUT.LOG";
                 Logger.LogError(exception);
-                visible = true;
+                SetVisible(true);
             }
         }
 
@@ -264,7 +335,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!string.IsNullOrEmpty(activeChallenge) && activeChallenge != "Nada")
                 DrawChallengeBanner();
 
-            if (visible)
+            if (cardVisibility > 0.001f)
                 DrawRoulette();
             else
                 GUI.Label(new Rect(24f, 672f, 250f, 28f), "F6  ABRIR RULETA", smallStyle);
@@ -325,8 +396,6 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             DrawBottomControls();
-            if (secretVisible)
-                DrawSecretStrip();
             GUI.EndGroup();
         }
 
@@ -409,37 +478,6 @@ namespace Gilomx.CupheadBossRoulette
             if (GUI.Button(rect, (difficulty == mode ? "✓  " : "") + label,
                 difficulty == mode ? buttonActiveStyle : buttonStyle))
                 difficulty = mode;
-        }
-
-        private void DrawSecretStrip()
-        {
-            var rect = new Rect(35f, 516f, 1100f, 108f);
-            GUI.color = new Color(0.93f, 0.84f, 0.66f);
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GameTheme.DrawBorder(rect, Ink, 3f);
-            GUI.Label(new Rect(15f, 8f, 200f, 28f), "MENÚ SECRETO", cardTitleStyle);
-            if (GUI.Button(new Rect(216f, 7f, 210f, 31f),
-                forceSelection ? "✓ RESULTADO FIJO" : "RESULTADO FIJO",
-                forceSelection ? buttonActiveStyle : buttonStyle))
-                forceSelection = !forceSelection;
-
-            if (GUI.Button(new Rect(441f, 7f, 47f, 31f), "‹", buttonStyle))
-                forced.Boss = Wrap(forced.Boss - 1, RouletteData.Bosses.Length);
-            GUI.Label(new Rect(494f, 7f, 355f, 31f), RouletteData.Bosses[forced.Boss].Character.ToUpperInvariant(), bodyStyle);
-            if (GUI.Button(new Rect(855f, 7f, 47f, 31f), "›", buttonStyle))
-                forced.Boss = Wrap(forced.Boss + 1, RouletteData.Bosses.Length);
-            if (GUI.Button(new Rect(915f, 7f, 168f, 31f), "COPIAR EQUIPO", buttonStyle))
-            {
-                forced.Weapon1 = result.Weapon1;
-                forced.Weapon2 = result.Weapon2;
-                forced.Super = result.Super;
-                forced.Charm = result.Charm;
-                forced.Modifier = result.Modifier;
-            }
-            GUI.Label(new Rect(18f, 47f, 1060f, 47f),
-                "El jefe se elige con las flechas. «Copiar equipo» fija las opciones visibles de la ruleta.",
-                bodyStyle);
         }
 
         private void DrawChallengeBanner()
@@ -633,17 +671,5 @@ namespace Gilomx.CupheadBossRoulette
             return value < 0 ? value + length : value;
         }
 
-        private static RouletteResult Copy(RouletteResult source)
-        {
-            return new RouletteResult
-            {
-                Boss = source.Boss,
-                Weapon1 = source.Weapon1,
-                Weapon2 = source.Weapon2,
-                Super = source.Super,
-                Charm = source.Charm,
-                Modifier = source.Modifier
-            };
-        }
     }
 }
