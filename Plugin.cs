@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -9,11 +9,11 @@ using UnityEngine;
 namespace Gilomx.CupheadBossRoulette
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    public sealed class Plugin : BaseUnityPlugin
+    public sealed partial class Plugin : BaseUnityPlugin
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.2.0";
+        public const string PluginVersion = "0.3.0";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -273,7 +273,7 @@ namespace Gilomx.CupheadBossRoulette
             GUI.matrix = previousMatrix;
         }
 
-        private void DrawRoulette()
+        private void DrawRouletteLegacy()
         {
             GUI.color = new Color(0f, 0f, 0f, 0.72f);
             GUI.DrawTexture(new Rect(0f, 0f, DesignWidth, DesignHeight), Texture2D.whiteTexture);
