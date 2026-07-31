@@ -14,10 +14,14 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.25";
+        public const string PluginVersion = "0.5.42";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
+        // TEMPORARY TEST SELECTOR. Keep non-empty while developing a challenge.
+        // Compatible bosses are still chosen randomly.
+        private static readonly string ForcedTestChallenge =
+            "Solo mini avión";
         private static readonly Color Ink = new Color(0.075f, 0.065f, 0.055f);
         private static readonly Color Red = new Color(0.67f, 0.12f, 0.10f);
         private static readonly Color Cream = new Color(0.94f, 0.87f, 0.70f);
@@ -70,6 +74,7 @@ namespace Gilomx.CupheadBossRoulette
         private string status = "PULSA ENTER PARA GIRAR";
         private string activeChallenge = "";
         private int activeChallengeBoss = -1;
+        private bool soloMiniRestartPending;
 
         private string AssetsDirectory
         {
@@ -90,7 +95,7 @@ namespace Gilomx.CupheadBossRoulette
                          difficultySetting.Value == Level.Mode.Hard
                 ? difficultySetting.Value
                 : Level.Mode.Normal;
-            uglyMode = challengeSetting.Value;
+            uglyMode = HasForcedTestChallenge() || challengeSetting.Value;
             theme = new GameTheme();
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
@@ -119,6 +124,75 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(levelPreWin, prefix: new HarmonyMethod(levelPreWinPrefix));
             else
                 Logger.LogWarning("Could not install the challenge win guard.");
+
+            var handleDash = AccessTools.Method(typeof(LevelPlayerMotor), "HandleDash");
+            var handleDashPrefix = AccessTools.Method(typeof(Plugin), "BlockDashPrefix");
+            if (handleDash != null && handleDashPrefix != null)
+                harmony.Patch(handleDash, prefix: new HarmonyMethod(handleDashPrefix));
+            else
+                Logger.LogWarning("Could not install the No Dash guard.");
+
+            var canUseEx = AccessTools.PropertyGetter(
+                typeof(PlayerStatsManager), "CanUseEx");
+            var canUseExPostfix = AccessTools.Method(
+                typeof(Plugin), "CanUseExPostfix");
+            var planeStartEx = AccessTools.Method(
+                typeof(PlanePlayerWeaponManager), "StartEx");
+            var blockPlaneExPrefix = AccessTools.Method(
+                typeof(Plugin), "BlockPlaneExPrefix");
+            if (canUseEx != null && canUseExPostfix != null &&
+                planeStartEx != null && blockPlaneExPrefix != null)
+            {
+                harmony.Patch(canUseEx,
+                    postfix: new HarmonyMethod(canUseExPostfix));
+                harmony.Patch(planeStartEx,
+                    prefix: new HarmonyMethod(blockPlaneExPrefix));
+            }
+            else
+                Logger.LogWarning("Could not install the No EX guard.");
+
+            var handleShrunk = AccessTools.Method(
+                typeof(PlanePlayerAnimationController), "HandleShrunk");
+            var blockMiniPlanePrefix = AccessTools.Method(
+                typeof(Plugin), "BlockMiniPlanePrefix");
+            if (handleShrunk != null && blockMiniPlanePrefix != null)
+                harmony.Patch(handleShrunk,
+                    prefix: new HarmonyMethod(blockMiniPlanePrefix));
+            else
+                Logger.LogWarning("Could not install the No mini airplane guard.");
+
+            var dealDamage = AccessTools.Method(
+                typeof(DamageDealer), "DealDamage",
+                new[] { typeof(GameObject) });
+            var restartSoloMiniOnInvalidDamagePostfix = AccessTools.Method(
+                typeof(Plugin), "RestartSoloMiniOnInvalidDamagePostfix");
+            if (dealDamage != null &&
+                restartSoloMiniOnInvalidDamagePostfix != null)
+                harmony.Patch(dealDamage,
+                    postfix: new HarmonyMethod(
+                        restartSoloMiniOnInvalidDamagePostfix));
+            else
+                Logger.LogWarning("Could not install the Solo mini airplane damage guard.");
+
+            var planeWeaponStart = AccessTools.Method(
+                typeof(PlanePlayerWeaponManager), "OnLevelStart");
+            var planeWeaponStartPostfix = AccessTools.Method(
+                typeof(Plugin), "EnforcePlaneStartingWeaponPostfix");
+            var handlePlaneWeaponSwitch = AccessTools.Method(
+                typeof(PlanePlayerWeaponManager), "HandleWeaponSwitch");
+            var blockPlaneWeaponSwitchPrefix = AccessTools.Method(
+                typeof(Plugin), "BlockPlaneWeaponSwitchPrefix");
+            if (planeWeaponStart != null && planeWeaponStartPostfix != null &&
+                handlePlaneWeaponSwitch != null &&
+                blockPlaneWeaponSwitchPrefix != null)
+            {
+                harmony.Patch(planeWeaponStart,
+                    postfix: new HarmonyMethod(planeWeaponStartPostfix));
+                harmony.Patch(handlePlaneWeaponSwitch,
+                    prefix: new HarmonyMethod(blockPlaneWeaponSwitchPrefix));
+            }
+            else
+                Logger.LogWarning("Could not install the No airplane bombs guard.");
 
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion + " listo. F6 abre/cierra; F7 gira.");
@@ -345,6 +419,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!CanUseRouletteOnMap() || running || pendingLoad)
                 return;
+            if (HasForcedTestChallenge())
+                uglyMode = true;
             if (!visible)
                 SetVisible(true);
 
@@ -370,7 +446,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private RouletteResult CreateRandomResult()
         {
-            var boss = random.Next(RouletteData.Bosses.Length);
+            var forcedModifier = ForcedTestModifierIndex();
+            var boss = forcedModifier >= 0
+                ? RandomBossForModifier(forcedModifier)
+                : random.Next(RouletteData.Bosses.Length);
             var weapon1 = random.Next(RouletteData.Weapons.Length - 1);
             int weapon2;
             do weapon2 = random.Next(RouletteData.Weapons.Length - 1);
@@ -383,9 +462,11 @@ namespace Gilomx.CupheadBossRoulette
                 ? RouletteData.Charms.Length - 1
                 : random.Next(RouletteData.Charms.Length);
 
-            var modifier = RouletteData.Modifiers.Length - 1;
+            var modifier = forcedModifier >= 0
+                ? forcedModifier
+                : RouletteData.Modifiers.Length - 1;
 
-            if (uglyMode && random.NextDouble() >= 0.3)
+            if (uglyMode && forcedModifier < 0)
             {
                 var valid = RouletteData.ValidModifierIndices(RouletteData.Bosses[boss]);
                 if (valid.Count > 0)
@@ -401,6 +482,39 @@ namespace Gilomx.CupheadBossRoulette
                 Charm = charm,
                 Modifier = modifier
             };
+        }
+
+        private static bool HasForcedTestChallenge()
+        {
+            return !string.IsNullOrEmpty(ForcedTestChallenge);
+        }
+
+        private static int ForcedTestModifierIndex()
+        {
+            if (!HasForcedTestChallenge())
+                return -1;
+
+            for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+            {
+                if (RouletteData.Modifiers[i].Name == ForcedTestChallenge)
+                    return i;
+            }
+            return -1;
+        }
+
+        private int RandomBossForModifier(int modifierIndex)
+        {
+            var compatibleBosses = new List<int>();
+            for (var i = 0; i < RouletteData.Bosses.Length; i++)
+            {
+                if (RouletteData.ValidModifierIndices(
+                    RouletteData.Bosses[i]).Contains(modifierIndex))
+                    compatibleBosses.Add(i);
+            }
+
+            return compatibleBosses.Count > 0
+                ? compatibleBosses[random.Next(compatibleBosses.Count)]
+                : random.Next(RouletteData.Bosses.Length);
         }
 
         private void UpdateSpin()
@@ -644,6 +758,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SetActiveChallenge(string challenge, int bossIndex)
         {
+            soloMiniRestartPending = false;
             activeChallenge = challenge == "Nada" ? "" : challenge;
             activeChallengeBoss = string.IsNullOrEmpty(activeChallenge) ? -1 : bossIndex;
             if (!string.IsNullOrEmpty(activeChallenge) &&
@@ -653,16 +768,202 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ClearActiveChallenge()
         {
+            soloMiniRestartPending = false;
             activeChallenge = "";
             activeChallengeBoss = -1;
             SetNativeChallengePromptVisible(false);
         }
 
-        private static void ClearChallengeOnWinPrefix()
+        private static void ClearChallengeOnWinPrefix(Level __instance)
         {
             var plugin = activeInstance;
-            if (plugin != null)
+            if (plugin != null && plugin.ShouldClearChallengeOnWin(__instance))
                 plugin.ClearActiveChallenge();
+        }
+
+        private bool ShouldClearChallengeOnWin(Level level)
+        {
+            if (soloMiniRestartPending)
+                return false;
+
+            if (level == null || !IsActiveDicePalaceChallenge())
+                return true;
+
+            return level.CurrentLevel == Levels.DicePalaceMain;
+        }
+
+        private static bool BlockDashPrefix(ref bool __result)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.ShouldBlockDash())
+                return true;
+
+            __result = false;
+            return false;
+        }
+
+        private bool ShouldBlockDash()
+        {
+            return activeChallenge == "No Dash" && ShouldShowActiveChallenge();
+        }
+
+        private static bool BlockMiniPlanePrefix()
+        {
+            var plugin = activeInstance;
+            return plugin == null || !plugin.ShouldBlockMiniPlane();
+        }
+
+        private bool ShouldBlockMiniPlane()
+        {
+            return activeChallenge == "No mini avión" &&
+                   ShouldShowActiveChallenge();
+        }
+
+        private static void RestartSoloMiniOnInvalidDamagePostfix(
+            GameObject hit,
+            float __result,
+            DamageDealer.DamageSource ___damageSource)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __result <= 0f ||
+                !plugin.ShouldRestartOnNonMiniPlaneDamage() ||
+                ___damageSource == DamageDealer.DamageSource.SmallPlane ||
+                !IsEnemyDamageTarget(hit))
+                return;
+
+            plugin.QueueSoloMiniRestart();
+        }
+
+        private bool ShouldRestartOnNonMiniPlaneDamage()
+        {
+            return activeChallenge == "Solo mini avión" &&
+                   ShouldShowActiveChallenge();
+        }
+
+        private void QueueSoloMiniRestart()
+        {
+            if (soloMiniRestartPending)
+                return;
+
+            soloMiniRestartPending = true;
+            StartCoroutine(RestartAfterSoloMiniViolation());
+        }
+
+        private IEnumerator RestartAfterSoloMiniViolation()
+        {
+            // Let the valid damage call and its collision callbacks finish
+            // before asking SceneLoader to replace the battle scene.
+            yield return null;
+
+            if (soloMiniRestartPending &&
+                activeChallenge == "Solo mini avión" &&
+                !SceneLoader.CurrentlyLoading)
+                SceneLoader.ReloadLevel();
+
+            soloMiniRestartPending = false;
+        }
+
+        private static bool IsEnemyDamageTarget(GameObject hit)
+        {
+            if (hit == null)
+                return false;
+
+            var receiver = hit.GetComponent<DamageReceiver>();
+            if (receiver == null)
+            {
+                var child = hit.GetComponent<DamageReceiverChild>();
+                if (child != null && child.enabled)
+                    receiver = child.Receiver;
+            }
+
+            return receiver != null && receiver.enabled &&
+                   receiver.type == DamageReceiver.Type.Enemy;
+        }
+
+        private static void EnforcePlaneStartingWeaponPostfix(
+            PlanePlayerWeaponManager __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null)
+                return;
+
+            var charm = RouletteData.Charms[plugin.result.Charm].Value;
+            Weapon startingWeapon;
+            if (plugin.activeChallenge == "No disparo bombas")
+            {
+                startingWeapon = charm == Charm.charm_chalice
+                    ? Weapon.plane_chalice_weapon_3way
+                    : Weapon.plane_weapon_peashot;
+            }
+            else if (plugin.activeChallenge == "No disparo Peashooter")
+            {
+                startingWeapon = charm == Charm.charm_chalice
+                    ? Weapon.plane_chalice_weapon_bomb
+                    : Weapon.plane_weapon_bomb;
+            }
+            else
+                return;
+
+            __instance.SwitchToWeapon(startingWeapon);
+        }
+
+        private static bool BlockPlaneWeaponSwitchPrefix()
+        {
+            var plugin = activeInstance;
+            return plugin == null || !plugin.ShouldLockPlaneWeapon();
+        }
+
+        private bool ShouldLockPlaneWeapon()
+        {
+            return (activeChallenge == "No disparo bombas" ||
+                    activeChallenge == "No disparo Peashooter") &&
+                   ShouldShowActiveChallenge();
+        }
+
+        private static void CanUseExPostfix(ref bool __result)
+        {
+            var plugin = activeInstance;
+            if (plugin != null && plugin.ShouldBlockGroundEx())
+                __result = false;
+        }
+
+        private static bool BlockPlaneExPrefix()
+        {
+            var plugin = activeInstance;
+            return plugin == null || !plugin.ShouldBlockEx();
+        }
+
+        private bool ShouldBlockGroundEx()
+        {
+            return ShouldBlockEx() && !ActiveChallengeUsesPlaneControls();
+        }
+
+        private bool ShouldBlockEx()
+        {
+            return activeChallenge == "No EX" &&
+                   ShouldShowActiveChallenge();
+        }
+
+        private bool ActiveChallengeUsesPlaneControls()
+        {
+            if (activeChallengeBoss < 0 ||
+                activeChallengeBoss >= RouletteData.Bosses.Length)
+                return false;
+
+            try
+            {
+                var level = Level.Current;
+                if (level != null &&
+                    (level.CurrentLevel == Levels.DicePalaceFlyingHorse ||
+                     level.CurrentLevel == Levels.DicePalaceFlyingMemory))
+                    return true;
+            }
+            catch
+            {
+                // Fall back to the roulette boss type during scene transitions.
+            }
+
+            return RouletteData.Bosses[activeChallengeBoss].IsPlane;
         }
 
         private void UpdateActiveChallengeLifecycle()
@@ -709,9 +1010,28 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ActiveChallengeMatches(Level level)
         {
+            if (activeChallengeBoss < 0 ||
+                activeChallengeBoss >= RouletteData.Bosses.Length)
+                return false;
+
+            var targetLevel = RouletteData.Bosses[activeChallengeBoss].Level;
+            return level.CurrentLevel == targetLevel ||
+                   (targetLevel == Levels.DicePalaceMain &&
+                    IsDicePalaceLevel(level.CurrentLevel));
+        }
+
+        private bool IsActiveDicePalaceChallenge()
+        {
             return activeChallengeBoss >= 0 &&
                    activeChallengeBoss < RouletteData.Bosses.Length &&
-                   level.CurrentLevel == RouletteData.Bosses[activeChallengeBoss].Level;
+                   RouletteData.Bosses[activeChallengeBoss].Level ==
+                   Levels.DicePalaceMain;
+        }
+
+        private static bool IsDicePalaceLevel(Levels level)
+        {
+            return level.ToString().StartsWith(
+                "DicePalace", StringComparison.Ordinal);
         }
 
         private Rect PulseRect(Rect rect, int field)

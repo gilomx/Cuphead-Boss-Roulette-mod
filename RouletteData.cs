@@ -92,7 +92,7 @@ namespace Gilomx.CupheadBossRoulette
             new BossEntry("Diversión Infernal", "El Diablo", Levels.Devil, false, "bosses/diablo.png"),
             new BossEntry("Cubil del Contrabando", "Las Alimañas", Levels.RumRunners, false, "bosses/alimanas.png"),
             new BossEntry("Morradas a Mediodía", "Esther Espuelas", Levels.FlyingCowboy, true, "bosses/vaca.png"),
-            new BossEntry("Perreo Perriagudo", "Los Perritos Pilotos", Levels.Airplane, true, "bosses/perritos.png"),
+            new BossEntry("Perreo Perriagudo", "Los Perritos Pilotos", Levels.Airplane, false, "bosses/perritos.png"),
             new BossEntry("Jefe Secreto", "Ángel y Demonio", Levels.Graveyard, false, "bosses/angelydemonio.png"),
             new BossEntry("Sopapos Sectafilocopos", "Genovevo de Gelante", Levels.SnowCult, false, "bosses/genovevo.png"),
             new BossEntry("Altercado Agrógnomo", "Granitoviejo el Gigante", Levels.OldMan, false, "bosses/granito.png"),
@@ -152,6 +152,8 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < Modifiers.Length; i++)
             {
                 var modifier = Modifiers[i];
+                if (modifier.Name == "Nada")
+                    continue;
                 if (modifier.Kind == ModifierKind.Both ||
                     (boss.IsPlane && modifier.Kind == ModifierKind.Plane) ||
                     (!boss.IsPlane && modifier.Kind == ModifierKind.Ground))
