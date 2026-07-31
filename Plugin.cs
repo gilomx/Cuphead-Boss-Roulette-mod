@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using BepInEx;
 using BepInEx.Configuration;
+using HarmonyLib;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
@@ -13,7 +14,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.4.0";
+        public const string PluginVersion = "0.5.25";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -28,9 +29,12 @@ namespace Gilomx.CupheadBossRoulette
         private ConfigEntry<KeyboardShortcut> toggleShortcut;
         private ConfigEntry<KeyboardShortcut> spinShortcut;
         private ConfigEntry<bool> autoLoad;
+        private ConfigEntry<Level.Mode> difficultySetting;
+        private ConfigEntry<bool> challengeSetting;
         private ConfigEntry<float> loadDelay;
         private GameTheme theme;
         private AudioSource audioSource;
+        private AudioSource effectsAudioSource;
         private AudioClip spinClip;
         private AudioClip selectionClip;
         private AudioClip openClip;
@@ -43,15 +47,20 @@ namespace Gilomx.CupheadBossRoulette
         private GUIStyle cardTitleStyle;
         private GUIStyle buttonStyle;
         private GUIStyle buttonActiveStyle;
-        private GUIStyle challengeStyle;
+
         private Font stylesFont;
-        private bool visible = true;
-        private float cardVisibility = 1f;
-        private int navigationIndex = 4;
-        private int lastSettingsIndex = 1;
+        private bool visible;
+        private float cardVisibility;
+        private int navigationIndex = 3;
+        private float cardRoll;
         private bool uglyMode;
         private bool running;
         private bool pendingLoad;
+        private bool resultReady;
+        private MapEquipUI nativeMapEquipUi;
+        private static Plugin activeInstance;
+        private Harmony harmony;
+        private int suppressMapPauseUntilFrame = -1;
         private float spinStartedAt;
         private float loadAt;
         private int ticker;
@@ -60,6 +69,7 @@ namespace Gilomx.CupheadBossRoulette
         private RouletteResult result = new RouletteResult();
         private string status = "PULSA ENTER PARA GIRAR";
         private string activeChallenge = "";
+        private int activeChallengeBoss = -1;
 
         private string AssetsDirectory
         {
@@ -71,24 +81,115 @@ namespace Gilomx.CupheadBossRoulette
             toggleShortcut = Config.Bind("Controles", "AbrirCerrar", new KeyboardShortcut(KeyCode.F6), "Abre o cierra la ruleta.");
             spinShortcut = Config.Bind("Controles", "Girar", new KeyboardShortcut(KeyCode.F7), "Inicia un giro.");
             autoLoad = Config.Bind("Juego", "CargarAutomaticamente", true, "Carga el jefe al finalizar el giro.");
+            difficultySetting = Config.Bind("Juego", "Dificultad", Level.Mode.Normal,
+                "Dificultad usada por la ruleta: Easy, Normal o Hard.");
+            challengeSetting = Config.Bind("Juego", "Reto", false,
+                "Activa los retos adicionales de la ruleta.");
             loadDelay = Config.Bind("Juego", "DemoraAntesDeCargar", 1.25f, "Segundos entre el resultado final y la carga.");
+            difficulty = difficultySetting.Value == Level.Mode.Easy ||
+                         difficultySetting.Value == Level.Mode.Hard
+                ? difficultySetting.Value
+                : Level.Mode.Normal;
+            uglyMode = challengeSetting.Value;
             theme = new GameTheme();
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
             audioSource.volume = 0.45f;
+            audioSource.spatialBlend = 0f;
+            audioSource.priority = 0;
+            audioSource.ignoreListenerPause = true;
+            effectsAudioSource = gameObject.AddComponent<AudioSource>();
+            effectsAudioSource.playOnAwake = false;
+            effectsAudioSource.volume = 1f;
+            effectsAudioSource.spatialBlend = 0f;
+            effectsAudioSource.priority = 0;
+            effectsAudioSource.ignoreListenerPause = true;
+            activeInstance = this;
+            harmony = new Harmony(PluginGuid);
+            var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
+            var mapPausePostfix = AccessTools.Method(typeof(Plugin), "BlockMapPausePostfix");
+            if (mapPauseCanPause != null && mapPausePostfix != null)
+                harmony.Patch(mapPauseCanPause, postfix: new HarmonyMethod(mapPausePostfix));
+            else
+                Logger.LogWarning("Could not install the map pause guard.");
+
+            var levelPreWin = AccessTools.Method(typeof(Level), "_OnPreWin");
+            var levelPreWinPrefix = AccessTools.Method(typeof(Plugin), "ClearChallengeOnWinPrefix");
+            if (levelPreWin != null && levelPreWinPrefix != null)
+                harmony.Patch(levelPreWin, prefix: new HarmonyMethod(levelPreWinPrefix));
+            else
+                Logger.LogWarning("Could not install the challenge win guard.");
+
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion + " listo. F6 abre/cierra; F7 gira.");
         }
 
+        private static void BlockMapPausePostfix(ref bool __result)
+        {
+            var plugin = activeInstance;
+            if (plugin != null &&
+                (plugin.visible || Time.frameCount <= plugin.suppressMapPauseUntilFrame))
+                __result = false;
+        }
+
+        private bool CanUseRouletteOnMap()
+        {
+            try
+            {
+                if (!PlayerData.Initialized || PlayerData.Data == null ||
+                    SceneLoader.CurrentlyLoading || Map.Current == null ||
+                    Convert.ToInt32(Map.Current.CurrentState) != 1 ||
+                    Convert.ToInt32(PauseManager.state) != 0)
+                    return false;
+
+                var equipUi = AbstractEquipUI.Current;
+                if (equipUi != null &&
+                    (Convert.ToInt32(equipUi.CurrentState) != 0 ||
+                     Convert.ToInt32(equipUi.state) != 0))
+                    return false;
+
+                var difficultyUi = MapDifficultySelectStartUI.Current;
+                var confirmUi = MapConfirmStartUI.Current;
+                var basicUi = MapBasicStartUI.Current;
+                return (difficultyUi == null || Convert.ToInt32(difficultyUi.CurrentState) == 0) &&
+                       (confirmUi == null || Convert.ToInt32(confirmUi.CurrentState) == 0) &&
+                       (basicUi == null || Convert.ToInt32(basicUi.CurrentState) == 0);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private void Update()
         {
-            cardVisibility = Mathf.MoveTowards(cardVisibility, visible ? 1f : 0f,
-                Time.unscaledDeltaTime / 0.42f);
+            UpdateActiveChallengeLifecycle();
+            var onMap = CanUseRouletteOnMap();
+            if (!onMap)
+            {
+                if (visible)
+                    SetVisible(false);
+                if (running)
+                {
+                    running = false;
+                    StopSpinAudio();
+                }
+                pendingLoad = false;
+                resultReady = false;
+            }
 
-            if (toggleShortcut.Value.IsDown())
+            var visibilityTarget = visible ? 1f : 0f;
+            cardVisibility = Mathf.Lerp(cardVisibility, visibilityTarget, Time.unscaledDeltaTime * 10f);
+            if (Mathf.Abs(cardVisibility - visibilityTarget) < 0.001f)
+                cardVisibility = visibilityTarget;
+
+            if (onMap && toggleShortcut.Value.IsDown())
                 SetVisible(!visible);
-            if (spinShortcut.Value.IsDown())
+            if (onMap && visible && !autoLoad.Value && resultReady &&
+                !running && !pendingLoad && spinShortcut.Value.IsDown())
                 StartRoulette();
+            if (visible)
+                SetNativeMapEquipEnabled(false);
             if (visible && cardVisibility > 0.72f && !running && !pendingLoad)
                 HandleCardNavigation();
             if (running)
@@ -107,11 +208,11 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
         }
-
         private void HandleCardNavigation()
         {
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                suppressMapPauseUntilFrame = Time.frameCount;
                 SetVisible(false);
                 return;
             }
@@ -119,61 +220,106 @@ namespace Gilomx.CupheadBossRoulette
             var moved = false;
             if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                if (navigationIndex == 4)
-                    navigationIndex = lastSettingsIndex;
+                navigationIndex = Wrap(navigationIndex - 1, 4);
                 moved = true;
             }
             else if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                if (navigationIndex < 4)
-                {
-                    lastSettingsIndex = navigationIndex;
-                    navigationIndex = 4;
-                }
+                navigationIndex = Wrap(navigationIndex + 1, 4);
                 moved = true;
             }
             else if (Input.GetKeyDown(KeyCode.LeftArrow))
             {
-                if (navigationIndex == 4)
-                    navigationIndex = lastSettingsIndex;
-                navigationIndex = Wrap(navigationIndex - 1, 4);
-                lastSettingsIndex = navigationIndex;
+                ChangeCurrentSetting(-1);
                 moved = true;
             }
             else if (Input.GetKeyDown(KeyCode.RightArrow))
             {
-                if (navigationIndex == 4)
-                    navigationIndex = lastSettingsIndex;
-                navigationIndex = Wrap(navigationIndex + 1, 4);
-                lastSettingsIndex = navigationIndex;
+                ChangeCurrentSetting(1);
                 moved = true;
             }
 
             if (moved)
-                PlayOneShot(selectionClip, 0.45f);
+                PlayNativeMenuSound("menu_equipment_move", selectionClip, 0.45f);
 
             if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter))
                 return;
 
-            switch (navigationIndex)
+            if (navigationIndex == 3)
             {
-                case 0:
-                    difficulty = Level.Mode.Easy;
-                    break;
-                case 1:
-                    difficulty = Level.Mode.Normal;
-                    break;
-                case 2:
-                    difficulty = Level.Mode.Hard;
-                    break;
-                case 3:
-                    uglyMode = !uglyMode;
-                    break;
-                default:
+                if (resultReady)
+                    BeginResultLoad();
+                else
                     StartRoulette();
-                    break;
             }
-            PlayOneShot(selectionClip, 0.65f);
+            else
+                ChangeCurrentSetting(1);
+            PlayNativeMenuSound("menu_equipment_move", selectionClip, 0.65f);
+        }
+
+        private void BeginResultLoad()
+        {
+            if (running || pendingLoad || !resultReady)
+                return;
+            pendingLoad = true;
+            loadAt = Time.realtimeSinceStartup;
+        }
+        private void ChangeCurrentSetting(int direction)
+        {
+            var changed = false;
+            if (navigationIndex == 0)
+            {
+                var modes = new[] { Level.Mode.Easy, Level.Mode.Normal, Level.Mode.Hard };
+                var current = difficulty == Level.Mode.Easy ? 0 : difficulty == Level.Mode.Hard ? 2 : 1;
+                var nextDifficulty = modes[Wrap(current + direction, modes.Length)];
+                if (difficulty != nextDifficulty)
+                {
+                    difficulty = nextDifficulty;
+                    difficultySetting.Value = difficulty;
+                    changed = true;
+                }
+            }
+            else if (navigationIndex == 1)
+            {
+                uglyMode = !uglyMode;
+                challengeSetting.Value = uglyMode;
+                changed = true;
+            }
+            else if (navigationIndex == 2)
+            {
+                autoLoad.Value = !autoLoad.Value;
+                changed = true;
+            }
+
+            if (!changed)
+                return;
+
+            Config.Save();
+            if (resultReady)
+            {
+                resultReady = false;
+                status = "PULSA ENTER PARA GIRAR";
+            }
+        }
+
+        private void FindNativeMapEquipUi()
+        {
+            if (nativeMapEquipUi == null)
+                nativeMapEquipUi = UnityEngine.Object.FindObjectOfType<MapEquipUI>();
+        }
+
+        private void SetNativeMapEquipEnabled(bool enabled)
+        {
+            FindNativeMapEquipUi();
+            if (nativeMapEquipUi != null && nativeMapEquipUi.enabled != enabled)
+                nativeMapEquipUi.enabled = enabled;
+        }
+
+        private IEnumerator RestoreNativeMapEquipNextFrame()
+        {
+            yield return null;
+            if (!visible)
+                SetNativeMapEquipEnabled(true);
         }
         private void SetVisible(bool value)
         {
@@ -181,31 +327,45 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             visible = value;
             if (visible)
-                navigationIndex = 4;
-            PlayOneShot(visible ? openClip : closeClip, 0.65f);
+            {
+                navigationIndex = 3;
+                cardRoll = random.Next(-4, 5);
+                SetNativeMapEquipEnabled(false);
+            }
+            else
+            {
+                cardRoll = 0f;
+                StartCoroutine(RestoreNativeMapEquipNextFrame());
+            }
+            PlayNativeMenuSound(visible ? "menu_cardup" : "menu_carddown",
+                visible ? openClip : closeClip, 0.65f);
         }
 
         private void StartRoulette()
         {
-            if (running || pendingLoad)
+            if (!CanUseRouletteOnMap() || running || pendingLoad)
                 return;
             if (!visible)
                 SetVisible(true);
 
+            resultReady = false;
             result = CreateRandomResult();
             revealed = 0;
             ticker = 0;
             spinStartedAt = Time.realtimeSinceStartup;
             running = true;
             status = "¡LA RULETA ESTÁ GIRANDO!";
-            activeChallenge = "";
+            ClearActiveChallenge();
             if (spinClip != null)
             {
                 audioSource.clip = spinClip;
                 audioSource.loop = true;
                 audioSource.volume = 0.45f;
+                audioSource.time = 0f;
                 audioSource.Play();
             }
+            else
+                Logger.LogWarning("El audio de giro no esta disponible.");
         }
 
         private RouletteResult CreateRandomResult()
@@ -222,6 +382,7 @@ namespace Gilomx.CupheadBossRoulette
             var charm = random.NextDouble() < 0.2
                 ? RouletteData.Charms.Length - 1
                 : random.Next(RouletteData.Charms.Length);
+
             var modifier = RouletteData.Modifiers.Length - 1;
 
             if (uglyMode && random.NextDouble() >= 0.3)
@@ -262,6 +423,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             running = false;
+            resultReady = true;
             StopSpinAudio();
             status = autoLoad.Value ? "¡RESULTADO LISTO! PREPARANDO COMBATE..." : "¡RESULTADO LISTO!";
             if (autoLoad.Value)
@@ -287,11 +449,14 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
 
+                resultReady = false;
                 ApplyLoadout(PlayerId.PlayerOne);
                 ApplyLoadout(PlayerId.PlayerTwo);
                 Level.SetCurrentMode(difficulty);
-                activeChallenge = uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "";
                 var boss = RouletteData.Bosses[result.Boss];
+                SetActiveChallenge(
+                    uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "",
+                    result.Boss);
                 Logger.LogInfo("Cargando " + boss.Character + " (" + boss.Level + ")");
                 SceneLoader.LoadLevel(boss.Level, SceneLoader.Transition.Iris, SceneLoader.Icon.None);
             }
@@ -313,7 +478,8 @@ namespace Gilomx.CupheadBossRoulette
             loadout.secondaryWeapon = RouletteData.Weapons[result.Weapon2].Value;
             loadout.super = RouletteData.Supers[result.Super].Value;
             loadout.charm = RouletteData.Charms[result.Charm].Value;
-            loadout.HasEquippedSecondaryRegularWeapon = loadout.secondaryWeapon != Weapon.None;
+            loadout.HasEquippedSecondaryRegularWeapon =
+                loadout.secondaryWeapon != Weapon.None;
             loadout.MustNotifySwitchRegularWeapon = true;
         }
 
@@ -332,13 +498,9 @@ namespace Gilomx.CupheadBossRoulette
                 Quaternion.identity,
                 new Vector3(scale, scale, 1f));
 
-            if (!string.IsNullOrEmpty(activeChallenge) && activeChallenge != "Nada")
-                DrawChallengeBanner();
 
-            if (cardVisibility > 0.001f)
+            if (CanUseRouletteOnMap() && cardVisibility > 0.001f)
                 DrawRoulette();
-            else
-                GUI.Label(new Rect(24f, 672f, 250f, 28f), "F6  ABRIR RULETA", smallStyle);
 
             GUI.color = previousColor;
             GUI.matrix = previousMatrix;
@@ -451,10 +613,10 @@ namespace Gilomx.CupheadBossRoulette
             DrawModeButton(new Rect(492f, 469f, 132f, 38f), "EXPERTO", Level.Mode.Hard);
 
             if (GUI.Button(new Rect(657f, 469f, 208f, 38f),
-                uglyMode ? "✓  MODO FEO" : "MODO FEO", uglyMode ? buttonActiveStyle : buttonStyle))
+                uglyMode ? "?  MODO FEO" : "MODO FEO", uglyMode ? buttonActiveStyle : buttonStyle))
                 uglyMode = !uglyMode;
             if (GUI.Button(new Rect(878f, 469f, 214f, 38f),
-                autoLoad.Value ? "✓  CARGA AUTO" : "CARGA AUTO", autoLoad.Value ? buttonActiveStyle : buttonStyle))
+                autoLoad.Value ? "?  CARGA AUTO" : "CARGA AUTO", autoLoad.Value ? buttonActiveStyle : buttonStyle))
                 autoLoad.Value = !autoLoad.Value;
 
             GUI.Label(new Rect(42f, 518f, 1050f, 31f), status, subtitleStyle);
@@ -475,19 +637,81 @@ namespace Gilomx.CupheadBossRoulette
 
         private void DrawModeButton(Rect rect, string label, Level.Mode mode)
         {
-            if (GUI.Button(rect, (difficulty == mode ? "✓  " : "") + label,
+            if (GUI.Button(rect, (difficulty == mode ? "?  " : "") + label,
                 difficulty == mode ? buttonActiveStyle : buttonStyle))
                 difficulty = mode;
         }
 
-        private void DrawChallengeBanner()
+        private void SetActiveChallenge(string challenge, int bossIndex)
         {
-            var rect = new Rect(408f, 18f, 464f, 53f);
-            GUI.color = Ink;
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GameTheme.DrawBorder(rect, Gold, 3f);
-            GUI.Label(rect, "RETO: " + activeChallenge.ToUpperInvariant(), challengeStyle);
+            activeChallenge = challenge == "Nada" ? "" : challenge;
+            activeChallengeBoss = string.IsNullOrEmpty(activeChallenge) ? -1 : bossIndex;
+            if (!string.IsNullOrEmpty(activeChallenge) &&
+                !PrepareNativeChallengePrompt())
+                Logger.LogWarning("Could not prepare the persistent challenge prompt.");
+        }
+
+        private void ClearActiveChallenge()
+        {
+            activeChallenge = "";
+            activeChallengeBoss = -1;
+            SetNativeChallengePromptVisible(false);
+        }
+
+        private static void ClearChallengeOnWinPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin != null)
+                plugin.ClearActiveChallenge();
+        }
+
+        private void UpdateActiveChallengeLifecycle()
+        {
+            if (string.IsNullOrEmpty(activeChallenge) || SceneLoader.CurrentlyLoading)
+                return;
+
+            try
+            {
+                var level = Level.Current;
+                if (level != null)
+                {
+                    if (level.LevelType != Level.Type.Battle || !ActiveChallengeMatches(level))
+                        ClearActiveChallenge();
+                    return;
+                }
+
+                if (Map.Current != null)
+                    ClearActiveChallenge();
+            }
+            catch
+            {
+                // Scene transitions can briefly invalidate Cuphead's static references.
+            }
+        }
+
+        private bool ShouldShowActiveChallenge()
+        {
+            if (string.IsNullOrEmpty(activeChallenge) || SceneLoader.CurrentlyLoading)
+                return false;
+
+            try
+            {
+                var level = Level.Current;
+                return level != null &&
+                       level.LevelType == Level.Type.Battle &&
+                       ActiveChallengeMatches(level);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool ActiveChallengeMatches(Level level)
+        {
+            return activeChallengeBoss >= 0 &&
+                   activeChallengeBoss < RouletteData.Bosses.Length &&
+                   level.CurrentLevel == RouletteData.Bosses[activeChallengeBoss].Level;
         }
 
         private Rect PulseRect(Rect rect, int field)
@@ -552,10 +776,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private IEnumerator LoadAudio()
         {
-            yield return StartCoroutine(LoadClip("sounds/spin.mp3", AudioType.MPEG, clip => spinClip = clip));
-            yield return StartCoroutine(LoadClip("sounds/selection.mp3", AudioType.MPEG, clip => selectionClip = clip));
-            yield return StartCoroutine(LoadClip("sounds/abrir.mp3", AudioType.MPEG, clip => openClip = clip));
-            yield return StartCoroutine(LoadClip("sounds/cerrar.mp3", AudioType.MPEG, clip => closeClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/spin.wav", AudioType.WAV, clip => spinClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/selection.wav", AudioType.WAV, clip => selectionClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/abrir.wav", AudioType.WAV, clip => openClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/cerrar.wav", AudioType.WAV, clip => closeClip = clip));
         }
 
         private IEnumerator LoadClip(string relativePath, AudioType type, Action<AudioClip> assign)
@@ -579,10 +803,21 @@ namespace Gilomx.CupheadBossRoulette
             www.Dispose();
         }
 
+        private void PlayNativeMenuSound(string soundName, AudioClip fallback, float volume)
+        {
+            try
+            {
+                AudioManager.Play(soundName);
+            }
+            catch
+            {
+                PlayOneShot(fallback, volume);
+            }
+        }
         private void PlayOneShot(AudioClip clip, float volume)
         {
-            if (clip != null && audioSource != null)
-                audioSource.PlayOneShot(clip, volume);
+            if (clip != null && effectsAudioSource != null)
+                effectsAudioSource.PlayOneShot(clip, volume);
         }
 
         private void StopSpinAudio()
@@ -606,7 +841,6 @@ namespace Gilomx.CupheadBossRoulette
             bodyStyle = NewStyle(theme.BodyFont, 17, TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
             smallStyle = NewStyle(theme.BodyFont, 13, TextAnchor.MiddleCenter, Ink, FontStyle.Normal);
             cardTitleStyle = NewStyle(theme.TitleFont, 19, TextAnchor.MiddleCenter, Color.white, FontStyle.Normal);
-            challengeStyle = NewStyle(theme.TitleFont, 22, TextAnchor.MiddleCenter, Gold, FontStyle.Normal);
 
             buttonStyle = NewStyle(theme.TitleFont, 17, TextAnchor.MiddleCenter, Ink, FontStyle.Normal);
             buttonStyle.normal.background = MakeButtonTexture(new Color(0.90f, 0.81f, 0.62f));
@@ -654,6 +888,14 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OnDestroy()
         {
+            if (harmony != null)
+                harmony.UnpatchSelf();
+            if (activeInstance == this)
+                activeInstance = null;
+            SetNativeMapEquipEnabled(true);
+            DestroyNativeRoulettePrompt();
+            DestroyNativeChallengePrompt();
+
             StopSpinAudio();
             if (theme != null)
                 theme.Dispose();
