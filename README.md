@@ -1,7 +1,9 @@
 # Gilomx Boss Roulette
 
-Mod para Cuphead 1.3.4 con DLC que traslada al juego la lógica de la ruleta de
-`gilomx.com`.
+Mod para Cuphead 1.3.4 que traslada al juego la lógica de la ruleta de
+`gilomx.com`. Funciona tanto con el juego base como con The Delicious Last
+Course: detecta automáticamente si el DLC está disponible y sólo incluye
+contenido que esa instalación puede cargar.
 
 La interfaz utiliza las fuentes y los iconos originales del menú de
 equipamiento de Cuphead, combinados con los retratos de la ruleta web. Al
@@ -10,8 +12,10 @@ terminar el giro, el mod equipa el resultado y carga directamente el combate.
 ## Controles
 
 - `F6`: abrir o cerrar la ruleta.
+- Mando: mantener el gatillo izquierdo y pulsar el botón de Equip Card
+  (`ZL + X` en Switch, `LT + Y` en Xbox, `L2 + Triángulo` en PlayStation).
 - `F7`: girar.
-- `←` `→`: recorrer dificultad y modo feo.
+- `←` `→`: recorrer dificultad y reto.
 - `↑` `↓`: cambiar entre las opciones y `¡GIRAR!`.
 - `Enter`: seleccionar.
 - `Esc`: cerrar la tarjeta.
@@ -49,8 +53,9 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
 
 ## Notas
 
-- Los retos del modo feo se muestran durante el combate; son reglas para el
-  jugador y no bloquean físicamente los controles.
+- Los retos del modo feo se muestran y aplican durante el combate.
+- Sin el DLC, la animación y el resultado excluyen automáticamente sus jefes,
+  armas y amuletos. Las tres posiciones de súper pertenecen al juego base.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
 - La Reliquia Divina utiliza el estado guardado en la partida.
 - El mod no modifica el progreso por su cuenta.

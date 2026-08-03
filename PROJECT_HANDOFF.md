@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
-Last updated: 2026-07-31
-Current local version: 0.5.42
+Last updated: 2026-08-03
+Current local version: 0.5.44
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -39,9 +39,35 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the challenge implementation through version 0.5.42.
+This handoff documents the roulette implementation through version 0.5.44.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
+
+Localization is intentionally deferred. No runtime text has been changed.
+`LOCALIZATION_CATALOG.md` records every currently identified translatable
+surface, Cuphead's 12 supported languages, native localization sources,
+technical prerequisites, and the wording decisions reserved for the user.
+
+Important correction from runtime diagnosis: the reported hotkey failure was
+not caused by DLC filtering or by any keyboard backend. The Steam instance
+running during the tests was stale and had been started during the direct
+Doorstop launch diagnostics. The evidence indicates that it inherited
+Doorstop's child-process disable marker, so every subsequent Cuphead process
+started by that Steam session loaded the local `winhttp.dll` proxy but skipped
+the BepInEx preloader. This made both the native prompt and F6 disappear. A full
+normal Steam shutdown and restart fixed the issue: Cuphead launched through
+Steam at 21:41 on 2026-08-02, BepInEx loaded Boss Roulette 0.5.43, and Rewired
+found XInput in the same process. The old BepInEx log can otherwise make the
+installation appear healthy even when its `LastWriteTime` predates the visible
+Cuphead process.
+
+All attempted keyboard hotkey workarounds from the diagnosis were removed at
+the user's request: no `R` fallback, Win32 polling, duplicate keyboard paths,
+extra input logging, or relaxed map gating remains. F6 still uses only the
+original BepInEx `KeyboardShortcut.IsDown()` path, so each keyboard press
+toggles exactly once. Version 0.5.44 introduces a separate, intentional Rewired
+path only for the controller combo described below. DLC filtering and challenge
+functionality remain intact.
 
 ## Build and install
 
@@ -60,12 +86,39 @@ To test, close Cuphead, replace only the installed DLL, and restart Cuphead.
 Keep the `assets` directory beside the DLL. Verify the version and errors in
 `BepInEx\LogOutput.log`.
 
+The following command was useful only as a diagnostic because it keeps BepInEx
+in one process:
+
+```powershell
+$env:SteamAppId = "268910"
+$env:SteamGameId = "268910"
+Start-Process `
+  -FilePath "E:\SteamLibrary\steamapps\common\Cuphead\Cuphead.exe" `
+  -WorkingDirectory "E:\SteamLibrary\steamapps\common\Cuphead"
+```
+
+`doorstop_config.ini` was restored to its original
+`ignore_disable_switch = false`; the temporary backup was removed. Do not ship
+or recommend the environment-variable launcher: starting outside Steam bypassed
+Steam Input, so the user's Switch Pro controller was not detected. Users should
+launch Cuphead normally through Steam; no extra launcher is part of the mod. If
+the same symptom returns after direct Doorstop diagnostics, fully exit Steam,
+start Steam again from Windows, and launch Cuphead from the library. Compare the
+surviving Cuphead process `StartTime` with `BepInEx\LogOutput.log`
+`LastWriteTime`; the log must be newer than the process and confirm the current
+Boss Roulette version.
+
 ## User-facing behavior
 
 - The roulette can only open after loading a save and while freely walking on a
   map.
 - It must not open at the title screen or inside a fight.
 - `F6` opens/closes the roulette.
+- A controller opens/closes it by holding the physical left trigger and
+  pressing Cuphead's `EquipMenu` action: Switch `ZL + X`, Xbox `LT + Y`, or
+  PlayStation `L2 + Triangle`. The trigger and Equip press must come from the
+  same Rewired player. The native Equip Card is suppressed while the trigger
+  is held, so the combo cannot open both interfaces.
 - Arrow keys move/change options.
 - `Enter` selects.
 - `Esc` closes the roulette without also opening Cuphead's pause menu.
@@ -335,6 +388,31 @@ level while preserving the challenge. A shot created in mini form remains
 valid if the player expands before impact, while a large-plane shot remains
 invalid if the player shrinks before impact.
 
+Version 0.5.43 adds automatic base-game/DLC compatibility. Each boss and
+equipment entry now records whether it requires The Delicious Last Course.
+Whenever the roulette opens or starts a spin, the plugin refreshes Cuphead's
+own entitlement state through `DLCManager.RefreshDLC()` and reads
+`DLCManager.DLCEnabled()`. If that check is false or throws, the safe fallback
+is base-game-only content.
+
+The DLC-only entries currently represented by the roulette are:
+
+- Bosses: Las Alimañas, Esther Espuelas, Los Perritos Pilotos, Ángel y
+  Demonio, Genovevo de Gelante, Granitoviejo el Gigante, and Chef Saleroso.
+- Weapons: Tiro Certero, Convergencia, and Ciclónica.
+- Charms: Galletita Astral, Reliquia Divina, and Anillo de Corazón.
+- Supers: none. The three selected super slots exist in the base game; Ms.
+  Chalice's variants are reached through Galletita Astral, which is already
+  DLC-only.
+
+Availability pools drive both `CreateRandomResult()` and the rolling card
+animation, including the forced challenge boss selector. Therefore a base-only
+player never sees or receives a DLC portrait, weapon, or charm, while a DLC
+owner retains the full pool. `Nada` remains available for super/charm display
+and probability exactly as before. The temporary challenge selector is empty
+in 0.5.43, restoring normal boss and challenge selection after the completed
+`Solo mini avión` test.
+
 Manual end-to-end checks still recommended:
 
 1. Spin with RETO enabled until a non-`Nada` challenge is selected.
@@ -361,6 +439,14 @@ The F6/F7 capsule dimensions and text offset were tuned by the user. Preserve:
 
 The roulette dim layer must be behind the card and the native F7 prompt must be
 in front of it.
+
+Version 0.5.44 adds the controller open/close combo. `Plugin.cs` reads
+Cuphead's `EquipMenu` action from each `Rewired.Player`, then scans only that
+player's assigned joysticks for the physical left trigger (`Left Trigger`,
+`L2`, or `ZL`). Axis and digital-button triggers are both supported. The combo
+uses `GetButtonDown`, so one press toggles exactly once even while the trigger
+remains held. `BlockMapPausePostfix` also rejects the native Equip Card while
+the trigger is held, preventing the same Equip press from opening both cards.
 
 ## Card layout invariants
 
@@ -464,7 +550,7 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
-- Version 0.5.42 builds with zero errors and zero warnings when
+- Version 0.5.44 builds with zero errors and zero warnings when
   `CupheadDir` points to the current installation on `E:`.
 - The temporary version 0.5.30 was installed and reproduced the frozen Dragon
   fight even after the safer ground `CanUseEx` change.
@@ -506,6 +592,16 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 - Version 0.5.42 was installed and launched successfully on 2026-07-31; the
   BepInEx log confirms:
   `Gilomx Boss Roulette 0.5.42 listo. F6 abre/cierra; F7 gira.`
+- Version 0.5.43 was installed and launched successfully on 2026-08-02; the
+  BepInEx log confirms:
+  `Gilomx Boss Roulette 0.5.43 listo. F6 abre/cierra; F7 gira.`
+- Version 0.5.44 was installed and launched through Steam successfully on
+  2026-08-03. The BepInEx log is newer than the Cuphead process and confirms:
+  `Gilomx Boss Roulette 0.5.44 listo. F6 o gatillo izquierdo + Equip abre/cierra; F7 gira.`
+- Manual 0.5.44 controller test: on the map, hold physical `ZL` and press
+  physical `X` on the Switch Pro. Confirm the roulette opens once and the
+  native Equip Card does not open. Repeat to close it, then release `ZL` and
+  confirm `X` still opens the native Equip Card normally.
 - Manual 0.5.40 test: every spin must select `No disparo Peashooter`; normal
   and Chalice players must start on bombs, weapon switching must not return to
   Peashooter before or after retry, and normal switching must return after
@@ -519,6 +615,11 @@ renderer. Avoid editing it unless deliberately removing legacy code.
   and then restart the level with the challenge label still active. Also verify
   the projectile-time rule by changing size while a shot is in flight, then
   confirm normal unrestricted play returns after win/exit.
+- Manual 0.5.43 test with DLC enabled: the BepInEx log must report that base and
+  DLC content are in use, and DLC bosses/equipment must continue appearing.
+- Manual 0.5.43 test without DLC: the log must report base-only mode; no DLC
+  boss, weapon, or charm may appear during the animation or as the final
+  result, and the selected base boss/loadout must load successfully.
 - Manual 0.5.38 test: every spin must select `No disparo bombas`; normal
   Peashooter/Chalice three-way fire must work, weapon switch must not select
   bombs before or after retry, and switching must return after win/exit.

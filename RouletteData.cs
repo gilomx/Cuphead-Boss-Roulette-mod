@@ -16,14 +16,17 @@ namespace Gilomx.CupheadBossRoulette
         internal readonly Levels Level;
         internal readonly bool IsPlane;
         internal readonly string Image;
+        internal readonly bool RequiresDlc;
 
-        internal BossEntry(string fight, string character, Levels level, bool isPlane, string image)
+        internal BossEntry(string fight, string character, Levels level,
+            bool isPlane, string image, bool requiresDlc = false)
         {
             Fight = fight;
             Character = character;
             Level = level;
             IsPlane = isPlane;
             Image = image;
+            RequiresDlc = requiresDlc;
         }
     }
 
@@ -33,13 +36,16 @@ namespace Gilomx.CupheadBossRoulette
         internal readonly T Value;
         internal readonly string Image;
         internal readonly string NativeSprite;
+        internal readonly bool RequiresDlc;
 
-        internal EquipmentEntry(string name, T value, string image, string nativeSprite)
+        internal EquipmentEntry(string name, T value, string image,
+            string nativeSprite, bool requiresDlc = false)
         {
             Name = name;
             Value = value;
             Image = image;
             NativeSprite = nativeSprite;
+            RequiresDlc = requiresDlc;
         }
     }
 
@@ -90,13 +96,13 @@ namespace Gilomx.CupheadBossRoulette
             new BossEntry("Furia en las Vías", "Expreso Fantasma", Levels.Train, false, "bosses/expreso.png"),
             new BossEntry("¡Apuestas Cerradas!", "Rey Dado", Levels.DicePalaceMain, false, "bosses/dado.png"),
             new BossEntry("Diversión Infernal", "El Diablo", Levels.Devil, false, "bosses/diablo.png"),
-            new BossEntry("Cubil del Contrabando", "Las Alimañas", Levels.RumRunners, false, "bosses/alimanas.png"),
-            new BossEntry("Morradas a Mediodía", "Esther Espuelas", Levels.FlyingCowboy, true, "bosses/vaca.png"),
-            new BossEntry("Perreo Perriagudo", "Los Perritos Pilotos", Levels.Airplane, false, "bosses/perritos.png"),
-            new BossEntry("Jefe Secreto", "Ángel y Demonio", Levels.Graveyard, false, "bosses/angelydemonio.png"),
-            new BossEntry("Sopapos Sectafilocopos", "Genovevo de Gelante", Levels.SnowCult, false, "bosses/genovevo.png"),
-            new BossEntry("Altercado Agrógnomo", "Granitoviejo el Gigante", Levels.OldMan, false, "bosses/granito.png"),
-            new BossEntry("Un menú que te mueres", "Chef Saleroso", Levels.Saltbaker, false, "bosses/salero.png")
+            new BossEntry("Cubil del Contrabando", "Las Alimañas", Levels.RumRunners, false, "bosses/alimanas.png", true),
+            new BossEntry("Morradas a Mediodía", "Esther Espuelas", Levels.FlyingCowboy, true, "bosses/vaca.png", true),
+            new BossEntry("Perreo Perriagudo", "Los Perritos Pilotos", Levels.Airplane, false, "bosses/perritos.png", true),
+            new BossEntry("Jefe Secreto", "Ángel y Demonio", Levels.Graveyard, false, "bosses/angelydemonio.png", true),
+            new BossEntry("Sopapos Sectafilocopos", "Genovevo de Gelante", Levels.SnowCult, false, "bosses/genovevo.png", true),
+            new BossEntry("Altercado Agrógnomo", "Granitoviejo el Gigante", Levels.OldMan, false, "bosses/granito.png", true),
+            new BossEntry("Un menú que te mueres", "Chef Saleroso", Levels.Saltbaker, false, "bosses/salero.png", true)
         };
 
         internal static readonly EquipmentEntry<Weapon>[] Weapons =
@@ -107,9 +113,9 @@ namespace Gilomx.CupheadBossRoulette
             new EquipmentEntry<Weapon>("Globero", Weapon.level_weapon_bouncer, "weapons/globero.png", "equip_icon_weapon_bouncer_0001"),
             new EquipmentEntry<Weapon>("Carga", Weapon.level_weapon_charge, "weapons/carga.png", "equip_icon_weapon_charge_0001"),
             new EquipmentEntry<Weapon>("Rodeo", Weapon.level_weapon_boomerang, "weapons/rodeo.png", "equip_icon_weapon_boomerang_0001"),
-            new EquipmentEntry<Weapon>("Tiro Certero", Weapon.level_weapon_crackshot, "weapons/tirocertero.png", "equip_icon_weapon_crackshot_0001"),
-            new EquipmentEntry<Weapon>("Convergencia", Weapon.level_weapon_wide_shot, "weapons/convergencia.png", "equip_icon_weapon_wide_shot_0001"),
-            new EquipmentEntry<Weapon>("Ciclónica", Weapon.level_weapon_upshot, "weapons/ciclonica.png", "equip_icon_weapon_upshot_0001"),
+            new EquipmentEntry<Weapon>("Tiro Certero", Weapon.level_weapon_crackshot, "weapons/tirocertero.png", "equip_icon_weapon_crackshot_0001", true),
+            new EquipmentEntry<Weapon>("Convergencia", Weapon.level_weapon_wide_shot, "weapons/convergencia.png", "equip_icon_weapon_wide_shot_0001", true),
+            new EquipmentEntry<Weapon>("Ciclónica", Weapon.level_weapon_upshot, "weapons/ciclonica.png", "equip_icon_weapon_upshot_0001", true),
             new EquipmentEntry<Weapon>("Nada", Weapon.None, "weapons/vacio.png", "equip_icon_empty")
         };
 
@@ -129,9 +135,9 @@ namespace Gilomx.CupheadBossRoulette
             new EquipmentEntry<Charm>("Desvío Dulce", Charm.charm_parry_plus, "charms/desviodulce.png", "equip_icon_charm_parry_slapper_0001"),
             new EquipmentEntry<Charm>("Corazón Doble", Charm.charm_health_up_2, "charms/corazondoble.png", "equip_icon_charm_hp2_0001"),
             new EquipmentEntry<Charm>("Afiladora", Charm.charm_parry_attack, "charms/afiladora.png", "equip_icon_charm_parry_attack_0001"),
-            new EquipmentEntry<Charm>("Galletita Astral", Charm.charm_chalice, "charms/galletitaastral.png", "equip_icon_charm_chalice_0001"),
-            new EquipmentEntry<Charm>("Reliquia Divina", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_5_0001"),
-            new EquipmentEntry<Charm>("Anillo de Corazón", Charm.charm_healer, "charms/anillocorazon.png", "equip_icon_charm_healer_0001"),
+            new EquipmentEntry<Charm>("Galletita Astral", Charm.charm_chalice, "charms/galletitaastral.png", "equip_icon_charm_chalice_0001", true),
+            new EquipmentEntry<Charm>("Reliquia Divina", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_5_0001", true),
+            new EquipmentEntry<Charm>("Anillo de Corazón", Charm.charm_healer, "charms/anillocorazon.png", "equip_icon_charm_healer_0001", true),
             new EquipmentEntry<Charm>("Nada", Charm.None, "weapons/vacio.png", "equip_icon_empty")
         };
 

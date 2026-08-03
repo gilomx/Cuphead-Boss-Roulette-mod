@@ -58,7 +58,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void DrawEquipCardContents()
         {
-            var bossIndex = DisplayIndex(0, result.Boss, RouletteData.Bosses.Length, 0);
+            var bossIndex = DisplayPoolIndex(
+                0, result.Boss, availableBossIndices, 0);
             var boss = RouletteData.Bosses[bossIndex];
             var bossPortrait = PulseRect(new Rect(208.5f, 116f, 178f, 178f), 0);
             DrawTexture(bossPortrait, boss.Image);
@@ -68,10 +69,17 @@ namespace Gilomx.CupheadBossRoulette
             GUI.Label(new Rect(54f, 275f, 487f, 39f), bossTitle, equipBossStyle);
             GUI.Label(new Rect(54f, 309f, 487f, 24f), boss.Fight.ToUpperInvariant(), equipFightStyle);
 
-            var weapon1 = DisplayIndex(1, result.Weapon1, RouletteData.Weapons.Length, 0);
-            var weapon2 = DisplayIndex(2, result.Weapon2, RouletteData.Weapons.Length, RouletteData.Weapons.Length / 2);
-            var super = DisplayIndex(3, result.Super, RouletteData.Supers.Length, RouletteData.Supers.Length / 3);
-            var charm = DisplayIndex(4, result.Charm, RouletteData.Charms.Length, RouletteData.Charms.Length / 4);
+            var weapon1 = DisplayPoolIndex(
+                1, result.Weapon1, availableWeaponIndices, 0);
+            var weapon2 = DisplayPoolIndex(
+                2, result.Weapon2, availableWeaponIndices,
+                availableWeaponIndices.Count / 2);
+            var super = DisplayPoolIndex(
+                3, result.Super, availableSuperIndices,
+                availableSuperIndices.Count / 3);
+            var charm = DisplayPoolIndex(
+                4, result.Charm, availableCharmIndices,
+                availableCharmIndices.Count / 4);
 
             DrawEquipSlot(ShotACenter, "TIRO A", RouletteData.Weapons[weapon1].Image,
                 RouletteData.Weapons[weapon1].NativeSprite, 1);

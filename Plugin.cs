@@ -5,6 +5,7 @@ using System.IO;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using Rewired;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
@@ -14,14 +15,14 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.42";
+        public const string PluginVersion = "0.5.44";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
         // TEMPORARY TEST SELECTOR. Keep non-empty while developing a challenge.
         // Compatible bosses are still chosen randomly.
         private static readonly string ForcedTestChallenge =
-            "Solo mini avión";
+            "";
         private static readonly Color Ink = new Color(0.075f, 0.065f, 0.055f);
         private static readonly Color Red = new Color(0.67f, 0.12f, 0.10f);
         private static readonly Color Cream = new Color(0.94f, 0.87f, 0.70f);
@@ -29,6 +30,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly System.Random random = new System.Random();
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
+        private readonly List<int> availableBossIndices = new List<int>();
+        private readonly List<int> availableWeaponIndices = new List<int>();
+        private readonly List<int> availableSuperIndices = new List<int>();
+        private readonly List<int> availableCharmIndices = new List<int>();
         private readonly float[] pulseUntil = new float[6];
         private ConfigEntry<KeyboardShortcut> toggleShortcut;
         private ConfigEntry<KeyboardShortcut> spinShortcut;
@@ -75,6 +80,8 @@ namespace Gilomx.CupheadBossRoulette
         private string activeChallenge = "";
         private int activeChallengeBoss = -1;
         private bool soloMiniRestartPending;
+        private bool dlcAvailabilityKnown;
+        private bool dlcEnabledForRoulette;
 
         private string AssetsDirectory
         {
@@ -195,15 +202,111 @@ namespace Gilomx.CupheadBossRoulette
                 Logger.LogWarning("Could not install the No airplane bombs guard.");
 
             StartCoroutine(LoadAudio());
-            Logger.LogInfo(PluginName + " " + PluginVersion + " listo. F6 abre/cierra; F7 gira.");
+            Logger.LogInfo(PluginName + " " + PluginVersion +
+                           " listo. F6 o gatillo izquierdo + Equip abre/cierra; F7 gira.");
         }
 
         private static void BlockMapPausePostfix(ref bool __result)
         {
             var plugin = activeInstance;
             if (plugin != null &&
-                (plugin.visible || Time.frameCount <= plugin.suppressMapPauseUntilFrame))
+                (plugin.visible ||
+                 Time.frameCount <= plugin.suppressMapPauseUntilFrame ||
+                 plugin.IsControllerToggleModifierHeld()))
                 __result = false;
+        }
+
+        private bool IsControllerTogglePressed()
+        {
+            try
+            {
+                return IsControllerTogglePressed(PlayerId.PlayerOne) ||
+                       IsControllerTogglePressed(PlayerId.PlayerTwo);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsControllerTogglePressed(PlayerId playerId)
+        {
+            var player = PlayerManager.GetPlayerInput(playerId);
+            return player != null &&
+                   player.GetButtonDown((int)CupheadButton.EquipMenu) &&
+                   IsLeftTriggerHeld(player);
+        }
+
+        private bool IsControllerToggleModifierHeld()
+        {
+            try
+            {
+                return IsLeftTriggerHeld(PlayerManager.GetPlayerInput(PlayerId.PlayerOne)) ||
+                       IsLeftTriggerHeld(PlayerManager.GetPlayerInput(PlayerId.PlayerTwo));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsLeftTriggerHeld(Rewired.Player player)
+        {
+            if (player == null || player.controllers == null)
+                return false;
+
+            foreach (var joystick in player.controllers.Joysticks)
+            {
+                if (joystick == null)
+                    continue;
+
+                foreach (var element in joystick.ElementIdentifiers)
+                {
+                    if (element == null)
+                        continue;
+
+                    var direct = IsLeftTriggerLabel(element.name);
+                    var positive = IsLeftTriggerLabel(element.positiveName);
+                    var negative = IsLeftTriggerLabel(element.negativeName);
+                    if (!direct && !positive && !negative)
+                        continue;
+
+                    if (element.elementType == ControllerElementType.Button)
+                    {
+                        if (joystick.GetButtonById(element.id))
+                            return true;
+                        continue;
+                    }
+
+                    if (element.elementType != ControllerElementType.Axis)
+                        continue;
+
+                    var value = joystick.GetAxisById(element.id);
+                    if ((direct || positive) && value > 0.5f)
+                        return true;
+                    if (negative && value < -0.5f)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsLeftTriggerLabel(string label)
+        {
+            if (string.IsNullOrEmpty(label))
+                return false;
+
+            var normalized = "";
+            foreach (var character in label.ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(character))
+                    normalized += character;
+            }
+
+            return normalized.Contains("lefttrigger") ||
+                   normalized.Contains("triggerleft") ||
+                   normalized == "l2" || normalized.EndsWith("l2") ||
+                   normalized == "zl" || normalized.EndsWith("zl");
         }
 
         private bool CanUseRouletteOnMap()
@@ -257,7 +360,8 @@ namespace Gilomx.CupheadBossRoulette
             if (Mathf.Abs(cardVisibility - visibilityTarget) < 0.001f)
                 cardVisibility = visibilityTarget;
 
-            if (onMap && toggleShortcut.Value.IsDown())
+            if (onMap &&
+                (toggleShortcut.Value.IsDown() || IsControllerTogglePressed()))
                 SetVisible(!visible);
             if (onMap && visible && !autoLoad.Value && resultReady &&
                 !running && !pendingLoad && spinShortcut.Value.IsDown())
@@ -282,6 +386,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
         }
+
         private void HandleCardNavigation()
         {
             if (Input.GetKeyDown(KeyCode.Escape))
@@ -399,6 +504,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (visible == value)
                 return;
+            if (value)
+                RefreshAvailableContent();
             visible = value;
             if (visible)
             {
@@ -419,6 +526,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!CanUseRouletteOnMap() || running || pendingLoad)
                 return;
+            RefreshAvailableContent();
             if (HasForcedTestChallenge())
                 uglyMode = true;
             if (!visible)
@@ -446,21 +554,26 @@ namespace Gilomx.CupheadBossRoulette
 
         private RouletteResult CreateRandomResult()
         {
+            EnsureAvailableContent();
             var forcedModifier = ForcedTestModifierIndex();
             var boss = forcedModifier >= 0
                 ? RandomBossForModifier(forcedModifier)
-                : random.Next(RouletteData.Bosses.Length);
-            var weapon1 = random.Next(RouletteData.Weapons.Length - 1);
+                : RandomPoolIndex(availableBossIndices);
+            var weapon1 = RandomNonEmptyPoolIndex(
+                availableWeaponIndices, RouletteData.Weapons.Length - 1);
             int weapon2;
-            do weapon2 = random.Next(RouletteData.Weapons.Length - 1);
+            do weapon2 = RandomNonEmptyPoolIndex(
+                availableWeaponIndices, RouletteData.Weapons.Length - 1);
             while (weapon2 == weapon1);
 
             var super = random.NextDouble() < 0.2
                 ? RouletteData.Supers.Length - 1
-                : random.Next(RouletteData.Supers.Length);
+                : RandomNonEmptyPoolIndex(
+                    availableSuperIndices, RouletteData.Supers.Length - 1);
             var charm = random.NextDouble() < 0.2
                 ? RouletteData.Charms.Length - 1
-                : random.Next(RouletteData.Charms.Length);
+                : RandomNonEmptyPoolIndex(
+                    availableCharmIndices, RouletteData.Charms.Length - 1);
 
             var modifier = forcedModifier >= 0
                 ? forcedModifier
@@ -505,16 +618,96 @@ namespace Gilomx.CupheadBossRoulette
         private int RandomBossForModifier(int modifierIndex)
         {
             var compatibleBosses = new List<int>();
-            for (var i = 0; i < RouletteData.Bosses.Length; i++)
+            for (var i = 0; i < availableBossIndices.Count; i++)
             {
+                var bossIndex = availableBossIndices[i];
                 if (RouletteData.ValidModifierIndices(
-                    RouletteData.Bosses[i]).Contains(modifierIndex))
-                    compatibleBosses.Add(i);
+                    RouletteData.Bosses[bossIndex]).Contains(modifierIndex))
+                    compatibleBosses.Add(bossIndex);
             }
 
             return compatibleBosses.Count > 0
                 ? compatibleBosses[random.Next(compatibleBosses.Count)]
-                : random.Next(RouletteData.Bosses.Length);
+                : RandomPoolIndex(availableBossIndices);
+        }
+
+        private void EnsureAvailableContent()
+        {
+            if (availableBossIndices.Count == 0 ||
+                availableWeaponIndices.Count == 0 ||
+                availableSuperIndices.Count == 0 ||
+                availableCharmIndices.Count == 0)
+                RefreshAvailableContent();
+        }
+
+        private void RefreshAvailableContent()
+        {
+            var dlcEnabled = false;
+            try
+            {
+                DLCManager.RefreshDLC();
+                dlcEnabled = DLCManager.DLCEnabled();
+            }
+            catch (Exception exception)
+            {
+                if (!dlcAvailabilityKnown)
+                    Logger.LogWarning(
+                        "No se pudo consultar el DLC; se usara solo contenido base: " +
+                        exception.Message);
+            }
+
+            availableBossIndices.Clear();
+            for (var i = 0; i < RouletteData.Bosses.Length; i++)
+            {
+                if (dlcEnabled || !RouletteData.Bosses[i].RequiresDlc)
+                    availableBossIndices.Add(i);
+            }
+
+            availableWeaponIndices.Clear();
+            for (var i = 0; i < RouletteData.Weapons.Length; i++)
+            {
+                if (dlcEnabled || !RouletteData.Weapons[i].RequiresDlc)
+                    availableWeaponIndices.Add(i);
+            }
+
+            availableSuperIndices.Clear();
+            for (var i = 0; i < RouletteData.Supers.Length; i++)
+            {
+                if (dlcEnabled || !RouletteData.Supers[i].RequiresDlc)
+                    availableSuperIndices.Add(i);
+            }
+
+            availableCharmIndices.Clear();
+            for (var i = 0; i < RouletteData.Charms.Length; i++)
+            {
+                if (dlcEnabled || !RouletteData.Charms[i].RequiresDlc)
+                    availableCharmIndices.Add(i);
+            }
+
+            if (!dlcAvailabilityKnown || dlcEnabledForRoulette != dlcEnabled)
+            {
+                Logger.LogInfo(dlcEnabled
+                    ? "DLC disponible: la ruleta usara contenido base y DLC."
+                    : "DLC no disponible: la ruleta usara solo contenido base.");
+            }
+            dlcEnabledForRoulette = dlcEnabled;
+            dlcAvailabilityKnown = true;
+        }
+
+        private int RandomPoolIndex(List<int> pool)
+        {
+            return pool.Count > 0 ? pool[random.Next(pool.Count)] : 0;
+        }
+
+        private int RandomNonEmptyPoolIndex(List<int> pool, int emptyIndex)
+        {
+            var candidates = new List<int>();
+            for (var i = 0; i < pool.Count; i++)
+            {
+                if (pool[i] != emptyIndex)
+                    candidates.Add(pool[i]);
+            }
+            return RandomPoolIndex(candidates);
         }
 
         private void UpdateSpin()
@@ -636,14 +829,22 @@ namespace Gilomx.CupheadBossRoulette
             GUI.Label(new Rect(35f, 17f, 1100f, 58f), "CUPHEAD · BOSS ROULETTE", titleStyle);
             GUI.Label(new Rect(35f, 76f, 1100f, 30f), "¡EL DESTINO DECIDE TU PRÓXIMO COMBATE!", subtitleStyle);
 
-            var bossIndex = DisplayIndex(0, result.Boss, RouletteData.Bosses.Length, 0);
+            var bossIndex = DisplayPoolIndex(
+                0, result.Boss, availableBossIndices, 0);
             var boss = RouletteData.Bosses[bossIndex];
             DrawBossPanel(boss);
 
-            var weapon1 = DisplayIndex(1, result.Weapon1, RouletteData.Weapons.Length, 0);
-            var weapon2 = DisplayIndex(2, result.Weapon2, RouletteData.Weapons.Length, RouletteData.Weapons.Length / 2);
-            var super = DisplayIndex(3, result.Super, RouletteData.Supers.Length, RouletteData.Supers.Length / 3);
-            var charm = DisplayIndex(4, result.Charm, RouletteData.Charms.Length, RouletteData.Charms.Length / 4);
+            var weapon1 = DisplayPoolIndex(
+                1, result.Weapon1, availableWeaponIndices, 0);
+            var weapon2 = DisplayPoolIndex(
+                2, result.Weapon2, availableWeaponIndices,
+                availableWeaponIndices.Count / 2);
+            var super = DisplayPoolIndex(
+                3, result.Super, availableSuperIndices,
+                availableSuperIndices.Count / 3);
+            var charm = DisplayPoolIndex(
+                4, result.Charm, availableCharmIndices,
+                availableCharmIndices.Count / 4);
 
             DrawEquipmentCard(new Rect(360f, 127f, 225f, 151f), "ARMA A",
                 RouletteData.Weapons[weapon1].Name, RouletteData.Weapons[weapon1].Image,
@@ -1048,6 +1249,15 @@ namespace Gilomx.CupheadBossRoulette
         private int DisplayIndex(int field, int finalIndex, int length, int offset)
         {
             return revealed > field ? finalIndex : Wrap(ticker + offset, length);
+        }
+
+        private int DisplayPoolIndex(int field, int finalIndex,
+            List<int> pool, int offset)
+        {
+            if (revealed > field || pool == null || pool.Count == 0)
+                return finalIndex;
+
+            return pool[Wrap(ticker + offset, pool.Count)];
         }
 
         private int CurrentRollingModifier(int bossIndex)
