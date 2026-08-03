@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.44";
+        public const string PluginVersion = "0.5.46";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -27,6 +27,71 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly Color Red = new Color(0.67f, 0.12f, 0.10f);
         private static readonly Color Cream = new Color(0.94f, 0.87f, 0.70f);
         private static readonly Color Gold = new Color(0.94f, 0.72f, 0.19f);
+
+        private sealed class LoadoutSnapshot
+        {
+            private readonly Weapon primaryWeapon;
+            private readonly Weapon secondaryWeapon;
+            private readonly Super super;
+            private readonly Charm charm;
+            private readonly bool hasSecondaryRegularWeapon;
+            private readonly bool hasSecondaryShmupWeapon;
+            private readonly bool mustNotifyRegularWeapon;
+            private readonly bool mustNotifyShmupWeapon;
+
+            private LoadoutSnapshot(
+                Weapon primaryWeapon,
+                Weapon secondaryWeapon,
+                Super super,
+                Charm charm,
+                bool hasSecondaryRegularWeapon,
+                bool hasSecondaryShmupWeapon,
+                bool mustNotifyRegularWeapon,
+                bool mustNotifyShmupWeapon)
+            {
+                this.primaryWeapon = primaryWeapon;
+                this.secondaryWeapon = secondaryWeapon;
+                this.super = super;
+                this.charm = charm;
+                this.hasSecondaryRegularWeapon = hasSecondaryRegularWeapon;
+                this.hasSecondaryShmupWeapon = hasSecondaryShmupWeapon;
+                this.mustNotifyRegularWeapon = mustNotifyRegularWeapon;
+                this.mustNotifyShmupWeapon = mustNotifyShmupWeapon;
+            }
+
+            internal static LoadoutSnapshot Capture(PlayerId playerId)
+            {
+                var loadout = PlayerData.Data.Loadouts.GetPlayerLoadout(playerId);
+                if (loadout == null)
+                    return null;
+
+                return new LoadoutSnapshot(
+                    loadout.primaryWeapon,
+                    loadout.secondaryWeapon,
+                    loadout.super,
+                    loadout.charm,
+                    loadout.HasEquippedSecondaryRegularWeapon,
+                    loadout.HasEquippedSecondarySHMUPWeapon,
+                    loadout.MustNotifySwitchRegularWeapon,
+                    loadout.MustNotifySwitchSHMUPWeapon);
+            }
+
+            internal void Restore(PlayerId playerId)
+            {
+                var loadout = PlayerData.Data.Loadouts.GetPlayerLoadout(playerId);
+                if (loadout == null)
+                    return;
+
+                loadout.primaryWeapon = primaryWeapon;
+                loadout.secondaryWeapon = secondaryWeapon;
+                loadout.super = super;
+                loadout.charm = charm;
+                loadout.HasEquippedSecondaryRegularWeapon = hasSecondaryRegularWeapon;
+                loadout.HasEquippedSecondarySHMUPWeapon = hasSecondaryShmupWeapon;
+                loadout.MustNotifySwitchRegularWeapon = mustNotifyRegularWeapon;
+                loadout.MustNotifySwitchSHMUPWeapon = mustNotifyShmupWeapon;
+            }
+        }
 
         private readonly System.Random random = new System.Random();
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
@@ -82,6 +147,10 @@ namespace Gilomx.CupheadBossRoulette
         private bool soloMiniRestartPending;
         private bool dlcAvailabilityKnown;
         private bool dlcEnabledForRoulette;
+        private LoadoutSnapshot originalPlayerOneLoadout;
+        private LoadoutSnapshot originalPlayerTwoLoadout;
+        private bool loanedLoadoutsActive;
+        private bool loanedBattleSeen;
 
         private string AssetsDirectory
         {
@@ -131,6 +200,16 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(levelPreWin, prefix: new HarmonyMethod(levelPreWinPrefix));
             else
                 Logger.LogWarning("Could not install the challenge win guard.");
+
+            var loadLastMap = AccessTools.Method(typeof(SceneLoader), "LoadLastMap");
+            var restoreLoadoutBeforeReturnToMapPrefix = AccessTools.Method(
+                typeof(Plugin), "RestoreLoadoutBeforeReturnToMapPrefix");
+            if (loadLastMap != null && restoreLoadoutBeforeReturnToMapPrefix != null)
+                harmony.Patch(loadLastMap,
+                    prefix: new HarmonyMethod(restoreLoadoutBeforeReturnToMapPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette loadout restoration guard.");
 
             var handleDash = AccessTools.Method(typeof(LevelPlayerMotor), "HandleDash");
             var handleDashPrefix = AccessTools.Method(typeof(Plugin), "BlockDashPrefix");
@@ -340,6 +419,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Update()
         {
+            UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
             var onMap = CanUseRouletteOnMap();
             if (!onMap)
@@ -757,6 +837,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
 
                 resultReady = false;
+                CaptureOriginalLoadouts();
                 ApplyLoadout(PlayerId.PlayerOne);
                 ApplyLoadout(PlayerId.PlayerTwo);
                 Level.SetCurrentMode(difficulty);
@@ -770,6 +851,7 @@ namespace Gilomx.CupheadBossRoulette
             catch (Exception exception)
             {
                 status = "NO SE PUDO CARGAR. REVISA LOGOUTPUT.LOG";
+                RestoreOriginalLoadouts(false);
                 Logger.LogError(exception);
                 SetVisible(true);
             }
@@ -788,6 +870,108 @@ namespace Gilomx.CupheadBossRoulette
             loadout.HasEquippedSecondaryRegularWeapon =
                 loadout.secondaryWeapon != Weapon.None;
             loadout.MustNotifySwitchRegularWeapon = true;
+        }
+
+        private void CaptureOriginalLoadouts()
+        {
+            if (loanedLoadoutsActive && !RestoreOriginalLoadouts(false))
+                throw new InvalidOperationException(
+                    "Could not restore the previous roulette loadout before a new fight.");
+
+            originalPlayerOneLoadout =
+                LoadoutSnapshot.Capture(PlayerId.PlayerOne);
+            originalPlayerTwoLoadout =
+                LoadoutSnapshot.Capture(PlayerId.PlayerTwo);
+            loanedLoadoutsActive = originalPlayerOneLoadout != null ||
+                                   originalPlayerTwoLoadout != null;
+            loanedBattleSeen = false;
+
+            if (!loanedLoadoutsActive)
+                throw new InvalidOperationException(
+                    "Could not capture either player loadout.");
+
+            Logger.LogInfo("Saved the original loadout before the roulette fight.");
+        }
+
+        private bool RestoreOriginalLoadouts(bool saveAfterRestore)
+        {
+            if (!loanedLoadoutsActive)
+                return true;
+            if (!PlayerData.Initialized || PlayerData.Data == null)
+                return false;
+
+            try
+            {
+                if (originalPlayerOneLoadout != null)
+                    originalPlayerOneLoadout.Restore(PlayerId.PlayerOne);
+                if (originalPlayerTwoLoadout != null)
+                    originalPlayerTwoLoadout.Restore(PlayerId.PlayerTwo);
+                if (saveAfterRestore)
+                    PlayerData.SaveCurrentFile();
+
+                originalPlayerOneLoadout = null;
+                originalPlayerTwoLoadout = null;
+                loanedLoadoutsActive = false;
+                loanedBattleSeen = false;
+                Logger.LogInfo("Restored the loadout used before the roulette fight.");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(
+                    "Could not restore the loadout used before the roulette fight: " +
+                    exception);
+                return false;
+            }
+        }
+
+        private void UpdateLoanedLoadoutLifecycle()
+        {
+            if (!loanedLoadoutsActive || SceneLoader.CurrentlyLoading)
+                return;
+
+            try
+            {
+                var level = Level.Current;
+                if (level != null)
+                {
+                    if (level.LevelType == Level.Type.Battle)
+                        loanedBattleSeen = true;
+                    return;
+                }
+
+                if (loanedBattleSeen && Map.Current != null)
+                    RestoreOriginalLoadouts(true);
+            }
+            catch
+            {
+                // Scene transitions can briefly invalidate Cuphead's static references.
+            }
+        }
+
+        private static void RestoreLoadoutBeforeReturnToMapPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin != null)
+                plugin.RestoreOriginalLoadouts(false);
+        }
+
+        private bool ShouldRestoreLoanedLoadoutOnWin(Level level)
+        {
+            if (!loanedLoadoutsActive)
+                return false;
+            if (level == null || !LoanedLoadoutUsesDicePalace())
+                return true;
+
+            return level.CurrentLevel == Levels.DicePalaceMain;
+        }
+
+        private bool LoanedLoadoutUsesDicePalace()
+        {
+            return result.Boss >= 0 &&
+                   result.Boss < RouletteData.Bosses.Length &&
+                   RouletteData.Bosses[result.Boss].Level ==
+                   Levels.DicePalaceMain;
         }
 
         private void OnGUI()
@@ -978,7 +1162,12 @@ namespace Gilomx.CupheadBossRoulette
         private static void ClearChallengeOnWinPrefix(Level __instance)
         {
             var plugin = activeInstance;
-            if (plugin != null && plugin.ShouldClearChallengeOnWin(__instance))
+            if (plugin == null)
+                return;
+
+            if (plugin.ShouldRestoreLoanedLoadoutOnWin(__instance))
+                plugin.RestoreOriginalLoadouts(false);
+            if (plugin.ShouldClearChallengeOnWin(__instance))
                 plugin.ClearActiveChallenge();
         }
 
@@ -1028,7 +1217,8 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin == null || __result <= 0f ||
                 !plugin.ShouldRestartOnNonMiniPlaneDamage() ||
-                ___damageSource == DamageDealer.DamageSource.SmallPlane ||
+                (___damageSource == DamageDealer.DamageSource.SmallPlane ||
+                 ___damageSource == DamageDealer.DamageSource.Super) ||
                 !IsEnemyDamageTarget(hit))
                 return;
 

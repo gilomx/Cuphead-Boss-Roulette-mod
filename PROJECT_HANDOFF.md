@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-03
-Current local version: 0.5.44
+Current local version: 0.5.46
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -150,6 +150,15 @@ Airplane bosses still roll and equip weapon A, weapon B, super, and charm.
 Those ground loadout values do not affect airplane weapons, but leaving all
 slots populated looks better and is the behavior requested by the user.
 
+The roulette intentionally uses the complete base/DLC equipment catalog even
+when an item has not been purchased or unlocked in the current save. Treat the
+result as a temporary loan: immediately before loading the selected boss,
+snapshot both players' complete loadout fields and flags. Keep the roulette
+loadout through losses, retries, challenge-triggered reloads, and every Rey
+Dado subfight. Restore the snapshots before Cuphead saves a victory or a return
+to the map. A map-side fallback restores and explicitly saves if a normal exit
+hook is ever missed. Never add the loaned item to the player's inventory.
+
 ## Challenge lifecycle
 
 Challenge names currently come from `RouletteData.Modifiers`.
@@ -190,9 +199,10 @@ Required behavior:
   `DamageSource.SmallPlane` marker queues `SceneLoader.ReloadLevel()` for the
   next frame and invalidates that attempt. Because the marker belongs to the
   projectile, changing size after firing does not change whether its impact is
-  valid. The same detection covers large-plane shots, bomb explosions, EX
-  attacks, and supers. The active challenge is retained across the automatic
-  restart.
+  valid. Large-plane shots, bomb explosions, and EX attacks still restart the
+  attempt. Airplane supers are explicitly allowed to balance the challenge;
+  Cuphead marks them with DamageSource.Super, separately from EX damage. The
+  active challenge is retained across an automatic restart.
 - `No disparo bombas` is enforced in two parts. An `OnLevelStart` postfix on
   `PlanePlayerWeaponManager` normalizes the starting weapon to
   `plane_weapon_peashot`, or `plane_chalice_weapon_3way` for Galletita Astral.
@@ -388,6 +398,19 @@ level while preserving the challenge. A shot created in mini form remains
 valid if the player expands before impact, while a large-plane shot remains
 invalid if the player shrinks before impact.
 
+Version 0.5.45 balances this rule by accepting both
+DamageSource.SmallPlane and DamageSource.Super. Airplane supers may damage
+the boss without restarting the attempt. Large-plane shots, bombs, and EX
+attacks remain violations and still restart the level after dealing damage.
+
+Version 0.5.46 makes every roulette loadout temporary. `LoadoutSnapshot`
+captures both players before `ApplyLoadout`. The existing `Level._OnPreWin`
+prefix restores regular victories, while a new `SceneLoader.LoadLastMap`
+prefix restores abandonment before Cuphead's own save call. Rey Dado delays
+victory restoration until `DicePalaceMain`; internal subfights and all retry or
+reload paths retain the roulette equipment. The inventory is never modified,
+so unpurchased equipment remains locked after the original loadout returns.
+
 Version 0.5.43 adds automatic base-game/DLC compatibility. Each boss and
 equipment entry now records whether it requires The Delicious Last Course.
 Whenever the roulette opens or starts a spin, the plugin refreshes Cuphead's
@@ -550,7 +573,7 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
-- Version 0.5.44 builds with zero errors and zero warnings when
+- Version 0.5.46 builds with zero errors and zero warnings when
   `CupheadDir` points to the current installation on `E:`.
 - The temporary version 0.5.30 was installed and reproduced the frozen Dragon
   fight even after the safer ground `CanUseEx` change.
@@ -606,6 +629,17 @@ renderer. Avoid editing it unless deliberately removing legacy code.
   and Chalice players must start on bombs, weapon switching must not return to
   Peashooter before or after retry, and normal switching must return after
   win/exit.
+- Manual 0.5.45 test: mini-plane shots and airplane supers must deal damage
+  without restarting. A large-plane shot, bomb, or EX must deal its normal
+  damage and then restart the level while retaining the challenge.
+- Manual 0.5.46 test: equip a known loadout, spin equipment that includes at
+  least one unpurchased item, and enter the fight. Lose/retry and confirm the
+  roulette equipment remains. Win and confirm the original equipment returns
+  on the map and in the Equip Card. Repeat by abandoning to the map. Restart
+  Cuphead and confirm the restored loadout persisted while the loaned item is
+  still locked. Finally test Rey Dado: roulette equipment must remain through
+  every internal subfight and restore only after winning `DicePalaceMain` or
+  abandoning the run.
 - Manual 0.5.41 test: every spin must select `Solo mini avión`; changing size
   remained available and non-mini damage was suppressed. This test behavior
   was superseded by 0.5.42.
