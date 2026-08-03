@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-03
-Current local version: 0.5.46
+Current local version: 0.5.47
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -119,9 +119,15 @@ Boss Roulette version.
   PlayStation `L2 + Triangle`. The trigger and Equip press must come from the
   same Rewired player. The native Equip Card is suppressed while the trigger
   is held, so the combo cannot open both interfaces.
-- Arrow keys move/change options.
-- `Enter` selects.
+- Arrow keys and the controller's D-pad/left stick move/change options.
+  Controller navigation uses Cuphead's native Rewired `MenuUp`, `MenuDown`,
+  `MenuLeft`, and `MenuRight` actions, so it follows the game's mappings.
+- `Enter` or the controller's native `Accept` action changes the selected
+  setting and confirms `GIRAR`/`JUGAR`.
+- The controller's physical right trigger (`ZR`, `RT`, or `R2`) rerolls only
+  when automatic load is disabled and a completed result is waiting.
 - `Esc` closes the roulette without also opening Cuphead's pause menu.
+  The controller's native `Cancel` action closes it through the same path.
 - The mouse is not required.
 - Forced selection from the website is intentionally excluded.
 - The normal Equip Card must continue to open with `Shift` whenever the
@@ -144,7 +150,8 @@ When automatic load is disabled:
 
 - After a spin, the main action becomes `JUGAR`.
 - `Enter` on `JUGAR` loads the result.
-- `F7` shows a native `VOLVER A GIRAR` prompt and allows another spin.
+- `F7` or the controller's physical right trigger (`ZR`/`RT`/`R2`) allows
+  another spin while the native `VOLVER A GIRAR` prompt is visible.
 
 Airplane bosses still roll and equip weapon A, weapon B, super, and charm.
 Those ground loadout values do not affect airplane weapons, but leaving all
@@ -471,6 +478,14 @@ uses `GetButtonDown`, so one press toggles exactly once even while the trigger
 remains held. `BlockMapPausePostfix` also rejects the native Equip Card while
 the trigger is held, preventing the same Equip press from opening both cards.
 
+Version 0.5.47 adds full controller navigation. It reads Cuphead's native
+Rewired menu actions for both players: `MenuUp`, `MenuDown`, `MenuLeft`,
+`MenuRight`, `Accept`, and `Cancel`. This supports D-pad and stick mappings
+without hard-coding face-button numbers. Reroll scans assigned joysticks for
+the physical right trigger labels (`Right Trigger`, `R2`, or `ZR`) and supports
+both axes and digital buttons. A stored held-state turns it into a rising-edge
+press, preventing repeated spins while the trigger remains held.
+
 ## Card layout invariants
 
 These values were adjusted repeatedly by the user and are considered final:
@@ -573,7 +588,7 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
-- Version 0.5.46 builds with zero errors and zero warnings when
+- Version 0.5.47 builds with zero errors and zero warnings when
   `CupheadDir` points to the current installation on `E:`.
 - The temporary version 0.5.30 was installed and reproduced the frozen Dragon
   fight even after the safer ground `CanUseEx` change.
@@ -640,6 +655,12 @@ renderer. Avoid editing it unless deliberately removing legacy code.
   still locked. Finally test Rey Dado: roulette equipment must remain through
   every internal subfight and restore only after winning `DicePalaceMain` or
   abandoning the run.
+- Manual 0.5.47 controller test: open with the existing left-trigger + Equip
+  combo, navigate all four rows with D-pad and left stick, change every setting
+  with left/right and `Accept`, then use `Accept` on `GIRAR` and `JUGAR`.
+  With automatic load disabled and a completed result waiting, press physical
+  `ZR`/`RT`/`R2` once and confirm exactly one new spin begins. Confirm the right
+  trigger does nothing during a spin and while automatic load is enabled.
 - Manual 0.5.41 test: every spin must select `Solo mini avión`; changing size
   remained available and non-mini damage was suppressed. This test behavior
   was superseded by 0.5.42.

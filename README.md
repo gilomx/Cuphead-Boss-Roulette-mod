@@ -14,11 +14,15 @@ terminar el giro, el mod equipa el resultado y carga directamente el combate.
 - `F6`: abrir o cerrar la ruleta.
 - Mando: mantener el gatillo izquierdo y pulsar el botón de Equip Card
   (`ZL + X` en Switch, `LT + Y` en Xbox, `L2 + Triángulo` en PlayStation).
-- `F7`: girar.
-- `←` `→`: recorrer dificultad y reto.
-- `↑` `↓`: cambiar entre las opciones y `¡GIRAR!`.
-- `Enter`: seleccionar.
+- `↑` `↓`: moverse entre las opciones y la acción principal.
+- `←` `→`: cambiar el valor de la opción seleccionada.
+- `Enter`: cambiar una opción o confirmar `¡GIRAR!`/`¡JUGAR!`.
 - `Esc`: cerrar la tarjeta.
+- Cruceta o stick: moverse y cambiar opciones con el mando.
+- Botón de confirmar: cambiar una opción o confirmar `¡GIRAR!`/`¡JUGAR!`.
+- `ZR`/`RT`/`R2`: volver a girar si ya existe un resultado y la carga
+  automática está desactivada.
+- `F7`: volver a girar en ese mismo caso desde el teclado.
 
 El giro dura cinco segundos y después detiene, uno por segundo, jefe, armas,
 súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.
@@ -31,7 +35,7 @@ súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.
 
    `Cuphead\BepInEx\plugins\GilomxBossRoulette\`
 
-4. Inicia una partida guardada y pulsa `F7`.
+4. Inicia una partida guardada, entra al mapa y pulsa `F6`.
 
 El archivo de configuración se crea en:
 

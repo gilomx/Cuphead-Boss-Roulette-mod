@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.46";
+        public const string PluginVersion = "0.5.47";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -135,6 +135,7 @@ namespace Gilomx.CupheadBossRoulette
         private static Plugin activeInstance;
         private Harmony harmony;
         private int suppressMapPauseUntilFrame = -1;
+        private bool rightTriggerWasHeld;
         private float spinStartedAt;
         private float loadAt;
         private int ticker;
@@ -329,6 +330,43 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private bool IsControllerMenuButtonDown(CupheadButton button)
+        {
+            try
+            {
+                return IsControllerMenuButtonDown(PlayerId.PlayerOne, button) ||
+                       IsControllerMenuButtonDown(PlayerId.PlayerTwo, button);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsControllerMenuButtonDown(PlayerId playerId, CupheadButton button)
+        {
+            var player = PlayerManager.GetPlayerInput(playerId);
+            return player != null && player.GetButtonDown((int)button);
+        }
+
+        private bool PollControllerRerollPressed()
+        {
+            var held = false;
+            try
+            {
+                held = IsRightTriggerHeld(PlayerManager.GetPlayerInput(PlayerId.PlayerOne)) ||
+                       IsRightTriggerHeld(PlayerManager.GetPlayerInput(PlayerId.PlayerTwo));
+            }
+            catch
+            {
+                held = false;
+            }
+
+            var pressed = held && !rightTriggerWasHeld;
+            rightTriggerWasHeld = held;
+            return pressed;
+        }
+
         private static bool IsLeftTriggerHeld(Rewired.Player player)
         {
             if (player == null || player.controllers == null)
@@ -370,6 +408,47 @@ namespace Gilomx.CupheadBossRoulette
             return false;
         }
 
+        private static bool IsRightTriggerHeld(Rewired.Player player)
+        {
+            if (player == null || player.controllers == null)
+                return false;
+
+            foreach (var joystick in player.controllers.Joysticks)
+            {
+                if (joystick == null)
+                    continue;
+
+                foreach (var element in joystick.ElementIdentifiers)
+                {
+                    if (element == null)
+                        continue;
+
+                    var direct = IsRightTriggerLabel(element.name);
+                    var positive = IsRightTriggerLabel(element.positiveName);
+                    var negative = IsRightTriggerLabel(element.negativeName);
+                    if (!direct && !positive && !negative)
+                        continue;
+
+                    if (element.elementType == ControllerElementType.Button)
+                    {
+                        if (joystick.GetButtonById(element.id))
+                            return true;
+                        continue;
+                    }
+
+                    if (element.elementType != ControllerElementType.Axis)
+                        continue;
+
+                    var value = joystick.GetAxisById(element.id);
+                    if ((direct || positive) && value > 0.5f)
+                        return true;
+                    if (negative && value < -0.5f)
+                        return true;
+                }
+            }
+            return false;
+        }
+
         private static bool IsLeftTriggerLabel(string label)
         {
             if (string.IsNullOrEmpty(label))
@@ -386,6 +465,24 @@ namespace Gilomx.CupheadBossRoulette
                    normalized.Contains("triggerleft") ||
                    normalized == "l2" || normalized.EndsWith("l2") ||
                    normalized == "zl" || normalized.EndsWith("zl");
+        }
+
+        private static bool IsRightTriggerLabel(string label)
+        {
+            if (string.IsNullOrEmpty(label))
+                return false;
+
+            var normalized = "";
+            foreach (var character in label.ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(character))
+                    normalized += character;
+            }
+
+            return normalized.Contains("righttrigger") ||
+                   normalized.Contains("triggerright") ||
+                   normalized == "r2" || normalized.EndsWith("r2") ||
+                   normalized == "zr" || normalized.EndsWith("zr");
         }
 
         private bool CanUseRouletteOnMap()
@@ -421,6 +518,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
+            var controllerRerollPressed = PollControllerRerollPressed();
             var onMap = CanUseRouletteOnMap();
             if (!onMap)
             {
@@ -444,7 +542,8 @@ namespace Gilomx.CupheadBossRoulette
                 (toggleShortcut.Value.IsDown() || IsControllerTogglePressed()))
                 SetVisible(!visible);
             if (onMap && visible && !autoLoad.Value && resultReady &&
-                !running && !pendingLoad && spinShortcut.Value.IsDown())
+                !running && !pendingLoad &&
+                (spinShortcut.Value.IsDown() || controllerRerollPressed))
                 StartRoulette();
             if (visible)
                 SetNativeMapEquipEnabled(false);
@@ -469,7 +568,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void HandleCardNavigation()
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (Input.GetKeyDown(KeyCode.Escape) ||
+                IsControllerMenuButtonDown(CupheadButton.Cancel))
             {
                 suppressMapPauseUntilFrame = Time.frameCount;
                 SetVisible(false);
@@ -477,22 +577,26 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             var moved = false;
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (Input.GetKeyDown(KeyCode.UpArrow) ||
+                IsControllerMenuButtonDown(CupheadButton.MenuUp))
             {
                 navigationIndex = Wrap(navigationIndex - 1, 4);
                 moved = true;
             }
-            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            else if (Input.GetKeyDown(KeyCode.DownArrow) ||
+                     IsControllerMenuButtonDown(CupheadButton.MenuDown))
             {
                 navigationIndex = Wrap(navigationIndex + 1, 4);
                 moved = true;
             }
-            else if (Input.GetKeyDown(KeyCode.LeftArrow))
+            else if (Input.GetKeyDown(KeyCode.LeftArrow) ||
+                     IsControllerMenuButtonDown(CupheadButton.MenuLeft))
             {
                 ChangeCurrentSetting(-1);
                 moved = true;
             }
-            else if (Input.GetKeyDown(KeyCode.RightArrow))
+            else if (Input.GetKeyDown(KeyCode.RightArrow) ||
+                     IsControllerMenuButtonDown(CupheadButton.MenuRight))
             {
                 ChangeCurrentSetting(1);
                 moved = true;
@@ -501,7 +605,9 @@ namespace Gilomx.CupheadBossRoulette
             if (moved)
                 PlayNativeMenuSound("menu_equipment_move", selectionClip, 0.45f);
 
-            if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (!Input.GetKeyDown(KeyCode.Return) &&
+                !Input.GetKeyDown(KeyCode.KeypadEnter) &&
+                !IsControllerMenuButtonDown(CupheadButton.Accept))
                 return;
 
             if (navigationIndex == 3)
