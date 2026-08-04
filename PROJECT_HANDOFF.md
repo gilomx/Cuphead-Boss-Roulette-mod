@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
-Last updated: 2026-08-03
-Current local version: 0.5.47
+Last updated: 2026-08-04
+Current local version: 0.5.48
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -222,6 +222,24 @@ Required behavior:
   `plane_chalice_weapon_bomb` for Galletita Astral, and the shared
   `HandleWeaponSwitch` prefix prevents returning to Peashooter/Chalice
   three-way fire. Reliquia Divina cannot randomize the starting weapon.
+- `Blanco y negro` applies to ground and airplane fights. The
+  `BlackAndWhiteSaturationEffect` loads a shader compiled with Unity 2017.4.9f1
+  from `assets/shaders/gilomx-boss-roulette-shaders`. One explicit command
+  buffer copies the final visible frame after Cuphead's image effects and
+  continuously changes only its saturation. At full desaturation a Harmony
+  postfix selects Cuphead's exact native BW filter; on exit it releases that
+  pass while the bundled shader still displays a gray frame, then restores
+  color smoothly. No white overlay, pre-image capture, or runtime shader lookup
+  is used. Each attempt waits 1.5 seconds in color, fades over 1.25 seconds, and
+  reverses over 0.9 seconds. It never mutates `PlayerData.Data.filter`; retry
+  restarts the delay and fade, while win or abandonment initiates the exit fade.
+  The temporary `BN` icon is
+  `modifiers/blackandwhite.png`. The shader exposes `_FlipY`, fixed at `1` on
+  Windows/Direct3D after the first manual test showed the frame vertically
+  inverted. The forced test selector was cleared after validation. Transition
+  timings are the
+  `BlackAndWhiteEntryDelay`, `BlackAndWhiteFadeInDuration`, and
+  `BlackAndWhiteFadeOutDuration` constants in `Plugin.cs`.
 
 Implementation:
 
@@ -588,7 +606,7 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
-- Version 0.5.47 builds with zero errors and zero warnings when
+- Version 0.5.48 builds with zero errors and zero warnings when
   `CupheadDir` points to the current installation on `E:`.
 - The temporary version 0.5.30 was installed and reproduced the frozen Dragon
   fight even after the safer ground `CanUseEx` change.
@@ -661,6 +679,13 @@ renderer. Avoid editing it unless deliberately removing legacy code.
   With automatic load disabled and a completed result waiting, press physical
   `ZR`/`RT`/`R2` once and confirm exactly one new spin begins. Confirm the right
   trigger does nothing during a spin and while automatic load is enabled.
+- Manual 0.5.48 test: select `Blanco y negro` in one ground fight and one
+  airplane fight. Confirm each attempt remains in color for 1.5 seconds, fades
+  continuously into the native black-and-white look and back after victory
+  or abandonment. After defeat/retry, confirm the next attempt repeats the
+  delay and fade. Repeat while the player's saved filter is `Two-Strip` and
+  confirm that setting returns unchanged on the map and after restarting
+  Cuphead.
 - Manual 0.5.41 test: every spin must select `Solo mini avión`; changing size
   remained available and non-mini damage was suppressed. This test behavior
   was superseded by 0.5.42.

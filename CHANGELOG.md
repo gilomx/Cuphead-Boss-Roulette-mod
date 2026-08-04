@@ -3,6 +3,25 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.48 — 2026-08-04
+
+### Reto `Blanco y negro`
+
+- Se añadió un reto compatible con niveles normales y de avión que utiliza el
+  filtro blanco y negro nativo de Cuphead durante el combate.
+- Cada intento comienza a color, espera 1.5 segundos y reduce suavemente la
+  saturación del fotograma visible durante 1.25 segundos. Al finalizar queda
+  activo el filtro blanco y negro original del juego.
+- La transición utiliza un AssetBundle de 5 KB compilado con Unity 2017.4.9f1;
+  el proyecto reproducible se conserva en `tools/unity-shader`.
+- Se corrigió la orientación vertical de la textura en Direct3D mediante
+  `_FlipY`, evitando que el combate aparezca de cabeza.
+- El filtro se aplica sin modificar ni guardar la preferencia visual real del
+  jugador y desaparece al ganar o abandonar el nivel.
+- El reto conserva el filtro al perder y volver a intentar.
+- Temporalmente utiliza `modifiers/blackandwhite.png` como icono provisional.
+- Se retiró la selección forzada de `Blanco y negro` después de las pruebas.
+
 ## 0.5.47 — 2026-08-03
 
 ### Controles con mando

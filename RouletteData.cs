@@ -149,6 +149,7 @@ namespace Gilomx.CupheadBossRoulette
             new ModifierEntry("No disparo bombas", ModifierKind.Plane, "modifiers/nobombitas.png"),
             new ModifierEntry("No disparo Peashooter", ModifierKind.Plane, "modifiers/nopeashooterair.png"),
             new ModifierEntry("No EX", ModifierKind.Both, "modifiers/noex.png"),
+            new ModifierEntry("Blanco y negro", ModifierKind.Both, "modifiers/blackandwhite.png"),
             new ModifierEntry("Nada", ModifierKind.Both, "weapons/vacio.png")
         };
 

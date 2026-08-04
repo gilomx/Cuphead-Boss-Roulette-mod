@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.47";
+        public const string PluginVersion = "0.5.48";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -23,6 +23,10 @@ namespace Gilomx.CupheadBossRoulette
         // Compatible bosses are still chosen randomly.
         private static readonly string ForcedTestChallenge =
             "";
+        private const string BlackAndWhiteChallenge = "Blanco y negro";
+        private const float BlackAndWhiteEntryDelay = 1.5f;
+        private const float BlackAndWhiteFadeInDuration = 1.25f;
+        private const float BlackAndWhiteFadeOutDuration = 0.9f;
         private static readonly Color Ink = new Color(0.075f, 0.065f, 0.055f);
         private static readonly Color Red = new Color(0.67f, 0.12f, 0.10f);
         private static readonly Color Cream = new Color(0.94f, 0.87f, 0.70f);
@@ -113,6 +117,8 @@ namespace Gilomx.CupheadBossRoulette
         private AudioClip selectionClip;
         private AudioClip openClip;
         private AudioClip closeClip;
+        private AssetBundle blackAndWhiteShaderBundle;
+        private Shader blackAndWhiteTransitionShader;
         private GUIStyle titleStyle;
         private GUIStyle subtitleStyle;
         private GUIStyle bossStyle;
@@ -145,6 +151,20 @@ namespace Gilomx.CupheadBossRoulette
         private string status = "PULSA ENTER PARA GIRAR";
         private string activeChallenge = "";
         private int activeChallengeBoss = -1;
+        private float blackAndWhiteBlend;
+        private float blackAndWhiteTransitionStartedAt = -1f;
+        private float blackAndWhiteTransitionFrom;
+        private float blackAndWhiteTransitionTo;
+        private float blackAndWhiteTransitionDelay;
+        private float blackAndWhiteTransitionDuration;
+        private int blackAndWhiteLevelInstanceId = -1;
+        private bool blackAndWhiteFadeOutStarted;
+        private bool blackAndWhiteNativeBaseActive;
+        private readonly List<BlackAndWhiteSaturationEffect>
+            blackAndWhiteEffects =
+                new List<BlackAndWhiteSaturationEffect>();
+        private float nextBlackAndWhiteEffectScanAt;
+        private bool blackAndWhiteRenderFailureLogged;
         private bool soloMiniRestartPending;
         private bool dlcAvailabilityKnown;
         private bool dlcEnabledForRoulette;
@@ -174,6 +194,7 @@ namespace Gilomx.CupheadBossRoulette
                 : Level.Mode.Normal;
             uglyMode = HasForcedTestChallenge() || challengeSetting.Value;
             theme = new GameTheme();
+            LoadBlackAndWhiteTransitionShader();
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
             audioSource.volume = 0.45f;
@@ -195,12 +216,25 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning("Could not install the map pause guard.");
 
+            var filterGetter = AccessTools.PropertyGetter(
+                typeof(SettingsData), "filter");
+            var overrideBlackAndWhiteFilterPostfix = AccessTools.Method(
+                typeof(Plugin), "OverrideBlackAndWhiteFilterPostfix");
+            if (filterGetter != null &&
+                overrideBlackAndWhiteFilterPostfix != null)
+                harmony.Patch(filterGetter, postfix: new HarmonyMethod(
+                    overrideBlackAndWhiteFilterPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the black-and-white filter bridge.");
+
             var levelPreWin = AccessTools.Method(typeof(Level), "_OnPreWin");
             var levelPreWinPrefix = AccessTools.Method(typeof(Plugin), "ClearChallengeOnWinPrefix");
             if (levelPreWin != null && levelPreWinPrefix != null)
                 harmony.Patch(levelPreWin, prefix: new HarmonyMethod(levelPreWinPrefix));
             else
                 Logger.LogWarning("Could not install the challenge win guard.");
+
 
             var loadLastMap = AccessTools.Method(typeof(SceneLoader), "LoadLastMap");
             var restoreLoadoutBeforeReturnToMapPrefix = AccessTools.Method(
@@ -286,6 +320,37 @@ namespace Gilomx.CupheadBossRoulette
                            " listo. F6 o gatillo izquierdo + Equip abre/cierra; F7 gira.");
         }
 
+        private void LoadBlackAndWhiteTransitionShader()
+        {
+            var bundlePath = Path.Combine(
+                AssetsDirectory,
+                Path.Combine("shaders", "gilomx-boss-roulette-shaders"));
+            if (!File.Exists(bundlePath))
+            {
+                Logger.LogWarning(
+                    "No se encontró el bundle del shader: " + bundlePath);
+                return;
+            }
+
+            blackAndWhiteShaderBundle = AssetBundle.LoadFromFile(bundlePath);
+            if (blackAndWhiteShaderBundle == null)
+            {
+                Logger.LogWarning(
+                    "Unity no pudo cargar el bundle del shader blanco y negro.");
+                return;
+            }
+
+            blackAndWhiteTransitionShader =
+                blackAndWhiteShaderBundle.LoadAsset<Shader>(
+                    "Assets/BossRouletteSaturation.shader");
+            if (blackAndWhiteTransitionShader == null)
+                Logger.LogWarning(
+                    "El bundle no contiene el shader de saturación esperado.");
+            else
+                Logger.LogInfo(
+                    "Shader suave blanco y negro cargado desde AssetBundle.");
+        }
+
         private static void BlockMapPausePostfix(ref bool __result)
         {
             var plugin = activeInstance;
@@ -294,6 +359,14 @@ namespace Gilomx.CupheadBossRoulette
                  Time.frameCount <= plugin.suppressMapPauseUntilFrame ||
                  plugin.IsControllerToggleModifierHeld()))
                 __result = false;
+        }
+
+        private static void OverrideBlackAndWhiteFilterPostfix(
+            ref BlurGamma.Filter __result)
+        {
+            var plugin = activeInstance;
+            if (plugin != null && plugin.blackAndWhiteNativeBaseActive)
+                __result = BlurGamma.Filter.BW;
         }
 
         private bool IsControllerTogglePressed()
@@ -518,6 +591,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
+            UpdateBlackAndWhiteTransition();
+            UpdateBlackAndWhiteRenderEffects();
             var controllerRerollPressed = PollControllerRerollPressed();
             var onMap = CanUseRouletteOnMap();
             if (!onMap)
@@ -958,6 +1033,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 status = "NO SE PUDO CARGAR. REVISA LOGOUTPUT.LOG";
                 RestoreOriginalLoadouts(false);
+                ClearActiveChallenge();
                 Logger.LogError(exception);
                 SetVisible(true);
             }
@@ -1245,6 +1321,219 @@ namespace Gilomx.CupheadBossRoulette
             if (GUI.Button(rect, (difficulty == mode ? "?  " : "") + label,
                 difficulty == mode ? buttonActiveStyle : buttonStyle))
                 difficulty = mode;
+        }
+
+        private void UpdateBlackAndWhiteTransition()
+        {
+            var challengeSelected = activeChallenge == BlackAndWhiteChallenge;
+            var activeFight = false;
+            var levelInstanceId = -1;
+
+            if (challengeSelected && !SceneLoader.CurrentlyLoading)
+            {
+                try
+                {
+                    var level = Level.Current;
+                    activeFight = level != null &&
+                                  level.LevelType == Level.Type.Battle &&
+                                  ActiveChallengeMatches(level);
+                    if (activeFight)
+                        levelInstanceId = level.GetInstanceID();
+                }
+                catch
+                {
+                    activeFight = false;
+                }
+            }
+
+            if (activeFight)
+            {
+                if (blackAndWhiteLevelInstanceId != levelInstanceId)
+                {
+                    ResetBlackAndWhiteRenderEffects();
+                    // A fresh attempt always starts in the player's normal
+                    // colors, then waits before fading into monochrome.
+                    blackAndWhiteLevelInstanceId = levelInstanceId;
+                    blackAndWhiteFadeOutStarted = false;
+                    blackAndWhiteBlend = 0f;
+                    BeginBlackAndWhiteTransition(
+                        1f, BlackAndWhiteEntryDelay,
+                        BlackAndWhiteFadeInDuration);
+                    Logger.LogInfo(
+                        "Black-and-white challenge transition started for " +
+                        Level.Current.CurrentLevel + ".");
+                }
+            }
+            else if (!(challengeSelected && SceneLoader.CurrentlyLoading))
+            {
+                blackAndWhiteLevelInstanceId = -1;
+                var fadingIn = blackAndWhiteTransitionStartedAt >= 0f &&
+                               blackAndWhiteTransitionTo > 0.001f;
+                if (!blackAndWhiteFadeOutStarted &&
+                    (blackAndWhiteBlend > 0.001f || fadingIn))
+                {
+                    blackAndWhiteFadeOutStarted = true;
+                    BeginBlackAndWhiteTransition(
+                        0f, 0f, BlackAndWhiteFadeOutDuration);
+                }
+            }
+
+            AdvanceBlackAndWhiteTransition();
+        }
+
+        private void UpdateBlackAndWhiteRenderEffects()
+        {
+            var shouldRun = blackAndWhiteLevelInstanceId >= 0 ||
+                            blackAndWhiteNativeBaseActive ||
+                            blackAndWhiteBlend > 0.001f ||
+                            blackAndWhiteTransitionStartedAt >= 0f;
+
+            for (var i = blackAndWhiteEffects.Count - 1; i >= 0; i--)
+            {
+                var effect = blackAndWhiteEffects[i];
+                if (!effect.IsValid)
+                {
+                    effect.Dispose();
+                    blackAndWhiteEffects.RemoveAt(i);
+                    continue;
+                }
+
+                effect.SetBlend(blackAndWhiteBlend);
+            }
+
+            // Switch to Cuphead's exact native filter only after saturation
+            // has reached zero. On fade-out, release it immediately while the
+            // correction component still renders a fully gray frame.
+            blackAndWhiteNativeBaseActive =
+                ShouldUseNativeBlackAndWhiteFilter();
+
+            if (!shouldRun)
+            {
+                ResetBlackAndWhiteRenderEffects();
+                return;
+            }
+
+            if (Time.realtimeSinceStartup < nextBlackAndWhiteEffectScanAt)
+                return;
+
+            nextBlackAndWhiteEffectScanAt =
+                Time.realtimeSinceStartup + 0.2f;
+            var blurEffects = FindObjectsOfType<BlurGamma>();
+            for (var i = 0; i < blurEffects.Length; i++)
+            {
+                var blurEffect = blurEffects[i];
+                if (blurEffect == null || HasBlackAndWhiteEffect(blurEffect))
+                    continue;
+
+                BlackAndWhiteSaturationEffect effect;
+                string error;
+                if (!BlackAndWhiteSaturationEffect.TryCreate(
+                    blurEffect, blackAndWhiteTransitionShader,
+                    out effect, out error))
+                {
+                    if (!string.IsNullOrEmpty(error) &&
+                        !blackAndWhiteRenderFailureLogged)
+                    {
+                        blackAndWhiteRenderFailureLogged = true;
+                        Logger.LogWarning(
+                            "Black-and-white render bridge is waiting: " +
+                            error);
+                    }
+                    continue;
+                }
+
+                effect.SetBlend(blackAndWhiteBlend);
+                blackAndWhiteEffects.Add(effect);
+                blackAndWhiteRenderFailureLogged = false;
+                Logger.LogInfo(
+                    "Attached the bundled saturation transition to camera " +
+                    blurEffect.gameObject.name + ".");
+            }
+
+            blackAndWhiteNativeBaseActive =
+                ShouldUseNativeBlackAndWhiteFilter();
+            for (var i = 0; i < blackAndWhiteEffects.Count; i++)
+                blackAndWhiteEffects[i].SetBlend(blackAndWhiteBlend);
+        }
+
+        private bool ShouldUseNativeBlackAndWhiteFilter()
+        {
+            var fadingOut = blackAndWhiteTransitionStartedAt >= 0f &&
+                            blackAndWhiteTransitionTo < 0.001f;
+            return blackAndWhiteEffects.Count > 0 && !fadingOut &&
+                   blackAndWhiteBlend >= 0.999f;
+        }
+
+        private bool HasBlackAndWhiteEffect(BlurGamma blurEffect)
+        {
+            for (var i = 0; i < blackAndWhiteEffects.Count; i++)
+            {
+                if (blackAndWhiteEffects[i].Matches(blurEffect))
+                    return true;
+            }
+            return false;
+        }
+
+        private void ResetBlackAndWhiteRenderEffects()
+        {
+            // Restore the player's real filter before removing the temporary
+            // saturation correction. No persistent setting is changed.
+            blackAndWhiteNativeBaseActive = false;
+            for (var i = blackAndWhiteEffects.Count - 1; i >= 0; i--)
+                blackAndWhiteEffects[i].Dispose();
+            blackAndWhiteEffects.Clear();
+            nextBlackAndWhiteEffectScanAt = 0f;
+        }
+
+        private void BeginBlackAndWhiteTransition(
+            float target, float delay, float duration)
+        {
+            blackAndWhiteTransitionStartedAt = Time.realtimeSinceStartup;
+            blackAndWhiteTransitionFrom = blackAndWhiteBlend;
+            blackAndWhiteTransitionTo = Mathf.Clamp01(target);
+            blackAndWhiteTransitionDelay = Mathf.Max(0f, delay);
+            blackAndWhiteTransitionDuration = Mathf.Max(0.001f, duration);
+        }
+
+        private void AdvanceBlackAndWhiteTransition()
+        {
+            if (blackAndWhiteTransitionStartedAt < 0f)
+                return;
+
+            // If a camera takes longer than usual to initialize, hold the
+            // color frame instead of starting a transition with no renderer.
+            if (blackAndWhiteTransitionTo > 0.999f &&
+                blackAndWhiteEffects.Count == 0 &&
+                Time.realtimeSinceStartup - blackAndWhiteTransitionStartedAt >
+                    blackAndWhiteTransitionDelay)
+            {
+                blackAndWhiteTransitionStartedAt =
+                    Time.realtimeSinceStartup - blackAndWhiteTransitionDelay;
+                blackAndWhiteBlend = blackAndWhiteTransitionFrom;
+                return;
+            }
+
+            var elapsed = Time.realtimeSinceStartup -
+                          blackAndWhiteTransitionStartedAt -
+                          blackAndWhiteTransitionDelay;
+            if (elapsed <= 0f)
+            {
+                blackAndWhiteBlend = blackAndWhiteTransitionFrom;
+                return;
+            }
+
+            var progress = Mathf.Clamp01(
+                elapsed / blackAndWhiteTransitionDuration);
+            var smoothProgress = progress * progress * (3f - 2f * progress);
+            blackAndWhiteBlend = Mathf.Lerp(
+                blackAndWhiteTransitionFrom,
+                blackAndWhiteTransitionTo,
+                smoothProgress);
+            if (progress >= 1f)
+            {
+                blackAndWhiteBlend = blackAndWhiteTransitionTo;
+                blackAndWhiteTransitionStartedAt = -1f;
+            }
         }
 
         private void SetActiveChallenge(string challenge, int bossIndex)
@@ -1721,6 +2010,13 @@ namespace Gilomx.CupheadBossRoulette
             SetNativeMapEquipEnabled(true);
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
+            ResetBlackAndWhiteRenderEffects();
+            blackAndWhiteTransitionShader = null;
+            if (blackAndWhiteShaderBundle != null)
+            {
+                blackAndWhiteShaderBundle.Unload(true);
+                blackAndWhiteShaderBundle = null;
+            }
 
             StopSpinAudio();
             if (theme != null)

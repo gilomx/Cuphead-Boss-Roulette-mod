@@ -68,5 +68,9 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
 - El equipamiento anterior de ambos jugadores se restaura al ganar o abandonar
   el nivel; al perder y reintentar se conserva el resultado de la ruleta.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
+- El reto `Blanco y negro` utiliza un AssetBundle de 5 KB compilado con Unity
+  2017.4.9f1 para realizar una transición continua y termina usando el filtro
+  nativo del juego. No oculta la pelea ni cambia la preferencia visual guardada;
+  provisionalmente utiliza un icono oscuro con las letras `BN`.
 - La Reliquia Divina utiliza el estado guardado en la partida.
 - El mod no desbloquea objetos ni modifica las compras o el progreso.
