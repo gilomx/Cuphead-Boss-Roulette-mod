@@ -9,6 +9,8 @@ La interfaz utiliza las fuentes y los iconos originales del menú de
 equipamiento de Cuphead, combinados con los retratos de la ruleta web. Al
 terminar el giro, el mod equipa el resultado y carga directamente el combate.
 
+Consulta [CHANGELOG.md](CHANGELOG.md) para ver el historial de cambios.
+
 ## Controles
 
 - `F6`: abrir o cerrar la ruleta.
@@ -57,9 +59,14 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
 
 ## Notas
 
-- Los retos del modo feo se muestran y aplican durante el combate.
+- Los retos se muestran y aplican durante el combate cuando la opción `RETO`
+  está activada.
 - Sin el DLC, la animación y el resultado excluyen automáticamente sus jefes,
   armas y amuletos. Las tres posiciones de súper pertenecen al juego base.
+- La ruleta puede prestar cualquier objeto del catálogo disponible aunque no se
+  haya comprado todavía.
+- El equipamiento anterior de ambos jugadores se restaura al ganar o abandonar
+  el nivel; al perder y reintentar se conserva el resultado de la ruleta.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
 - La Reliquia Divina utiliza el estado guardado en la partida.
-- El mod no modifica el progreso por su cuenta.
+- El mod no desbloquea objetos ni modifica las compras o el progreso.
