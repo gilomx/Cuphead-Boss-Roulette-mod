@@ -107,6 +107,7 @@ decidir otra etiqueta; esa lógica no funcionaría en otros idiomas.
 | `challenge.no_bombs` | `No disparo bombas` |
 | `challenge.no_peashooter` | `No disparo Peashooter` |
 | `challenge.no_ex` | `No EX` |
+| `challenge.black_and_white` | `Blanco y negro` |
 | `challenge.none` | `Nada` |
 
 Antes de traducir retos es obligatorio separar su ID interno del texto visible.
