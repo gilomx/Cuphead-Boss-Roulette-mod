@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.50";
+        public const string PluginVersion = "0.5.51";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;

@@ -72,9 +72,10 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
 - Los jugadores no pueden caminar por el mapa mientras la ruleta está abierta;
   el movimiento se recupera inmediatamente al cerrarla.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
+- Cada reto utiliza una animación propia de tres frames a la misma velocidad
+  visual que las armas, los súper y los amuletos de la tarjeta.
 - El reto `Blanco y negro` utiliza un AssetBundle de 5 KB compilado con Unity
   2017.4.9f1 para realizar una transición continua y termina usando el filtro
-  nativo del juego. No oculta la pelea ni cambia la preferencia visual guardada;
-  provisionalmente utiliza un icono oscuro con las letras `BN`.
+  nativo del juego. No oculta la pelea ni cambia la preferencia visual guardada.
 - La Reliquia Divina utiliza el estado guardado en la partida.
 - El mod no desbloquea objetos ni modifica las compras o el progreso.

@@ -125,13 +125,20 @@ namespace Gilomx.CupheadBossRoulette
                 var rollingModifier = CurrentRollingModifier(bossIndex);
                 var modifier = DisplayIndex(5, result.Modifier, RouletteData.Modifiers.Length,
                     rollingModifier - ticker);
-                DrawTexture(rect, RouletteData.Modifiers[modifier].Image);
+                DrawTexture(rect, AnimatedTexturePath(
+                    RouletteData.Modifiers[modifier].Image, 3, EquipIconFramesPerSecond));
             }
             else
             {
                 var empty = AnimatedSpriteName("equip_icon_empty_0001", 3, EquipIconFramesPerSecond);
                 if (!theme.DrawSprite(empty, rect, Color.white))
                     DrawTexture(rect, "weapons/vacio.png");
+            }
+
+            if (running && revealed <= 5)
+            {
+                var sheen = AnimatedSpriteName("equip_icon_sheen_0001", 5, 12f);
+                theme.DrawSprite(sheen, rect, new Color(1f, 1f, 1f, 0.28f));
             }
             GUI.Label(new Rect(ChallengeCenter.x - 49f,
                 ChallengeCenter.y + halfSize + EquipLabelGap, 98f, 23f), "RETO",
@@ -212,6 +219,22 @@ namespace Gilomx.CupheadBossRoulette
                 return firstFrame;
             var frame = 1 + ((int)(Time.realtimeSinceStartup * framesPerSecond) % frameCount);
             return firstFrame.Substring(0, marker) + "_000" + frame;
+        }
+
+        private static string AnimatedTexturePath(string firstFrame,
+            int frameCount, float framesPerSecond)
+        {
+            if (string.IsNullOrEmpty(firstFrame) || frameCount < 2)
+                return firstFrame;
+
+            var marker = firstFrame.LastIndexOf(
+                "_01.", StringComparison.OrdinalIgnoreCase);
+            if (marker < 0)
+                return firstFrame;
+
+            var frame = 1 + ((int)(Time.realtimeSinceStartup * framesPerSecond) % frameCount);
+            return firstFrame.Substring(0, marker) + "_" + frame.ToString("00") +
+                   firstFrame.Substring(marker + 3);
         }
 
         private void DrawNavigationCursor(Rect rect)

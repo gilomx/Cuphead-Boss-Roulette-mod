@@ -3,6 +3,19 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.51 — 2026-08-05
+
+### Iconos animados de retos
+
+- Los siete retos tienen ahora secuencias propias de tres frames diseñadas con
+  el estilo visual de la Equip Card de Cuphead.
+- Los iconos se reproducen a 12.5 FPS, la misma frecuencia usada por armas,
+  súper y amuletos dentro de la ruleta.
+- `Nada` conserva el círculo vacío animado nativo del juego cuando RETO está
+  desactivado.
+- El slot de RETO utiliza el mismo reflejo animado de los demás elementos
+  mientras gira y lo retira en cuanto queda revelado.
+
 ## 0.5.50 — 2026-08-04
 
 ### Movimiento bloqueado con la ruleta abierta
