@@ -67,6 +67,10 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
   haya comprado todavía.
 - El equipamiento anterior de ambos jugadores se restaura al ganar o abandonar
   el nivel; al perder y reintentar se conserva el resultado de la ruleta.
+- Mientras ese resultado temporal siga activo, la Equip Card no puede abrirse
+  desde la pantalla de derrota; vuelve a estar disponible al salir al mapa.
+- Los jugadores no pueden caminar por el mapa mientras la ruleta está abierta;
+  el movimiento se recupera inmediatamente al cerrarla.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
 - El reto `Blanco y negro` utiliza un AssetBundle de 5 KB compilado con Unity
   2017.4.9f1 para realizar una transición continua y termina usando el filtro

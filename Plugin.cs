@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.48";
+        public const string PluginVersion = "0.5.50";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -216,6 +216,17 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning("Could not install the map pause guard.");
 
+            var mapPlayerCanMove = AccessTools.Method(
+                typeof(MapPlayerController), "CanMove");
+            var blockMapMovementPostfix = AccessTools.Method(
+                typeof(Plugin), "BlockMapMovementPostfix");
+            if (mapPlayerCanMove != null && blockMapMovementPostfix != null)
+                harmony.Patch(mapPlayerCanMove,
+                    postfix: new HarmonyMethod(blockMapMovementPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette map movement guard.");
+
             var filterGetter = AccessTools.PropertyGetter(
                 typeof(SettingsData), "filter");
             var overrideBlackAndWhiteFilterPostfix = AccessTools.Method(
@@ -245,6 +256,19 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning(
                     "Could not install the roulette loadout restoration guard.");
+
+            var changeEquipmentAfterDefeat = AccessTools.Method(
+                typeof(LevelGameOverGUI), "ChangeEquipment");
+            var blockEquipmentAfterRouletteDefeatPrefix = AccessTools.Method(
+                typeof(Plugin), "BlockEquipmentAfterRouletteDefeatPrefix");
+            if (changeEquipmentAfterDefeat != null &&
+                blockEquipmentAfterRouletteDefeatPrefix != null)
+                harmony.Patch(changeEquipmentAfterDefeat,
+                    prefix: new HarmonyMethod(
+                        blockEquipmentAfterRouletteDefeatPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette defeat equipment guard.");
 
             var handleDash = AccessTools.Method(typeof(LevelPlayerMotor), "HandleDash");
             var handleDashPrefix = AccessTools.Method(typeof(Plugin), "BlockDashPrefix");
@@ -358,6 +382,13 @@ namespace Gilomx.CupheadBossRoulette
                 (plugin.visible ||
                  Time.frameCount <= plugin.suppressMapPauseUntilFrame ||
                  plugin.IsControllerToggleModifierHeld()))
+                __result = false;
+        }
+
+        private static void BlockMapMovementPostfix(ref bool __result)
+        {
+            var plugin = activeInstance;
+            if (plugin != null && plugin.visible)
                 __result = false;
         }
 
@@ -1136,6 +1167,12 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin != null)
                 plugin.RestoreOriginalLoadouts(false);
+        }
+
+        private static bool BlockEquipmentAfterRouletteDefeatPrefix()
+        {
+            var plugin = activeInstance;
+            return plugin == null || !plugin.loanedLoadoutsActive;
         }
 
         private bool ShouldRestoreLoanedLoadoutOnWin(Level level)
