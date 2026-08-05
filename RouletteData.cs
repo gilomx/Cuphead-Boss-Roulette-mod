@@ -143,13 +143,13 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static readonly ModifierEntry[] Modifiers =
         {
-            new ModifierEntry("No Dash", ModifierKind.Ground, "modifiers/nodash.png"),
-            new ModifierEntry("No mini avión", ModifierKind.Plane, "modifiers/nomini.png"),
-            new ModifierEntry("Solo mini avión", ModifierKind.Plane, "modifiers/miniavion.png"),
-            new ModifierEntry("No disparo bombas", ModifierKind.Plane, "modifiers/nobombitas.png"),
-            new ModifierEntry("No disparo Peashooter", ModifierKind.Plane, "modifiers/nopeashooterair.png"),
-            new ModifierEntry("No EX", ModifierKind.Both, "modifiers/noex.png"),
-            new ModifierEntry("Blanco y negro", ModifierKind.Both, "modifiers/blackandwhite.png"),
+            new ModifierEntry("No Dash", ModifierKind.Ground, "modifiers/nodash_01.png"),
+            new ModifierEntry("No mini avión", ModifierKind.Plane, "modifiers/nomini_01.png"),
+            new ModifierEntry("Solo mini avión", ModifierKind.Plane, "modifiers/mini_01.png"),
+            new ModifierEntry("No disparo bombas", ModifierKind.Plane, "modifiers/nobombs_01.png"),
+            new ModifierEntry("No disparo Peashooter", ModifierKind.Plane, "modifiers/nopeashooter_01.png"),
+            new ModifierEntry("No EX", ModifierKind.Both, "modifiers/noex_01.png"),
+            new ModifierEntry("Blanco y negro", ModifierKind.Both, "modifiers/blacknwhite_01.png"),
             new ModifierEntry("Nada", ModifierKind.Both, "weapons/vacio.png")
         };
 

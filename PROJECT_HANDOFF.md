@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
-Last updated: 2026-08-04
-Current local version: 0.5.50
+Last updated: 2026-08-05
+Current local version: 0.5.51
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -39,7 +39,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.50.
+This handoff documents the roulette implementation through version 0.5.51.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -449,6 +449,16 @@ postfix forces `MapPlayerController.CanMove()` to return false only when
 velocity, and `Rigidbody2D` velocity in the same frame, while
 `MapPlayerAnimationController` becomes stationary. The static check covers
 both players and restores native movement immediately after closing the card.
+
+Version 0.5.51 replaces the static challenge artwork with seven user-supplied
+three-frame PNG sequences. All frames are 80x80 ARGB and live in
+`assets/modifiers` using the source prefixes `nodash`, `nomini`, `mini`,
+`nobombs`, `nopeashooter`, `noex`, and `blacknwhite`. `DrawModifierSlot()`
+selects the current file through `AnimatedTexturePath()` at the shared Equip
+Card rate of 12.5 FPS. The old static files remain available as legacy assets
+and must not be removed without checking packaged builds that may reference them.
+While field 5 is still rolling, the challenge slot also draws Cuphead's native
+five-frame `equip_icon_sheen` overlay at the same 0.28 alpha as the other slots.
 
 Version 0.5.43 adds automatic base-game/DLC compatibility. Each boss and
 equipment entry now records whether it requires The Delicious Last Course.
