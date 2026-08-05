@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-04
-Current local version: 0.5.48
+Current local version: 0.5.50
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -39,7 +39,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.44.
+This handoff documents the roulette implementation through version 0.5.50.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -436,6 +436,20 @@ victory restoration until `DicePalaceMain`; internal subfights and all retry or
 reload paths retain the roulette equipment. The inventory is never modified,
 so unpurchased equipment remains locked after the original loadout returns.
 
+Version 0.5.49 prevents changing that temporary result from the defeat screen.
+A Harmony prefix on `LevelGameOverGUI.ChangeEquipment()` skips the native
+Equip Card action while `loanedLoadoutsActive` is true. This condition covers
+every loss and retry in the same roulette session without affecting ordinary
+fights. Victory or `SceneLoader.LoadLastMap()` restores the original loadout,
+clears the flag, and therefore returns normal Equip Card behavior on the map.
+
+Version 0.5.50 freezes map movement while the roulette is visible. A Harmony
+postfix forces `MapPlayerController.CanMove()` to return false only when
+`visible` is true. `MapPlayerMotor.Update()` then clears its axis, logical
+velocity, and `Rigidbody2D` velocity in the same frame, while
+`MapPlayerAnimationController` becomes stationary. The static check covers
+both players and restores native movement immediately after closing the card.
+
 Version 0.5.43 adds automatic base-game/DLC compatibility. Each boss and
 equipment entry now records whether it requires The Delicious Last Course.
 Whenever the roulette opens or starts a spin, the plugin refreshes Cuphead's
@@ -686,6 +700,14 @@ renderer. Avoid editing it unless deliberately removing legacy code.
   delay and fade. Repeat while the player's saved filter is `Two-Strip` and
   confirm that setting returns unchanged on the map and after restarting
   Cuphead.
+- Manual 0.5.49 test: start any fight through the roulette, lose, and press the
+  native Equip Card button on the defeat screen. Confirm that the card does not
+  open and retry uses the exact roulette loadout. Then exit to the map and
+  confirm the normal Equip Card opens again with the restored original loadout.
+- Manual 0.5.50 test: start walking and open the roulette before releasing the
+  direction. Confirm both the movement and walking animation stop immediately.
+  Try every direction and, in multiplayer, both players. Close the card and
+  confirm normal movement returns without opening the native Equip Card.
 - Manual 0.5.41 test: every spin must select `Solo mini avión`; changing size
   remained available and non-mini damage was suppressed. This test behavior
   was superseded by 0.5.42.

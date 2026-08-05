@@ -3,6 +3,27 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.50 — 2026-08-04
+
+### Movimiento bloqueado con la ruleta abierta
+
+- Ambos jugadores quedan inmóviles en el mapa mientras la tarjeta de la
+  ruleta está visible.
+- Al abrirla se cancela inmediatamente la velocidad que llevaran los
+  personajes, evitando que sigan deslizándose bajo la interfaz.
+- El movimiento vuelve a funcionar en cuanto se cierra la ruleta.
+
+## 0.5.49 — 2026-08-04
+
+### Equip Card bloqueada después de perder
+
+- La Equip Card de la pantalla de derrota no puede abrirse mientras siga
+  activa una partida iniciada por la ruleta.
+- El resultado prestado por la ruleta queda protegido durante todos los
+  reintentos y no puede reemplazarse antes de reiniciar el combate.
+- El bloqueo sólo afecta esa pantalla de derrota; desaparece al ganar o salir
+  al mapa junto con el equipamiento temporal.
+
 ## 0.5.48 — 2026-08-04
 
 ### Reto `Blanco y negro`
