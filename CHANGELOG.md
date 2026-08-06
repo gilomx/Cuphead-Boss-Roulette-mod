@@ -3,6 +3,255 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.71 — 2026-08-05
+
+### HUD persistente durante toda la partida de Rey Dado
+
+- La cadena de Rey Dado conserva una sola sesión visual aunque cada minijefe
+  cargue una escena distinta.
+- Los círculos y sus impactos de audio se animan únicamente al entrar por
+  primera vez al nivel; los cambios internos de escena y reintentos muestran
+  de inmediato el HUD ya revelado.
+- Mientras la cadena siga activa, el HUD permanece en su canvas independiente
+  y no hereda el destello del parry de capas pertenecientes a escenas previas.
+- La victoria de `DicePalaceMain` sigue trasladando el HUD a la capa nativa para
+  que se oscurezca y desaparezca junto con las vidas durante el knockout.
+
+## 0.5.70 — 2026-08-05
+
+### Ajuste fino de la entrada del HUD
+
+- La espera antes del primer círculo aumentó de 1.0 a 1.1 segundos.
+- El intervalo entre elementos bajó ligeramente de 300 a 280 ms.
+- En tierra aparecen a los 1.10, 1.38, 1.66, 1.94 y 2.22 segundos; en avión,
+  a los 1.10 y 1.38 segundos.
+- Volumen, compactación, pulsos y sincronización del audio permanecen iguales.
+
+## 0.5.69 — 2026-08-05
+
+### Pausa inicial y secuencia más rápida
+
+- La animación del HUD espera ahora 1 segundo antes de mostrar el primer
+  círculo.
+- La separación entre apariciones bajó de 350 a 300 ms.
+- En tierra, los cinco elementos aparecen a los 1.0, 1.3, 1.6, 1.9 y 2.2
+  segundos; en avión aparecen a los 1.0 y 1.3 segundos.
+- El texto del reto también incorpora la espera inicial y continúa apareciendo
+  después de terminar la secuencia de círculos.
+- Cada impacto de audio permanece sincronizado con su elemento.
+
+## 0.5.68 — 2026-08-05
+
+### HUD más audible y ágil
+
+- El volumen relativo de cada impacto aumentó de 0.70 a 0.85, manteniendo su
+  enrutamiento por los controles **Principal** y **Efectos** del juego.
+- La espera entre círculos bajó de 450 a 350 ms.
+- En tierra, el quinto elemento aparece a los 1.4 segundos en vez de 1.8; en
+  avión, el segundo aparece a los 350 ms.
+- La separación visual compacta y la sincronización de un impacto por elemento
+  permanecen intactas.
+
+## 0.5.67 — 2026-08-05
+
+### Impacto del HUD más audible
+
+- El volumen relativo de `impact_01.wav` durante la aparición de cada círculo
+  aumentó de 0.55 a 0.70.
+- El incremento sólo afecta los impactos del HUD; el giro, las selecciones y los
+  sonidos de apertura/cierre conservan sus niveles anteriores.
+- El audio continúa enrutado al grupo SFX nativo, por lo que sigue respondiendo
+  tanto al volumen **Principal** como al volumen **Efectos** de Cuphead.
+
+## 0.5.66 — 2026-08-05
+
+### HUD más compacto y aparición pausada
+
+- La separación entre los círculos de disparos, súper, amuleto y reto pasó de
+  4 a −2 unidades, compensando el margen transparente incluido en los iconos.
+- El grupo terrestre completo ocupa 24 unidades menos de ancho; el HUD de avión
+  también conserva la misma compactación proporcional.
+- La separación de 10 unidades entre el último círculo y el texto del reto no
+  cambió.
+- La espera entre la aparición de cada círculo aumentó de 150 a 450 ms, sumando
+  los 300 ms solicitados. Los impactos de audio permanecen sincronizados con
+  cada aparición.
+
+## 0.5.65 — 2026-08-05
+
+### Respaldo puntual para español de España
+
+- Si `<nivel>Selection` no proporciona texto utilizable mientras el juego está
+  en español de España, el subtítulo usa `BossEntry.Fight`, conservando el
+  nombre español original incluido por el autor del mod.
+- El respaldo se limita a español de España; español latino sigue usando su
+  traducción nativa y los otros diez idiomas continúan sin subtítulo.
+
+## 0.5.64 — 2026-08-05
+
+### Subtítulo exclusivo para español
+
+- El nombre del combate se muestra como texto únicamente cuando Cuphead usa
+  español de España o español latinoamericano.
+- En inglés, francés, italiano, alemán, coreano, ruso, polaco, portugués
+  brasileño, japonés y chino simplificado se muestra sólo el nombre localizado
+  del jefe.
+- Se retiró por completo la ruta de imágenes de `SpriteAtlas`, evitando que el
+  nombre del jefe aparezca duplicado dentro del subtítulo.
+- También se eliminó la recoloración y caché de esas imágenes, que ya no son
+  necesarias.
+
+## 0.5.63 — 2026-08-05
+
+### Mayor tamaño para los títulos gráficos
+
+- El área disponible para los nombres de combate provenientes de `SpriteAtlas`
+  aumentó de 461×34 a 487×46 unidades de diseño.
+- El arte permanece centrado y conserva su proporción, pero ahora aprovecha el
+  ancho completo del subtítulo y tiene aproximadamente 35% más altura máxima.
+- El bloque se desplazó ligeramente hacia abajo para no cubrir el nombre grande
+  del jefe y mantiene separación respecto a los círculos de equipo.
+- Los idiomas que usan texto conservan exactamente el tamaño anterior.
+
+## 0.5.62 — 2026-08-05
+
+### Sin respaldo visual en otro idioma
+
+- Si la traducción activa de `<nivel>Selection` no contiene ni imagen ni texto
+  utilizable, el subtítulo del combate ahora queda vacío.
+- Se eliminó el respaldo visual que mostraba `BossEntry.Fight` en español,
+  evitando mezclar idiomas dentro de la ruleta.
+- Los nombres españoles permanecen en los datos del mod como referencia interna,
+  pero ya no se dibujan cuando falta un recurso nativo.
+
+## 0.5.61 — 2026-08-05
+
+### Color uniforme para el arte localizado
+
+- Los títulos provenientes de los atlas nativos ya no conservan sus píxeles
+  negros ni dependen de un tinte multiplicativo incapaz de aclararlos.
+- Cada sprite se copia una sola vez mediante GPU, se recolorea al mismo crema
+  usado por `equipFightStyle` y conserva su canal alfa y bordes suavizados.
+- La textura procesada queda almacenada en caché durante la sesión y se destruye
+  junto con los demás recursos del mod al cerrarlo.
+- Los títulos textuales no cambian; ambos formatos comparten ahora exactamente
+  el mismo tono visual.
+
+## 0.5.60 — 2026-08-05
+
+### Títulos nativos en los doce idiomas
+
+- El nombre del combate ahora reproduce la estrategia completa de localización
+  de la tarjeta de dificultad de Cuphead.
+- Cuando `<nivel>Selection` proporciona un recurso de `SpriteAtlas`, la ruleta
+  dibuja directamente ese arte localizado y respeta su proporción. Esto cubre
+  los títulos que Cuphead distribuye como imagen en inglés, coreano, japonés y
+  chino simplificado.
+- Cuando la traducción es textual, se eliminan las etiquetas de TextMeshPro y
+  los caracteres transparentes usados por el juego para ajustar su tarjeta
+  original antes de mostrar el título en una sola línea.
+- Si un sprite no puede recuperarse del atlas se intenta el texto traducido y,
+  sólo como último respaldo, el nombre español incluido en `BossEntry`.
+
+## 0.5.59 — 2026-08-05
+
+### Nombre localizado del combate
+
+- El subtítulo situado debajo del nombre del jefe ya no usa siempre el texto
+  español guardado en `BossEntry.Fight`.
+- Ahora consulta la clave nativa `<nivel>Selection`, la misma que usa la tarjeta
+  de dificultad de Cuphead para el nombre del combate.
+- La consulta se realiza al dibujar la ruleta, por lo que refleja los cambios de
+  idioma del juego sin reiniciar el mod.
+- El nombre español existente se conserva como respaldo si la clave no existe,
+  la traducción no contiene texto o el recurso está temporalmente indisponible.
+
+## 0.5.58 — 2026-08-05
+
+### Audio integrado con los ajustes de Cuphead
+
+- Los dos canales de audio propios del mod ahora se envían al grupo `sfx` del
+  mezclador nativo de Cuphead.
+- El volumen **Principal** afecta los sonidos del mod como volumen maestro y el
+  volumen **Efectos** controla su categoría; el volumen **Música** no los altera.
+- El cambio se aplica automáticamente, incluso si el jugador modifica el volumen
+  mientras el juego está abierto.
+- Esto incluye el giro, las selecciones, los audios de apertura/cierre usados
+  como respaldo y los impactos de aparición del HUD. Los sonidos nativos de menú
+  ya pasan por el mezclador del juego y no reciben volumen duplicado.
+
+## 0.5.57 — 2026-08-05
+
+### Cancelación del giro al cerrar la ruleta
+
+- Cerrar la Equip Card con F6, mando o cualquier otra ruta mientras gira ahora
+  cancela la tirada en vez de mantenerla activa en segundo plano.
+- Se detienen inmediatamente el audio continuo del giro y los sonidos de
+  selección que todavía se estén reproduciendo.
+- Se descartan el resultado parcial, los elementos revelados, los pulsos y una
+  posible carga pendiente.
+- Al abrir nuevamente la tarjeta vuelve al estado `¡GIRAR!`; es obligatorio
+  iniciar una tirada nueva.
+
+## 0.5.56 — 2026-08-05
+
+### Entrada estable en pantalla completa
+
+- La inclinación aleatoria de la Equip Card permanece fija durante toda la
+  animación de entrada y salida, en lugar de interpolarse mientras se mueve.
+- El desplazamiento vertical se ajusta a píxeles físicos completos después de
+  aplicar la escala de resolución.
+- Esto evita que fuentes, iconos y líneas parezcan deformarse o moverse entre
+  sí al jugar a pantalla completa con escalas fraccionarias como 1.5×.
+- La posición, inclinación y composición finales de la tarjeta no cambian.
+
+## 0.5.55 — 2026-08-05
+
+### Sincronización del impacto del HUD
+
+- Se detectó que `impact_01.wav` contenía entre 90 y 98 ms antes de su golpe
+  audible, aunque Unity iniciaba el clip en el mismo frame que el círculo.
+- Se recortaron 85 ms del inicio y se conservó una entrada suave de 5 ms para
+  evitar clics. El sonido perceptible comienza ahora aproximadamente 12 ms
+  después de la aparición.
+- No se cambió la cadencia de los círculos ni el momento de reproducción en el
+  código; la corrección está contenida en el recurso de audio.
+
+## 0.5.54 — 2026-08-05
+
+### Salida nativa del HUD y sonido de aparición
+
+- Se eliminó el parpadeo que podía producirse al transferir la fila al Canvas
+  nativo durante el knockout.
+- Al vencer se crea una copia visual ya preparada dentro de `LevelHUD`; el
+  overlay se oculta en el mismo frame, sin mover la fila visible.
+- La copia permanece aunque `SceneLoader` haya iniciado la carga y desaparece
+  únicamente cuando el HUD original se oscurece y es retirado antes de la
+  pantalla de resultados.
+- Se añadió `assets/sounds/impact_01.wav`, convertido a PCM estéreo de 16 bits
+  y 44.1 kHz para Unity 2017.4.
+- El sonido se reproduce una vez con la aparición de cada círculo del HUD al
+  comenzar un intento. No se reproduce para el texto del reto.
+- Los combates terrestres reproducen cinco impactos y los de avión dos; pausa,
+  derrota y transiciones temporales no repiten sonidos ya revelados.
+
+## 0.5.53 — 2026-08-05
+
+### HUD estable durante parry y knockout
+
+- La fila del resultado queda aislada del efecto de cámara del parry y ya no
+  debe destellar ni pulsar cuando el jugador realiza una parada.
+- Durante el combate utiliza su Canvas overlay independiente, pero continúa
+  respetando la disponibilidad del HUD original para no atravesar iris ni
+  apagados de fase.
+- El estado visual conserva una copia del resultado y del nombre del reto por
+  separado del equipamiento temporal y de las restricciones jugables.
+- Al vencer, la fila permanece fija durante todo el knockout, vuelve al Canvas
+  nativo para compartir su salida y desaparece cuando comienza la transición
+  oscura; no aparece en la pantalla de resultados.
+- La derrota, los reintentos, la pausa, los niveles de avión y el reto Blanco y
+  negro conservan su comportamiento anterior.
+
 ## 0.5.52 — 2026-08-05
 
 ### Resultado de la ruleta en el HUD

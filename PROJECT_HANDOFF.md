@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-05
-Current local version: 0.5.52
+Current local version: 0.5.71
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -39,7 +39,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.52.
+This handoff documents the roulette implementation through version 0.5.71.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -503,30 +503,305 @@ the 0.209-second selection clip is played at volume 0.45 instead of 0.9 so it no
 longer masks the spin loop by roughly 6 dB whenever a field settles. Do not route
 selection sounds back through the spin source.
 
-## Pending HUD follow-up for the next agent
+## HUD parry and knockout lifecycle (0.5.53-0.5.54)
 
-The following two runtime observations are intentionally documented but not
-implemented in version 0.5.52:
+Version 0.5.53 resolves the two runtime observations recorded after 0.5.52.
+During normal gameplay `PlaceBattleHudOnGameplayLayer()` keeps the row on the
+persistent Screen Space Overlay Canvas instead of the camera-rendered
+`LevelHUD.Canvas`. This isolates it from Cuphead's parry camera flash. The
+method still requires the native Canvas to exist, be enabled, and be active in
+the hierarchy, so phase and iris transitions can hide the row normally. Pause
+and game-over continue reparenting the same root below their menu content.
 
-1. The roulette result row flashes when the player performs a parry. It must
-   remain visually steady. Investigate which native `LevelHUD` child,
-   `CanvasGroup`, or animation propagates the parry flash. Move or isolate the
-   row from that transient effect while preserving its current render order:
-   normal phase/iris transitions must still cover it like the health HUD, and
-   pause/game-over cards must still draw above it.
-2. The row disappears as soon as the boss is defeated. It must remain visible
-   throughout the victory and results sequence and disappear only after the
-   player has actually returned to the map. Keep the visual result snapshot
-   separate from `activeChallenge` and `loanedLoadoutsActive`: gameplay
-   restrictions and temporary equipment should still clear/restore at the
-   existing victory hooks, but the HUD presentation should survive until
-   `SceneLoader.LoadLastMap()` or confirmed map activation.
+The visual lifetime no longer depends on `loanedLoadoutsActive` or
+`activeChallenge`. `BeginBattleResultHudSession()` snapshots every roulette
+result index plus the challenge name before `LoadLevel()`. The regular victory
+hook can therefore restore the original equipment and clear all gameplay
+restrictions immediately without erasing the displayed row.
 
-Acceptance checks: parry repeatedly during a roulette fight without any flash;
-defeat the boss and confirm the row remains through knockout/results; then
-confirm it is gone once free movement on the map resumes. Also recheck iris,
-pause, defeat/retry, airplane two-slot layout, and Blanco y negro after changing
-the HUD parent or lifetime.
+Version 0.5.53 initially reparented the visible row under `LevelHUD` and hid it
+as soon as `SceneLoader.CurrentlyLoading` became true. Runtime testing found a
+brief transfer blink and confirmed that the loading flag becomes true before
+the native HUD has finished darkening.
+
+Version 0.5.54 replaces that transfer with
+`TrySwapBattleHudToNativeVictoryLayer()`. It instantiates an inactive copy of
+the fully revealed row directly under `LevelHUD.Canvas`, validates and captures
+its five `RawImage` components and challenge `Text`, hides the overlay, then
+activates the native copy in the same frame. The visible object is never moved,
+so its screen position and alpha cannot jump. During this final-victory state,
+`ShouldShowBattleResultHud()` deliberately tolerates
+`SceneLoader.CurrentlyLoading` while the native root still exists. The native
+Canvas therefore darkens and destroys the copy exactly with health and super;
+the results scene has no battle `Level.Current`, so it cannot recreate there.
+
+Dice Palace subfight victories do not enable this final-victory path, so the
+snapshot remains available for the next internal battle. Returning to the map
+through `SceneLoader.LoadLastMap()` explicitly ends the presentation session.
+
+Version 0.5.54 also loads `assets/sounds/impact_01.wav` into
+`battleHudImpactClip`. The supplied 32-bit float WAV is normalized for runtime
+shipping as 16-bit stereo PCM at 44.1 kHz without changing its 0.834-second
+duration. `UpdateBattleResultHudReveal()` tracks
+`battleHudImpactPlayedCount` and calls `PlayOneShot` at 0.55 volume exactly once
+for every icon whose reveal threshold has passed. Ground fights produce five
+sounds and plane fights two. The challenge text has no sound. The counter
+resets for a new attempt/session, but not when the HUD is temporarily hidden by
+pause, phase, or iris layering.
+
+Runtime testing found that the original waveform itself delayed its audible
+impact: it remained below -25 dB for about 97.5 ms, even though
+`PlayOneShot()` and the icon reveal occurred in the same frame. Version 0.5.55
+rebuilds the shipping WAV from the supplied source with the first 85 ms removed
+and a 5 ms fade-in. The resulting PCM file lasts 0.749 seconds and reaches the
+same -25 dB threshold after about 12.5 ms. Do not add leading silence to fix
+visual synchronization; that moves the perceived impact later. If further
+tuning is requested, adjust the audio trim rather than `BattleHudRevealStep`.
+
+## Compact HUD icon row and slower cadence (0.5.66)
+
+The user felt the shot, super, charm, and challenge circles were visually too
+far apart even though their rectangles had only a 4-unit gap; the artwork itself
+contains transparent breathing room. `BattleHudIconGap` is now `-2f`, producing
+a slight rectangle overlap that moves neighboring centers from 52 to 46 units.
+Five ground icons therefore shrink from 256 to 232 units overall. Plane HUDs use
+the same formula for their two visible icons. `BattleHudTextGap` intentionally
+remains `10f`, so the visual space from the final circle to `RETO: ...` is
+unchanged.
+
+`BattleHudRevealStep` increases from `0.15f` to `0.45f`, adding exactly 300 ms
+between consecutive circle reveals. The first circle still appears at the same
+time. Impact playback derives from `revealedIconCount`, so every sound remains
+on the same frame as its corresponding circle without further audio changes.
+The challenge text delay continues to derive from the reveal step and therefore
+waits until the slower icon sequence is complete.
+
+## Louder HUD reveal impact (0.5.67)
+
+`BattleHudImpactVolume` increases from `0.55f` to `0.70f` so the short reveal
+impact remains perceptible when the player's game volumes are set relatively
+low. This is only the clip's local `PlayOneShot` gain: `effectsAudioSource`
+continues through Cuphead's native `sfx` mixer group, so both Principal/Master
+and Efectos/SFX still control the final output and setting either to silence
+still mutes the impact. No other mod sound level changes.
+
+## HUD cadence and impact retune (0.5.68)
+
+After gameplay testing, the 0.5.66 cadence felt too slow and the 0.5.67 impact
+still too quiet. `BattleHudRevealStep` is now `0.35f` instead of `0.45f`, placing
+the five ground reveals at 0, 350, 700, 1050, and 1400 ms; the plane pair appears
+at 0 and 350 ms. `BattleHudImpactVolume` is now `0.85f`. The compact `-2f` icon
+gap, native SFX mixer routing, per-icon impact counter, trimmed WAV, pulse
+duration, and challenge-text timing formula are unchanged.
+
+## Delayed HUD sequence start (0.5.69)
+
+`BattleHudInitialRevealDelay = 1f` now holds the complete custom HUD invisible
+for one second after its presentation begins. `BattleHudRevealStep` decreases
+from `0.35f` to `0.30f`, so ground icons reveal at 1.0, 1.3, 1.6, 1.9, and 2.2
+seconds and plane icons at 1.0 and 1.3 seconds. `localElapsed` subtracts both the
+initial delay and each icon's step; the impact counter therefore remains silent
+during the hold and still fires on each reveal frame. The challenge text delay
+also adds `BattleHudInitialRevealDelay`, preventing it from fading in during the
+new one-second pause.
+
+## Final HUD reveal timing refinement (0.5.70)
+
+The accepted 0.5.69 rhythm receives a small final adjustment:
+`BattleHudInitialRevealDelay` is `1.1f` and `BattleHudRevealStep` is `0.28f`.
+Ground reveal timestamps are 1.10, 1.38, 1.66, 1.94, and 2.22 seconds; plane
+timestamps are 1.10 and 1.38 seconds. This delays the first visual by 100 ms
+while shortening each subsequent gap by only 20 ms. Impact volume remains
+`0.85f`; icon gap, pulse duration, text-delay formula, and audio synchronization
+are unchanged.
+
+## King Dice HUD session continuity (0.5.71)
+
+King Dice must always be treated as one battle session even though Cuphead
+loads a different `DicePalace*` scene for each board space. When
+`ShouldShowBattleResultHud()` becomes false during one of those internal loads,
+`UpdateBattleResultHud()` now hides the row without clearing
+`battleHudWasVisible`, `battleHudRevealStartedAt`, or
+`battleHudImpactPlayedCount`. The initial icon animation and its impact sounds
+therefore run only after the real entry into King Dice; subsequent minijefes,
+scene transitions, and retries restore the already revealed HUD immediately.
+`BeginBattleResultHudSession()` remains the only reset at roulette launch, and
+`EndBattleResultHudSession()` still clears the state when returning to the map.
+
+`BattleHudUsesDicePalaceChain()` identifies this behavior from the snapshotted
+roulette boss instead of the current scene. While that chain is active and the
+final-victory flag is false, `PlaceBattleHudInsideMenuLayer()` keeps the row
+under the persistent overlay canvas instead of adopting a scene-local pause,
+defeat, or transition layer. This prevents later internal fights from inheriting
+the native parry flash. Winning the real `DicePalaceMain` fight still calls
+`KeepBattleResultHudThroughVictory()`, enables the native-victory path, and lets
+the row darken and disappear with Cuphead's original HUD during knockout.
+
+## Fullscreen Equip Card entrance stability (0.5.56)
+
+At 1920x1080 the 1280x720 IMGUI design matrix uses a 1.5 scale. The previous
+entrance multiplied `cardRoll` by `cardVisibility` while also moving the card by
+an unsnapped fractional Y offset. Unity re-rasterized every IMGUI label, sprite,
+and thin line at a slightly different rotated subpixel position each frame;
+the paper background concealed this sampling change, but the contents appeared
+to deform or move gelatinously until the card stopped.
+
+`DrawRoulette()` now applies the selected `cardRoll` unchanged for the complete
+entry/exit and snaps its design-space Y offset through
+`Round(rawOffsetY * screenScale) / screenScale`. The whole composition therefore
+moves as a rigid card in exact physical-pixel increments. `SetVisible(false)`
+no longer clears `cardRoll`; the hidden value is harmless and a new random roll
+is still selected at the next open. Preserve this rigid transform unless the
+card is migrated away from IMGUI to a single precomposited texture.
+
+## Spin cancellation when closing the card (0.5.57)
+
+Previously, `SetVisible(false)` only animated the Equip Card out. The
+frame-driven `UpdateSpin()` state remained active, so the roulette continued
+advancing and playing audio while hidden and could finish with a valid result.
+
+Closing the card while `running` now calls `CancelRouletteSpin()` before the
+close sound is played. It clears `running`, `pendingLoad`, `resultReady`, the
+timers, ticker, reveal count, pulse timers, and the partial `RouletteResult`.
+It also stops both the dedicated looping spin `AudioSource` and transient
+selection sounds on `effectsAudioSource`, then restores the prompt state to
+`PULSA ENTER PARA GIRAR`. This applies equally to F6, the controller shortcut,
+Escape, leaving the map, or any future close path routed through
+`SetVisible(false)`. Reopening never resumes or accepts the cancelled result;
+the player must start a new spin.
+
+## Native audio settings integration (0.5.58)
+
+Cuphead's audio options are not three independent multipliers applied by game
+code. `SettingsData` stores `masterVolume`, `sFXVolume`, and `musicVolume`, then
+applies them to the exposed `AudioManager` mixer properties `MasterVolume`,
+`Options_SFXVolume`, and `Options_BGMVolume`. The master group is the parent of
+both categories, so **Principal** affects music and effects; **Efectos** and
+**Música** then control their respective child paths.
+
+`RouteModAudioToGameSfxMixer()` assigns both persistent plugin `AudioSource`
+instances to `AudioManagerMixer.GetGroups().sfx`, the same group used by
+Cuphead's default-channel sound effects. This covers the roulette loop and all
+clips played through `effectsAudioSource`: selection stops, local menu fallbacks,
+and battle HUD impacts. Because routing occurs through the mixer, live option
+changes propagate without polling or manually converting the mixer's decibel
+values. Do not additionally multiply source volumes by `SettingsData` values;
+that would apply the settings twice. Calls handled successfully by
+`AudioManager.Play()` are already native SFX and keep their existing routing.
+
+## Native fight-title localization (0.5.59)
+
+The Equip Card originally localized only the large boss/character name through
+`Localization.Find(boss.Level.ToString())`; its smaller fight title came from
+the Spanish-only `BossEntry.Fight` field. Cuphead's localization catalog does
+not expose these titles through a consistent `IntelMenu...` family. Inspection
+of `MapDifficultySelectStartUI.In()` shows the actual native difficulty card
+builds the title key by concatenating the level identifier with `Selection`
+(and uses `<level>WorldMap` separately for the boss name).
+
+`LocalizedFightName()` requests `<boss.Level>Selection` every time the card is
+drawn and normalizes embedded `\\N` line breaks. This per-frame lookup
+intentionally mirrors `LocalizedBossName()` and means changing Cuphead's
+language updates both visible names without restarting the plugin. Version
+0.5.59 originally fell back to `BossEntry.Fight`; 0.5.62 removes that visual
+fallback so an unavailable translation leaves the subtitle empty.
+
+## Native fight-title artwork and markup handling (0.5.60)
+
+Runtime inspection of `FrogsSelection` confirmed the complete format split.
+English, Korean, Japanese, and Simplified Chinese provide localized title art
+through `spriteAtlasName` / `spriteAtlasImageName` (Japanese also carries text).
+French, Italian, German, both Spanish variants, Russian, Polish, and Brazilian
+Portuguese provide text decorated with TextMeshPro layout tags and transparent
+punctuation used for the two-line native card.
+
+`DrawLocalizedFightArtwork()` now mirrors `LocalizationHelper`: when the active
+`Selection` translation reports `hasSpriteAtlasImage`, it obtains the atlas via
+`AssetLoader<SpriteAtlas>.GetCachedAsset()`, retrieves the named sprite, fits it
+without stretching inside the roulette subtitle area, and draws it through the
+new direct-`Sprite` overload in `GameTheme`. A direct `translation.image` is
+also supported. If no artwork is available, `PlainFightTitle()` removes fully
+transparent TMP spans, remaining markup, hidden quote/semicolon kerning
+characters, and line breaks before the IMGUI label is drawn. If atlas lookup
+fails, the same active-language text path is attempted.
+
+This means all twelve languages use Cuphead's own representation rather than a
+mod-maintained translation table. Do not replace the atlas lookup with
+`Resources.FindObjectsOfTypeAll<Sprite>()`: `LocalizationHelper` uses the same
+`AssetLoader` cache because atlas sub-sprites are not guaranteed to appear in a
+global resource scan.
+
+## Uniform localized-title color (0.5.61)
+
+Tinting the localized atlas sprite with `GUI.color` did not produce the same
+cream as `equipFightStyle`: multiplication can darken white artwork but cannot
+turn already-black pixels into a light color. This made several native titles
+appear black while text-backed languages used `secondaryText` (`0.91, 0.86,
+0.69`).
+
+`GetTintedFightArtwork()` now copies the sprite's atlas rectangle through a
+temporary `RenderTexture`, reads only that small region into a mod-owned
+`Texture2D`, replaces its RGB with `equipFightStyle.normal.textColor`, and
+preserves the original alpha (including antialiased edges). This GPU-copy first
+step is required because Unity's imported atlas textures are not guaranteed to
+be CPU-readable. Results are cached in the existing `textures` dictionary by
+atlas, image, sprite, and target color, then destroyed by the established
+`OnDestroy()` cleanup. Never perform `GetPixels32()` directly on the source
+atlas and do not rebuild the tinted texture per frame.
+
+## Empty missing-localization behavior (0.5.62)
+
+The user explicitly prefers no fight subtitle over a title in the wrong
+language. `LocalizedFightName()` therefore returns `string.Empty` when the
+active `<level>Selection` entry has neither usable artwork nor usable text, or
+when localization is temporarily unavailable. `BossEntry.Fight` remains in
+`RouletteData` as internal Spanish reference data but is no longer a rendering
+fallback. Preserve this distinction in future localization changes.
+
+## Larger native fight-title artwork (0.5.63)
+
+The initial atlas-art bounds (`x=67, y=303, width=461, height=34`) made several
+native titles look materially smaller than the text-backed subtitle, especially
+when the sprite itself included internal breathing room. Artwork now fits within
+`x=54, y=305, width=487, height=46`: full subtitle width and about 35% more
+maximum height. Aspect ratio and centering remain unchanged. The lower placement
+keeps the larger art from covering the large boss name and still ends before the
+equipment circles begin. Do not apply these bounds to `equipFightStyle`; the
+text-backed path intentionally retains its original 487x24 rectangle.
+
+## Spanish-only fight subtitle policy (0.5.64)
+
+The user chose a simpler final presentation after seeing that Cuphead's
+`Selection` atlas art contains both the boss name and the fight title, which
+duplicated the already-localized large boss name on the roulette card. The
+fight subtitle is now drawn only when `Localization.language` is
+`SpanishSpain` or `SpanishAmerica`; both use the cleaned native
+`<level>Selection` text. Every other language intentionally shows only the
+large localized boss name and leaves the subtitle area empty.
+
+Version 0.5.64 removes `DrawLocalizedFightArtwork()`, the atlas lookup, GPU
+recoloring/cache, and the direct-`Sprite` `GameTheme.DrawSprite()` overload
+introduced in 0.5.60-0.5.63. Those sections remain above as implementation
+history, not current behavior. Preserve the Spanish-only rule unless the user
+explicitly supplies or approves a text catalog for other languages.
+
+## Spanish-Spain missing-title fallback (0.5.65)
+
+At least one Spanish-Spain `Selection` entry may not expose usable text. The
+user wants that isolated gap filled with the mod author's existing Spanish
+title instead of leaving it blank. `LocalizedFightName()` records whether the
+active language is `SpanishSpain`; if the native lookup, cleanup, or resource
+availability produces no title, it returns `boss.Fight`. This fallback does not
+apply to `SpanishAmerica` or any other language. Keep it narrowly scoped so the
+general no-language-mixing policy from 0.5.64 remains intact.
+
+Manual acceptance checks: parry repeatedly during a roulette fight and confirm
+the row remains visually steady. Confirm each ground icon produces one impact
+sound and the challenge text produces none; repeat in a plane fight for exactly
+two impacts. Defeat the boss and confirm the row neither blinks nor moves, stays
+fixed while the screen darkens, and disappears with the health HUD before the
+results card appears. Also recheck iris, pause, defeat/retry, Blanco y negro,
+and the final Dice Palace victory.
 
 Version 0.5.43 adds automatic base-game/DLC compatibility. Each boss and
 equipment entry now records whether it requires The Delicious Last Course.
@@ -698,6 +973,20 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
+- Version 0.5.71 builds with zero errors and zero warnings and was installed
+  and launched successfully on 2026-08-05. `BepInEx\LogOutput.log` confirms
+  `Loading [Gilomx Boss Roulette 0.5.71]` and the normal ready message.
+- The ready-to-paste artifact is
+  `dist/Gilomx-Boss-Roulette-0.5.71-BepInEx-x64.zip` (10,575,732 bytes,
+  SHA-256 `8DB50162FBDEF4E630C18543FEB3072471F4CCD26FE66207D27392BD6361F217`).
+  Its 122 entries were inspected: it contains the x64 Doorstop bootstrap,
+  18 BepInEx core files, the 0.5.71 DLL, the complete asset tree including
+  `impact_01.wav`, and no config, log, cache, save, or unrelated plugin files.
+- Manual 0.5.71 King Dice acceptance: confirm the icon/audio entry sequence
+  runs once at the real start, never repeats during internal `DicePalace*`
+  scene changes or retries, and remains steady during parries in later
+  minijefes. The final `DicePalaceMain` knockout must still darken and remove
+  the row with Cuphead's native health HUD.
 - Version 0.5.48 builds with zero errors and zero warnings when
   `CupheadDir` points to the current installation on `E:`.
 - The temporary version 0.5.30 was installed and reproduced the frozen Dragon

@@ -31,6 +31,13 @@ súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.
 
 ## Instalación
 
+El ZIP `Gilomx-Boss-Roulette-<versión>-BepInEx-x64.zip` ya incluye BepInEx y el
+mod. Extrae su contenido directamente en la carpeta de Cuphead y acepta la
+combinación de carpetas; no incluye configuraciones, partidas, logs ni otros
+mods.
+
+Para una instalación manual:
+
 1. Instala BepInEx 5 x64 en la carpeta de Cuphead y ejecuta el juego una vez.
 2. Compila el proyecto o descarga una versión publicada.
 3. Coloca la DLL y la carpeta `assets` juntas en:
@@ -78,8 +85,14 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
 - Los iconos entran uno por uno con el pulso de selección de la ruleta y el
   texto aparece al final. Los nombres largos ajustan su tamaño sin perder el
   margen derecho. El reto Blanco y negro también desatura este HUD agregado.
-- La fila forma parte del Canvas nativo de `LevelHUD`, por lo que las
-  transiciones de iris y los apagados de fase la ocultan junto al HUD original.
+- Cada círculo reproduce `impact_01.wav` al aparecer al inicio del intento; el
+  texto del reto entra sin sonido.
+- Durante el combate la fila utiliza un Canvas aislado para no destellar con
+  los parry, pero respeta la visibilidad de `LevelHUD` para que las transiciones
+  de iris y los apagados de fase la oculten junto al HUD original.
+- Al vencer una copia visual ya preparada permanece fija dentro del HUD nativo,
+  se oscurece junto con las vidas y desaparece antes de la pantalla de
+  resultados, sin parpadeos ni cambios de posición.
 - Al pausar o perder, este HUD queda delante del oscurecimiento y detrás de la
   tarjeta del menú.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
