@@ -28,6 +28,15 @@ incluye:
 Las dos variantes de español pueden compartir inicialmente el texto actual o
 tener vocabulario distinto si se decide después.
 
+### Política parcial ya implementada
+
+El nombre grande del jefe usa la localización nativa de Cuphead. El subtítulo
+del nivel usa el catálogo existente `BossEntry.Fight` tanto en
+`SpanishSpain` como en `SpanishAmerica`, garantizando que todos los jefes tengan
+texto. En los otros diez idiomas el subtítulo queda vacío y sólo se muestra el
+nombre localizado del jefe. Esta decisión ya está cerrada; el resto de la
+interfaz continúa pendiente de una estrategia de traducción completa.
+
 ## Textos que puede proporcionar el propio juego
 
 Conviene reutilizar estas traducciones oficiales en lugar de mantener copias:
@@ -180,4 +189,3 @@ buscar, y traducir sólo los avisos que ayudan directamente al jugador.
 - Qué redacción debe tener cada reto en cada idioma.
 - Si `Boss Roulette` permanece como marca o se traduce.
 - Si se traducen configuración y logs además de la interfaz.
-- Si español de España y español de América comparten textos.

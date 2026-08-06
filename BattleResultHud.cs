@@ -33,6 +33,8 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly System.Reflection.FieldInfo
             LevelHudPlayerSuperField = AccessTools.Field(
                 typeof(LevelHUDPlayer), "super");
+        private static readonly System.Reflection.FieldInfo
+            SceneLoaderCanvasField = AccessTools.Field(typeof(SceneLoader), "canvas");
 
         private GameObject battleHudCanvas;
         private GameObject battleHudRoot;
@@ -49,6 +51,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool battleHudOnPauseLayer;
         private bool battleHudPresentationActive;
         private bool battleHudFollowNativeVictoryLayer;
+        private bool battleHudHoldOverlayThroughVictory;
         private RouletteResult battleHudResultSnapshot;
         private string battleHudChallengeSnapshot = "";
         private int battleHudImpactPlayedCount;
@@ -101,9 +104,15 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!battleHudPresentationActive)
                 return false;
-            if (SceneLoader.CurrentlyLoading &&
-                (!battleHudFollowNativeVictoryLayer || battleHudRoot == null))
-                return false;
+            if (SceneLoader.CurrentlyLoading)
+            {
+                var keepThroughSceneLoad =
+                    battleHudFollowNativeVictoryLayer ||
+                    battleHudHoldOverlayThroughVictory ||
+                    BattleHudUsesDicePalaceChain();
+                if (!keepThroughSceneLoad || battleHudRoot == null)
+                    return false;
+            }
 
             try
             {
@@ -118,8 +127,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private void BeginBattleResultHudSession()
         {
+            returnToMapAfterRouletteFinalBossWin = false;
             battleHudPresentationActive = true;
             battleHudFollowNativeVictoryLayer = false;
+            battleHudHoldOverlayThroughVictory = false;
             battleHudChallengeSnapshot = activeChallenge ?? "";
             battleHudResultSnapshot = new RouletteResult
             {
@@ -135,12 +146,22 @@ namespace Gilomx.CupheadBossRoulette
             battleHudImpactPlayedCount = 0;
         }
 
-        private void KeepBattleResultHudThroughVictory()
+        private void KeepBattleResultHudThroughVictory(
+            bool holdUntilSceneChange)
         {
             if (!battleHudPresentationActive)
                 return;
 
-            battleHudFollowNativeVictoryLayer = true;
+            battleHudHoldOverlayThroughVictory =
+                holdUntilSceneChange;
+            battleHudFollowNativeVictoryLayer =
+                !holdUntilSceneChange;
+            if (holdUntilSceneChange)
+            {
+                if (!PlaceBattleHudOnSceneTransitionLayer())
+                    PlaceBattleHudOnPersistentOverlay();
+                return;
+            }
             Canvas nativeCanvas;
             if (TryGetNativeBattleHudCanvas(out nativeCanvas))
                 TrySwapBattleHudToNativeVictoryLayer(nativeCanvas);
@@ -148,8 +169,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private void EndBattleResultHudSession()
         {
+            returnToMapAfterRouletteFinalBossWin = false;
             battleHudPresentationActive = false;
             battleHudFollowNativeVictoryLayer = false;
+            battleHudHoldOverlayThroughVictory = false;
             battleHudResultSnapshot = null;
             battleHudChallengeSnapshot = "";
             battleHudWasVisible = false;
@@ -953,6 +976,16 @@ namespace Gilomx.CupheadBossRoulette
             if (battleHudRoot == null)
                 return false;
 
+            if (battleHudHoldOverlayThroughVictory)
+                return PlaceBattleHudOnSceneTransitionLayer() ||
+                       PlaceBattleHudOnPersistentOverlay();
+
+            if (SceneLoader.CurrentlyLoading &&
+                !battleHudFollowNativeVictoryLayer &&
+                BattleHudUsesDicePalaceChain())
+                return PlaceBattleHudOnSceneTransitionLayer() ||
+                       PlaceBattleHudOnPersistentOverlay();
+
             Canvas nativeCanvas;
             if (!TryGetNativeBattleHudCanvas(out nativeCanvas))
                 return false;
@@ -969,6 +1002,50 @@ namespace Gilomx.CupheadBossRoulette
             // during active play so that flash cannot tint or pulse it. On a
             // final victory it moves back to LevelHUD above, allowing the
             // native knockout transition to remove both HUDs together.
+            return PlaceBattleHudOnPersistentOverlay();
+        }
+
+        private bool PlaceBattleHudOnSceneTransitionLayer()
+        {
+            if (battleHudRoot == null || SceneLoaderCanvasField == null)
+                return false;
+
+            Canvas sceneTransitionCanvas;
+            try
+            {
+                var loader = SceneLoader.Exists
+                    ? SceneLoader.instance
+                    : null;
+                sceneTransitionCanvas = loader == null
+                    ? null
+                    : SceneLoaderCanvasField.GetValue(loader) as Canvas;
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (sceneTransitionCanvas == null ||
+                !sceneTransitionCanvas.enabled ||
+                !sceneTransitionCanvas.gameObject.activeInHierarchy)
+                return false;
+
+            if (battleHudRoot.transform.parent !=
+                sceneTransitionCanvas.transform)
+                battleHudRoot.transform.SetParent(
+                    sceneTransitionCanvas.transform, false);
+            // SceneLoader's fader is a later sibling on this same canvas, so
+            // Cuphead's native three-second victory fade covers the roulette
+            // row exactly as it covers the game image.
+            battleHudRoot.transform.SetAsFirstSibling();
+            battleHudOnNativeCanvas = false;
+            battleHudOnPauseLayer = false;
+            FadeBattleHudRootAlphaToFull();
+            return true;
+        }
+
+        private bool PlaceBattleHudOnPersistentOverlay()
+        {
             if (battleHudCanvas == null)
                 return false;
             if (battleHudRoot.transform.parent != battleHudCanvas.transform)
@@ -1007,6 +1084,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 battleHudRoot.transform.SetAsLastSibling();
                 battleHudOnNativeCanvas = true;
+                battleHudHoldOverlayThroughVictory = false;
                 battleHudOnPauseLayer = false;
                 return true;
             }
@@ -1032,6 +1110,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudIcons = nativeIcons;
             battleHudChallengeText = nativeText;
             battleHudOnNativeCanvas = true;
+            battleHudHoldOverlayThroughVictory = false;
             battleHudOnPauseLayer = false;
             if (battleHudSaturationMaterial != null)
                 battleHudSaturationMaterial.SetFloat("_Saturation", 1f);
@@ -1099,6 +1178,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudImpactPlayedCount = 0;
             battleHudPresentationActive = false;
             battleHudFollowNativeVictoryLayer = false;
+            battleHudHoldOverlayThroughVictory = false;
             battleHudResultSnapshot = null;
             battleHudChallengeSnapshot = "";
         }

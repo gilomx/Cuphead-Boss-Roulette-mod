@@ -15,21 +15,24 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.100";
+        public const string PluginVersion = "0.5.108";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
         // TEMPORARY TEST SELECTOR. Keep non-empty while developing a challenge.
         // Compatible bosses are still chosen randomly.
         private static readonly string ForcedTestChallenge =
-            "No disparo Peashooter";
+            "";
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
         // Dormant test selector: exercise both restricted plane weapons.
         private static readonly bool ForcePlaneRelicChallengeTestSequence =
             false;
         // TEMPORARY VISUAL TEST. It does not change either player's real meter.
-        private static readonly bool ForceFiveSuperCardsForHudTest = true;
+        private static readonly bool ForceFiveSuperCardsForHudTest = false;
+        // TEMPORARY BOSS TEST. Disable before publishing a normal build.
+        private static readonly bool ForceTestBoss = false;
+        private static readonly Levels ForcedTestBossLevel = Levels.DicePalaceMain;
 
         private const string BlackAndWhiteChallenge = "Blanco y negro";
         private const float BlackAndWhiteEntryDelay = 1.5f;
@@ -186,6 +189,7 @@ namespace Gilomx.CupheadBossRoulette
         private LoadoutSnapshot originalPlayerTwoLoadout;
         private bool loanedLoadoutsActive;
         private bool loanedBattleSeen;
+        private bool returnToMapAfterRouletteFinalBossWin;
         private static int curseRelicRuntimeSetupDepth;
 
         private string AssetsDirectory
@@ -286,6 +290,25 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(levelPreWin, prefix: new HarmonyMethod(levelPreWinPrefix));
             else
                 Logger.LogWarning("Could not install the challenge win guard.");
+
+            var baseGameEndingLoad = AccessTools.Method(
+                typeof(Cutscene), "Load", new[]
+                {
+                    typeof(Scenes), typeof(Scenes),
+                    typeof(SceneLoader.Transition),
+                    typeof(SceneLoader.Transition),
+                    typeof(SceneLoader.Icon)
+                });
+            var returnRouletteFinalBossWinToMapPrefix = AccessTools.Method(
+                typeof(Plugin), "ReturnRouletteFinalBossWinToMapPrefix");
+            if (baseGameEndingLoad != null &&
+                returnRouletteFinalBossWinToMapPrefix != null)
+                harmony.Patch(baseGameEndingLoad,
+                    prefix: new HarmonyMethod(
+                        returnRouletteFinalBossWinToMapPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette final-boss ending bypass.");
 
 
             var loadLastMap = AccessTools.Method(typeof(SceneLoader), "LoadLastMap");
@@ -1046,9 +1069,12 @@ namespace Gilomx.CupheadBossRoulette
                 ForcedPlaneRelicChallengeModifierIndex();
             if (forcedModifier < 0)
                 forcedModifier = ForcedTestModifierIndex();
-            var boss = forcedModifier >= 0
-                ? RandomBossForModifier(forcedModifier)
-                : RandomPoolIndex(availableBossIndices);
+            var forcedBoss = ForcedTestBossIndex();
+            var boss = forcedBoss >= 0
+                ? forcedBoss
+                : forcedModifier >= 0
+                    ? RandomBossForModifier(forcedModifier)
+                    : RandomPoolIndex(availableBossIndices);
             var weapon1 = RandomNonEmptyPoolIndex(
                 availableWeaponIndices, RouletteData.Weapons.Length - 1);
             int weapon2;
@@ -1110,6 +1136,29 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
 
+            return -1;
+        }
+
+        private int ForcedTestBossIndex()
+        {
+            if (!ForceTestBoss)
+                return -1;
+
+            for (var i = 0; i < availableBossIndices.Count; i++)
+            {
+                var bossIndex = availableBossIndices[i];
+                var boss = RouletteData.Bosses[bossIndex];
+                if (boss.Level == ForcedTestBossLevel)
+                {
+                    Logger.LogInfo(
+                        "Forced test boss: " + boss.Character + ".");
+                    return bossIndex;
+                }
+            }
+
+            Logger.LogWarning(
+                "Could not force test boss " + ForcedTestBossLevel +
+                " because it is unavailable.");
             return -1;
         }
 
@@ -1848,13 +1897,52 @@ namespace Gilomx.CupheadBossRoulette
             if (plugin == null)
                 return;
 
+            var currentLevel = __instance == null
+                ? default(Levels)
+                : __instance.CurrentLevel;
+            var isRouletteFinalBoss = plugin.loanedLoadoutsActive &&
+                (currentLevel == Levels.Devil ||
+                 currentLevel == Levels.Saltbaker);
+            if (isRouletteFinalBoss)
+                plugin.returnToMapAfterRouletteFinalBossWin = true;
+
             if (plugin.ShouldRestoreLoanedLoadoutOnWin(__instance))
             {
-                plugin.KeepBattleResultHudThroughVictory();
+                plugin.KeepBattleResultHudThroughVictory(
+                    currentLevel == Levels.Saltbaker);
                 plugin.RestoreOriginalLoadouts(false);
             }
             if (plugin.ShouldClearChallengeOnWin(__instance))
                 plugin.ClearActiveChallenge();
+        }
+
+        private static bool ReturnRouletteFinalBossWinToMapPrefix(
+            Scenes __0, Scenes __1)
+        {
+            var plugin = activeInstance;
+            if (plugin == null ||
+                !plugin.returnToMapAfterRouletteFinalBossWin)
+                return true;
+
+            var previousLevel = Level.PreviousLevel;
+            var isDevilEnding = previousLevel == Levels.Devil &&
+                __0 == Scenes.scene_title &&
+                __1 == Scenes.scene_cutscene_outro;
+            var isSaltbakerEnding = previousLevel == Levels.Saltbaker &&
+                __0 == Scenes.scene_map_world_DLC &&
+                __1 == Scenes.scene_cutscene_dlc_ending;
+            if (!isDevilEnding && !isSaltbakerEnding)
+                return true;
+
+            // WinScreen reaches this call only after grading, progression,
+            // achievements and PlayerData.SaveCurrentFile(). Reuse the normal
+            // map-return path so its existing loadout/HUD cleanup also runs.
+            plugin.returnToMapAfterRouletteFinalBossWin = false;
+            plugin.Logger.LogInfo(
+                "Roulette final-boss victory: skipping the ending and returning to the map (" +
+                previousLevel + ").");
+            SceneLoader.LoadLastMap();
+            return false;
         }
 
         private bool ShouldClearChallengeOnWin(Level level)
