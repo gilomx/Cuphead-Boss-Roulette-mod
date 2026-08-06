@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
-Last updated: 2026-08-05
-Current local version: 0.5.71
+Last updated: 2026-08-06
+Current local version: 0.5.79
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -39,7 +39,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.71.
+This handoff documents the roulette implementation through version 0.5.78.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -637,6 +637,145 @@ the native parry flash. Winning the real `DicePalaceMain` fight still calls
 `KeepBattleResultHudThroughVictory()`, enables the native-victory path, and lets
 the row darken and disappear with Cuphead's original HUD during knockout.
 
+## King Dice parry visibility gate correction (0.5.72)
+
+Manual testing of 0.5.71 showed that the row could still blink during parries
+in later King Dice scenes. Parenting was no longer the cause: the active row
+was already under the persistent overlay. The remaining dependency was
+`PlaceBattleHudOnGameplayLayer()`, which called
+`TryGetNativeBattleHudCanvas()` before deciding where to render. Some
+`DicePalace*` fights briefly disable their native `LevelHUD.Canvas` during a
+parry. That made the method return false, and `UpdateBattleResultHud()` hid the
+custom row for the affected frame.
+
+Version 0.5.72 routes an active King Dice chain directly through the new shared
+`PlaceBattleHudOnPersistentOverlay()` helper before consulting native HUD
+availability. `PlaceBattleHudInsideMenuLayer()` uses the same helper, removing
+the duplicated persistent-parent code. This exception applies only while
+`battleHudFollowNativeVictoryLayer` is false. The real `DicePalaceMain` victory
+still sets that flag and uses `TryGetNativeBattleHudCanvas()` plus
+`TrySwapBattleHudToNativeVictoryLayer()`, preserving the accepted knockout fade
+and removal behavior. This change was insufficient: the user then confirmed
+that the visual blink remained and also occurred in every boss, not only King
+Dice. Do not treat native-Canvas availability as the established root cause.
+
+## Native battle HUD material parity (0.5.73)
+
+Inspection of Cuphead's `Assembly-CSharp.dll` with Mono.Cecil confirmed that
+`LevelHUDPlayerHealth` obtains its native `UnityEngine.UI.Image` in `Awake()`
+and changes only animator state, transform scale, and `Graphic.color`; it does
+not install or rewrite a custom material during updates. The roulette row did
+the opposite: `CreateBattleHudIcon()` and `CreateBattleHudRoot()` assigned the
+shared saturation material immediately, and
+`UpdateBattleResultHudSaturation()` forced it back onto all five `RawImage`s and
+the challenge `Text` every frame even when saturation was exactly 1.
+
+Version 0.5.73 keeps the same normal material path as Cuphead. `RawImage` icons
+use their default UI material, and `battleHudChallengeBaseMaterial` preserves
+the material inherited from the native text template. The custom saturation
+material is assigned only while `Blanco y negro` is active on the persistent
+overlay. Moving to the native victory Canvas restores the base materials because
+that Canvas already receives the game's visual transition. This removes the
+always-active custom shared-material path from ordinary parry Canvas rebuilds
+without sacrificing the black-and-white challenge or final knockout behavior.
+Manual testing showed that the parry blink still remained, so material parity
+alone was not sufficient and must not be recorded as the final root cause.
+
+## Fully independent active-gameplay overlay (0.5.74)
+
+Version 0.5.74 removes the two remaining ways a parry can visually affect the
+active row. First, `PlaceBattleHudOnGameplayLayer()` records the current
+`Level.GetInstanceID()`. For a new level instance it waits until
+`TryGetNativeBattleHudCanvas()` succeeds once, matching the original HUD's entry
+readiness. After that first success, native Canvas enabled/active changes no
+longer toggle the persistent row for that attempt. Loads and retries create a
+new `Level` instance and reset the gate; `SceneLoader.CurrentlyLoading` still
+hides the row immediately.
+
+Second, `CreatePersistentBattleHudCanvas()` assigns the highest available Unity
+sorting layer and `short.MaxValue` sorting order. This ensures a screen overlay
+used for the parry cannot be composited above the roulette icons and text.
+`PlaceBattleHudInsideMenuLayer()` no longer has a King Dice exception: pause and
+game-over always use their native menu hierarchy, so the topmost gameplay Canvas
+cannot cover those cards. Final victory still sets
+`battleHudFollowNativeVictoryLayer` and swaps to the native `LevelHUD.Canvas`;
+that path intentionally bypasses the persistent sorting and follows the accepted
+knockout fade/removal.
+
+Manual 0.5.74 testing still reproduced the blink on every parry. Therefore the
+row's native visibility dependency and overlay sorting are not sufficient to
+explain the symptom. Do not continue changing these blindly.
+
+## Frame-level parry trace (0.5.75 diagnostic)
+
+Version 0.5.75 adds temporary Harmony prefixes to
+`LevelPlayerMotor.OnParryHit()` and
+`PlanePlayerParryController.OnParrySuccess()`. An active roulette HUD then logs
+24 consecutive LateUpdate samples tagged `HUD_PARRY_BEGIN` and
+`HUD_PARRY_FRAME`. Each frame records `ShouldShowBattleResultHud()`, loading,
+root `activeSelf`/`activeInHierarchy`, full parent path, parent Canvas render
+mode/sorting layer/order/enabled state, native LevelHUD enabled/active state,
+first-icon enabled/alpha, CanvasRenderer culling/alpha, and shader name.
+
+This diagnostic must be reproduced before another visual fix. If all recorded
+values remain stable while the user sees the blink, the effect is downstream of
+the UI object's state and likely belongs to final frame composition. If a value
+changes, use the first differing trace frame to correct that exact lifecycle
+path. Remove or disable the temporary per-frame trace after establishing the
+cause so normal releases do not add log noise.
+
+The first 0.5.75 reproduction produced no `HUD_PARRY` lines even though the
+visual symptom occurred. Version 0.5.76 therefore expands the temporary Harmony
+targets to `LevelPlayerParryController.StartParry()`,
+`PlanePlayerParryController.StartParry()`, `LevelPlayerMotor.OnParryHit()`,
+`PlanePlayerParryController.OnParrySuccess()`, and
+`PlayerStatsManager.OnParry()`. Startup logs the installed target count; verify
+that it is nonzero before asking for another reproduction.
+
+The 0.5.76 startup confirmed five installed hooks, but the next reproduction
+still produced no trace because `BeginBattleHudParryTrace()` silently returned
+before logging when `battleHudPresentationActive` was false. Version 0.5.77
+logs before any session filter and includes `session`/`root` in the begin line.
+It also hooks `LevelPlayerMotor.ForceParry()` and `ChaliceDashParry()` to cover
+Ms. Chalice explicitly. A missing trace after this version means none of the
+seven patched methods ran; a trace with `session=false` instead proves a roulette
+session-lifecycle problem rather than a rendering-state problem.
+
+The 0.5.77 reproduction still produced no hook lines. Mono.Cecil call-site
+inspection then located the actual success pause in
+`AbstractParryEffect/<hit_cr>c__Iterator1.MoveNext()`, which invokes virtual
+`OnPaused()` and `OnUnpaused()`. Version 0.5.78 hooks base/ground `OnPaused()`
+and base/plane `OnSuccess()`. It also adds `HUD_STATE_CHANGE`, a hook-independent
+LateUpdate watcher that logs only when the persistent row's activity, parent,
+Canvas, native Canvas availability, first-icon visibility/alpha/culling, or
+material instance changes. This guarantees evidence even if another parry
+implementation bypasses all patched methods.
+
+## Parry hit-stop versus real pause menu (0.5.79)
+
+The 0.5.78 capture established the exact cause. Immediately after a successful
+parry, the HUD remained on the same persistent canvas with the same enabled
+canvas, icon alpha, culling state and UI material, but its root changed from
+`activeSelf=true` to `activeSelf=false` at frame 3191. It stayed disabled
+through frame 3201 and became active again at frame 3202. During those same 11
+frames Cuphead temporarily changed `PauseManager.state` for the parry hit-stop.
+
+`UpdateBattleResultHudLayer()` previously treated every nonzero
+`PauseManager.state` as a real pause menu. Because the actual pause background
+does not exist during parry hit-stop, that branch returned false and
+`UpdateBattleResultHud()` explicitly disabled `battleHudRoot`. Version 0.5.79
+only reparents the row when `pauseBackground` exists and its GameObject is
+active in the hierarchy. A nonzero pause state without that visible menu falls
+through to `PlaceBattleHudOnGameplayLayer()`, so parries no longer toggle the
+row. Real pause, game over and final-victory behavior remain unchanged.
+
+All temporary Harmony parry hooks, frame logs and state watchers from
+0.5.75–0.5.78 were removed after establishing the cause. The speculative
+highest sorting layer/order and per-Level readiness gate from 0.5.74 were also
+reverted to reduce regression risk. The native material parity introduced in
+0.5.73 remains because it matches Cuphead's original health HUD and preserves
+the special saturation material only for the `Blanco y negro` challenge.
+
 ## Fullscreen Equip Card entrance stability (0.5.56)
 
 At 1920x1080 the 1280x720 IMGUI design matrix uses a 1.5 scale. The previous
@@ -973,6 +1112,27 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
+- Version 0.5.79 builds with zero errors and zero warnings on 2026-08-06. The
+  release DLL was installed over the temporary diagnostic build and its SHA-256
+  matches the build output:
+  `13DD9EAF39649E85BE2E7564ADA63144AB6627E23EAD061710C8E678F2B77AB4`.
+  Manual testing then confirmed that successful parries no longer make the HUD
+  disappear and reappear. The pause-state false positive is therefore the
+  accepted root cause and version 0.5.79 is the accepted fix.
+- Version 0.5.74 builds with zero errors and zero warnings and was installed
+  successfully on 2026-08-06. `BepInEx\LogOutput.log` confirms
+  `Loading [Gilomx Boss Roulette 0.5.74]` and the normal ready message. Manual
+  acceptance must parry repeatedly in ground, plane, and later King Dice fights;
+  then recheck pause, defeat/retry, loading iris, `Blanco y negro`, and knockout.
+- Version 0.5.73 builds with zero errors and zero warnings and was installed
+  successfully on 2026-08-06. `BepInEx\LogOutput.log` confirms
+  `Loading [Gilomx Boss Roulette 0.5.73]` and the normal ready message. Manual
+  acceptance showed that matching the native materials alone did not stop the
+  parry blink; this result led to the full visibility/sorting isolation in
+  0.5.74.
+- Version 0.5.72 builds with zero errors and zero warnings and was installed
+  successfully on 2026-08-06. `BepInEx\LogOutput.log` confirms
+  `Loading [Gilomx Boss Roulette 0.5.72]` and the normal ready message.
 - Version 0.5.71 builds with zero errors and zero warnings and was installed
   and launched successfully on 2026-08-05. `BepInEx\LogOutput.log` confirms
   `Loading [Gilomx Boss Roulette 0.5.71]` and the normal ready message.
@@ -982,11 +1142,12 @@ renderer. Avoid editing it unless deliberately removing legacy code.
   Its 122 entries were inspected: it contains the x64 Doorstop bootstrap,
   18 BepInEx core files, the 0.5.71 DLL, the complete asset tree including
   `impact_01.wav`, and no config, log, cache, save, or unrelated plugin files.
-- Manual 0.5.71 King Dice acceptance: confirm the icon/audio entry sequence
-  runs once at the real start, never repeats during internal `DicePalace*`
-  scene changes or retries, and remains steady during parries in later
-  minijefes. The final `DicePalaceMain` knockout must still darken and remove
-  the row with Cuphead's native health HUD.
+- Manual 0.5.71 King Dice testing passed the one-time animation behavior but
+  found that later minijefes could still blink the row on parry because their
+  native HUD canvas briefly became unavailable. Version 0.5.72 removes that
+  remaining gate. Recheck parries across several internal `DicePalace*` scenes;
+  the final `DicePalaceMain` knockout must still darken and remove the row with
+  Cuphead's native health HUD.
 - Version 0.5.48 builds with zero errors and zero warnings when
   `CupheadDir` points to the current installation on `E:`.
 - The temporary version 0.5.30 was installed and reproduced the frozen Dragon

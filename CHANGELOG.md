@@ -3,6 +3,114 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.79 — 2026-08-06
+
+### Corrección definitiva del parpadeo del HUD al hacer parry
+
+- El rastreo cuadro por cuadro mostró que el impacto del parry cambia
+  temporalmente `PauseManager.state`, aunque no exista un menú de pausa real.
+- El mod interpretaba cualquier valor distinto de cero como pausa y ocultaba
+  la raíz del HUD durante 11 frames al no encontrar la tarjeta del menú.
+- El HUD ahora entra a la jerarquía de pausa únicamente cuando el fondo real
+  del menú existe y está activo; el hit-stop del parry conserva el overlay de
+  juego sin desactivar los círculos ni el texto.
+- Se retiraron todos los hooks y registros temporales de diagnóstico.
+- Se revirtieron el orden de canvas máximo y la compuerta especulativa por
+  instancia de nivel, manteniendo el uso de materiales nativos de 0.5.73.
+
+## 0.5.78 — 2026-08-06
+
+### Rastreo de la pausa real del efecto de parry
+
+- La ruta central encontrada en `AbstractParryEffect.hit_cr` llama
+  `OnPaused()` y `OnUnpaused()` durante el impacto; el diagnóstico intercepta
+  ahora esa pausa tanto en la clase base como en tierra y avión.
+- Un vigilante adicional registra cualquier cambio real de actividad,
+  jerarquía, canvas, visibilidad, culling, alpha o material del HUD durante toda
+  la sesión, aunque ningún hook de parry se ejecute.
+
+## 0.5.77 — 2026-08-06
+
+### Rastreo sin filtro de sesión y soporte para Chalice
+
+- El evento de diagnóstico se escribe ahora antes de comprobar si la sesión del
+  HUD está activa, mostrando tanto ese estado como la existencia de la raíz.
+- Se añadieron `ForceParry()` y `ChaliceDashParry()` para cubrir explícitamente
+  las rutas terrestres de Ms. Chalice.
+
+## 0.5.76 — 2026-08-06
+
+### Rastreo ampliado del parry
+
+- La primera reproducción con 0.5.75 no generó muestras: los dos métodos
+  iniciales no cubrían la ruta de parry usada durante la prueba.
+- El diagnóstico intercepta ahora inicio y éxito en controladores terrestres y
+  aéreos, además de `PlayerStatsManager.OnParry()`.
+- El arranque informa cuántos hooks quedaron instalados para verificar el
+  instrumento antes de la siguiente reproducción.
+
+## 0.5.75 — 2026-08-06
+
+### Instrumentación exacta del parpadeo por parry
+
+- Las pruebas confirmaron que el aislamiento de visibilidad, orden de canvas y
+  materiales de 0.5.72–0.5.74 no eliminó el síntoma.
+- Se añadieron hooks temporales al parry terrestre y aéreo que registran 24
+  frames desde cada impacto exitoso.
+- Cada muestra incluye actividad y jerarquía del HUD, canvas, modo, capa, orden,
+  visibilidad nativa, alpha, culling y shader del primer círculo.
+- Esta instrumentación permitirá distinguir con evidencia si cambia el objeto
+  del mod o si el destello ocurre en una etapa posterior de composición.
+
+## 0.5.74 — 2026-08-06
+
+### Overlay de combate completamente independiente
+
+- El `LevelHUD` nativo se usa una sola vez para confirmar que la escena nueva
+  terminó de crear su HUD; después deja de controlar la visibilidad de la fila
+  durante ese intento.
+- Cada nueva instancia de `Level` reinicia esa espera inicial, por lo que la
+  fila no aparece antes que las vidas durante cargas o reintentos.
+- El canvas persistente usa la capa de orden superior y el máximo `sortingOrder`
+  durante el juego activo, evitando que el overlay visual del parry se dibuje
+  encima de sus círculos y texto.
+- Pausa y derrota siguen colocando la fila dentro de sus menús. La victoria
+  conserva la copia al `LevelHUD` nativo para oscurecerse con el knockout.
+- La prueba manual posterior confirmó que el parpadeo continuaba; esta versión
+  queda registrada como otro intento descartado, no como solución final.
+
+## 0.5.73 — 2026-08-06
+
+### Materiales nativos del HUD durante el parry
+
+- Se comparó la implementación de `LevelHUDPlayerHealth` del juego con la fila
+  del mod: las vidas conservan el material UI nativo, mientras nuestra fila
+  reemplazaba continuamente todos sus materiales por el shader de saturación.
+- Los círculos usan ahora el material UI predeterminado y el texto recupera el
+  material original de Cuphead durante cualquier combate normal.
+- El shader personalizado queda reservado exclusivamente para la transición
+  del reto `Blanco y negro` mientras la fila está en el overlay independiente.
+- Al pasar al HUD nativo durante la victoria también se restauran los materiales
+  normales, manteniendo el comportamiento del knockout.
+- La prueba posterior confirmó que igualar los materiales tampoco eliminaba por
+  sí solo el parpadeo; 0.5.74 aísla también visibilidad y orden de renderizado.
+
+## 0.5.72 — 2026-08-06
+
+### Primer aislamiento adicional del parry en Rey Dado
+
+- El HUD de Rey Dado ya no consulta la activación del `LevelHUD` nativo durante
+  los minijefes ni durante el combate final activo.
+- Algunas escenas de `DicePalace` deshabilitan brevemente ese canvas al hacer
+  parry; la comprobación anterior ocultaba nuestra fila durante un frame aunque
+  estuviera dibujada en un canvas independiente.
+- La cadena activa mantiene ahora su overlay persistente sin esa dependencia.
+  La victoria final conserva la transferencia al HUD nativo para desaparecer
+  correctamente durante el knockout.
+- Las pruebas posteriores mostraron que este cambio no resolvía el parpadeo y
+  que el síntoma también aparecía fuera de Rey Dado; 0.5.73 corrige la diferencia
+  de materiales respecto al HUD original.
+
 ## 0.5.71 — 2026-08-05
 
 ### HUD persistente durante toda la partida de Rey Dado

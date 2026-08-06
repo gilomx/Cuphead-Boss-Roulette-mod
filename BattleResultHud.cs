@@ -24,6 +24,8 @@ namespace Gilomx.CupheadBossRoulette
         private RawImage[] battleHudIcons;
         private Text battleHudChallengeText;
         private Material battleHudSaturationMaterial;
+        private Material battleHudChallengeBaseMaterial;
+        private bool battleHudUsingSaturationMaterial;
         private int battleHudTextBaseFontSize;
         private int battleHudVisibleIconCount = 5;
         private float battleHudRevealStartedAt = -1f;
@@ -245,6 +247,8 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             battleHudChallengeText.transform.SetParent(rootRect, false);
+            battleHudChallengeBaseMaterial = battleHudChallengeText.material;
+            battleHudUsingSaturationMaterial = false;
             battleHudChallengeText.raycastTarget = false;
             battleHudChallengeText.alignment = TextAnchor.MiddleLeft;
             battleHudChallengeText.resizeTextForBestFit = false;
@@ -254,7 +258,6 @@ namespace Gilomx.CupheadBossRoulette
             var textColor = battleHudChallengeText.color;
             textColor.a = BattleHudAlpha;
             battleHudChallengeText.color = textColor;
-            battleHudChallengeText.material = battleHudSaturationMaterial;
             battleHudTextBaseFontSize = Mathf.Max(1,
                 battleHudChallengeText.fontSize);
 
@@ -282,7 +285,6 @@ namespace Gilomx.CupheadBossRoulette
             var icon = iconObject.GetComponent<RawImage>();
             icon.raycastTarget = false;
             icon.color = new Color(1f, 1f, 1f, BattleHudAlpha);
-            icon.material = battleHudSaturationMaterial;
 
             var rect = icon.rectTransform;
             rect.anchorMin = Vector2.zero;
@@ -496,34 +498,45 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateBattleResultHudSaturation()
         {
-            EnsureBattleHudSaturationMaterial();
-            if (battleHudSaturationMaterial == null)
-                return;
+            // Cuphead's original HUD keeps the normal UI material. Do the same
+            // unless this independent overlay must reproduce the roulette's
+            // black-and-white transition, avoiding an unnecessary custom
+            // shared-material path during ordinary combat.
+            var useSaturationMaterial = !battleHudOnNativeCanvas &&
+                string.Equals(battleHudChallengeSnapshot,
+                    BlackAndWhiteChallenge,
+                    StringComparison.OrdinalIgnoreCase);
+            if (useSaturationMaterial)
+            {
+                EnsureBattleHudSaturationMaterial();
+                if (battleHudSaturationMaterial != null)
+                    battleHudSaturationMaterial.SetFloat(
+                        "_Saturation",
+                        1f - Mathf.Clamp01(blackAndWhiteBlend));
+                else
+                    useSaturationMaterial = false;
+            }
 
-            // The LevelHUD camera already receives the scene transition.
-            var saturation = battleHudOnNativeCanvas
-                ? 1f : string.Equals(battleHudChallengeSnapshot,
-                BlackAndWhiteChallenge, StringComparison.OrdinalIgnoreCase)
-                ? 1f - Mathf.Clamp01(blackAndWhiteBlend)
-                : 1f;
-            battleHudSaturationMaterial.SetFloat("_Saturation", saturation);
+            if (battleHudUsingSaturationMaterial == useSaturationMaterial)
+                return;
+            battleHudUsingSaturationMaterial = useSaturationMaterial;
+
+            var iconMaterial = useSaturationMaterial
+                ? battleHudSaturationMaterial : null;
 
             if (battleHudIcons != null)
             {
                 for (var i = 0; i < battleHudIcons.Length; i++)
                 {
-                    if (battleHudIcons[i] != null &&
-                        battleHudIcons[i].material !=
-                        battleHudSaturationMaterial)
-                        battleHudIcons[i].material =
-                            battleHudSaturationMaterial;
+                    if (battleHudIcons[i] != null)
+                        battleHudIcons[i].material = iconMaterial;
                 }
             }
-            if (battleHudChallengeText != null &&
-                battleHudChallengeText.material !=
-                battleHudSaturationMaterial)
-                battleHudChallengeText.material =
-                    battleHudSaturationMaterial;
+            var textMaterial = useSaturationMaterial
+                ? battleHudSaturationMaterial
+                : battleHudChallengeBaseMaterial;
+            if (battleHudChallengeText != null)
+                battleHudChallengeText.material = textMaterial;
         }
 
         private void UpdateBattleResultHudReveal()
@@ -644,13 +657,15 @@ namespace Gilomx.CupheadBossRoulette
                     Text textTemplate;
                     TryFindBattleHudNativeLayers(out screenCanvas,
                         out pauseBackground, out textTemplate);
-                    if (pauseBackground != null)
+                    // Parry hit-stop also changes PauseManager.state for a
+                    // handful of frames. Only a visible pause card is a real
+                    // menu; otherwise keep rendering on the gameplay overlay.
+                    if (pauseBackground != null &&
+                        pauseBackground.gameObject.activeInHierarchy)
                     {
                         PlaceBattleHudInsideMenuLayer(pauseBackground);
                         return true;
                     }
-
-                    return false;
                 }
             }
             catch
@@ -662,24 +677,6 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PlaceBattleHudInsideMenuLayer(Transform layer)
         {
-            // King Dice is a chain of scene-local fights. Keeping its active
-            // HUD under the persistent overlay prevents a surviving pause,
-            // defeat, or transition layer from making it react to parry
-            // flashes after the next internal scene loads. The final victory
-            // explicitly enables the native layer before reaching this path.
-            if (BattleHudUsesDicePalaceChain() &&
-                !battleHudFollowNativeVictoryLayer &&
-                battleHudCanvas != null)
-            {
-                if (battleHudRoot.transform.parent !=
-                    battleHudCanvas.transform)
-                    battleHudRoot.transform.SetParent(
-                        battleHudCanvas.transform, false);
-                battleHudRoot.transform.SetAsLastSibling();
-                battleHudOnNativeCanvas = false;
-                return;
-            }
-
             if (battleHudRoot.transform.parent != layer)
                 battleHudRoot.transform.SetParent(layer, false);
             battleHudRoot.transform.SetAsFirstSibling();
@@ -823,6 +820,8 @@ namespace Gilomx.CupheadBossRoulette
             battleHudIcons = null;
             battleHudChallengeText = null;
             battleHudSaturationMaterial = null;
+            battleHudChallengeBaseMaterial = null;
+            battleHudUsingSaturationMaterial = false;
             battleHudVisibleIconCount = 5;
             battleHudWasVisible = false;
             battleHudOnNativeCanvas = false;
