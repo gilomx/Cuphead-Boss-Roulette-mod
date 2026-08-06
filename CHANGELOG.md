@@ -3,6 +3,68 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.108 — 2026-08-06
+
+- Se desactiva `ForceTestBoss` después de validar toda la cadena de Rey Dado.
+- La ruleta vuelve a elegir jefes normalmente; el selector genérico permanece
+  disponible, pero dormido, para pruebas futuras.
+
+## 0.5.107 — 2026-08-06
+
+- Las victorias de los minijefes del Palacio de Dados ya no ocultan el HUD al
+  comenzar `SceneLoader.CurrentlyLoading`, antes del fundido.
+- Durante esas cargas internas, la fila pasa temporalmente al canvas de
+  `SceneLoader` como primer hijo, debajo del fader nativo.
+- La victoria final contra Rey Dado conserva su ruta aceptada mediante
+  `LevelHUD.Canvas`; no se modifica su fundido.
+
+## 0.5.106 — 2026-08-06
+
+- El selector temporal de jefe se generaliza mediante `ForceTestBoss` y
+  `ForcedTestBossLevel`.
+- Para la prueba actual, todos los giros eligen `Levels.DicePalaceMain` (Rey
+  Dado); armas, súper, amuleto y reto continúan girando normalmente.
+
+## 0.5.105 — 2026-08-06
+
+- Durante la victoria de Chef Saleroso, el HUD pasa al canvas nativo de
+  `SceneLoader` como primer hijo, debajo de su fader.
+- El fundido negro de tres segundos ahora cubre el HUD exactamente como cubre
+  la imagen del juego, sin perderlo cuando `LevelHUD.Canvas` se desactiva.
+- Los demás jefes conservan su ruta anterior mediante `LevelHUD.Canvas`.
+
+## 0.5.104 — 2026-08-06
+
+- Se forzó temporalmente Chef Saleroso para validar el salto de la historia
+  final y la permanencia del HUD hasta calificaciones.
+
+## 0.5.103 — 2026-08-06
+
+- Una victoria de ruleta contra Chef Saleroso omite la historia final del DLC
+  después de la calificación y vuelve directamente al mapa de la isla.
+- El final del DLC se conserva cuando Chef Saleroso se derrota fuera de la
+  ruleta.
+- Durante la victoria de Chef Saleroso, el HUD de la ruleta permanece en su
+  overlay estable hasta que comienza el cambio real a la pantalla de
+  calificación, evitando que desaparezca antes por el apagado de `LevelHUD`.
+
+## 0.5.102 — 2026-08-06
+
+- Una victoria contra el Diablo iniciada por la ruleta vuelve al último mapa
+  después de la pantalla de calificación, en lugar de reproducir el epílogo y
+  regresar a la selección de partida/personaje.
+- La redirección ocurre después del cálculo de nota, progreso, logros y guardado.
+- Derrotar al Diablo desde el flujo normal del juego conserva el final original.
+
+## 0.5.101 — 2026-08-06
+
+- Ambas variantes de español muestran siempre el nombre de nivel guardado en
+  `BossEntry.Fight`; así los jefes cuya clave `Selection` no contiene texto,
+  como Esther Espuelas, ya no dejan el subtítulo vacío.
+- Los demás idiomas conservan únicamente el nombre localizado del jefe y no
+  muestran subtítulo de nivel.
+- Se desactivan el reto forzado y la simulación visual de cinco cartas.
+
 ## 0.5.100 — 2026-08-06
 
 - Al reanudar desde pausa, el HUD recupera suavemente su opacidad de 70% a

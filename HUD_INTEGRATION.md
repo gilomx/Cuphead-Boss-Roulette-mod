@@ -79,13 +79,22 @@ frame para no distraer durante el combate.
    entrada.
 4. Al perder y reintentar se conserva la sesión y no se repite la animación.
 5. `KeepBattleResultHudThroughVictory()` activa la ruta de victoria y traslada
-   una copia preparada al Canvas nativo.
+   una copia preparada al Canvas nativo. Chef Saleroso conserva la misma raíz
+   y la mueve al canvas de `SceneLoader`, debajo del fader, porque desactiva
+   `LevelHUD.Canvas` antes de terminar la transición.
 6. `EndBattleResultHudSession()` limpia el snapshot únicamente al volver al mapa
    o abandonar definitivamente la pelea.
 
 El Palacio de Dados encadena varias escenas dentro de una sola pelea lógica.
 `BattleHudUsesDicePalaceChain()` evita reiniciar la entrada y sus sonidos entre
-casillas. No conviertas una ocultación temporal en un fin de sesión.
+casillas. También permite conservar la fila mientras
+`SceneLoader.CurrentlyLoading` está activo al finalizar un minijefe. Durante
+esa carga interna, si `battleHudFollowNativeVictoryLayer` continúa en `false`,
+`PlaceBattleHudOnGameplayLayer()` usa `PlaceBattleHudOnSceneTransitionLayer()`
+para que el fader nativo oscurezca la fila en lugar de ocultarla antes. La
+victoria final contra Rey Dado pone el flag en `true` y debe continuar por
+`LevelHUD.Canvas`. No conviertas una ocultación temporal en un fin de sesión ni
+reinicies el snapshot entre casillas.
 
 ## Capas y estados de render
 
@@ -95,6 +104,7 @@ casillas. No conviertas una ocultación temporal en un fin de sesión.
 | Pausa | Primer hijo del `LevelPauseGUI` activo | El oscurecimiento afecta la fila y la tarjeta/ayudas quedan encima. |
 | Derrota | Primer hijo del `Background` de `LevelGameOverGUI` | Comparte la presentación del menú de derrota sin tapar sus controles. |
 | Victoria | Copia dentro de `LevelHUD.Canvas` | Se oscurece y desaparece junto con la vida y las cartas nativas. |
+| Victoria de Chef Saleroso | Primer hijo de `SceneLoader.canvas` | Sobrevive al apagado temprano de `LevelHUD`; el fader nativo queda encima y oscurece la fila junto con el juego. |
 | Iris/fase sin HUD nativo | Oculto temporalmente | No atraviesa la máscara y conserva su estado de entrada. |
 
 Durante combate normal, `PlaceBattleHudOnGameplayLayer()` mantiene la raíz en
@@ -172,6 +182,10 @@ se vuelve blanco y negro.
 8. Verifica que `TrySwapBattleHudToNativeVictoryLayer()` encuentre el nuevo
    componente en la copia. Si aumenta el número de iconos, actualiza también la
    validación mínima de `nativeIcons`.
+   Chef Saleroso es la excepción: `battleHudHoldOverlayThroughVictory` conserva
+   la raíz hasta que `Level.Current` deja de ser una batalla, pero durante el
+   fundido debe vivir como primer hijo de `SceneLoader.canvas`, nunca encima de
+   su fader.
 9. Conserva la misma raíz durante pausa, derrota, reintento y Palacio de Dados;
    no crees overlays paralelos para cada estado.
 10. Documenta cualquier constante visual nueva aquí y en `CHANGELOG.md`.
@@ -194,14 +208,18 @@ Antes de publicar una extensión del HUD, probar:
 
 ## Selectores temporales de prueba
 
-En la versión local `0.5.100` siguen activos deliberadamente:
+En la versión `0.5.108` el estado de los selectores temporales es:
 
-- `ForceFiveSuperCardsForHudTest = true`.
-- `ForcedTestChallenge = "No disparo Peashooter"`.
+- `ForceFiveSuperCardsForHudTest = false`.
+- `ForcedTestChallenge = ""`.
+- `ForceTestBoss = false`.
+- `ForcedTestBossLevel = Levels.DicePalaceMain`.
 
 El primero sólo modifica el valor entregado al renderer del HUD nativo; no toca
-el medidor real. El segundo fuerza un reto largo y un jefe compatible. Ambos
-deben quedar desactivados antes de preparar una versión pública normal.
+el medidor real cuando se habilita. El segundo permite forzar un reto y un jefe
+compatible durante pruebas. Los dos últimos permiten forzar un jefe concreto;
+Rey Dado se conserva únicamente como objetivo dormido para una prueba futura.
+No publicar una versión normal con alguno de estos selectores activo.
 
 ## Errores que no deben reintroducirse
 

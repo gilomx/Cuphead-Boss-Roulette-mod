@@ -1,5 +1,4 @@
 using System;
-using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
@@ -25,11 +24,6 @@ namespace Gilomx.CupheadBossRoulette
         private const float EquipIconSize = 80f;
         private const float EquipLabelGap = 4f;
         private const float EquipIconFramesPerSecond = 12.5f;
-        private static readonly Regex TransparentFightMarkup = new Regex(
-            "<color=#00000000>.*?</color>",
-            RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        private static readonly Regex FightMarkup = new Regex(
-            "<[^>]+>", RegexOptions.Singleline);
 
         private void DrawRoulette()
         {
@@ -226,45 +220,21 @@ namespace Gilomx.CupheadBossRoulette
 
         private string LocalizedFightName(BossEntry boss)
         {
-            var useSpanishSpainFallback = false;
             try
             {
                 var language = Localization.language;
-                if (language != Localization.Languages.SpanishSpain &&
-                    language != Localization.Languages.SpanishAmerica)
-                    return string.Empty;
-                useSpanishSpainFallback =
-                    language == Localization.Languages.SpanishSpain;
-
-                // This is the same key used by Cuphead's native difficulty card.
-                var element = Localization.Find(boss.Level + "Selection");
-                if (element != null)
-                {
-                    var translated = PlainFightTitle(element.translation.SanitizedText());
-                    if (!string.IsNullOrEmpty(translated))
-                        return translated;
-                }
+                // The roulette's existing fight titles are the accepted copy
+                // for both Spanish variants. Other languages intentionally
+                // show only Cuphead's localized boss name.
+                if (language == Localization.Languages.SpanishSpain ||
+                    language == Localization.Languages.SpanishAmerica)
+                    return boss.Fight;
             }
             catch
             {
-                // Missing localization should leave the subtitle empty instead
-                // of displaying a title from a different language.
+                // If localization is not ready, do not guess the language.
             }
-            return useSpanishSpainFallback ? boss.Fight : string.Empty;
-        }
-
-        private static string PlainFightTitle(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return value;
-
-            value = TransparentFightMarkup.Replace(value, "");
-            value = FightMarkup.Replace(value, "");
-            var lines = value.Replace("\\N", "\n").Replace("\\n", "\n")
-                .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-            for (var i = 0; i < lines.Length; i++)
-                lines[i] = lines[i].Trim(' ', '\t', ';', '"');
-            return string.Join(" ", lines).Trim();
+            return string.Empty;
         }
 
         private static string AnimatedSpriteName(string firstFrame, int frameCount, float framesPerSecond)

@@ -82,6 +82,14 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
   haya comprado todavía.
 - El equipamiento anterior de ambos jugadores se restaura al ganar o abandonar
   el nivel; al perder y reintentar se conserva el resultado de la ruleta.
+- Si la ruleta selecciona al Diablo, después de mostrar y guardar la calificación
+  se vuelve al último mapa. El epílogo original sólo se omite en esa partida de
+  ruleta; derrotarlo desde el recorrido normal conserva el final completo del
+  juego.
+- Si la ruleta selecciona a Chef Saleroso, después de mostrar y guardar la
+  calificación vuelve directamente al mapa del DLC, sin reproducir su historia
+  final. Una victoria normal conserva esa historia. Su HUD de ruleta permanece
+  visible hasta que comienza el cambio real a la pantalla de calificación.
 - Mientras ese resultado temporal siga activo, la Equip Card no puede abrirse
   desde la pantalla de derrota; vuelve a estar disponible al salir al mapa.
 - Los jugadores no pueden caminar por el mapa mientras la ruleta está abierta;

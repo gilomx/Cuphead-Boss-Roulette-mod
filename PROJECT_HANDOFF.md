@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-06
-Current local version: 0.5.100
+Current local version: 0.5.108
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -43,7 +43,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.100.
+This handoff documents the roulette implementation through version 0.5.108.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -1081,6 +1081,98 @@ active language is `SpanishSpain`; if the native lookup, cleanup, or resource
 availability produces no title, it returns `boss.Fight`. This fallback does not
 apply to `SpanishAmerica` or any other language. Keep it narrowly scoped so the
 general no-language-mixing policy from 0.5.64 remains intact.
+
+## Shared Spanish fight-title catalog (0.5.101)
+
+The 0.5.65 fallback still allowed `SpanishAmerica` to become empty whenever a
+native `<level>Selection` entry had no usable text; Esther Espuelas exposed
+that case. `LocalizedFightName()` no longer reads `Selection`. It returns the
+existing `BossEntry.Fight` catalog for both `SpanishSpain` and
+`SpanishAmerica`, and returns an empty subtitle for every other language. The
+large boss name remains localized through Cuphead. This is the user's explicit
+policy and guarantees complete, identical level titles in both Spanish modes.
+
+Version 0.5.101 also disables `ForcedTestChallenge` and
+`ForceFiveSuperCardsForHudTest`; normal random results and real super meters
+are restored.
+
+## Roulette Devil victory returns to the map (0.5.102)
+
+Cuphead's `WinScreen/<main_cr>.MoveNext()` waits until grading is finished and
+the player confirms. It then checks `Level.PreviousLevel`: `Levels.Devil`
+loads `Cutscene.Load(scene_title, scene_cutscene_outro, ...)`, while an ordinary
+boss calls `SceneLoader.LoadLastMap()`. By this point `_OnPreWin`, grade and
+progress updates, achievements, loadout restoration and
+`PlayerData.SaveCurrentFile()` have already run.
+
+The plugin records `returnToMapAfterRouletteDevilWin` only when `_OnPreWin`
+belongs to a roulette-loaned `Levels.Devil` fight. A Harmony prefix targets only
+the `Cutscene.Load(Scenes, Scenes, Transition, Transition, Icon)` overload and
+requires that one-shot flag, `Level.PreviousLevel == Levels.Devil`,
+`scene_title`, and `scene_cutscene_outro`. It calls `SceneLoader.LoadLastMap()`
+and skips the cutscene. That reuses the established map-return cleanup for the
+loaned loadout and battle HUD. Normal Devil victories do not set the flag and
+retain Cuphead's complete ending.
+
+The flag resets at both `BeginBattleResultHudSession()` and
+`EndBattleResultHudSession()` so an abandoned or unrelated session cannot
+redirect a future cutscene.
+
+## Saltbaker ending bypass and HUD hold (0.5.103)
+
+The same `WinScreen` coroutine has a second final-boss branch. After grading a
+`Levels.Saltbaker` victory it calls
+`Cutscene.Load(scene_map_world_DLC, scene_cutscene_dlc_ending, ...)`. Version
+0.5.103 generalizes the one-shot state to
+`returnToMapAfterRouletteFinalBossWin`. The existing `Cutscene.Load(Scenes,
+Scenes, ...)` Harmony prefix now recognizes either the exact Devil pair or the
+exact Saltbaker pair, calls `SceneLoader.LoadLastMap()`, and skips only that
+roulette ending. Normal campaign victories set no flag and retain both stories.
+All grade, progression, achievement and save work still occurs before this
+interception.
+
+Saltbaker can disable `LevelHUD.Canvas` before the scene actually changes to
+WinScreen. Moving the roulette row to that native Canvas at `_OnPreWin` made it
+disappear early. `KeepBattleResultHudThroughVictory(true)` sets
+`battleHudHoldOverlayThroughVictory` only for Saltbaker, and
+`ShouldShowBattleResultHud()` tolerates scene loading until `Level.Current` is
+no longer a battle.
+
+Version 0.5.105 no longer leaves that held row above the screen fade.
+`PlaceBattleHudOnSceneTransitionLayer()` reads the private `SceneLoader.canvas`
+through `SceneLoaderCanvasField`, reparents the same HUD root there and makes it
+the first sibling. Cuphead's native fader remains a later sibling on the same
+canvas, so its three-second black transition covers the roulette HUD and the
+game image together. This preserves the row after Saltbaker disables
+`LevelHUD.Canvas`, but removes the bright-overlay pop before grading. If the
+SceneLoader canvas is temporarily unavailable, the persistent overlay remains
+a safe fallback and the method retries every frame. Other bosses retain the
+accepted native-victory clone/fade path through `LevelHUD.Canvas`.
+
+Version 0.5.106 generalizes the temporary boss selector to `ForceTestBoss` and
+`ForcedTestBossLevel`. Both are currently configured to force
+`Levels.DicePalaceMain` for the King Dice HUD-chain test. The existing
+`BattleHudUsesDicePalaceChain()` must preserve the snapshot, reveal progress
+and impact count across every internal board/miniboss scene. Disable
+`ForceTestBoss` after manual acceptance.
+
+Version 0.5.107 fixes the early disappearance observed after Dice Palace
+minibosses 2, 4 and 7 (and therefore applies to every internal miniboss). Those
+wins do not call the final `KeepBattleResultHudThroughVictory()` path, so
+`battleHudFollowNativeVictoryLayer` remains false. Previously,
+`ShouldShowBattleResultHud()` hid the row as soon as
+`SceneLoader.CurrentlyLoading` became true, before the screen fade began. A
+Dice Palace chain now counts as a valid reason to survive loading. While an
+internal load is active and the final-victory flag is still false,
+`PlaceBattleHudOnGameplayLayer()` moves the root to the same
+`SceneLoader.canvas`/first-sibling layer used by Saltbaker. The native fader
+therefore covers it at the correct time. The real `DicePalaceMain` victory has
+`battleHudFollowNativeVictoryLayer == true` and retains the accepted
+`LevelHUD.Canvas` route.
+
+Version 0.5.108 disables `ForceTestBoss` after the complete King Dice test.
+Normal random boss selection is restored. `ForcedTestBossLevel` remains set to
+`Levels.DicePalaceMain` only as a dormant future-test target.
 
 Manual acceptance checks: parry repeatedly during a roulette fight and confirm
 the row remains visually steady. Confirm each ground icon produces one impact
