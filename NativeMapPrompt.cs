@@ -21,7 +21,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void LateUpdate()
         {
-            UpdateNativeChallengePrompt();
+            UpdateBattleResultHud();
             UpdateNativeRoulettePrompt();
         }
 

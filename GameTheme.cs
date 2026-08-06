@@ -43,12 +43,20 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        internal bool DrawSprite(string name, Rect rect, Color color)
+        internal Sprite GetSprite(string name)
         {
             Refresh();
             Sprite sprite;
             if (string.IsNullOrEmpty(name) || !sprites.TryGetValue(name, out sprite) ||
-                sprite == null || sprite.texture == null)
+                sprite == null)
+                return null;
+            return sprite;
+        }
+
+        internal bool DrawSprite(string name, Rect rect, Color color)
+        {
+            var sprite = GetSprite(name);
+            if (sprite == null || sprite.texture == null)
                 return false;
 
             var textureRect = sprite.textureRect;

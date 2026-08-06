@@ -19,6 +19,16 @@ public static class BuildShaderBundle
         importer.assetBundleName = BundleName;
         importer.SaveAndReimport();
 
+        const string uiShaderPath =
+            "Assets/BossRouletteUiSaturation.shader";
+        var uiImporter = AssetImporter.GetAtPath(uiShaderPath);
+        if (uiImporter == null)
+            throw new InvalidOperationException(
+                "UI shader was not found: " + uiShaderPath);
+
+        uiImporter.assetBundleName = BundleName;
+        uiImporter.SaveAndReimport();
+
         const string outputDirectory = "AssetBundles";
         Directory.CreateDirectory(outputDirectory);
         var manifest = BuildPipeline.BuildAssetBundles(
@@ -35,6 +45,30 @@ public static class BuildShaderBundle
         if (!File.Exists(outputPath))
             throw new FileNotFoundException(
                 "El AssetBundle no fue generado.", outputPath);
+
+        var bundle = AssetBundle.LoadFromFile(outputPath);
+        if (bundle == null)
+            throw new InvalidOperationException(
+                "The generated shader AssetBundle could not be opened.");
+        try
+        {
+            var expectedShaderPaths = new[]
+            {
+                "Assets/BossRouletteSaturation.shader",
+                "Assets/BossRouletteUiSaturation.shader"
+            };
+            for (var i = 0; i < expectedShaderPaths.Length; i++)
+            {
+                if (bundle.LoadAsset<Shader>(expectedShaderPaths[i]) == null)
+                    throw new InvalidOperationException(
+                        "Shader missing from AssetBundle: " +
+                        expectedShaderPaths[i]);
+            }
+        }
+        finally
+        {
+            bundle.Unload(true);
+        }
         Debug.Log("GILOMX_SHADER_BUNDLE=" + outputPath);
     }
 }

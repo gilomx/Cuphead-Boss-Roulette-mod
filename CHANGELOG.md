@@ -3,6 +3,37 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.52 — 2026-08-05
+
+### Resultado de la ruleta en el HUD
+
+- Durante una pelea iniciada por la ruleta, el HUD muestra tiro A, tiro B,
+  súper, amuleto y reto junto a los puntos de vida.
+- En combates de avión sólo muestra amuleto y reto, porque los dos tiros y el
+  súper terrestres no se utilizan en esos niveles.
+- Dentro del combate cada icono mantiene estático su primer frame para evitar
+  distracciones; la entrada secuencial conserva el pulso breve de selección.
+  Todos se dibujan con 70% de opacidad y el nombre del reto aparece después.
+- El conjunto queda anclado al margen inferior derecho y alineado verticalmente
+  con el HUD nativo. Los iconos aparecen uno por uno con el mismo pulso de
+  selección de la ruleta y el texto entra al final con fundido y asentamiento.
+- Los nombres largos conservan fijo el margen derecho y reducen su tipografía
+  sólo cuando superan el ancho máximo disponible.
+- La antigua etiqueta aislada de la esquina fue sustituida por este conjunto.
+- Al pausar o perder, el HUD se reubica en la jerarquía nativa para quedar por
+  encima del oscurecimiento de fondo y por debajo de la tarjeta y sus opciones.
+- El reto Blanco y negro aplica la misma transición de saturación al HUD nuevo.
+- Durante la pelea, la fila pertenece a `LevelHUD.Current.Canvas`, igual que las
+  vidas y las cartas del juego; los iris y apagados de fase ahora la cubren de
+  forma natural.
+- El resultado permanece durante los reintentos y desaparece al ganar o salir.
+- Los golpes de parada ya no enmascaran el audio continuo de la ruleta: ambos
+  usan fuentes independientes, niveles equilibrados y el loop conserva mayor
+  prioridad de reproducción.
+- La animación de entrada del HUD se ejecuta una sola vez al comenzar la pelea;
+  las desactivaciones temporales del Canvas durante fases o iris ya no vuelven a
+  dispararla.
+
 ## 0.5.51 — 2026-08-05
 
 ### Iconos animados de retos

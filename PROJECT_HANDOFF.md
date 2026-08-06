@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-05
-Current local version: 0.5.51
+Current local version: 0.5.52
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -39,7 +39,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.51.
+This handoff documents the roulette implementation through version 0.5.52.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -459,6 +459,74 @@ Card rate of 12.5 FPS. The old static files remain available as legacy assets
 and must not be removed without checking packaged builds that may reference them.
 While field 5 is still rolling, the challenge slot also draws Cuphead's native
 five-frame `equip_icon_sheen` overlay at the same 0.28 alpha as the other slots.
+
+Version 0.5.52 replaces the separate persistent challenge label with
+`BattleResultHud.cs`. During a roulette battle it displays the two weapons,
+super, charm, and challenge in a right-anchored row at the bottom of the screen,
+vertically aligned with Cuphead's health HUD. The row keeps a 26-unit right
+margin. In the battle HUD, native equipment and challenge icons intentionally
+use only their first frame; their looping Equip Card animation was distracting
+during play. Ground battles show all five slots. Plane battles show only charm
+and challenge because the first three roulette loadout values are not used by
+plane controls. All icons and the challenge text use 0.70 alpha. Icons reveal
+one by one at 0.15-second intervals and use the roulette's 0.38-second, 7.5%
+sine pulse; the challenge label fades and settles from 1.12 scale after the
+final icon. Long labels retain the fixed right edge, cap their width at 420
+units, and reduce the font size down to 15.
+
+`BossRouletteUiSaturation.shader` is shipped in the same AssetBundle as the
+camera transition shader. `BattleResultHud` feeds it `1 - blackAndWhiteBlend`,
+so the added icons and text crossfade to monochrome in sync with the scene.
+
+The HUD is prepared from the map's native prompt before `LoadLevel()` and lives
+initially in a `DontDestroyOnLoad` staging Canvas. The root stays hidden until
+`LevelHUD.Current.Canvas` exists, then it is reparented into that native camera
+Canvas. Cuphead's iris and phase transitions therefore cover the roulette row
+exactly like health and super cards; the camera also supplies the gameplay
+black-and-white pass without double desaturation. When `PauseManager.state` is
+not zero it becomes the first child of `PauseGUI/Background`; on defeat it
+becomes the first child of the active `LevelGameOverGUI` background. In both
+cases the parent background draws the dark overlay first and later menu children
+draw above the HUD. The custom UI saturation shader remains the fallback outside
+the native LevelHUD Canvas. If a retry destroys the reparented root, it is
+recreated from the staging Canvas.
+
+Do not reset `battleHudWasVisible` or `battleHudRevealStartedAt` when the native
+LevelHUD Canvas is only temporarily unavailable. Phase and iris transitions can
+disable that Canvas; preserving both values prevents the entry animation from
+replaying when it becomes active again. The normal `ShouldShowBattleResultHud`
+false path still resets them for a genuinely new load/retry.
+
+Roulette audio uses two separate `AudioSource` components. The continuous spin
+source stays at priority 0 and volume 0.45. Transient UI sounds use priority 64;
+the 0.209-second selection clip is played at volume 0.45 instead of 0.9 so it no
+longer masks the spin loop by roughly 6 dB whenever a field settles. Do not route
+selection sounds back through the spin source.
+
+## Pending HUD follow-up for the next agent
+
+The following two runtime observations are intentionally documented but not
+implemented in version 0.5.52:
+
+1. The roulette result row flashes when the player performs a parry. It must
+   remain visually steady. Investigate which native `LevelHUD` child,
+   `CanvasGroup`, or animation propagates the parry flash. Move or isolate the
+   row from that transient effect while preserving its current render order:
+   normal phase/iris transitions must still cover it like the health HUD, and
+   pause/game-over cards must still draw above it.
+2. The row disappears as soon as the boss is defeated. It must remain visible
+   throughout the victory and results sequence and disappear only after the
+   player has actually returned to the map. Keep the visual result snapshot
+   separate from `activeChallenge` and `loanedLoadoutsActive`: gameplay
+   restrictions and temporary equipment should still clear/restore at the
+   existing victory hooks, but the HUD presentation should survive until
+   `SceneLoader.LoadLastMap()` or confirmed map activation.
+
+Acceptance checks: parry repeatedly during a roulette fight without any flash;
+defeat the boss and confirm the row remains through knockout/results; then
+confirm it is gone once free movement on the map resumes. Also recheck iris,
+pause, defeat/retry, airplane two-slot layout, and Blanco y negro after changing
+the HUD parent or lifetime.
 
 Version 0.5.43 adds automatic base-game/DLC compatibility. Each boss and
 equipment entry now records whether it requires The Delicious Last Course.
