@@ -3,6 +3,202 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.100 — 2026-08-06
+
+- Al reanudar desde pausa, el HUD recupera suavemente su opacidad de 70% a
+  100% durante 0.30 segundos usando tiempo no escalado.
+- La entrada a pausa y la posición permanente del HUD no cambian.
+- Se añade `HUD_INTEGRATION.md` con la arquitectura, capas, ciclo de vida,
+  constantes, puntos de extensión y matriz de pruebas del HUD de combate.
+
+## 0.5.99 — 2026-08-06
+
+- La opacidad adicional durante pausa sube de 55% a 70%.
+- La fila sube 1 unidad de forma permanente: los márgenes normal y de pausa
+  pasan de 12 a 13, por igual para uno y dos jugadores.
+
+## 0.5.98 — 2026-08-06
+
+- La opacidad adicional del HUD durante pausa sube de 48% a 55%.
+- La posición permanente de la fila baja 3 unidades: los márgenes normal y de
+  pausa pasan de 15 a 12. El cambio se aplica por igual a uno y dos jugadores,
+  sin animación ni desplazamiento al abrir el menú.
+
+## 0.5.97 — 2026-08-06
+
+- Se elimina el paso del HUD por `LevelHUD.Canvas` durante pausa; ese Canvas
+  `ScreenSpaceCamera` aplicaba el desenfoque fuerte del combate.
+- La fila se coloca como primer hijo del `LevelPauseGUI` activo, debajo de su
+  tarjeta y ayudas, siguiendo la ruta UI usada al perder.
+- Un `CanvasGroup` reduce su opacidad al 48% durante la pausa para conservar el
+  peso visual tenue de game over sin añadir blur. Al reanudar vuelve al 100%.
+
+## 0.5.96 — 2026-08-06
+
+- El margen inferior durante la pausa cambia de 10 a 15 unidades, igualando el
+  valor normal. La fila conserva así la misma coordenada vertical al abrir y
+  cerrar el menú sin alterar la ruta de Canvas ya validada.
+
+## 0.5.95 — 2026-08-06
+
+- La pausa de combate ya no se detecta mediante nombres frágiles como
+  `Glyph (2)` y `Help (2)`. Se consulta directamente cada `LevelPauseGUI`
+  activo y su estado nativo `Paused/Animating`.
+- Esto evita confundir el hit-stop de parry con una pausa y garantiza que la
+  fila llegue a `LevelHUD.Canvas` cuando la tarjeta está visible.
+- El texto clonado del prompt del mapa desactiva su `LocalizationHelper`
+  heredado y reafirma su etiqueta cada frame. Cuphead ya no puede sustituir
+  `ABRIR RULETA` por el `VOLVER` original de la plantilla.
+
+## 0.5.94 — 2026-08-06
+
+- Las capturas confirmaron que la pausa procesa la imagen renderizada del
+  combate; no existe un `Background` UI posterior capaz de afectar a sus hijos.
+- Se combina la selección del PauseGUI activo, corregida en 0.5.92, con el
+  reparentado a `LevelHUD.Canvas`. La fila comparte así la misma ruta de render
+  que la vida y las cartas, mientras las ayudas de PauseGUI permanecen encima.
+- El log registra una sola vez el modo y `sortingOrder` del Canvas al efectuar
+  el cambio, para validar el comportamiento real durante esta prueba.
+
+## 0.5.93 — 2026-08-06
+
+- La captura de un jugador confirmó que la fila sí entraba al PauseGUI, pero
+  como hija de `Background`; Unity dibuja el Graphic del padre antes que sus
+  hijos, por lo que la fila permanecía nítida y encima de esa capa.
+- La fila ahora se inserta como primer hijo del propio `PauseGUI`. El
+  `Background`, la tarjeta y las ayudas se renderizan después, dejando el HUD
+  agregado debajo del tratamiento visual de pausa y de `CONFIRMAR / VOLVER`.
+
+## 0.5.92 — 2026-08-06
+
+- La detección de pausa ahora prioriza el `PauseGUI/Background` que está activo
+  en la escena. Antes podía tomar otra instancia inactiva conservada en memoria
+  y dejar la fila en el overlay independiente.
+- Durante una pausa real, la fila utiliza exactamente la misma ruta probada al
+  perder: se vuelve el primer hijo del `Background` activo, conservando el
+  desenfoque y quedando detrás de las ayudas del menú.
+
+## 0.5.91 — 2026-08-06
+
+- Al abrir la pausa, el HUD de la ruleta se mueve temporalmente al mismo Canvas
+  nativo que las vidas y cartas. Por ello recibe el desenfoque de Cuphead en
+  lugar de permanecer nítido sobre el fondo.
+- Las ayudas nativas `CONFIRMAR` y `VOLVER` permanecen delante de la fila.
+- La fila baja 5 unidades únicamente durante la pausa para alinear mejor el
+  texto con esas ayudas; la posición durante el combate no cambia.
+
+## 0.5.90 — 2026-08-06 (prueba temporal)
+
+- Además de las cinco cartas visuales de ambos jugadores, se fuerza el reto
+  `No disparo Peashooter`, el nombre más largo del catálogo actual.
+- La ruleta limita la prueba a jefes de avión compatibles para validar el ancho
+  del texto en el caso cooperativo más estrecho.
+
+## 0.5.89 — 2026-08-06 (prueba temporal)
+
+- P1 y P2 muestran cinco cartas de súper en el HUD nativo para validar
+  visualmente el centrado de la fila de resultados en cooperativo.
+- El selector sólo sustituye el valor recibido por `LevelHUDPlayerSuper`; no
+  modifica `PlayerStatsManager.SuperMeter`, no regala súper y no altera la
+  pelea. Debe desactivarse después de aprobar el diseño.
+
+## 0.5.88 — 2026-08-06
+
+- En cooperativo, la fila del resultado ya no permanece pegada al margen
+  derecho ni invade la vida y las cartas de P2.
+- El mod mide los límites nativos de `LevelHUDPlayerHealth` y
+  `LevelHUDPlayerSuper` para ambos jugadores y centra la fila en el espacio
+  libre entre ellos, con margen de seguridad en cada lado.
+- El ancho máximo del texto del reto se limita al espacio cooperativo disponible
+  para evitar solapamientos. En partidas de un jugador se conservan exactamente
+  el ancla derecha y los márgenes anteriores.
+
+## 0.5.87 — 2026-08-06
+
+- La cápsula manual de teclado actualiza también el `LayoutElement` que usa la
+  fila nativa. Esto evita que el layout vuelva a reducir F6/F7 al ancho del
+  glifo circular de mando que ocupó antes el mismo contenedor.
+- Al regresar del mando al teclado se restauran la escala, el ajuste de texto y
+  los modos de desbordamiento del `Text`; F6/F7 disponen de un ancho mínimo de
+  35 unidades y permanecen completos dentro del recuadro.
+- El bloque de mando `LT/L2/ZL + Equip` no recibe este reajuste visual.
+
+## 0.5.86 — 2026-08-06
+
+- El modo teclado reafirma F6/F7 después de los eventos de cambio de controles.
+  `CupheadGlyph` sigue suscrito a `PlayerManager.OnControlsChanged` aunque su
+  componente esté desactivado y podía volver a escribir `SHIFT` dentro de la
+  cápsula manual.
+- Se añadió un poco de espacio horizontal a las cápsulas manuales.
+
+## 0.5.85 — 2026-08-06
+
+- El indicador de mando se reordenó como `ABRIR RULETA  LT + Y` (o sus
+  equivalentes de PlayStation y Switch): primero la acción y después los
+  botones.
+- Se desactivó el comportamiento de localización del primer texto clonado de
+  PauseGUI. Ese componente restauraba `CONFIRMAR` encima del separador `+`.
+- El orden de hermanos de la fila nativa quedó fijado como acción, gatillo,
+  separador y glifo de Equipar.
+
+## 0.5.84 — 2026-08-06
+
+- El indicador inferior derecho detecta el último dispositivo activo de
+  Rewired. En teclado utiliza F6/F7; en mando utiliza el gatillo izquierdo más
+  el glifo nativo de Equipar para abrir, y el gatillo derecho para volver a
+  girar.
+- Las etiquetas físicas cambian entre `LT/RT`, `L2/R2` y `ZL/ZR` según la
+  identidad del mando. El botón Equipar conserva el glifo original de Cuphead.
+- Se desactivaron `ForceRelicTestSequence` y
+  `ForcePlaneRelicChallengeTestSequence` después de concluir la matriz de
+  pruebas de reliquias y armas de avión. Los selectores quedan dormidos para
+  futuras pruebas, pero los giros normales ya no fuerzan esos resultados.
+
+## 0.5.83 — 2026-08-06 (prueba temporal)
+
+- Todos los giros cargan temporalmente un jefe compatible de avión.
+- La matriz de cuatro giros prueba, en orden: Maldita + No bombas, Divina + No
+  bombas, Maldita + No Peashooter y Divina + No Peashooter; después se repite.
+- `ForcePlaneRelicChallengeTestSequence` activa RETO aunque el ajuste guardado
+  esté desactivado. Jefes, armas terrestres y súper continúan siendo aleatorios.
+- Retirar tanto este selector como `ForceRelicTestSequence` cuando concluyan
+  las pruebas.
+
+## 0.5.82 — 2026-08-06 (prueba temporal)
+
+- Los retos `No disparo bombas` y `No disparo Peashooter` interceptan ahora
+  también `PlanePlayerWeaponManager.SwitchWeapon()`.
+- La Reliquia Maldita y la Reliquia Divina cambian el disparo de avión desde
+  `CheckBasic()` mediante esa ruta directa, sin pasar por el cambio manual que
+  ya estaba bloqueado. Cualquier selección prohibida se sustituye por el arma
+  permitida antes de comenzar el disparo.
+- El bloqueo cubre a ambos jugadores y conserva EX, súper, mini avión y los
+  demás efectos de la reliquia. Continúa activa la secuencia temporal que
+  alterna Reliquia Maldita y Reliquia Divina para las pruebas.
+
+## 0.5.81 — 2026-08-06 (prueba temporal)
+
+- Fuerza una secuencia alternada de amuletos para validar la separación de las
+  reliquias: el primer giro entrega Reliquia Maldita, el segundo Reliquia
+  Divina, y los siguientes repiten ese orden.
+- Los jefes, armas, súper, dificultad y reto continúan seleccionándose con las
+  reglas normales. Retirar `ForceRelicTestSequence` después de la prueba.
+
+## 0.5.80 — 2026-08-06
+
+### Reliquia Maldita y Reliquia Divina independientes
+
+- La Reliquia Maldita se añadió como un resultado separado del conjunto de
+  amuletos y utiliza el primer icono animado nativo de `charm_curse`.
+- La Reliquia Maldita fuerza temporalmente el grado interno `0`, mientras que
+  la Reliquia Divina fuerza el grado máximo `4` y conserva su quinto icono.
+- Ambas entradas siguen equipando el mismo amuleto oficial de Cuphead; el nivel
+  se sustituye solamente mientras `PlayerStatsManager` y los controladores de
+  animación inicializan el combate.
+- Las consultas de progreso realizadas al ganar quedan fuera del parche. No se
+  cambian el cementerio, los puntos acumulados, las compras ni la partida
+  guardada, y el equipamiento previo continúa restaurándose al ganar o salir.
+
 ## 0.5.79 — 2026-08-06
 
 ### Corrección definitiva del parpadeo del HUD al hacer parry

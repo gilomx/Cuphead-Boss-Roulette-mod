@@ -1,11 +1,15 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-06
-Current local version: 0.5.79
+Current local version: 0.5.100
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
 coordinates and avoid broad rewrites.
+
+The accepted HUD architecture, layer matrix, layout invariants and extension
+checklist now live in [HUD_INTEGRATION.md](HUD_INTEGRATION.md). Read that guide
+before adding any new battle indicator.
 
 ## Goal
 
@@ -39,7 +43,7 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.78.
+This handoff documents the roulette implementation through version 0.5.100.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
@@ -221,7 +225,16 @@ Required behavior:
   reverse. `OnLevelStart` forces `plane_weapon_bomb`, or
   `plane_chalice_weapon_bomb` for Galletita Astral, and the shared
   `HandleWeaponSwitch` prefix prevents returning to Peashooter/Chalice
-  three-way fire. Reliquia Divina cannot randomize the starting weapon.
+  three-way fire.
+- Both airplane weapon restrictions also patch
+  `PlanePlayerWeaponManager.SwitchWeapon(Weapon)`. Cursed/Divine Relic chooses
+  a new airplane shot in `CheckBasic()` and calls this lower-level method
+  directly, bypassing `HandleWeaponSwitch()`. The prefix replaces the requested
+  weapon with the challenge's required Peashooter/bomb variant before the
+  manager ends or starts firing. This covers both relic outcomes and both
+  players without disabling EX, super, shrinking, or other relic effects.
+  Keep the `OnLevelStart` normalization as well: it handles the random initial
+  weapon before the first `CheckBasic()` call.
 - `Blanco y negro` applies to ground and airplane fights. The
   `BlackAndWhiteSaturationEffect` loads a shader compiled with Unity 2017.4.9f1
   from `assets/shaders/gilomx-boss-roulette-shaders`. One explicit command
@@ -776,6 +789,141 @@ reverted to reduce regression risk. The native material parity introduced in
 0.5.73 remains because it matches Cuphead's original health HUD and preserves
 the special saturation material only for the `Blanco y negro` challenge.
 
+Version 0.5.88 adds a separate cooperative placement path. It reflects
+`LevelHUD.cuphead`/`mugman`, then measures only the native health and super-card
+components relative to `LevelHUD.Canvas`. Those inner edges are converted from
+the native canvas through screen coordinates into the current roulette HUD
+parent, so the calculation survives gameplay, pause/game-over reparenting and
+resolution scaling. The roulette row is centered between those edges with an
+18-unit safety gap per player. Its challenge text width is capped by the
+remaining cooperative space. If P2 is absent, inactive, or its bounds are not
+ready, the exact original single-player right anchor `(-26, 15)` is restored.
+This still needs visual validation with a real two-player session, especially
+after pause, retry and victory transitions.
+
+Version 0.5.89 temporarily enables `ForceFiveSuperCardsForHudTest`. A Harmony
+prefix changes only the `float` passed to `LevelHUDPlayerSuper.OnSuperChanged`
+to that player's `SuperMeterMax`, so both native HUDs render five cards while
+the underlying `PlayerStatsManager.SuperMeter` and combat remain untouched.
+This is strictly a layout-test selector: set it back to `false` after the
+cooperative spacing is approved. The BepInEx log prints a warning while it is
+active.
+
+Version 0.5.90 additionally sets `ForcedTestChallenge` to
+`No disparo Peashooter`, the longest current challenge label. This forces a
+compatible plane boss and exercises the narrow cooperative result row together
+with both native five-card HUDs. Clear this selector after visual validation.
+
+Version 0.5.91 changes only the real-pause route. While PauseGUI's Background
+is active, the roulette row is reparented to `LevelHUD.Canvas`, the same source
+as the native health and super HUD. It therefore enters Cuphead's blurred
+gameplay image and stays below PauseGUI's Confirm/Back prompts. Its pause-only
+bottom margin is 10 instead of 15 units, aligning the label more closely with
+those prompts. Resuming reparents it to the independent overlay again, so the
+existing parry-flash isolation remains unchanged.
+
+Version 0.5.92 corrects the pause-layer detection after runtime validation.
+`TryFindBattleHudNativeLayers()` used to return the first matching PauseGUI
+kept in memory even when inactive. It now retains that first match only as a
+template fallback and continues scanning for an active Background. A real pause
+then uses `PlaceBattleHudInsideMenuLayer(activeBackground)`, exactly like the
+working game-over path, while keeping the 10-unit pause-only bottom margin.
+
+Version 0.5.93 corrects the remaining draw-order difference observed in a real
+one-player pause. A Unity UI Graphic on a parent renders before its children,
+so placing the roulette row inside PauseGUI/Background still left it above that
+background. The row is now the first direct child of PauseGUI instead. The
+Background, pause card and help prompts are later siblings and therefore render
+over it, matching the dim/blur treatment and prompt priority seen in the native
+HUD. The active-PauseGUI selection fix from 0.5.92 remains.
+
+Version 0.5.94 combines the two facts learned separately. The 0.5.91 native
+LevelHUD experiment never actually ran in the reported pause because the code
+still selected an inactive PauseGUI; 0.5.92 fixed that selection but then used
+a PauseGUI parent, which screenshots proved remains outside the processed
+gameplay image. With the active pause reliably identified, the row now moves to
+`LevelHUD.Canvas`, exactly where native health/super already receive pause
+dimming/blur. PauseGUI stays on its own later Canvas, so Confirm/Back remain
+above. A one-shot log line records native Canvas render mode and sorting order
+whenever the parent actually changes.
+
+Version 0.5.95 removes the final name-based dependency from runtime pause
+detection. `Resources.FindObjectsOfTypeAll<LevelPauseGUI>()` is filtered to a
+valid active scene object and its public `AbstractPauseGUI.state`; Paused and
+Animating count as visible, while parry hit-stop leaves this UI-specific state
+Unpaused. The existing native-Canvas move therefore runs from a direct game
+signal instead of a cloned help-row hierarchy.
+
+The map prompt regression was the template's `LocalizationHelper` restoring its
+original `VOLVER` localization after `ABRIR RULETA` had been set. The helper is
+disabled on the cloned action Text, and the label/width are also reasserted in
+the unchanged-layout fast path as a defensive measure.
+
+Version 0.5.96 keeps the validated pause-Canvas behavior and changes only
+`BattleHudPauseBottomMargin` from 10 to 15, matching the normal
+`BattleHudBottomMargin`. The row therefore does not shift vertically during
+pause reparenting.
+
+Version 0.5.97 responds to visual validation that the ScreenSpaceCamera pause
+path was much blurrier than game over. The active `LevelPauseGUI` is still
+identified from its native state, but the row is now its first child instead of
+joining `LevelHUD.Canvas`. A root `CanvasGroup` uses alpha 0.48 during pause and
+returns to 1.0 everywhere else. PauseGUI's later siblings stay above the row,
+while the independent UI path avoids the camera blur and visually approaches
+the dim game-over presentation.
+
+Version 0.5.98 raises `BattleHudPauseAlphaMultiplier` from 0.48 to 0.55. Both
+`BattleHudBottomMargin` and `BattleHudPauseBottomMargin` are reduced from 15 to
+12, moving the row down by three units in every state. Because both
+single-player and cooperative placement consume those constants, the move is
+static and identical for 1P/2P with no pause animation or jump.
+
+Version 0.5.99 raises `BattleHudPauseAlphaMultiplier` from 0.55 to 0.70. Both
+bottom margins rise from 12 to 13, moving the row up by one static unit in all
+states and for both player counts.
+
+Version 0.5.100 keeps pause entry immediate at alpha 0.70, but replaces the
+single-frame return to alpha 1.0 after unpausing with a 0.30-second
+`Mathf.MoveTowards` transition driven by `Time.unscaledDeltaTime`. It does not
+animate or change the HUD position.
+
+## Separate cursed and divine relic outcomes (0.5.80)
+
+Cuphead exposes the Broken, Cursed and Divine Relic as the same enum value,
+`Charm.charm_curse`. Its effective strength is the integer returned by
+`CharmCurse.CalculateLevel(PlayerId)`: `-1` before the graveyard, `0` through
+`3` while cursed, and `4` at the divine maximum. The native Equip Card uses
+icons `equip_icon_charm_curse_1_0001` through
+`equip_icon_charm_curse_5_0001` for those five active grades.
+
+Version 0.5.80 gives the roulette two independent entries. `Reliquia Maldita`
+uses grade `0` and the first native icon; `Reliquia Divina` uses grade `4` and
+the fifth native icon. `EquipmentEntry<T>.CurseLevelOverride` stores this
+per-result distinction even though both entries equip the same enum.
+
+The Harmony postfix on `CharmCurse.CalculateLevel()` is gated by a setup-depth
+counter. Prefix/finalizer pairs open that gate only around
+`PlayerStatsManager.LevelInit()`, `LevelPlayerAnimationController.Start()`, and
+`PlanePlayerAnimationController.Start()`. Consequently health, curse abilities,
+weapon randomization and the matching player animation initialize at the chosen
+grade, while map UI, graveyard state and win/progression calls still receive the
+real saved value. Do not broaden the postfix to the complete battle: King Dice
+and normal win paths query relic progress and must remain untouched.
+
+Version 0.5.81 temporarily sets `ForceRelicTestSequence = true`. The first
+roulette spin after loading the plugin selects Reliquia Maldita, the second
+selects Reliquia Divina, and later spins alternate. Only the charm is forced;
+all other results remain random. Set the constant back to `false`, remove the
+temporary counter/helper, and bump the version after user acceptance.
+
+Version 0.5.83 also sets `ForcePlaneRelicChallengeTestSequence = true` and
+forces a four-spin matrix: Maldita + No bombas, Divina + No bombas, Maldita +
+No Peashooter, then Divina + No Peashooter. `RandomBossForModifier()` therefore
+chooses only a compatible plane boss from the current base/DLC availability
+pool. The selector forces `uglyMode` on so the challenge is actually applied
+even if the saved RETO setting is off. Remove both temporary selectors and
+their counters/helpers after acceptance.
+
 ## Fullscreen Equip Card entrance stability (0.5.56)
 
 At 1920x1080 the 1280x720 IMGUI design matrix uses a 1.5 scale. The previous
@@ -954,7 +1102,8 @@ The DLC-only entries currently represented by the roulette are:
 - Bosses: Las Alimañas, Esther Espuelas, Los Perritos Pilotos, Ángel y
   Demonio, Genovevo de Gelante, Granitoviejo el Gigante, and Chef Saleroso.
 - Weapons: Tiro Certero, Convergencia, and Ciclónica.
-- Charms: Galletita Astral, Reliquia Divina, and Anillo de Corazón.
+- Charms: Galletita Astral, Reliquia Maldita, Reliquia Divina, and Anillo de
+  Corazón.
 - Supers: none. The three selected super slots exist in the base game; Ms.
   Chalice's variants are reached through Galletita Astral, which is already
   DLC-only.
@@ -983,16 +1132,43 @@ Manual end-to-end checks still recommended:
 - `VOLVER A GIRAR` + F7 when applicable
 - The persistent informational challenge prompt during a fight
 
-The F6/F7 capsule dimensions and text offset were tuned by the user. Preserve:
+Versions 0.5.84-0.5.87 make the map/reroll prompt device-aware. The last active
+`Rewired.Controller` decides the presentation:
 
-- Minimum key width: 30
-- Key padding: 2.5
-- Key text anchored offset: `(-10, -0.3)`
-- Right edge constant: 1290
-- Text-to-key gap: 4.5
+- Keyboard: `ABRIR RULETA  F6` and `VOLVER A GIRAR  F7`.
+- Xbox-style controller: `ABRIR RULETA  LT + Y`; reroll uses `RT`.
+- PlayStation-style controller: `L2` plus the native Equip glyph; reroll uses
+  `R2`.
+- Nintendo-style controller: `ZL` plus the native Equip glyph; reroll uses
+  `ZR`.
+
+The rightmost Equip button is still a real `CupheadGlyph` configured for
+`CupheadButton.EquipMenu`, so Cuphead chooses the correct face-button symbol.
+The physical trigger is a compact text capsule because there is no trigger
+entry in `CupheadButton`. Controller identity selects `LT`, `L2`, or `ZL`.
+
+The cloned PauseGUI row originally contains `CONFIRMAR`, glyph, action, glyph.
+The mod disables the localization behaviour on the first text and reorders the
+children to action, trigger, `+`, Equip glyph. Do not remove that behaviour
+guard: localization otherwise writes `CONFIRMAR` over the plus sign.
+
+For keyboard, `CupheadGlyph` can still receive `OnControlsChanged` after being
+disabled and overwrite F6/F7 with the Equip binding. The cached-layout branch
+therefore reasserts the expected manual key. `ConfigureManualPromptGlyph()`
+also restores scale 1, disables best-fit, updates the root `LayoutElement`, and
+uses a 35-unit minimum width for the rightmost F6/F7 capsule. The trigger
+capsule keeps its separate compact sizing. Preserve the right edge constant
+1290 and the 4.5-unit action-to-key gap unless the user requests a visual move.
 
 The roulette dim layer must be behind the card and the native F7 prompt must be
 in front of it.
+
+Physical-controller validation is still pending. This PC currently uses Steam
+Link, whose exposed controls do not include LT, so the complete open combo and
+navigation/reroll flow could not be exercised end to end here. On the next PC,
+test with a real Xbox/PlayStation/Switch-style controller: prompt order and
+glyph, open/close combo, D-pad/stick navigation, Accept/Cancel, and RT/R2/ZR
+reroll with automatic loading disabled. Keyboard F6/F7 was tested locally.
 
 Version 0.5.44 adds the controller open/close combo. `Plugin.cs` reads
 Cuphead's `EquipMenu` action from each `Rewired.Player`, then scans only that
@@ -1009,6 +1185,11 @@ without hard-coding face-button numbers. Reroll scans assigned joysticks for
 the physical right trigger labels (`Right Trigger`, `R2`, or `ZR`) and supports
 both axes and digital buttons. A stored held-state turns it into a rising-edge
 press, preventing repeated spins while the trigger remains held.
+
+The temporary relic test switches introduced in 0.5.81 and 0.5.83 are both
+`false` as of 0.5.84. Do not report the current build as forced-plane or
+forced-relic mode. The helper code remains available only as a dormant testing
+facility.
 
 ## Card layout invariants
 
