@@ -15,14 +15,22 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.79";
+        public const string PluginVersion = "0.5.100";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
         // TEMPORARY TEST SELECTOR. Keep non-empty while developing a challenge.
         // Compatible bosses are still chosen randomly.
         private static readonly string ForcedTestChallenge =
-            "";
+            "No disparo Peashooter";
+        // Dormant test selector: alternate cursed/divine relic each spin.
+        private static readonly bool ForceRelicTestSequence = false;
+        // Dormant test selector: exercise both restricted plane weapons.
+        private static readonly bool ForcePlaneRelicChallengeTestSequence =
+            false;
+        // TEMPORARY VISUAL TEST. It does not change either player's real meter.
+        private static readonly bool ForceFiveSuperCardsForHudTest = true;
+
         private const string BlackAndWhiteChallenge = "Blanco y negro";
         private const float BlackAndWhiteEntryDelay = 1.5f;
         private const float BlackAndWhiteFadeInDuration = 1.25f;
@@ -100,6 +108,8 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private readonly System.Random random = new System.Random();
+        private int forcedRelicTestSpin;
+        private int forcedPlaneRelicChallengeTestSpin;
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
         private readonly List<int> availableBossIndices = new List<int>();
         private readonly List<int> availableWeaponIndices = new List<int>();
@@ -176,6 +186,7 @@ namespace Gilomx.CupheadBossRoulette
         private LoadoutSnapshot originalPlayerTwoLoadout;
         private bool loanedLoadoutsActive;
         private bool loanedBattleSeen;
+        private static int curseRelicRuntimeSetupDepth;
 
         private string AssetsDirectory
         {
@@ -196,7 +207,9 @@ namespace Gilomx.CupheadBossRoulette
                          difficultySetting.Value == Level.Mode.Hard
                 ? difficultySetting.Value
                 : Level.Mode.Normal;
-            uglyMode = HasForcedTestChallenge() || challengeSetting.Value;
+            uglyMode = HasForcedTestChallenge() ||
+                       ForcePlaneRelicChallengeTestSequence ||
+                       challengeSetting.Value;
             theme = new GameTheme();
             LoadBlackAndWhiteTransitionShader();
             audioSource = gameObject.AddComponent<AudioSource>();
@@ -233,6 +246,27 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning(
                     "Could not install the roulette map movement guard.");
+
+            if (ForceFiveSuperCardsForHudTest)
+            {
+                var superChanged = AccessTools.Method(
+                    typeof(LevelHUDPlayerSuper), "OnSuperChanged",
+                    new[] { typeof(float) });
+                var forceFiveSuperCardsPrefix = AccessTools.Method(
+                    typeof(Plugin), "ForceFiveSuperCardsForHudTestPrefix");
+                if (superChanged != null &&
+                    forceFiveSuperCardsPrefix != null)
+                {
+                    harmony.Patch(superChanged,
+                        prefix: new HarmonyMethod(
+                            forceFiveSuperCardsPrefix));
+                    Logger.LogWarning(
+                        "TEMP HUD test active: both players show five super cards; real meters are unchanged.");
+                }
+                else
+                    Logger.LogWarning(
+                        "Could not install the temporary five-card HUD test.");
+            }
 
             var filterGetter = AccessTools.PropertyGetter(
                 typeof(SettingsData), "filter");
@@ -346,9 +380,131 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning("Could not install the No airplane bombs guard.");
 
+            var switchPlaneWeapon = AccessTools.Method(
+                typeof(PlanePlayerWeaponManager), "SwitchWeapon",
+                new[] { typeof(Weapon) });
+            var enforcePlaneWeaponRestrictionPrefix = AccessTools.Method(
+                typeof(Plugin), "EnforcePlaneWeaponRestrictionPrefix");
+            if (switchPlaneWeapon != null &&
+                enforcePlaneWeaponRestrictionPrefix != null)
+                harmony.Patch(switchPlaneWeapon,
+                    prefix: new HarmonyMethod(
+                        enforcePlaneWeaponRestrictionPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the cursed relic airplane weapon guard.");
+
+            InstallCurseRelicLevelOverridePatches();
+
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion +
                            " listo. F6 o gatillo izquierdo + Equip abre/cierra; F7 gira.");
+        }
+
+        private static void ForceFiveSuperCardsForHudTestPrefix(
+            LevelHUDPlayerSuper __instance, ref float __0)
+        {
+            if (!ForceFiveSuperCardsForHudTest || __instance == null)
+                return;
+
+            var hud = Traverse.Create(__instance)
+                .Property("_hud").GetValue<LevelHUDPlayer>();
+            var player = hud != null ? hud.player : null;
+            var stats = player != null ? player.stats : null;
+            if (stats != null)
+            {
+                // Feed only the native HUD renderer its own maximum. The real
+                // PlayerStatsManager.SuperMeter value is never modified.
+                __0 = stats.SuperMeterMax;
+            }
+        }
+
+        private void InstallCurseRelicLevelOverridePatches()
+        {
+            var calculateLevel = AccessTools.Method(
+                typeof(CharmCurse), "CalculateLevel",
+                new[] { typeof(PlayerId) });
+            var overrideLevelPostfix = AccessTools.Method(
+                typeof(Plugin), "OverrideSelectedCurseRelicLevelPostfix");
+            var beginSetupPrefix = AccessTools.Method(
+                typeof(Plugin), "BeginCurseRelicRuntimeSetupPrefix");
+            var endSetupFinalizer = AccessTools.Method(
+                typeof(Plugin), "EndCurseRelicRuntimeSetupFinalizer");
+
+            if (calculateLevel == null || overrideLevelPostfix == null ||
+                beginSetupPrefix == null || endSetupFinalizer == null)
+            {
+                Logger.LogWarning(
+                    "Could not install the cursed/divine relic level override.");
+                return;
+            }
+
+            harmony.Patch(calculateLevel,
+                postfix: new HarmonyMethod(overrideLevelPostfix));
+
+            var runtimeSetupMethods = new[]
+            {
+                AccessTools.Method(typeof(PlayerStatsManager), "LevelInit"),
+                AccessTools.Method(typeof(LevelPlayerAnimationController),
+                    "Start"),
+                AccessTools.Method(typeof(PlanePlayerAnimationController),
+                    "Start")
+            };
+            for (var i = 0; i < runtimeSetupMethods.Length; i++)
+            {
+                var method = runtimeSetupMethods[i];
+                if (method == null)
+                {
+                    Logger.LogWarning(
+                        "Could not find a relic runtime setup method at index " +
+                        i + ".");
+                    continue;
+                }
+
+                harmony.Patch(method,
+                    prefix: new HarmonyMethod(beginSetupPrefix),
+                    finalizer: new HarmonyMethod(endSetupFinalizer));
+            }
+        }
+
+        private static void BeginCurseRelicRuntimeSetupPrefix()
+        {
+            curseRelicRuntimeSetupDepth++;
+        }
+
+        private static void EndCurseRelicRuntimeSetupFinalizer()
+        {
+            if (curseRelicRuntimeSetupDepth > 0)
+                curseRelicRuntimeSetupDepth--;
+        }
+
+        private static void OverrideSelectedCurseRelicLevelPostfix(
+            ref int __result)
+        {
+            if (curseRelicRuntimeSetupDepth <= 0)
+                return;
+
+            var plugin = activeInstance;
+            int forcedLevel;
+            if (plugin != null &&
+                plugin.TryGetSelectedCurseRelicLevel(out forcedLevel))
+                __result = forcedLevel;
+        }
+
+        private bool TryGetSelectedCurseRelicLevel(out int level)
+        {
+            level = EquipmentEntry<Charm>.NoCurseLevelOverride;
+            if (!loanedLoadoutsActive || result == null || result.Charm < 0 ||
+                result.Charm >= RouletteData.Charms.Length)
+                return false;
+
+            var selectedCharm = RouletteData.Charms[result.Charm];
+            if (selectedCharm.Value != Charm.charm_curse ||
+                selectedCharm.CurseLevelOverride < 0)
+                return false;
+
+            level = selectedCharm.CurseLevelOverride;
+            return true;
         }
 
         private void LoadBlackAndWhiteTransitionShader()
@@ -857,6 +1013,8 @@ namespace Gilomx.CupheadBossRoulette
             RefreshAvailableContent();
             if (HasForcedTestChallenge())
                 uglyMode = true;
+            if (ForcePlaneRelicChallengeTestSequence)
+                uglyMode = true;
             if (!visible)
                 SetVisible(true);
 
@@ -884,7 +1042,10 @@ namespace Gilomx.CupheadBossRoulette
         private RouletteResult CreateRandomResult()
         {
             EnsureAvailableContent();
-            var forcedModifier = ForcedTestModifierIndex();
+            var forcedModifier =
+                ForcedPlaneRelicChallengeModifierIndex();
+            if (forcedModifier < 0)
+                forcedModifier = ForcedTestModifierIndex();
             var boss = forcedModifier >= 0
                 ? RandomBossForModifier(forcedModifier)
                 : RandomPoolIndex(availableBossIndices);
@@ -899,10 +1060,13 @@ namespace Gilomx.CupheadBossRoulette
                 ? RouletteData.Supers.Length - 1
                 : RandomNonEmptyPoolIndex(
                     availableSuperIndices, RouletteData.Supers.Length - 1);
-            var charm = random.NextDouble() < 0.2
-                ? RouletteData.Charms.Length - 1
-                : RandomNonEmptyPoolIndex(
-                    availableCharmIndices, RouletteData.Charms.Length - 1);
+            var forcedCharm = ForcedRelicTestCharmIndex();
+            var charm = forcedCharm >= 0
+                ? forcedCharm
+                : random.NextDouble() < 0.2
+                    ? RouletteData.Charms.Length - 1
+                    : RandomNonEmptyPoolIndex(
+                        availableCharmIndices, RouletteData.Charms.Length - 1);
 
             var modifier = forcedModifier >= 0
                 ? forcedModifier
@@ -924,6 +1088,51 @@ namespace Gilomx.CupheadBossRoulette
                 Charm = charm,
                 Modifier = modifier
             };
+        }
+
+        private int ForcedPlaneRelicChallengeModifierIndex()
+        {
+            if (!ForcePlaneRelicChallengeTestSequence)
+                return -1;
+
+            var testSpin = forcedPlaneRelicChallengeTestSpin++ % 4;
+            var expectedName = testSpin < 2
+                ? "No disparo bombas"
+                : "No disparo Peashooter";
+            for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+            {
+                if (RouletteData.Modifiers[i].Name == expectedName)
+                {
+                    Logger.LogInfo(
+                        "Forced plane relic challenge: " + expectedName +
+                        ".");
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private int ForcedRelicTestCharmIndex()
+        {
+            if (!ForceRelicTestSequence)
+                return -1;
+
+            var expectedName = forcedRelicTestSpin++ % 2 == 0
+                ? "Reliquia Maldita"
+                : "Reliquia Divina";
+            for (var i = 0; i < availableCharmIndices.Count; i++)
+            {
+                var charmIndex = availableCharmIndices[i];
+                if (RouletteData.Charms[charmIndex].Name == expectedName)
+                {
+                    Logger.LogInfo(
+                        "Forced relic test result: " + expectedName + ".");
+                    return charmIndex;
+                }
+            }
+
+            return -1;
         }
 
         private static bool HasForcedTestChallenge()
@@ -1755,24 +1964,48 @@ namespace Gilomx.CupheadBossRoulette
             if (plugin == null || __instance == null)
                 return;
 
-            var charm = RouletteData.Charms[plugin.result.Charm].Value;
             Weapon startingWeapon;
-            if (plugin.activeChallenge == "No disparo bombas")
-            {
-                startingWeapon = charm == Charm.charm_chalice
-                    ? Weapon.plane_chalice_weapon_3way
-                    : Weapon.plane_weapon_peashot;
-            }
-            else if (plugin.activeChallenge == "No disparo Peashooter")
-            {
-                startingWeapon = charm == Charm.charm_chalice
-                    ? Weapon.plane_chalice_weapon_bomb
-                    : Weapon.plane_weapon_bomb;
-            }
-            else
+            if (!plugin.TryGetRequiredPlaneWeapon(out startingWeapon))
                 return;
 
             __instance.SwitchToWeapon(startingWeapon);
+        }
+
+        private static void EnforcePlaneWeaponRestrictionPrefix(
+            ref Weapon __0)
+        {
+            var plugin = activeInstance;
+            Weapon requiredWeapon;
+            if (plugin != null && plugin.ShouldLockPlaneWeapon() &&
+                plugin.TryGetRequiredPlaneWeapon(out requiredWeapon))
+                __0 = requiredWeapon;
+        }
+
+        private bool TryGetRequiredPlaneWeapon(out Weapon weapon)
+        {
+            weapon = Weapon.None;
+            if (result == null || result.Charm < 0 ||
+                result.Charm >= RouletteData.Charms.Length)
+                return false;
+
+            var isChalice =
+                RouletteData.Charms[result.Charm].Value == Charm.charm_chalice;
+            if (activeChallenge == "No disparo bombas")
+            {
+                weapon = isChalice
+                    ? Weapon.plane_chalice_weapon_3way
+                    : Weapon.plane_weapon_peashot;
+                return true;
+            }
+            if (activeChallenge == "No disparo Peashooter")
+            {
+                weapon = isChalice
+                    ? Weapon.plane_chalice_weapon_bomb
+                    : Weapon.plane_weapon_bomb;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool BlockPlaneWeaponSwitchPrefix()

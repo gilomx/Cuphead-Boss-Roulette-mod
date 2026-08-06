@@ -11,6 +11,9 @@ terminar el giro, el mod equipa el resultado y carga directamente el combate.
 
 Consulta [CHANGELOG.md](CHANGELOG.md) para ver el historial de cambios.
 
+Para extender los indicadores durante una pelea, consulta
+[HUD_INTEGRATION.md](HUD_INTEGRATION.md) antes de modificar las capas o el layout.
+
 ## Controles
 
 - `F6`: abrir o cerrar la ruleta.
@@ -25,6 +28,11 @@ Consulta [CHANGELOG.md](CHANGELOG.md) para ver el historial de cambios.
 - `ZR`/`RT`/`R2`: volver a girar si ya existe un resultado y la carga
   automática está desactivada.
 - `F7`: volver a girar en ese mismo caso desde el teclado.
+
+El indicador inferior derecho cambia automáticamente con el último dispositivo
+usado. En teclado muestra F6/F7; en mando muestra el gatillo físico y el glifo
+nativo de Equipar (`LT + Y`, `L2 + Triángulo` o `ZL + X`) y el gatillo derecho
+cuando se permite volver a girar.
 
 El giro dura cinco segundos y después detiene, uno por segundo, jefe, armas,
 súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.
@@ -82,6 +90,9 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
   derecho y alineado verticalmente con el HUD de vida: tiro A, tiro B, súper,
   amuleto, reto y el nombre del reto. En niveles de avión sólo aparecen amuleto
   y reto. Los iconos usan 70% de opacidad y mantienen estático su primer frame.
+  Si participan dos jugadores, esa misma fila se centra en el espacio libre
+  entre las vidas/cartas de P1 y P2, sin invadir ninguno de los dos HUD. El
+  margen derecho original se conserva sin cambios cuando sólo participa P1.
 - Los iconos entran uno por uno con el pulso de selección de la ruleta y el
   texto aparece al final. Los nombres largos ajustan su tamaño sin perder el
   margen derecho. El reto Blanco y negro también desatura este HUD agregado.
@@ -101,5 +112,8 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
 - El reto `Blanco y negro` utiliza un AssetBundle de 5 KB compilado con Unity
   2017.4.9f1 para realizar una transición continua y termina usando el filtro
   nativo del juego. No oculta la pelea ni cambia la preferencia visual guardada.
-- La Reliquia Divina utiliza el estado guardado en la partida.
-- El mod no desbloquea objetos ni modifica las compras o el progreso.
+- La Reliquia Maldita y la Reliquia Divina son resultados separados. Ambas
+  equipan el amuleto nativo `charm_curse`, pero durante la inicialización del
+  combate la Maldita usa su grado inicial y la Divina su grado máximo.
+- Este ajuste es temporal: el mod no desbloquea objetos ni modifica las compras,
+  los puntos de mejora de la reliquia o el progreso guardado.

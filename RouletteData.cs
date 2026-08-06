@@ -32,20 +32,25 @@ namespace Gilomx.CupheadBossRoulette
 
     internal sealed class EquipmentEntry<T>
     {
+        internal const int NoCurseLevelOverride = -1;
+
         internal readonly string Name;
         internal readonly T Value;
         internal readonly string Image;
         internal readonly string NativeSprite;
         internal readonly bool RequiresDlc;
+        internal readonly int CurseLevelOverride;
 
         internal EquipmentEntry(string name, T value, string image,
-            string nativeSprite, bool requiresDlc = false)
+            string nativeSprite, bool requiresDlc = false,
+            int curseLevelOverride = NoCurseLevelOverride)
         {
             Name = name;
             Value = value;
             Image = image;
             NativeSprite = nativeSprite;
             RequiresDlc = requiresDlc;
+            CurseLevelOverride = curseLevelOverride;
         }
     }
 
@@ -136,7 +141,8 @@ namespace Gilomx.CupheadBossRoulette
             new EquipmentEntry<Charm>("Corazón Doble", Charm.charm_health_up_2, "charms/corazondoble.png", "equip_icon_charm_hp2_0001"),
             new EquipmentEntry<Charm>("Afiladora", Charm.charm_parry_attack, "charms/afiladora.png", "equip_icon_charm_parry_attack_0001"),
             new EquipmentEntry<Charm>("Galletita Astral", Charm.charm_chalice, "charms/galletitaastral.png", "equip_icon_charm_chalice_0001", true),
-            new EquipmentEntry<Charm>("Reliquia Divina", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_5_0001", true),
+            new EquipmentEntry<Charm>("Reliquia Maldita", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_1_0001", true, 0),
+            new EquipmentEntry<Charm>("Reliquia Divina", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_5_0001", true, 4),
             new EquipmentEntry<Charm>("Anillo de Corazón", Charm.charm_healer, "charms/anillocorazon.png", "equip_icon_charm_healer_0001", true),
             new EquipmentEntry<Charm>("Nada", Charm.None, "weapons/vacio.png", "equip_icon_empty")
         };

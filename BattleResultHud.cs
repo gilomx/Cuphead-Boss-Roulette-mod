@@ -1,4 +1,5 @@
 using System;
+using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,17 +8,31 @@ namespace Gilomx.CupheadBossRoulette
     public sealed partial class Plugin
     {
         private const float BattleHudAlpha = 0.70f;
+        private const float BattleHudPauseAlphaMultiplier = 0.70f;
+        private const float BattleHudResumeAlphaDuration = 0.30f;
         private const float BattleHudIconSize = 48f;
         private const float BattleHudIconGap = -2f;
         private const float BattleHudRightMargin = 26f;
-        private const float BattleHudBottomMargin = 15f;
+        private const float BattleHudBottomMargin = 13f;
+        private const float BattleHudPauseBottomMargin = 13f;
         private const float BattleHudTextGap = 10f;
         private const float BattleHudMaxTextWidth = 420f;
+        private const float BattleHudMultiplayerSideGap = 18f;
         private const float BattleHudInitialRevealDelay = 1.1f;
         private const float BattleHudRevealStep = 0.28f;
         private const float BattleHudPulseDuration = 0.38f;
         private const float BattleHudTextRevealDuration = 0.28f;
         private const float BattleHudImpactVolume = 0.85f;
+        private static readonly System.Reflection.FieldInfo
+            LevelHudCupheadField = AccessTools.Field(typeof(LevelHUD), "cuphead");
+        private static readonly System.Reflection.FieldInfo
+            LevelHudMugmanField = AccessTools.Field(typeof(LevelHUD), "mugman");
+        private static readonly System.Reflection.FieldInfo
+            LevelHudPlayerHealthField = AccessTools.Field(
+                typeof(LevelHUDPlayer), "health");
+        private static readonly System.Reflection.FieldInfo
+            LevelHudPlayerSuperField = AccessTools.Field(
+                typeof(LevelHUDPlayer), "super");
 
         private GameObject battleHudCanvas;
         private GameObject battleHudRoot;
@@ -31,6 +46,7 @@ namespace Gilomx.CupheadBossRoulette
         private float battleHudRevealStartedAt = -1f;
         private bool battleHudWasVisible;
         private bool battleHudOnNativeCanvas;
+        private bool battleHudOnPauseLayer;
         private bool battleHudPresentationActive;
         private bool battleHudFollowNativeVictoryLayer;
         private RouletteResult battleHudResultSnapshot;
@@ -211,7 +227,7 @@ namespace Gilomx.CupheadBossRoulette
         private void CreateBattleHudRoot(Text textTemplate)
         {
             battleHudRoot = new GameObject("Gilomx Roulette Battle HUD",
-                typeof(RectTransform));
+                typeof(RectTransform), typeof(CanvasGroup));
             battleHudRoot.transform.SetParent(battleHudCanvas.transform, false);
             var rootRect = battleHudRoot.transform as RectTransform;
             rootRect.anchorMin = new Vector2(1f, 0f);
@@ -328,13 +344,24 @@ namespace Gilomx.CupheadBossRoulette
                 if (canvas == null || action == null)
                     continue;
 
+                // Several PauseGUI instances can remain loaded. Preserve the
+                // first one as a template fallback, but always prefer the
+                // currently visible battle pause menu.
+                if (screenCanvas == null)
+                {
+                    screenCanvas = canvas.transform;
+                    pauseBackground = background;
+                    textTemplate = action;
+                }
+                if (!background.gameObject.activeInHierarchy)
+                    continue;
                 screenCanvas = canvas.transform;
                 pauseBackground = background;
                 textTemplate = action;
                 return true;
             }
 
-            return false;
+            return screenCanvas != null;
         }
 
         private void UpdateBattleResultHudContents()
@@ -449,38 +476,224 @@ namespace Gilomx.CupheadBossRoulette
             if (battleHudRoot == null || battleHudChallengeText == null)
                 return;
 
+            var rootRect = (RectTransform)battleHudRoot.transform;
+            float multiplayerGapLeft;
+            float multiplayerGapRight;
+            var useMultiplayerGap = TryGetBattleHudMultiplayerGap(
+                rootRect.parent as RectTransform,
+                out multiplayerGapLeft,
+                out multiplayerGapRight);
+            var iconsWidth = BattleHudIconsWidth(battleHudVisibleIconCount);
             var textRect = battleHudChallengeText.rectTransform;
             var hasText = !string.IsNullOrEmpty(battleHudChallengeText.text);
             var textWidth = 0f;
             if (hasText)
             {
+                var maxTextWidth = BattleHudMaxTextWidth;
+                if (useMultiplayerGap)
+                    maxTextWidth = Mathf.Min(maxTextWidth, Mathf.Max(0f,
+                        multiplayerGapRight - multiplayerGapLeft -
+                        iconsWidth - BattleHudTextGap));
                 battleHudChallengeText.fontSize = battleHudTextBaseFontSize;
                 textRect.sizeDelta = new Vector2(
-                    BattleHudMaxTextWidth, BattleHudIconSize);
+                    maxTextWidth, BattleHudIconSize);
                 var preferredWidth = battleHudChallengeText.preferredWidth;
-                if (preferredWidth > BattleHudMaxTextWidth)
+                if (maxTextWidth > 0f && preferredWidth > maxTextWidth)
                 {
                     var fittedSize = Mathf.FloorToInt(
                         battleHudTextBaseFontSize *
-                        BattleHudMaxTextWidth / preferredWidth);
+                        maxTextWidth / preferredWidth);
                     battleHudChallengeText.fontSize = Mathf.Max(15,
                         fittedSize);
                     preferredWidth = battleHudChallengeText.preferredWidth;
                 }
-                textWidth = Mathf.Min(BattleHudMaxTextWidth,
+                textWidth = Mathf.Min(maxTextWidth,
                     Mathf.Ceil(preferredWidth + 2f));
             }
 
             textRect.anchoredPosition = new Vector2(
-                BattleHudIconsWidth(battleHudVisibleIconCount) + BattleHudTextGap,
+                iconsWidth + BattleHudTextGap,
                 BattleHudIconSize * 0.5f);
             textRect.sizeDelta = new Vector2(textWidth, BattleHudIconSize);
 
-            var rootWidth = BattleHudIconsWidth(battleHudVisibleIconCount);
+            var rootWidth = iconsWidth;
             if (hasText)
                 rootWidth += BattleHudTextGap + textWidth;
-            ((RectTransform)battleHudRoot.transform).sizeDelta =
-                new Vector2(rootWidth, BattleHudIconSize);
+            rootRect.sizeDelta = new Vector2(rootWidth, BattleHudIconSize);
+            var bottomMargin = battleHudOnPauseLayer
+                ? BattleHudPauseBottomMargin
+                : BattleHudBottomMargin;
+            if (useMultiplayerGap)
+                PlaceBattleHudInMultiplayerGap(rootRect,
+                    multiplayerGapLeft, multiplayerGapRight, bottomMargin);
+            else
+                PlaceBattleHudAtSinglePlayerPosition(rootRect, bottomMargin);
+        }
+
+        private static void PlaceBattleHudAtSinglePlayerPosition(
+            RectTransform rootRect, float bottomMargin)
+        {
+            rootRect.anchorMin = new Vector2(1f, 0f);
+            rootRect.anchorMax = new Vector2(1f, 0f);
+            rootRect.pivot = new Vector2(1f, 0f);
+            rootRect.anchoredPosition = new Vector2(
+                -BattleHudRightMargin, bottomMargin);
+        }
+
+        private static void PlaceBattleHudInMultiplayerGap(
+            RectTransform rootRect,
+            float gapLeft,
+            float gapRight,
+            float bottomMargin)
+        {
+            var parentRect = rootRect.parent as RectTransform;
+            if (parentRect == null)
+            {
+                PlaceBattleHudAtSinglePlayerPosition(rootRect, bottomMargin);
+                return;
+            }
+
+            var gapCenter = (gapLeft + gapRight) * 0.5f;
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.zero;
+            rootRect.pivot = new Vector2(0.5f, 0f);
+            rootRect.anchoredPosition = new Vector2(
+                gapCenter - parentRect.rect.xMin,
+                bottomMargin);
+        }
+
+        private static bool TryGetBattleHudMultiplayerGap(
+            RectTransform targetParent,
+            out float gapLeft,
+            out float gapRight)
+        {
+            gapLeft = 0f;
+            gapRight = 0f;
+            if (targetParent == null || LevelHudCupheadField == null ||
+                LevelHudMugmanField == null ||
+                LevelHudPlayerHealthField == null ||
+                LevelHudPlayerSuperField == null)
+                return false;
+
+            LevelHUD nativeHud;
+            try
+            {
+                nativeHud = LevelHUD.Current;
+            }
+            catch
+            {
+                return false;
+            }
+            if (nativeHud == null || nativeHud.Canvas == null)
+                return false;
+
+            var playerOneHud =
+                LevelHudCupheadField.GetValue(nativeHud) as LevelHUDPlayer;
+            var playerTwoHud =
+                LevelHudMugmanField.GetValue(nativeHud) as LevelHUDPlayer;
+            if (playerOneHud == null || playerTwoHud == null ||
+                !playerOneHud.gameObject.activeInHierarchy ||
+                !playerTwoHud.gameObject.activeInHierarchy ||
+                playerTwoHud.player == null)
+                return false;
+
+            var nativeCanvasRect =
+                nativeHud.Canvas.transform as RectTransform;
+            if (nativeCanvasRect == null)
+                return false;
+
+            Bounds playerOneBounds;
+            Bounds playerTwoBounds;
+            if (!TryGetNativePlayerHudBounds(playerOneHud,
+                    nativeCanvasRect, out playerOneBounds) ||
+                !TryGetNativePlayerHudBounds(playerTwoHud,
+                    nativeCanvasRect, out playerTwoBounds))
+                return false;
+
+            var nativeGapLeft = playerOneBounds.max.x +
+                                BattleHudMultiplayerSideGap;
+            var nativeGapRight = playerTwoBounds.min.x -
+                                 BattleHudMultiplayerSideGap;
+            if (nativeGapRight <= nativeGapLeft)
+                return false;
+
+            if (!TryConvertNativeCanvasXToTarget(
+                    nativeCanvasRect, nativeHud.Canvas,
+                    nativeGapLeft, playerOneBounds.center.y,
+                    targetParent, out gapLeft) ||
+                !TryConvertNativeCanvasXToTarget(
+                    nativeCanvasRect, nativeHud.Canvas,
+                    nativeGapRight, playerTwoBounds.center.y,
+                    targetParent, out gapRight))
+                return false;
+
+            return gapRight > gapLeft;
+        }
+
+        private static bool TryGetNativePlayerHudBounds(
+            LevelHUDPlayer playerHud,
+            RectTransform relativeTo,
+            out Bounds bounds)
+        {
+            bounds = new Bounds();
+            var hasBounds = false;
+            var health = LevelHudPlayerHealthField.GetValue(playerHud)
+                as Component;
+            var super = LevelHudPlayerSuperField.GetValue(playerHud)
+                as Component;
+            var components = new[] { health, super };
+            for (var i = 0; i < components.Length; i++)
+            {
+                var component = components[i];
+                if (component == null ||
+                    !component.gameObject.activeInHierarchy)
+                    continue;
+                var componentBounds =
+                    RectTransformUtility.CalculateRelativeRectTransformBounds(
+                        relativeTo, component.transform);
+                if (!hasBounds)
+                {
+                    bounds = componentBounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(componentBounds.min);
+                    bounds.Encapsulate(componentBounds.max);
+                }
+            }
+            return hasBounds;
+        }
+
+        private static bool TryConvertNativeCanvasXToTarget(
+            RectTransform sourceCanvasRect,
+            Canvas sourceCanvas,
+            float sourceX,
+            float sourceY,
+            RectTransform targetRect,
+            out float targetX)
+        {
+            targetX = 0f;
+            var worldPoint = sourceCanvasRect.TransformPoint(
+                new Vector3(sourceX, sourceY, 0f));
+            var sourceCamera = sourceCanvas.renderMode ==
+                               RenderMode.ScreenSpaceOverlay
+                ? null
+                : sourceCanvas.worldCamera;
+            var screenPoint = RectTransformUtility.WorldToScreenPoint(
+                sourceCamera, worldPoint);
+            var targetCanvas = targetRect.GetComponentInParent<Canvas>();
+            var targetCamera = targetCanvas == null ||
+                               targetCanvas.renderMode ==
+                               RenderMode.ScreenSpaceOverlay
+                ? null
+                : targetCanvas.worldCamera;
+            Vector2 localPoint;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    targetRect, screenPoint, targetCamera, out localPoint))
+                return false;
+            targetX = localPoint.x;
+            return true;
         }
 
         private void EnsureBattleHudSaturationMaterial()
@@ -648,31 +861,45 @@ namespace Gilomx.CupheadBossRoulette
                 return true;
             }
 
-            try
+            LevelPauseGUI activePauseGui;
+            if (TryGetActiveLevelPauseMenu(out activePauseGui))
             {
-                if (Convert.ToInt32(PauseManager.state) != 0)
-                {
-                    Transform screenCanvas;
-                    Transform pauseBackground;
-                    Text textTemplate;
-                    TryFindBattleHudNativeLayers(out screenCanvas,
-                        out pauseBackground, out textTemplate);
-                    // Parry hit-stop also changes PauseManager.state for a
-                    // handful of frames. Only a visible pause card is a real
-                    // menu; otherwise keep rendering on the gameplay overlay.
-                    if (pauseBackground != null &&
-                        pauseBackground.gameObject.activeInHierarchy)
-                    {
-                        PlaceBattleHudInsideMenuLayer(pauseBackground);
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
+                PlaceBattleHudInsidePauseLayer(activePauseGui.transform);
+                return true;
             }
 
             return PlaceBattleHudOnGameplayLayer();
+        }
+
+        private static bool TryGetActiveLevelPauseMenu(
+            out LevelPauseGUI activePauseGui)
+        {
+            activePauseGui = null;
+            var pauseGuis =
+                Resources.FindObjectsOfTypeAll<LevelPauseGUI>();
+            for (var i = 0; i < pauseGuis.Length; i++)
+            {
+                var pauseGui = pauseGuis[i];
+                if (pauseGui == null ||
+                    !pauseGui.gameObject.scene.IsValid() ||
+                    !pauseGui.gameObject.activeInHierarchy)
+                    continue;
+                try
+                {
+                    // Unlike PauseManager.state, this state is not changed by
+                    // parry hit-stop. Both Paused (1) and Animating (2) are a
+                    // real visible pause transition.
+                    if (Convert.ToInt32(pauseGui.state) != 0)
+                    {
+                        activePauseGui = pauseGui;
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+            return false;
         }
 
         private void PlaceBattleHudInsideMenuLayer(Transform layer)
@@ -681,6 +908,44 @@ namespace Gilomx.CupheadBossRoulette
                 battleHudRoot.transform.SetParent(layer, false);
             battleHudRoot.transform.SetAsFirstSibling();
             battleHudOnNativeCanvas = false;
+            battleHudOnPauseLayer = false;
+            SetBattleHudRootAlpha(1f);
+        }
+
+        private void PlaceBattleHudInsidePauseLayer(Transform pauseLayer)
+        {
+            if (battleHudRoot.transform.parent != pauseLayer)
+                battleHudRoot.transform.SetParent(pauseLayer, false);
+            battleHudRoot.transform.SetAsFirstSibling();
+            battleHudOnNativeCanvas = false;
+            battleHudOnPauseLayer = true;
+            SetBattleHudRootAlpha(BattleHudPauseAlphaMultiplier);
+        }
+
+        private void SetBattleHudRootAlpha(float alpha)
+        {
+            if (battleHudRoot == null)
+                return;
+            var canvasGroup = battleHudRoot.GetComponent<CanvasGroup>();
+            if (canvasGroup != null)
+                canvasGroup.alpha = Mathf.Clamp01(alpha);
+        }
+
+        private void FadeBattleHudRootAlphaToFull()
+        {
+            if (battleHudRoot == null)
+                return;
+            var canvasGroup = battleHudRoot.GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+                return;
+
+            var alphaPerSecond =
+                (1f - BattleHudPauseAlphaMultiplier) /
+                Mathf.Max(0.01f, BattleHudResumeAlphaDuration);
+            canvasGroup.alpha = Mathf.MoveTowards(
+                canvasGroup.alpha,
+                1f,
+                alphaPerSecond * Time.unscaledDeltaTime);
         }
 
         private bool PlaceBattleHudOnGameplayLayer()
@@ -711,6 +976,8 @@ namespace Gilomx.CupheadBossRoulette
                     battleHudCanvas.transform, false);
             battleHudRoot.transform.SetAsLastSibling();
             battleHudOnNativeCanvas = false;
+            battleHudOnPauseLayer = false;
+            FadeBattleHudRootAlphaToFull();
             return true;
         }
 
@@ -740,6 +1007,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 battleHudRoot.transform.SetAsLastSibling();
                 battleHudOnNativeCanvas = true;
+                battleHudOnPauseLayer = false;
                 return true;
             }
 
@@ -764,6 +1032,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudIcons = nativeIcons;
             battleHudChallengeText = nativeText;
             battleHudOnNativeCanvas = true;
+            battleHudOnPauseLayer = false;
             if (battleHudSaturationMaterial != null)
                 battleHudSaturationMaterial.SetFloat("_Saturation", 1f);
             nativeRoot.SetActive(true);
@@ -825,6 +1094,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudVisibleIconCount = 5;
             battleHudWasVisible = false;
             battleHudOnNativeCanvas = false;
+            battleHudOnPauseLayer = false;
             battleHudRevealStartedAt = -1f;
             battleHudImpactPlayedCount = 0;
             battleHudPresentationActive = false;
