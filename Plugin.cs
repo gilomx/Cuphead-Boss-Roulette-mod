@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.52";
+        public const string PluginVersion = "0.5.71";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -119,6 +119,7 @@ namespace Gilomx.CupheadBossRoulette
         private AudioClip selectionClip;
         private AudioClip openClip;
         private AudioClip closeClip;
+        private AudioClip battleHudImpactClip;
         private AssetBundle blackAndWhiteShaderBundle;
         private Shader blackAndWhiteTransitionShader;
         private Shader battleHudSaturationShader;
@@ -212,6 +213,7 @@ namespace Gilomx.CupheadBossRoulette
             // Unity ever needs to virtualize one of the sources.
             effectsAudioSource.priority = 64;
             effectsAudioSource.ignoreListenerPause = true;
+            RouteModAudioToGameSfxMixer();
             activeInstance = this;
             harmony = new Harmony(PluginGuid);
             var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
@@ -810,6 +812,8 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             if (value)
                 RefreshAvailableContent();
+            else if (running)
+                CancelRouletteSpin();
             visible = value;
             if (visible)
             {
@@ -819,11 +823,31 @@ namespace Gilomx.CupheadBossRoulette
             }
             else
             {
-                cardRoll = 0f;
                 StartCoroutine(RestoreNativeMapEquipNextFrame());
             }
             PlayNativeMenuSound(visible ? "menu_cardup" : "menu_carddown",
                 visible ? openClip : closeClip, 0.65f);
+        }
+
+        private void CancelRouletteSpin()
+        {
+            running = false;
+            pendingLoad = false;
+            resultReady = false;
+            spinStartedAt = 0f;
+            loadAt = 0f;
+            ticker = 0;
+            revealed = 0;
+            result = new RouletteResult();
+            status = "PULSA ENTER PARA GIRAR";
+
+            for (var i = 0; i < pulseUntil.Length; i++)
+                pulseUntil[i] = 0f;
+
+            StopSpinAudio();
+            if (effectsAudioSource != null)
+                effectsAudioSource.Stop();
+            Logger.LogInfo("Giro cancelado al cerrar la ruleta.");
         }
 
         private void StartRoulette()
@@ -843,6 +867,7 @@ namespace Gilomx.CupheadBossRoulette
             spinStartedAt = Time.realtimeSinceStartup;
             running = true;
             status = "¡LA RULETA ESTÁ GIRANDO!";
+            EndBattleResultHudSession();
             ClearActiveChallenge();
             if (spinClip != null)
             {
@@ -1069,6 +1094,7 @@ namespace Gilomx.CupheadBossRoulette
                 SetActiveChallenge(
                     uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "",
                     result.Boss);
+                BeginBattleResultHudSession();
                 if (!PrepareBattleResultHud())
                     Logger.LogWarning(
                         "Could not prepare the roulette battle HUD before loading.");
@@ -1080,6 +1106,7 @@ namespace Gilomx.CupheadBossRoulette
                 status = "NO SE PUDO CARGAR. REVISA LOGOUTPUT.LOG";
                 RestoreOriginalLoadouts(false);
                 ClearActiveChallenge();
+                EndBattleResultHudSession();
                 Logger.LogError(exception);
                 SetVisible(true);
             }
@@ -1181,7 +1208,10 @@ namespace Gilomx.CupheadBossRoulette
         {
             var plugin = activeInstance;
             if (plugin != null)
+            {
                 plugin.RestoreOriginalLoadouts(false);
+                plugin.EndBattleResultHudSession();
+            }
         }
 
         private static bool BlockEquipmentAfterRouletteDefeatPrefix()
@@ -1610,7 +1640,10 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             if (plugin.ShouldRestoreLoanedLoadoutOnWin(__instance))
+            {
+                plugin.KeepBattleResultHudThroughVictory();
                 plugin.RestoreOriginalLoadouts(false);
+            }
             if (plugin.ShouldClearChallengeOnWin(__instance))
                 plugin.ClearActiveChallenge();
         }
@@ -1944,6 +1977,8 @@ namespace Gilomx.CupheadBossRoulette
             yield return StartCoroutine(LoadClip("sounds/selection.wav", AudioType.WAV, clip => selectionClip = clip));
             yield return StartCoroutine(LoadClip("sounds/abrir.wav", AudioType.WAV, clip => openClip = clip));
             yield return StartCoroutine(LoadClip("sounds/cerrar.wav", AudioType.WAV, clip => closeClip = clip));
+            yield return StartCoroutine(LoadClip("sounds/impact_01.wav", AudioType.WAV,
+                clip => battleHudImpactClip = clip));
         }
 
         private IEnumerator LoadClip(string relativePath, AudioType type, Action<AudioClip> assign)
@@ -1978,6 +2013,33 @@ namespace Gilomx.CupheadBossRoulette
                 PlayOneShot(fallback, volume);
             }
         }
+
+        private void RouteModAudioToGameSfxMixer()
+        {
+            try
+            {
+                var groups = AudioManagerMixer.GetGroups();
+                var sfxGroup = groups != null ? groups.sfx : null;
+                if (sfxGroup == null)
+                {
+                    Logger.LogWarning(
+                        "No se encontro el grupo SFX de Cuphead; se usara la salida de audio predeterminada.");
+                    return;
+                }
+
+                audioSource.outputAudioMixerGroup = sfxGroup;
+                effectsAudioSource.outputAudioMixerGroup = sfxGroup;
+                Logger.LogInfo(
+                    "Audio del mod conectado a los volumenes Principal y Efectos de Cuphead.");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning(
+                    "No se pudo conectar el audio del mod al mezclador SFX de Cuphead: " +
+                    exception.Message);
+            }
+        }
+
         private void PlayOneShot(AudioClip clip, float volume)
         {
             if (clip != null && effectsAudioSource != null)

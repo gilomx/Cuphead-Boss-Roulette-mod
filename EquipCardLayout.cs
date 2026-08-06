@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
@@ -24,6 +25,11 @@ namespace Gilomx.CupheadBossRoulette
         private const float EquipIconSize = 80f;
         private const float EquipLabelGap = 4f;
         private const float EquipIconFramesPerSecond = 12.5f;
+        private static readonly Regex TransparentFightMarkup = new Regex(
+            "<color=#00000000>.*?</color>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        private static readonly Regex FightMarkup = new Regex(
+            "<[^>]+>", RegexOptions.Singleline);
 
         private void DrawRoulette()
         {
@@ -32,10 +38,15 @@ namespace Gilomx.CupheadBossRoulette
 
             var baseMatrix = GUI.matrix;
             var center = new Vector3(DesignWidth * 0.5f, DesignHeight * 0.5f, 0f);
-            var offsetY = (1f - cardVisibility) * 760f;
+            var rawOffsetY = (1f - cardVisibility) * 760f;
+            var screenScale = Mathf.Min(
+                Screen.width / DesignWidth, Screen.height / DesignHeight);
+            var offsetY = screenScale > 0f
+                ? Mathf.Round(rawOffsetY * screenScale) / screenScale
+                : rawOffsetY;
             var motion =
                 Matrix4x4.TRS(center + new Vector3(0f, offsetY, 0f),
-                    Quaternion.Euler(0f, 0f, cardRoll * cardVisibility), Vector3.one) *
+                    Quaternion.Euler(0f, 0f, cardRoll), Vector3.one) *
                 Matrix4x4.TRS(-center, Quaternion.identity, Vector3.one);
             GUI.matrix = baseMatrix * motion;
 
@@ -67,7 +78,10 @@ namespace Gilomx.CupheadBossRoulette
             var bossTitle = LocalizedBossName(boss).ToUpperInvariant();
             GUI.Label(new Rect(55.5f, 277f, 487f, 39f), bossTitle, equipBossShadowStyle);
             GUI.Label(new Rect(54f, 275f, 487f, 39f), bossTitle, equipBossStyle);
-            GUI.Label(new Rect(54f, 309f, 487f, 24f), boss.Fight.ToUpperInvariant(), equipFightStyle);
+            var fightTitle = LocalizedFightName(boss);
+            if (!string.IsNullOrEmpty(fightTitle))
+                GUI.Label(new Rect(54f, 309f, 487f, 24f),
+                    fightTitle.ToUpperInvariant(), equipFightStyle);
 
             var weapon1 = DisplayPoolIndex(
                 1, result.Weapon1, availableWeaponIndices, 0);
@@ -208,6 +222,49 @@ namespace Gilomx.CupheadBossRoulette
             {
             }
             return boss.Character;
+        }
+
+        private string LocalizedFightName(BossEntry boss)
+        {
+            var useSpanishSpainFallback = false;
+            try
+            {
+                var language = Localization.language;
+                if (language != Localization.Languages.SpanishSpain &&
+                    language != Localization.Languages.SpanishAmerica)
+                    return string.Empty;
+                useSpanishSpainFallback =
+                    language == Localization.Languages.SpanishSpain;
+
+                // This is the same key used by Cuphead's native difficulty card.
+                var element = Localization.Find(boss.Level + "Selection");
+                if (element != null)
+                {
+                    var translated = PlainFightTitle(element.translation.SanitizedText());
+                    if (!string.IsNullOrEmpty(translated))
+                        return translated;
+                }
+            }
+            catch
+            {
+                // Missing localization should leave the subtitle empty instead
+                // of displaying a title from a different language.
+            }
+            return useSpanishSpainFallback ? boss.Fight : string.Empty;
+        }
+
+        private static string PlainFightTitle(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return value;
+
+            value = TransparentFightMarkup.Replace(value, "");
+            value = FightMarkup.Replace(value, "");
+            var lines = value.Replace("\\N", "\n").Replace("\\n", "\n")
+                .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            for (var i = 0; i < lines.Length; i++)
+                lines[i] = lines[i].Trim(' ', '\t', ';', '"');
+            return string.Join(" ", lines).Trim();
         }
 
         private static string AnimatedSpriteName(string firstFrame, int frameCount, float framesPerSecond)
