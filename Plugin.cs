@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.51";
+        public const string PluginVersion = "0.5.52";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -27,6 +27,8 @@ namespace Gilomx.CupheadBossRoulette
         private const float BlackAndWhiteEntryDelay = 1.5f;
         private const float BlackAndWhiteFadeInDuration = 1.25f;
         private const float BlackAndWhiteFadeOutDuration = 0.9f;
+        private const float SpinAudioVolume = 0.45f;
+        private const float SelectionStopAudioVolume = 0.45f;
         private static readonly Color Ink = new Color(0.075f, 0.065f, 0.055f);
         private static readonly Color Red = new Color(0.67f, 0.12f, 0.10f);
         private static readonly Color Cream = new Color(0.94f, 0.87f, 0.70f);
@@ -119,6 +121,7 @@ namespace Gilomx.CupheadBossRoulette
         private AudioClip closeClip;
         private AssetBundle blackAndWhiteShaderBundle;
         private Shader blackAndWhiteTransitionShader;
+        private Shader battleHudSaturationShader;
         private GUIStyle titleStyle;
         private GUIStyle subtitleStyle;
         private GUIStyle bossStyle;
@@ -197,7 +200,7 @@ namespace Gilomx.CupheadBossRoulette
             LoadBlackAndWhiteTransitionShader();
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
-            audioSource.volume = 0.45f;
+            audioSource.volume = SpinAudioVolume;
             audioSource.spatialBlend = 0f;
             audioSource.priority = 0;
             audioSource.ignoreListenerPause = true;
@@ -205,7 +208,9 @@ namespace Gilomx.CupheadBossRoulette
             effectsAudioSource.playOnAwake = false;
             effectsAudioSource.volume = 1f;
             effectsAudioSource.spatialBlend = 0f;
-            effectsAudioSource.priority = 0;
+            // Keep the continuous roulette loop above transient UI voices if
+            // Unity ever needs to virtualize one of the sources.
+            effectsAudioSource.priority = 64;
             effectsAudioSource.ignoreListenerPause = true;
             activeInstance = this;
             harmony = new Harmony(PluginGuid);
@@ -369,10 +374,17 @@ namespace Gilomx.CupheadBossRoulette
                     "Assets/BossRouletteSaturation.shader");
             if (blackAndWhiteTransitionShader == null)
                 Logger.LogWarning(
-                    "El bundle no contiene el shader de saturación esperado.");
+                    "El bundle no contiene el shader de saturación de cámara esperado.");
             else
                 Logger.LogInfo(
                     "Shader suave blanco y negro cargado desde AssetBundle.");
+
+            battleHudSaturationShader =
+                blackAndWhiteShaderBundle.LoadAsset<Shader>(
+                    "Assets/BossRouletteUiSaturation.shader");
+            if (battleHudSaturationShader == null)
+                Logger.LogWarning(
+                    "El bundle no contiene el shader de saturación para el HUD.");
         }
 
         private static void BlockMapPausePostfix(ref bool __result)
@@ -836,7 +848,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 audioSource.clip = spinClip;
                 audioSource.loop = true;
-                audioSource.volume = 0.45f;
+                audioSource.volume = SpinAudioVolume;
                 audioSource.time = 0f;
                 audioSource.Play();
             }
@@ -1015,7 +1027,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 for (var i = oldRevealed; i < revealed; i++)
                     pulseUntil[i] = Time.realtimeSinceStartup + 0.38f;
-                PlayOneShot(selectionClip, 0.9f);
+                PlayOneShot(selectionClip, SelectionStopAudioVolume);
             }
 
             if (revealed < fields)
@@ -1057,6 +1069,9 @@ namespace Gilomx.CupheadBossRoulette
                 SetActiveChallenge(
                     uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "",
                     result.Boss);
+                if (!PrepareBattleResultHud())
+                    Logger.LogWarning(
+                        "Could not prepare the roulette battle HUD before loading.");
                 Logger.LogInfo("Cargando " + boss.Character + " (" + boss.Level + ")");
                 SceneLoader.LoadLevel(boss.Level, SceneLoader.Transition.Iris, SceneLoader.Icon.None);
             }
@@ -1578,9 +1593,6 @@ namespace Gilomx.CupheadBossRoulette
             soloMiniRestartPending = false;
             activeChallenge = challenge == "Nada" ? "" : challenge;
             activeChallengeBoss = string.IsNullOrEmpty(activeChallenge) ? -1 : bossIndex;
-            if (!string.IsNullOrEmpty(activeChallenge) &&
-                !PrepareNativeChallengePrompt())
-                Logger.LogWarning("Could not prepare the persistent challenge prompt.");
         }
 
         private void ClearActiveChallenge()
@@ -2047,8 +2059,10 @@ namespace Gilomx.CupheadBossRoulette
             SetNativeMapEquipEnabled(true);
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
+            DestroyBattleResultHud();
             ResetBlackAndWhiteRenderEffects();
             blackAndWhiteTransitionShader = null;
+            battleHudSaturationShader = null;
             if (blackAndWhiteShaderBundle != null)
             {
                 blackAndWhiteShaderBundle.Unload(true);

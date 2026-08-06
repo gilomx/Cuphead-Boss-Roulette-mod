@@ -20,3 +20,12 @@ Thumbs.db
 *.dll
 *.pdb
 *.zip
+
+# Unity shader build cache/output (the distributable bundle is under assets/)
+tools/unity-shader/AssetBundles/
+tools/unity-shader/Library/
+tools/unity-shader/Temp/
+tools/unity-shader/UnityPackageManager/
+tools/unity-shader/ProjectSettings/*
+!tools/unity-shader/ProjectSettings/ProjectVersion.txt
+tools/unity-shader/Assets/**/*.meta

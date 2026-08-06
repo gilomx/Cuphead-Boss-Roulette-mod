@@ -71,6 +71,17 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
   desde la pantalla de derrota; vuelve a estar disponible al salir al mapa.
 - Los jugadores no pueden caminar por el mapa mientras la ruleta está abierta;
   el movimiento se recupera inmediatamente al cerrarla.
+- Durante el combate, el resultado de la ruleta aparece en el margen inferior
+  derecho y alineado verticalmente con el HUD de vida: tiro A, tiro B, súper,
+  amuleto, reto y el nombre del reto. En niveles de avión sólo aparecen amuleto
+  y reto. Los iconos usan 70% de opacidad y mantienen estático su primer frame.
+- Los iconos entran uno por uno con el pulso de selección de la ruleta y el
+  texto aparece al final. Los nombres largos ajustan su tamaño sin perder el
+  margen derecho. El reto Blanco y negro también desatura este HUD agregado.
+- La fila forma parte del Canvas nativo de `LevelHUD`, por lo que las
+  transiciones de iris y los apagados de fase la ocultan junto al HUD original.
+- Al pausar o perder, este HUD queda delante del oscurecimiento y detrás de la
+  tarjeta del menú.
 - Cuphead usa su armamento de avión automáticamente en los combates aéreos.
 - Cada reto utiliza una animación propia de tres frames a la misma velocidad
   visual que las armas, los súper y los amuletos de la tarjeta.
