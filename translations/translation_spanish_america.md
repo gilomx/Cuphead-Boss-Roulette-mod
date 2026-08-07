@@ -1,8 +1,9 @@
-# Traducción española base y de España
+# Traducción activa — SpanishAmerica
 
-Estado: **activa para `SpanishSpain` y como base de `SpanishAmerica` en 0.5.120**.
+Estado: **revisión regional activa en la versión 0.5.120**.
 
-`SpanishAmerica` hereda estos valores, excepto `challenge.no_peashooter`, que se registra por separado como `SIN PEASHOOTER`.
+Comparte los demás valores con español de España, pero el reto
+`challenge.no_peashooter` usa `SIN PEASHOOTER` por decisión posterior.
 
 | ID | Traducción aprobada |
 | --- | --- |
@@ -32,6 +33,6 @@ Estado: **activa para `SpanishSpain` y como base de `SpanishAmerica` en 0.5.120*
 | `challenge.no_mini_plane` | NO MINIAVIÓN |
 | `challenge.mini_plane_only` | SOLO BALAS DE MINIAVIÓN |
 | `challenge.no_bombs` | NO DISPARO BOMBAS |
-| `challenge.no_peashooter` | SIN DISPARO NORMAL |
+| `challenge.no_peashooter` | SIN PEASHOOTER |
 | `challenge.no_ex` | NO EX |
 | `challenge.black_and_white` | BLANCO Y NEGRO |

@@ -1,6 +1,6 @@
 # Catálogo de localización
 
-Estado: **los 12 idiomas de Cuphead usan sus entregas revisadas en 0.5.119**. Las propuestas de `SpanishSpain` y `SpanishAmerica` son idénticas, por lo que ambas variantes comparten una sola tabla revisada. `LOCALIZATION_TRANSLATIONS.md` queda sólo como registro de borradores históricos.
+Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `SpanishSpain` usa la tabla española base; `SpanishAmerica` hereda esa tabla y cambia sólo `challenge.no_peashooter` a `SIN PEASHOOTER`. `LOCALIZATION_TRANSLATIONS.md` queda como registro histórico.
 
 ## Alcance visible verificado en 0.5.110 y aplicado en 0.5.111
 
@@ -23,7 +23,7 @@ herramientas técnicas y no pertenecen a la traducción pública de la primera
 versión. `LOCALIZATION_TRANSLATIONS.md` conserva propuestas históricas, pero
 sus filas adicionales no son una solicitud de traducción.
 
-Las diez tablas no españolas activas están versionadas como `translations/translation_<idioma>.md`; las dos variantes de español comparten `translations/translation_spanish_shared.md`. Las 12 entregas revisadas completas se conservan en `translations/review_by_language/`. Cada grupo contiene exactamente 29 valores y se carga sólo para su enum.
+Las diez tablas no españolas activas están versionadas como `translations/translation_<idioma>.md`; `SpanishSpain` usa `translations/translation_spanish_shared.md` como base y `SpanishAmerica` registra su tabla efectiva en `translations/translation_spanish_america.md`. Las 12 entregas revisadas completas se conservan en `translations/review_by_language/`. Cada grupo contiene exactamente 29 valores y se carga sólo para su enum.
 
 ## Base técnica implementada en 0.5.109
 

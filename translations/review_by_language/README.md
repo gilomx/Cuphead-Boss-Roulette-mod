@@ -6,7 +6,7 @@ Cada archivo contiene exactamente los 29 IDs públicos del mod y conserva la
 entrega revisada completa, incluida la referencia de cadenas originales de
 Cuphead. Las doce entregas están activas desde la versión 0.5.119.
 
-Las entregas de `SpanishSpain` y `SpanishAmerica` son idénticas. Ambas alimentan `translations/translation_spanish_shared.md` y se conservan también por separado en esta carpeta para verificar su procedencia.
+La revisión posterior de `SpanishAmerica` cambia sólo `challenge.no_peashooter` a `SIN PEASHOOTER`; `SpanishSpain` conserva `SIN DISPARO NORMAL`. El archivo americano de esta carpeta ya incorpora esa corrección.
 
 ## Archivos
 

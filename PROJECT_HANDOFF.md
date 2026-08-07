@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-07
-Current local version: 0.5.119
+Current local version: 0.5.120
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -11,17 +11,19 @@ The accepted HUD architecture, layer matrix, layout invariants and extension
 checklist now live in [HUD_INTEGRATION.md](HUD_INTEGRATION.md). Read that guide
 before adding any new battle indicator.
 
-## Reviewed 12-language localization (0.5.119)
+## Spanish-America regional override (0.5.120)
 
-- All 12 submitted files were validated at 29/29 IDs with no blanks.
-- The ten non-Spanish tables use their reviewed independent catalogs.
-- `SpanishSpain` and `SpanishAmerica` submitted identical reviewed values
-  and share that reviewed table from 0.5.119 onward.
-- Notable Spanish changes include `FÁCIL`, `NO MINIAVIÓN`,
-  `SOLO BALAS DE MINIAVIÓN` and `SIN DISPARO NORMAL`.
-- An unknown future language alone falls back to Spanish.
-- Do not change approved wording to solve font or layout issues.
-- Automated validation reports 29/29 values and zero differences for all 12 enums. Release build: 0 errors, 0 warnings. Compiled and installed DLL SHA-256: `A9F36AC54D9FC37544720481184E0EE7850A13E0E9BF6D138EAE0D4EC1E1E528`; `LogOutput.log` confirms version 0.5.119.
+- `SpanishSpain` keeps `SIN DISPARO NORMAL` for
+  `challenge.no_peashooter`.
+- `SpanishAmerica` uses `SIN PEASHOOTER` for that one ID and inherits every
+  other value from the Spanish base dictionary.
+- The full active America table is in
+  `translations/translation_spanish_america.md`; the base/Spain table remains
+  in `translations/translation_spanish_shared.md`.
+- All other approved wording remains unchanged.
+- The card PNG was replaced at the user's request without changing any layout
+  coordinate or drawing logic.
+- Build verification: 0 errors, 0 warnings. Compiled and installed DLL SHA-256: `88DA9E3E6F61E0F9B0AF9DF0D71A3BECB5ECD06F88D96F30B07ED1DA0FE87067`; `LogOutput.log` confirms version 0.5.120.
 
 ### Checklist localization layout (0.5.117)
 
@@ -63,11 +65,11 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.119.
+This handoff documents the roulette implementation through version 0.5.120.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
-Localization activation is complete for Cuphead's 12 language enums. Version 0.5.119 uses reviewed deliveries for every language. Spanish Spain and Spanish America have identical reviewed values and therefore continue to share one dictionary.
+Localization activation is complete for Cuphead's 12 language enums. From 0.5.120, Spanish Spain uses the Spanish base dictionary while Spanish America clones that base and overrides only `ChallengeNoPeashooter` with `SIN PEASHOOTER`.
 
 ## Localization-safe internal model (0.5.109)
 
@@ -155,14 +157,13 @@ French now deliberately uses `ARME A/B`, `FACILE`, `NORMAL` and
 `NOCHMAL DREHEN`, `OHNE MINIBOMBEN` and `OHNE MASCHINENGEWEHR`.
 These reviewed values supersede all older wording in this handoff.
 
-## Reviewed shared Spanish localization (0.5.119)
+## Spanish localization with one regional override (0.5.120)
 
-`SpanishSpain` and `SpanishAmerica` supplied identical 29-value reviewed
-tables. Both enums still route to the same `spanish` dictionary, but that
-dictionary now uses the reviewed copy rather than the original 0.5.115 text.
-The active values are in `translations/translation_spanish_shared.md`; the
-two exact source deliveries remain in `translations/review_by_language/`.
-Do not introduce regional differences unless future deliveries diverge.
+`SpanishSpain` uses the reviewed base table. `SpanishAmerica` copies all
+base values during initialization and overrides only
+`ChallengeNoPeashooter` as `SIN PEASHOOTER`; Spain retains
+`SIN DISPARO NORMAL`. Keep this distinction when changing or validating
+Spanish localization.
 
 ## Reviewed Korean and five newly active languages (0.5.118)
 
