@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-07
-Current local version: 0.5.121
+Current local version: 0.5.122
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -10,6 +10,38 @@ coordinates and avoid broad rewrites.
 The accepted HUD architecture, layer matrix, layout invariants and extension
 checklist now live in [HUD_INTEGRATION.md](HUD_INTEGRATION.md). Read that guide
 before adding any new battle indicator.
+
+## Current 0.5.122 state
+
+- `assets/card/roulette-card.png` is the user-provided third background
+  revision (595×668). No card coordinate or layout value changed.
+- `EnableLanguageTestShortcut = false`; the temporary `Ctrl+F8` localization
+  shortcut is dormant in normal builds.
+- Empty weapon/super/charm catalog entries use
+  `equip_icon_empty_0001`. `DrawEquipSlot()` therefore animates all three
+  native empty frames exactly like the disabled challenge slot.
+- Weapon A is always non-empty. Weapon B has an exact 20% chance of
+  `Weapon.None`; otherwise it is non-empty and cannot duplicate Weapon A.
+- Empty results are white only in the battle HUD.
+  `ApplyWhiteBattleHudEmptyIcon()` extracts the native sprite alpha and writes
+  a white silhouette; a procedural 72×72 segmented ring is the fallback. The
+  cached texture is destroyed with the HUD. The Equip Card keeps the native
+  dark animated art.
+- `impact_01.wav` is processed with +20 dB into a fast −1 dB limiter. Measured
+  integrated loudness changes from about −20.01 to −12.4 LUFS and mean level
+  from −20.2 to −11.4 dB. `BattleHudImpactVolume = 1f`, avoiding a second
+  boost in Unity. The clip remains routed through Cuphead's native SFX mixer,
+  so Master or SFX at zero still mutes it completely.
+- Saltbaker return now checks the dedicated `MapBakeryLoader` first. This is
+  the actual DLC bakery interactive entity present when `Map.CreatePlayers()`
+  runs; `MapLevelLoader`/`MapSceneLoader` remain fallbacks. It still calls the
+  game-owned `SetPlayerReturnPos()` rather than storing coordinates.
+- `ForceTestBoss = false`; the dormant Saltbaker/Devil sequence remains available
+  for future diagnostics but no longer affects spins. Relic, plane-relic,
+  challenge and five-card selectors are also disabled.
+- Current verification: build completed with 0 errors and 0 warnings. The
+  compiled and installed DLLs match at SHA-256 `689C1EF0FE1D528F19B5ACA0C94BD23B09B6C367BB05BB0B57DB397FEE82100C`.
+  The processed and installed WAVs match at `F44C76F5A12C7356E608915BC48D010C9613B2FCE4FD0D658800DD3EC63BAB98`.
 
 ## Native boss-door return and covered map input (0.5.121)
 
@@ -22,9 +54,10 @@ before adding any new battle indicator.
   AbstractMapInteractiveEntity.SetPlayerReturnPos(). Native player creation
   therefore starts at the boss door and supports both players without a visible
   post-load teleport.
-- Entrance lookup accepts an exact MapLevelLoader.level; Saltbaker can use
-  Levels.Kitchen or a MapSceneLoader for scene_level_kitchen; King Dice and
-  Devil can use MapDicePalaceSceneLoader.
+- Entrance lookup accepts an exact MapLevelLoader.level. Saltbaker first uses
+  its dedicated MapBakeryLoader, then Levels.Kitchen or a MapSceneLoader for
+  scene_level_kitchen as fallbacks; King Dice and Devil can use
+  MapDicePalaceSceneLoader.
 - The map association is World 1/2/3/4 from Cuphead's native arrays, DLC from
   worldDLCBossLevelsWithSaltbaker, plus explicit Levels.Graveyard.
 - A Harmony prefix skips AbstractMapInteractiveEntity.Update() while the

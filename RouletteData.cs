@@ -133,7 +133,7 @@ namespace Gilomx.CupheadBossRoulette
             new EquipmentEntry<Weapon>("Tiro Certero", Weapon.level_weapon_crackshot, "weapons/tirocertero.png", "equip_icon_weapon_crackshot_0001", true),
             new EquipmentEntry<Weapon>("Convergencia", Weapon.level_weapon_wide_shot, "weapons/convergencia.png", "equip_icon_weapon_wide_shot_0001", true),
             new EquipmentEntry<Weapon>("Ciclónica", Weapon.level_weapon_upshot, "weapons/ciclonica.png", "equip_icon_weapon_upshot_0001", true),
-            new EquipmentEntry<Weapon>("Nada", Weapon.None, "weapons/vacio.png", "equip_icon_empty")
+            new EquipmentEntry<Weapon>("Nada", Weapon.None, "weapons/vacio.png", "equip_icon_empty_0001")
         };
 
         internal static readonly EquipmentEntry<Super>[] Supers =
@@ -141,7 +141,7 @@ namespace Gilomx.CupheadBossRoulette
             new EquipmentEntry<Super>("Súper I", Super.level_super_beam, "supers/super1.png", "equip_icon_super_beam_0001"),
             new EquipmentEntry<Super>("Súper II", Super.level_super_invincible, "supers/super2.png", "equip_icon_super_invincible_0001"),
             new EquipmentEntry<Super>("Súper III", Super.level_super_ghost, "supers/super3.png", "equip_icon_super_ghost_0001"),
-            new EquipmentEntry<Super>("Nada", Super.None, "weapons/vacio.png", "equip_icon_empty")
+            new EquipmentEntry<Super>("Nada", Super.None, "weapons/vacio.png", "equip_icon_empty_0001")
         };
 
         internal static readonly EquipmentEntry<Charm>[] Charms =
@@ -156,7 +156,7 @@ namespace Gilomx.CupheadBossRoulette
             new EquipmentEntry<Charm>("Reliquia Maldita", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_1_0001", true, 0),
             new EquipmentEntry<Charm>("Reliquia Divina", Charm.charm_curse, "charms/reliquiadivina.png", "equip_icon_charm_curse_5_0001", true, 4),
             new EquipmentEntry<Charm>("Anillo de Corazón", Charm.charm_healer, "charms/anillocorazon.png", "equip_icon_charm_healer_0001", true),
-            new EquipmentEntry<Charm>("Nada", Charm.None, "weapons/vacio.png", "equip_icon_empty")
+            new EquipmentEntry<Charm>("Nada", Charm.None, "weapons/vacio.png", "equip_icon_empty_0001")
         };
 
         internal static readonly ModifierEntry[] Modifiers =

@@ -22,7 +22,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float BattleHudRevealStep = 0.28f;
         private const float BattleHudPulseDuration = 0.38f;
         private const float BattleHudTextRevealDuration = 0.28f;
-        private const float BattleHudImpactVolume = 0.85f;
+        private const float BattleHudImpactVolume = 1f;
         private static readonly System.Reflection.FieldInfo
             LevelHudCupheadField = AccessTools.Field(typeof(LevelHUD), "cuphead");
         private static readonly System.Reflection.FieldInfo
@@ -41,6 +41,7 @@ namespace Gilomx.CupheadBossRoulette
         private RawImage[] battleHudIcons;
         private Text battleHudChallengeText;
         private Material battleHudSaturationMaterial;
+        private Texture2D battleHudWhiteEmptyTexture;
         private Material battleHudChallengeBaseMaterial;
         private bool battleHudUsingSaturationMaterial;
         private int battleHudTextBaseFontSize;
@@ -409,26 +410,31 @@ namespace Gilomx.CupheadBossRoulette
             if (BattleHudUsesPlaneLoadout())
             {
                 SetBattleHudVisibleIconCount(2);
-                ApplyNativeBattleHudIcon(battleHudIcons[0],
+                ApplyBattleHudEquipmentIcon(battleHudIcons[0],
                     RouletteData.Charms[charm].NativeSprite,
-                    RouletteData.Charms[charm].Image);
+                    RouletteData.Charms[charm].Image,
+                    RouletteData.Charms[charm].Value == Charm.None);
                 ApplyBattleHudChallengeIcon(battleHudIcons[1], modifier);
             }
             else
             {
                 SetBattleHudVisibleIconCount(5);
-                ApplyNativeBattleHudIcon(battleHudIcons[0],
+                ApplyBattleHudEquipmentIcon(battleHudIcons[0],
                     RouletteData.Weapons[weapon1].NativeSprite,
-                    RouletteData.Weapons[weapon1].Image);
-                ApplyNativeBattleHudIcon(battleHudIcons[1],
+                    RouletteData.Weapons[weapon1].Image,
+                    RouletteData.Weapons[weapon1].Value == Weapon.None);
+                ApplyBattleHudEquipmentIcon(battleHudIcons[1],
                     RouletteData.Weapons[weapon2].NativeSprite,
-                    RouletteData.Weapons[weapon2].Image);
-                ApplyNativeBattleHudIcon(battleHudIcons[2],
+                    RouletteData.Weapons[weapon2].Image,
+                    RouletteData.Weapons[weapon2].Value == Weapon.None);
+                ApplyBattleHudEquipmentIcon(battleHudIcons[2],
                     RouletteData.Supers[super].NativeSprite,
-                    RouletteData.Supers[super].Image);
-                ApplyNativeBattleHudIcon(battleHudIcons[3],
+                    RouletteData.Supers[super].Image,
+                    RouletteData.Supers[super].Value == Super.None);
+                ApplyBattleHudEquipmentIcon(battleHudIcons[3],
                     RouletteData.Charms[charm].NativeSprite,
-                    RouletteData.Charms[charm].Image);
+                    RouletteData.Charms[charm].Image,
+                    RouletteData.Charms[charm].Value == Charm.None);
                 ApplyBattleHudChallengeIcon(battleHudIcons[4], modifier);
             }
 
@@ -444,8 +450,7 @@ namespace Gilomx.CupheadBossRoulette
             int modifier)
         {
             if (battleHudChallengeSnapshot == ModifierId.None)
-                ApplyNativeBattleHudIcon(image,
-                    "equip_icon_empty_0001", "weapons/vacio.png");
+                ApplyWhiteBattleHudEmptyIcon(image);
             else
                 ApplyTextureToBattleHudIcon(image, GetTexture(
                     RouletteData.Modifiers[modifier].Image));
@@ -842,6 +847,157 @@ namespace Gilomx.CupheadBossRoulette
                 textScale, textScale, 1f);
         }
 
+        private void ApplyBattleHudEquipmentIcon(RawImage image,
+            string firstFrame, string fallbackImage, bool isEmpty)
+        {
+            if (isEmpty)
+            {
+                ApplyWhiteBattleHudEmptyIcon(image);
+                return;
+            }
+
+            ApplyNativeBattleHudIcon(image, firstFrame, fallbackImage);
+        }
+
+        private void ApplyWhiteBattleHudEmptyIcon(RawImage image)
+        {
+            if (battleHudWhiteEmptyTexture == null)
+                battleHudWhiteEmptyTexture =
+                    CreateWhiteBattleHudEmptyTexture();
+            ApplyTextureToBattleHudIcon(
+                image, battleHudWhiteEmptyTexture);
+        }
+
+        private Texture2D CreateWhiteBattleHudEmptyTexture()
+        {
+            var sprite = theme.GetSprite("equip_icon_empty_0001");
+            if (sprite != null && sprite.texture != null)
+            {
+                try
+                {
+                    var nativeWhite =
+                        CreateWhiteSilhouetteFromSprite(sprite);
+                    if (nativeWhite != null)
+                        return nativeWhite;
+                }
+                catch (System.Exception exception)
+                {
+                    Logger.LogWarning(
+                        "Could not whiten the native empty HUD icon; " +
+                        "using the procedural dotted circle. " + exception);
+                }
+            }
+
+            return CreateProceduralWhiteEmptyTexture();
+        }
+
+        private static Texture2D CreateWhiteSilhouetteFromSprite(
+            Sprite sprite)
+        {
+            var source = sprite.texture;
+            var sourceRect = sprite.textureRect;
+            var width = Mathf.Max(1, Mathf.RoundToInt(sourceRect.width));
+            var height = Mathf.Max(1, Mathf.RoundToInt(sourceRect.height));
+            var renderTexture = RenderTexture.GetTemporary(
+                width, height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            Texture2D texture = null;
+            try
+            {
+                var scale = new Vector2(
+                    sourceRect.width / source.width,
+                    sourceRect.height / source.height);
+                var offset = new Vector2(
+                    sourceRect.x / source.width,
+                    sourceRect.y / source.height);
+                Graphics.Blit(source, renderTexture, scale, offset);
+                RenderTexture.active = renderTexture;
+
+                texture = new Texture2D(
+                    width, height, TextureFormat.ARGB32, false);
+                texture.name = "Gilomx White Empty Battle HUD";
+                texture.ReadPixels(
+                    new Rect(0f, 0f, width, height), 0, 0, false);
+                texture.Apply(false, false);
+
+                var pixels = texture.GetPixels();
+                var visiblePixels = 0;
+                for (var i = 0; i < pixels.Length; i++)
+                {
+                    var alpha = pixels[i].a;
+                    if (alpha <= 0.01f)
+                    {
+                        pixels[i] = Color.clear;
+                        continue;
+                    }
+
+                    visiblePixels++;
+                    pixels[i] = new Color(1f, 1f, 1f, alpha);
+                }
+
+                // A dotted ring occupies only a small part of its rectangle.
+                // Reject a fully opaque atlas read and use the safe fallback
+                // instead of ever showing a white square in the HUD.
+                if (visiblePixels > pixels.Length * 0.55f)
+                {
+                    UnityEngine.Object.Destroy(texture);
+                    texture = null;
+                    return null;
+                }
+
+                texture.SetPixels(pixels);
+                texture.Apply(false, false);
+                texture.filterMode = FilterMode.Bilinear;
+                texture.wrapMode = TextureWrapMode.Clamp;
+                return texture;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(renderTexture);
+            }
+        }
+
+        private static Texture2D CreateProceduralWhiteEmptyTexture()
+        {
+            const int size = 72;
+            const float radius = 27.5f;
+            const float thickness = 2.25f;
+            const float dashCount = 14f;
+            const float dashFill = 0.62f;
+
+            var texture = new Texture2D(
+                size, size, TextureFormat.ARGB32, false);
+            texture.name = "Gilomx White Empty Battle HUD Fallback";
+            var pixels = new Color[size * size];
+            var center = (size - 1) * 0.5f;
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    var dx = x - center;
+                    var dy = y - center;
+                    var distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    var lineDistance = Mathf.Abs(distance - radius);
+                    var angle = Mathf.Atan2(dy, dx);
+                    if (angle < 0f)
+                        angle += Mathf.PI * 2f;
+                    var dashPhase = Mathf.Repeat(
+                        angle / (Mathf.PI * 2f) * dashCount, 1f);
+                    var alpha = dashPhase < dashFill
+                        ? Mathf.Clamp01(thickness - lineDistance)
+                        : 0f;
+                    pixels[y * size + x] =
+                        new Color(1f, 1f, 1f, alpha);
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(false, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            return texture;
+        }
         private void ApplyNativeBattleHudIcon(RawImage image,
             string firstFrame, string fallbackImage)
         {
@@ -1162,11 +1318,14 @@ namespace Gilomx.CupheadBossRoulette
                 Destroy(battleHudCanvas);
             if (battleHudSaturationMaterial != null)
                 Destroy(battleHudSaturationMaterial);
+            if (battleHudWhiteEmptyTexture != null)
+                Destroy(battleHudWhiteEmptyTexture);
             battleHudCanvas = null;
             battleHudRoot = null;
             battleHudIcons = null;
             battleHudChallengeText = null;
             battleHudSaturationMaterial = null;
+            battleHudWhiteEmptyTexture = null;
             battleHudChallengeBaseMaterial = null;
             battleHudUsingSaturationMaterial = false;
             battleHudVisibleIconCount = 5;
