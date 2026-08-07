@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-06
-Current local version: 0.5.108
+Current local version: 0.5.115
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -43,14 +43,133 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.108.
+This handoff documents the roulette implementation through version 0.5.115.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
-Localization is intentionally deferred. No runtime text has been changed.
-`LOCALIZATION_CATALOG.md` records every currently identified translatable
-surface, Cuphead's 12 supported languages, native localization sources,
-technical prerequisites, and the wording decisions reserved for the user.
+Localization activation is intentionally deferred, but its safe runtime
+architecture is implemented. `LOCALIZATION_CATALOG.md` records the completed
+ID migration and remaining work. `LOCALIZATION_TRANSLATIONS.md` contains an
+inactive first draft for the remaining languages. English, French, Italian,
+German and both Spanish variants are approved and active; no other foreign
+wording should be enabled before the user reviews it.
+
+## Localization-safe internal model (0.5.109)
+
+Version 0.5.109 removes visible Spanish copy from every gameplay decision.
+`ModifierId` is the canonical identity for `NoDash`, `NoMiniPlane`,
+`MiniPlaneOnly`, `NoBombs`, `NoPeashooter`, `NoEx`, `BlackAndWhite`, and
+`None`. `ModifierEntry` keeps only that ID, compatibility kind and artwork.
+Challenge restrictions, forced development selectors, lifecycle checks and
+the black-and-white renderer compare IDs exclusively.
+
+`RouletteStatus` replaces the mutable status sentence. In particular,
+`DrawSpinBand()` now checks `RouletteStatus.SaveRequired` rather than searching
+for the Spanish word `PARTIDA`. `ModLocalization` maps `ModText` and
+`ModifierId` to visible copy, subscribes to
+`Localization.OnLanguageChangedEvent`, and unsubscribes during plugin cleanup.
+The current table intentionally contains only the accepted Spanish strings;
+every language falls back to that table until translations are approved.
+
+The Equip Card, native map prompts, persistent challenge label and battle HUD
+resolve their copy every frame. The map prompt invalidates its cached layout on
+a language event so its width is measured again. The battle snapshot stores a
+`ModifierId`, allowing its visible label to change without altering the active
+rule. Helpers for the unused legacy interface can still resolve equipment names
+through Cuphead, but the active Equip Card displays only equipment icons.
+
+Before enabling another language, review `LOCALIZATION_TRANSLATIONS.md`, add
+its approved table to `ModLocalization`, establish English then Spanish
+fallback, and validate native fonts plus width in windowed/fullscreen play.
+Keep the accepted policy that fight subtitles appear only in the two Spanish
+variants unless the user explicitly changes it.
+
+## Temporary language review shortcut (0.5.110)
+
+`Ctrl+F8` calls Cuphead's public `Localization.language` setter and cycles the
+complete enum in official order, starting with `English` on the first press.
+This deliberately changes the complete game language, not only the mod, so a
+review also exercises native boss/equipment names, fonts and
+`OnLanguageChangedEvent`. A small top-center notice remains for three seconds.
+
+The first use snapshots the original language. `OnApplicationQuit()` and
+`OnDestroy()` restore that value, and the selector never calls
+`SettingsData.Save()`. Avoid opening and closing Cuphead's Options screen while
+a test language is active because the game itself saves settings when that
+menu closes. The release off-switch is the single constant
+`EnableLanguageTestShortcut` near the other temporary selectors in `Plugin.cs`;
+set it to `false` before packaging the public build.
+
+`TRANSLATION_REVIEW_TEMPLATE.md` is the user-facing handoff format. Make one
+copy per language, fill only `Traducción aprobada`, and preserve each ID. The
+user may attach that Markdown file or paste short `id = value` lines in chat.
+The template also lists the 12 languages in Spanish, their Cuphead enum names,
+the exact Ctrl+F8 order, and a suggested filename for every language.
+
+### Verified public translation scope
+
+The 2026-08-06 render-path audit reduced that template to exactly **29 visible
+strings**. The active paths are `EquipCardLayout.DrawRoulette()`, the two native
+map prompts, and the battle challenge HUD. `Plugin.OnGUI()` never calls
+`DrawRouletteLegacy()`, and `ModLocalization.StatusText()` is called only from
+that legacy method. Therefore `status.scene_loading` and every other
+`status.*` phrase are not player-visible and must not be sent for translation.
+
+The same exclusion applies to the old brand/tagline/controls/close copy,
+equipment names (`Nada` and both relic labels), `challenge.none`, BepInEx config
+descriptions, logs and the temporary Ctrl+F8 notice. `ui.action.select_save` is
+also unreachable on the active card because `OnGUI()` requires
+`CanUseRouletteOnMap()`, which already requires initialized save data. Keep
+`LOCALIZATION_TRANSLATIONS.md` only as a historical proposal pool; the review
+template is the source of truth for what the user needs to translate.
+
+## Approved English localization (0.5.111)
+
+The user supplied a completed `translation_english.md` with all 29 public IDs.
+The exact accepted copy is preserved in
+`translations/translation_english.md` and loaded by `ModLocalization` only for
+`Localization.Languages.English`. Notable deliberate wording includes
+`SHOT-A`, `SHOT-B`, `AUTO-LOAD`, `REGULAR`, `NO MINI-BOMBS` and
+`BLACK & WHITE`; do not normalize these without asking the user.
+
+All unapproved languages still use the accepted Spanish dictionary. Switching
+to English with the temporary `Ctrl+F8` tester should update the active Equip
+Card, map prompt and challenge HUD through Cuphead's normal language event.
+
+## Approved French localization (0.5.112)
+
+The user's second completed delivery contains all 29 French public IDs. Its
+exact copy is preserved in `translations/translation_french.md` and selected
+only for `Localization.Languages.French`. Deliberate wording includes `TIR-A`,
+`RÉGULIER`, `LANCER !`, `SANS MINI-BOMBES` and `SANS LANCE-POIS`; do not alter
+it without asking. English remains independent, and every unapproved language
+still falls back to Spanish.
+
+## Approved Italian localization (0.5.113)
+
+The third completed delivery contains all 29 Italian public IDs. The exact
+approved copy lives in `translations/translation_italian.md` and is selected
+only for `Localization.Languages.Italian`. Preserve the submitted grammatical
+pair `ATTIVA/DISATTIVA` for the challenge setting and `ATTIVO/DISATTIVO` for
+automatic loading. Other deliberate terms include `REGOLARE`, `RULETTA`,
+`SENZA MINI-BOMBE` and `SENZA SPARASEMI`.
+
+## Approved German localization (0.5.114)
+
+The fourth completed delivery contains all 29 German public IDs. Its exact
+copy lives in `translations/translation_german.md` and is selected only for
+`Localization.Languages.German`. Preserve deliberate labels including
+`CHALLENGE`, `AUTO-LADEN`, `MINIFLUGZEUG`, `OHNE MINI-BOMBEN` and
+`SCHWARZ-WEISS`.
+
+## Shared Spanish localization (0.5.115)
+
+The user explicitly chose the mod's original Spanish for both
+`Localization.Languages.SpanishSpain` and `SpanishAmerica`. `ModLocalization`
+routes both enums to the same `spanish` dictionary before checking the approved
+foreign tables. The 29 public values are recorded once in
+`translations/translation_spanish_shared.md`. Do not introduce regional copy
+differences unless the user reverses this decision.
 
 Important correction from runtime diagnosis: the reported hotkey failure was
 not caused by DLC filtering or by any keyboard backend. The Steam instance
@@ -1385,6 +1504,56 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 
 ## Verification status at handoff
 
+- Version 0.5.115 builds with zero errors and zero warnings on 2026-08-06.
+  Ordered comparison confirms that the 29 shared Spanish public values exactly
+  match the original dictionary. Release DLL SHA-256:
+  `885D23F74F3C5BEDC8E90405ED1BD46842BFB74715877E3FCE710965E91648DA`.
+  It was not installed because Cuphead process 35736 remained open. After
+  closing the game, install this newer DLL instead of the superseded 0.5.114
+  build and verify Ctrl+F8 positions five and six show identical mod copy.
+- Version 0.5.114 builds with zero errors and zero warnings on 2026-08-06.
+  Direct ordered comparison against the German delivery reports 29 entries and
+  zero differences. Release DLL SHA-256:
+  `D6323C2A6D1D59B718EF96F8FBCF4DDAC695A9A31776B7AC9DBA6CB10B9C1000`.
+  It was not copied into BepInEx because Cuphead process 35736 was still open;
+  close the game before installation. Runtime verification then needs four
+  `Ctrl+F8` presses to reach German and a fit check of card, prompts and HUD.
+- Version 0.5.113 builds with zero errors and zero warnings on 2026-08-06.
+  Direct ordered comparison against the Italian delivery reports 29 entries
+  and zero differences. The installed DLL matches the release build with
+  SHA-256
+  `8C763BAE455AF49895AC2BC2EAC5BA6312FBEF488D976A7C59C41A753A4DA415`.
+  Runtime verification remains: press `Ctrl+F8` three times to reach Italian,
+  then inspect text fit in the card, map prompts and challenge HUD.
+- Version 0.5.112 builds with zero errors and zero warnings on 2026-08-06.
+  Direct ordered comparison against the user's French delivery reports 29
+  entries and zero differences. The BepInEx DLL matches the release build with
+  SHA-256
+  `60D4E406EEFFB99C273309599E4401654A4D236AE0D7474240DB457A02462974`.
+  Runtime verification remains: press `Ctrl+F8` twice from the original
+  language cycle to reach French, then inspect card, map prompts and challenge
+  HUD for text fit and accents.
+- Version 0.5.111 builds with zero errors and zero warnings on 2026-08-06.
+  Static comparison confirms that the 29 English dictionary values exactly
+  match `translations/translation_english.md`. The release DLL was installed
+  in BepInEx and its hash matches the build. SHA-256:
+  `BFF31BE9AF7BFAD0D3E00DB07968D0F768D4FD873D72E8C01D70094AB1F55428`.
+  Runtime verification remains: use `Ctrl+F8` once, open the card, spin with
+  manual and automatic loading, and confirm the card, map prompts and challenge
+  HUD all use the approved English copy.
+- Version 0.5.110 builds with zero errors and zero warnings on 2026-08-06. The
+  installed DLL matches the release build with SHA-256
+  `FC251CF0ABAAC8FBF0CB8F3A188FA6858F746630D81F6ED983674F363C7D7A3F`.
+  Manual verification must launch through Steam, press `Ctrl+F8` repeatedly,
+  confirm the first result is English and all 12 languages cycle, then exit and
+  confirm the original language returns.
+- Version 0.5.109 builds with zero errors and zero warnings on 2026-08-06.
+  Static verification confirms Spanish coverage for all 47 `ModText` values
+  and finds no remaining `activeChallenge` string comparisons,
+  `status.IndexOf()` localization logic or `ModifierEntry.Name` gameplay use.
+  Runtime language tables are intentionally not active yet, so the immediate
+  manual regression check is that Spanish presentation and all eight challenge
+  behaviors remain unchanged.
 - Version 0.5.79 builds with zero errors and zero warnings on 2026-08-06. The
   release DLL was installed over the temporary diagnostic build and its SHA-256
   matches the build output:

@@ -1,8 +1,70 @@
-# Catálogo de localización pendiente
+# Catálogo de localización
 
-Estado: **sólo planificación**. La versión actual del mod conserva todos sus
-textos en español. Este documento no autoriza ni implementa traducciones; sirve
-para decidir más adelante qué se traduce, a qué idiomas y con qué redacción.
+Estado: **arquitectura implementada; inglés, francés, italiano, alemán y ambos
+españoles aprobados y activos**. La versión 0.5.115 usa las entregas de
+`English`, `French`, `Italian` y `German`; `SpanishSpain` y `SpanishAmerica`
+comparten explícitamente el español original. Los otros idiomas conservan ese
+español como respaldo provisional. Las propuestas aún no aprobadas están en
+`LOCALIZATION_TRANSLATIONS.md`.
+
+## Alcance visible verificado en 0.5.110 y aplicado en 0.5.111
+
+La fuente de verdad para solicitar traducciones es
+`TRANSLATION_REVIEW_TEMPLATE.md`. Una revisión directa de las rutas que se
+dibujan actualmente redujo el alcance público a **29 textos**:
+
+- etiquetas, ajustes y acciones de la Equip Card actual;
+- los dos prompts de la ruleta en el mapa;
+- el prefijo del HUD y los siete nombres reales de reto.
+
+Los `status.*` no aparecen en la interfaz actual: `StatusText()` sólo se llama
+desde `DrawRouletteLegacy()`, que no forma parte de `OnGUI()`. Por la misma
+razón se excluyen el título, eslogan, ayuda y botón de cierre antiguos. La
+tarjeta actual muestra iconos de equipo, no los textos `Nada`, `Reliquia
+Maldita` o `Reliquia Divina`; cuando no hay reto tampoco escribe `Nada`.
+
+El aviso de `Ctrl+F8`, los logs y las descripciones de configuración son
+herramientas técnicas y no pertenecen a la traducción pública de la primera
+versión. `LOCALIZATION_TRANSLATIONS.md` conserva propuestas históricas, pero
+sus filas adicionales no son una solicitud de traducción.
+
+Las entregas aprobadas están versionadas en
+`translations/translation_english.md` y
+`translations/translation_french.md`, además de
+`translations/translation_italian.md` y `translations/translation_german.md`.
+Las dos variantes de español comparten
+`translations/translation_spanish_shared.md`. Cada grupo de 29 valores se carga
+sólo para su idioma; cualquier ID interno que no forme parte de las entregas
+sigue usando el respaldo español.
+
+## Base técnica implementada en 0.5.109
+
+- `ModifierId` identifica los ocho resultados de reto; ninguna restricción de
+  gameplay compara ya nombres como `No EX` o `No mini avión`.
+- `RouletteStatus` sustituye las frases almacenadas en `status`; la tarjeta ya
+  no busca la palabra española `PARTIDA` para decidir su acción principal.
+- `ModLocalization` concentra los IDs `ModText`, el español aceptado, el
+  fallback y la traducción visible de cada `ModifierId`.
+- El servicio lee `Localization.language`, se suscribe a
+  `Localization.OnLanguageChangedEvent` y se desconecta en `OnDestroy()`.
+- Tarjeta, prompts del mapa, etiqueta del reto, HUD y la interfaz antigua
+  resuelven sus textos al dibujarse. Cambiar el idioma invalida también la
+  medición en caché del prompt nativo.
+- Los snapshots del HUD guardan `ModifierId`, no texto. Un cambio de idioma en
+  mitad de una pelea puede actualizar la etiqueta sin perder la regla activa.
+- La interfaz antigua puede consultar nombres de equipo mediante
+  `WeaponProperties.GetDisplayName()`, pero la Equip Card activa sólo muestra
+  sus iconos y no requiere traducir esos nombres.
+- Inglés, francés, italiano, alemán y las dos variantes de español usan ya sus
+  tablas aprobadas. Los idiomas todavía pendientes caen al mismo español usado
+  antes de esta refactorización.
+- La herramienta temporal de 0.5.110 usa `Ctrl+F8` para recorrer los 12 idiomas
+  reales sin depender del menú de opciones. Se desactiva con una sola constante
+  antes de publicar.
+- `TRANSLATION_REVIEW_TEMPLATE.md` es el formato recomendado para que el usuario
+  entregue una traducción completa o correcciones puntuales por ID. La plantilla
+  incluye sólo los 29 textos visibles, además de los 12 nombres en español, sus
+  enums de Cuphead, el orden exacto de `Ctrl+F8` y nombres de archivo sugeridos.
 
 ## Idiomas que Cuphead puede detectar
 
@@ -49,12 +111,15 @@ Conviene reutilizar estas traducciones oficiales en lugar de mantener copias:
 | Nombre de súper | `WeaponProperties.GetDisplayName(Super)` | `EquipmentEntry.Name` |
 | Nombre de amuleto | `WeaponProperties.GetDisplayName(Charm)` | `EquipmentEntry.Name` |
 
-`Nada` no corresponde a un equipo real y necesita traducción propia. Antes de
-implementar debe verificarse visualmente qué clave de jefe corresponde al
-nombre y cuál al título del combate; las rutas anteriores son las que usa la
-interfaz interna de selección de nivel de Cuphead.
+`Nada` no corresponde a un equipo real, pero no se escribe en la Equip Card
+actual. Sólo necesitará traducción si una interfaz futura vuelve a mostrar
+nombres de equipo.
 
-## Textos propios de la tarjeta
+## Inventario técnico de textos de tarjeta
+
+Esta sección conserva también IDs de la interfaz antigua como referencia de
+implementación. **No debe usarse como plantilla de traducción**; para eso está
+`TRANSLATION_REVIEW_TEMPLATE.md`.
 
 Los siguientes identificadores son propuestas estables. La columna “actual”
 registra lo que aparece hoy, no una traducción definitiva.
@@ -90,7 +155,10 @@ registra lo que aparece hoy, no una traducción definitiva.
 | `ui.controls` | `F6 ABRIR/CERRAR · F7 GIRAR · CTRL+I SELECCIÓN FORZADA` | Ayuda de controles antigua |
 | `ui.controls.controller_toggle` | `Gatillo izquierdo + Equip` | Descripción neutral del atajo de mando; sus etiquetas físicas son ZL+X, LT+Y y L2+Triángulo |
 
-## Mensajes de estado
+## Mensajes de estado internos o heredados
+
+Estos estados todavía existen para controlar el flujo, pero sus frases sólo se
+dibujan en la interfaz antigua. No forman parte de las traducciones pendientes.
 
 | ID propuesto | Texto actual |
 | --- | --- |
@@ -119,11 +187,9 @@ decidir otra etiqueta; esa lógica no funcionaría en otros idiomas.
 | `challenge.black_and_white` | `Blanco y negro` |
 | `challenge.none` | `Nada` |
 
-Antes de traducir retos es obligatorio separar su ID interno del texto visible.
-La versión actual compara frases como `No mini avión` para aplicar las reglas;
-traducirlas directamente rompería la funcionalidad. `ModifierId` debería ser
-un enum y la traducción sólo una propiedad de presentación. El selector
-temporal de pruebas también debe usar ese ID, no una frase.
+Los retos ya usan `ModifierId`; traducir su presentación no modifica sus reglas
+de gameplay. `challenge.none` permanece como respaldo interno, pero no se
+muestra: el círculo queda vacío cuando los retos están desactivados.
 
 ## Configuración de BepInEx
 
@@ -166,21 +232,18 @@ buscar, y traducir sólo los avisos que ayudan directamente al jugador.
 - Valores internos de `Weapon`, `Charm`, `Super`, `Levels` y retos.
 - Nombres propios oficiales cuando Cuphead ya proporciona la forma localizada.
 
-## Requisitos técnicos para una implementación futura
+## Requisitos técnicos de activación restantes
 
-1. Crear un servicio único, por ejemplo `ModLocalization`, con fallback a
-   inglés y después al español actual.
-2. Leer `Localization.language` al mostrar la interfaz.
-3. Suscribirse a `Localization.OnLanguageChangedEvent` en `Awake()` y quitar la
-   suscripción en `OnDestroy()`.
-4. Guardar estados y retos como enums/IDs, nunca como texto localizado.
-5. Actualizar en caliente la tarjeta, prompts del mapa y etiqueta del reto.
-6. Obtener nombres de contenido desde Cuphead y usar los textos de
-   `RouletteData` sólo como respaldo.
-7. Seleccionar fuentes nativas compatibles con cada idioma. Esto es esencial
+1. Aprobar las seis traducciones restantes: coreano, ruso, polaco, portugués de
+   Brasil, japonés y chino simplificado.
+2. Añadir cada tabla aprobada a `ModLocalization`. Inglés ya está activo; el
+   español actual continúa como fallback provisional para las tablas pendientes.
+3. Seleccionar fuentes nativas compatibles con cada idioma. Esto es esencial
    para cirílico, coreano, japonés y chino simplificado.
-8. Revisar anchos y saltos de línea: alemán, francés, ruso y portugués pueden
+4. Revisar anchos y saltos de línea: alemán, francés, ruso y portugués pueden
    ocupar más espacio que el español; CJK necesita fuentes y tamaños propios.
+5. Ejecutar la matriz visual completa cambiando el idioma con la tarjeta
+   abierta, en el mapa y durante un reto activo.
 
 ## Decisiones reservadas para el usuario
 

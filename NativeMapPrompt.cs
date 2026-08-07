@@ -60,7 +60,9 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
-            var action = showReroll ? "VOLVER A GIRAR" : "ABRIR RULETA";
+            var action = showReroll
+                ? L(ModText.ActionSpinAgain)
+                : L(ModText.ActionOpenRoulette);
             var key = showReroll ? "F7" : "F6";
             int rewiredPlayerId;
             string leftTrigger;
@@ -548,7 +550,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (nativeChallengePrompt != null)
                 return true;
-            if (string.IsNullOrEmpty(activeChallenge))
+            if (activeChallenge == ModifierId.None)
                 return false;
             if (nativeRoulettePrompt == null && !TryCreateNativeRoulettePrompt())
                 return false;
@@ -636,7 +638,7 @@ namespace Gilomx.CupheadBossRoulette
 
             SetNativeChallengePromptVisible(true);
             ApplyNativeChallengePromptText(
-                "RETO: " + activeChallenge.ToUpperInvariant());
+                LocalizedChallengeLabel(activeChallenge).ToUpperInvariant());
         }
 
         private void ApplyNativeChallengePromptText(string text)

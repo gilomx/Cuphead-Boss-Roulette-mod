@@ -3,6 +3,110 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.115 — 2026-08-06
+
+### Español compartido para ambas regiones
+
+- `SpanishSpain` y `SpanishAmerica` seleccionan explícitamente el diccionario
+  español original del mod.
+- Las dos variantes comparten exactamente las mismas 29 cadenas visibles; no
+  hay adaptación regional.
+- La decisión queda registrada en
+  `translations/translation_spanish_shared.md` para evitar que una traducción
+  futura cambie una variante por separado.
+
+## 0.5.114 — 2026-08-06
+
+### Traducción alemana aprobada
+
+- Se incorporan exactamente los 29 textos entregados en
+  `translation_german.md`.
+- `Localization.Languages.German` selecciona su tabla propia en la Equip Card,
+  prompts del mapa y HUD de reto.
+- Inglés, francés, italiano y alemán quedan activos; los idiomas pendientes
+  continúan con el respaldo español.
+- La entrega exacta se conserva en `translations/translation_german.md`.
+
+## 0.5.113 — 2026-08-06
+
+### Traducción italiana aprobada
+
+- Se incorporan exactamente los 29 textos entregados en
+  `translation_italian.md`.
+- `Localization.Languages.Italian` selecciona su tabla propia en la Equip
+  Card, prompts del mapa y HUD de reto.
+- Inglés, francés e italiano quedan activos; los demás idiomas continúan con
+  el respaldo español.
+- La entrega exacta se conserva en `translations/translation_italian.md`.
+
+## 0.5.112 — 2026-08-06
+
+### Traducción francesa aprobada
+
+- Se incorporan exactamente los 29 textos entregados en
+  `translation_french.md`.
+- `Localization.Languages.French` selecciona ahora su propia tabla para la
+  Equip Card, prompts del mapa y HUD de reto.
+- Inglés y francés quedan activos; los demás idiomas continúan usando el
+  respaldo español mientras esperan aprobación.
+- La entrega exacta queda registrada en
+  `translations/translation_french.md`.
+
+## 0.5.111 — 2026-08-06
+
+### Primera traducción aprobada: inglés
+
+- Se incorporan exactamente los 29 textos entregados en
+  `translation_english.md`.
+- Cuando `Localization.language` es `English`, la Equip Card, los prompts del
+  mapa y el HUD de reto cambian inmediatamente a inglés.
+- Los textos internos o de la interfaz antigua no se traducen ni amplían el
+  alcance público.
+- Los otros once idiomas conservan el respaldo español hasta recibir una tabla
+  aprobada.
+- La entrega original queda registrada en
+  `translations/translation_english.md`.
+
+## 0.5.110 — 2026-08-06 (herramienta temporal)
+
+### Selector de idioma para revisar traducciones
+
+- `Ctrl+F8` recorre los 12 valores reales de `Localization.Languages`,
+  comenzando siempre por inglés.
+- El selector cambia `Localization.language`, por lo que actualiza a la vez la
+  interfaz de Cuphead, sus nombres nativos y el mod mediante el evento oficial.
+- Una etiqueta temporal muestra el idioma elegido durante tres segundos y el
+  log registra tanto el idioma de prueba como el original.
+- El idioma original se restaura en `OnApplicationQuit()` y `OnDestroy()`; el
+  selector no llama a `SettingsData.Save()`.
+- La herramienta completa se desactiva cambiando únicamente
+  `EnableLanguageTestShortcut` a `false` antes de publicar.
+- `TRANSLATION_REVIEW_TEMPLATE.md` permite entregar cada idioma conservando
+  los IDs estables de las etiquetas.
+- Una auditoría de las rutas que realmente se dibujan deja la plantilla en 29
+  textos visibles. Se excluyen los `status.*`, la interfaz antigua, nombres de
+  equipo no escritos, `challenge.none`, configuración, logs y el aviso temporal
+  de idioma.
+
+## 0.5.109 — 2026-08-06
+
+### Base segura para la localización
+
+- Los retos usan ahora `ModifierId`; ninguna regla de gameplay depende de una
+  frase española ni cambia al traducir su nombre visible.
+- Los mensajes internos usan `RouletteStatus`. Se eliminó la búsqueda de la
+  palabra `PARTIDA` que decidía la acción principal de la tarjeta.
+- `ModLocalization` centraliza los IDs de interfaz, detecta
+  `Localization.language` y escucha cambios de idioma en caliente.
+- Tarjeta, prompts del mapa, HUD y reto persistente resuelven el texto desde el
+  servicio. El snapshot de combate guarda el ID del reto, no su traducción.
+- Armas, supers y amuletos normales reutilizan sus nombres oficiales mediante
+  `WeaponProperties.GetDisplayName()`; `Nada` y las dos reliquias conservan
+  entradas propias.
+- El español visible permanece idéntico mientras se revisa
+  `LOCALIZATION_TRANSLATIONS.md`; las propuestas de los otros once idiomas no
+  están activadas todavía.
+
 ## 0.5.108 — 2026-08-06
 
 - Se desactiva `ForceTestBoss` después de validar toda la cadena de Rey Dado.

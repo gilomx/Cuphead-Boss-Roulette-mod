@@ -15,14 +15,14 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.108";
+        public const string PluginVersion = "0.5.115";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
-        // TEMPORARY TEST SELECTOR. Keep non-empty while developing a challenge.
+        // TEMPORARY TEST SELECTOR. Keep non-None while developing a challenge.
         // Compatible bosses are still chosen randomly.
-        private static readonly string ForcedTestChallenge =
-            "";
+        private static readonly ModifierId ForcedTestChallenge =
+            ModifierId.None;
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
         // Dormant test selector: exercise both restricted plane weapons.
@@ -33,8 +33,13 @@ namespace Gilomx.CupheadBossRoulette
         // TEMPORARY BOSS TEST. Disable before publishing a normal build.
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels ForcedTestBossLevel = Levels.DicePalaceMain;
+        // TEMPORARY LOCALIZATION TEST. Set false before the public release.
+        private const bool EnableLanguageTestShortcut = true;
+        private static readonly KeyboardShortcut LanguageTestLeftShortcut =
+            new KeyboardShortcut(KeyCode.F8, KeyCode.LeftControl);
+        private static readonly KeyboardShortcut LanguageTestRightShortcut =
+            new KeyboardShortcut(KeyCode.F8, KeyCode.RightControl);
 
-        private const string BlackAndWhiteChallenge = "Blanco y negro";
         private const float BlackAndWhiteEntryDelay = 1.5f;
         private const float BlackAndWhiteFadeInDuration = 1.25f;
         private const float BlackAndWhiteFadeOutDuration = 0.9f;
@@ -125,6 +130,7 @@ namespace Gilomx.CupheadBossRoulette
         private ConfigEntry<Level.Mode> difficultySetting;
         private ConfigEntry<bool> challengeSetting;
         private ConfigEntry<float> loadDelay;
+        private ModLocalization modLocalization;
         private GameTheme theme;
         private AudioSource audioSource;
         private AudioSource effectsAudioSource;
@@ -165,8 +171,8 @@ namespace Gilomx.CupheadBossRoulette
         private int revealed;
         private Level.Mode difficulty = Level.Mode.Normal;
         private RouletteResult result = new RouletteResult();
-        private string status = "PULSA ENTER PARA GIRAR";
-        private string activeChallenge = "";
+        private RouletteStatus status = RouletteStatus.Ready;
+        private ModifierId activeChallenge = ModifierId.None;
         private int activeChallengeBoss = -1;
         private float blackAndWhiteBlend;
         private float blackAndWhiteTransitionStartedAt = -1f;
@@ -191,14 +197,169 @@ namespace Gilomx.CupheadBossRoulette
         private bool loanedBattleSeen;
         private bool returnToMapAfterRouletteFinalBossWin;
         private static int curseRelicRuntimeSetupDepth;
+        private bool languageTestOriginalCaptured;
+        private Localization.Languages languageTestOriginalLanguage;
+        private int languageTestCycleIndex = -1;
+        private float languageTestNoticeUntil;
 
         private string AssetsDirectory
         {
             get { return Path.Combine(Path.GetDirectoryName(Info.Location) ?? Paths.PluginPath, "assets"); }
         }
 
+        private string L(ModText id)
+        {
+            return modLocalization == null ? id.ToString() :
+                modLocalization.Text(id);
+        }
+
+        private string LocalizedModifierName(ModifierId id)
+        {
+            return modLocalization == null ? id.ToString() :
+                modLocalization.ModifierName(id);
+        }
+
+        private string LocalizedChallengeLabel(ModifierId id)
+        {
+            return modLocalization == null ? string.Empty :
+                modLocalization.ChallengeLabel(id);
+        }
+
+        private string LocalizedEquipmentName(EquipmentEntry<Weapon> entry)
+        {
+            if (entry.Value == Weapon.None)
+                return L(ModText.CommonNone);
+            try
+            {
+                var value = WeaponProperties.GetDisplayName(entry.Value);
+                if (!string.IsNullOrEmpty(value))
+                    return value;
+            }
+            catch
+            {
+            }
+            return entry.Name;
+        }
+
+        private string LocalizedEquipmentName(EquipmentEntry<Super> entry)
+        {
+            if (entry.Value == Super.None)
+                return L(ModText.CommonNone);
+            try
+            {
+                var value = WeaponProperties.GetDisplayName(entry.Value);
+                if (!string.IsNullOrEmpty(value))
+                    return value;
+            }
+            catch
+            {
+            }
+            return entry.Name;
+        }
+
+        private string LocalizedEquipmentName(EquipmentEntry<Charm> entry)
+        {
+            if (entry.Value == Charm.None)
+                return L(ModText.CommonNone);
+            if (entry.Value == Charm.charm_curse)
+                return entry.CurseLevelOverride >= 4
+                    ? L(ModText.CharmDivineRelic)
+                    : L(ModText.CharmCursedRelic);
+            try
+            {
+                var value = WeaponProperties.GetDisplayName(entry.Value);
+                if (!string.IsNullOrEmpty(value))
+                    return value;
+            }
+            catch
+            {
+            }
+            return entry.Name;
+        }
+
+        private void OnModLanguageChanged()
+        {
+            // Every visible string is resolved while drawing. Reset the one
+            // cached native layout so its measured width is rebuilt too.
+            nativeRoulettePromptLayoutToken = null;
+        }
+
+        private void UpdateLanguageTestShortcut()
+        {
+            if (!EnableLanguageTestShortcut ||
+                (!LanguageTestLeftShortcut.IsDown() &&
+                 !LanguageTestRightShortcut.IsDown()))
+                return;
+
+            Localization.Languages current;
+            try
+            {
+                current = Localization.language;
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!languageTestOriginalCaptured)
+            {
+                languageTestOriginalLanguage = current;
+                languageTestOriginalCaptured = true;
+            }
+
+            var languages = (Localization.Languages[])Enum.GetValues(
+                typeof(Localization.Languages));
+            languageTestCycleIndex =
+                (languageTestCycleIndex + 1) % languages.Length;
+            var nextIndex = languageTestCycleIndex;
+            var next = languages[nextIndex];
+            Localization.language = next;
+            languageTestNoticeUntil = Time.realtimeSinceStartup + 3f;
+            Logger.LogWarning("TEMP language test: " + next +
+                " (Ctrl+F8 cycles; original=" +
+                languageTestOriginalLanguage + ").");
+        }
+
+        private void RestoreOriginalTestLanguage()
+        {
+            if (!languageTestOriginalCaptured)
+                return;
+
+            try
+            {
+                if (Localization.language != languageTestOriginalLanguage)
+                    Localization.language = languageTestOriginalLanguage;
+            }
+            catch
+            {
+            }
+            languageTestOriginalCaptured = false;
+            languageTestCycleIndex = -1;
+        }
+
+        private void DrawLanguageTestNotice()
+        {
+            if (!EnableLanguageTestShortcut ||
+                Time.realtimeSinceStartup >= languageTestNoticeUntil)
+                return;
+
+            var language = modLocalization == null
+                ? "UNKNOWN"
+                : modLocalization.CurrentLanguage.ToString().ToUpperInvariant();
+            var rect = new Rect(365f, 12f, 550f, 44f);
+            var previousColor = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.72f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(rect, "IDIOMA DE PRUEBA: " + language +
+                "  ·  CTRL+F8", subtitleStyle);
+            GUI.color = previousColor;
+        }
+
         private void Awake()
         {
+            modLocalization = new ModLocalization();
+            modLocalization.LanguageChanged += OnModLanguageChanged;
             toggleShortcut = Config.Bind("Controles", "AbrirCerrar", new KeyboardShortcut(KeyCode.F6), "Abre o cierra la ruleta.");
             spinShortcut = Config.Bind("Controles", "Girar", new KeyboardShortcut(KeyCode.F7), "Inicia un giro.");
             autoLoad = Config.Bind("Juego", "CargarAutomaticamente", true, "Carga el jefe al finalizar el giro.");
@@ -813,6 +974,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Update()
         {
+            UpdateLanguageTestShortcut();
             UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
             UpdateBlackAndWhiteTransition();
@@ -962,7 +1124,7 @@ namespace Gilomx.CupheadBossRoulette
             if (resultReady)
             {
                 resultReady = false;
-                status = "PULSA ENTER PARA GIRAR";
+                status = RouletteStatus.Ready;
             }
         }
 
@@ -1018,7 +1180,7 @@ namespace Gilomx.CupheadBossRoulette
             ticker = 0;
             revealed = 0;
             result = new RouletteResult();
-            status = "PULSA ENTER PARA GIRAR";
+            status = RouletteStatus.Ready;
 
             for (var i = 0; i < pulseUntil.Length; i++)
                 pulseUntil[i] = 0f;
@@ -1047,7 +1209,7 @@ namespace Gilomx.CupheadBossRoulette
             ticker = 0;
             spinStartedAt = Time.realtimeSinceStartup;
             running = true;
-            status = "¡LA RULETA ESTÁ GIRANDO!";
+            status = RouletteStatus.Spinning;
             EndBattleResultHudSession();
             ClearActiveChallenge();
             if (spinClip != null)
@@ -1122,15 +1284,15 @@ namespace Gilomx.CupheadBossRoulette
                 return -1;
 
             var testSpin = forcedPlaneRelicChallengeTestSpin++ % 4;
-            var expectedName = testSpin < 2
-                ? "No disparo bombas"
-                : "No disparo Peashooter";
+            var expectedId = testSpin < 2
+                ? ModifierId.NoBombs
+                : ModifierId.NoPeashooter;
             for (var i = 0; i < RouletteData.Modifiers.Length; i++)
             {
-                if (RouletteData.Modifiers[i].Name == expectedName)
+                if (RouletteData.Modifiers[i].Id == expectedId)
                 {
                     Logger.LogInfo(
-                        "Forced plane relic challenge: " + expectedName +
+                        "Forced plane relic challenge: " + expectedId +
                         ".");
                     return i;
                 }
@@ -1167,16 +1329,16 @@ namespace Gilomx.CupheadBossRoulette
             if (!ForceRelicTestSequence)
                 return -1;
 
-            var expectedName = forcedRelicTestSpin++ % 2 == 0
-                ? "Reliquia Maldita"
-                : "Reliquia Divina";
+            var expectedCurseLevel = forcedRelicTestSpin++ % 2 == 0 ? 0 : 4;
             for (var i = 0; i < availableCharmIndices.Count; i++)
             {
                 var charmIndex = availableCharmIndices[i];
-                if (RouletteData.Charms[charmIndex].Name == expectedName)
+                if (RouletteData.Charms[charmIndex].CurseLevelOverride ==
+                    expectedCurseLevel)
                 {
                     Logger.LogInfo(
-                        "Forced relic test result: " + expectedName + ".");
+                        "Forced relic test curse level: " +
+                        expectedCurseLevel + ".");
                     return charmIndex;
                 }
             }
@@ -1186,7 +1348,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool HasForcedTestChallenge()
         {
-            return !string.IsNullOrEmpty(ForcedTestChallenge);
+            return ForcedTestChallenge != ModifierId.None;
         }
 
         private static int ForcedTestModifierIndex()
@@ -1196,7 +1358,7 @@ namespace Gilomx.CupheadBossRoulette
 
             for (var i = 0; i < RouletteData.Modifiers.Length; i++)
             {
-                if (RouletteData.Modifiers[i].Name == ForcedTestChallenge)
+                if (RouletteData.Modifiers[i].Id == ForcedTestChallenge)
                     return i;
             }
             return -1;
@@ -1319,7 +1481,9 @@ namespace Gilomx.CupheadBossRoulette
             running = false;
             resultReady = true;
             StopSpinAudio();
-            status = autoLoad.Value ? "¡RESULTADO LISTO! PREPARANDO COMBATE..." : "¡RESULTADO LISTO!";
+            status = autoLoad.Value
+                ? RouletteStatus.ResultLoading
+                : RouletteStatus.ResultReady;
             if (autoLoad.Value)
             {
                 pendingLoad = true;
@@ -1333,13 +1497,13 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (!PlayerData.Initialized || PlayerData.Data == null)
                 {
-                    status = "SELECCIONA PRIMERO UNA PARTIDA GUARDADA";
+                    status = RouletteStatus.SaveRequired;
                     Logger.LogWarning("Selecciona primero una partida guardada.");
                     return;
                 }
                 if (SceneLoader.CurrentlyLoading)
                 {
-                    status = "CUPHEAD YA ESTÁ CARGANDO OTRA ESCENA";
+                    status = RouletteStatus.SceneLoading;
                     return;
                 }
 
@@ -1350,7 +1514,9 @@ namespace Gilomx.CupheadBossRoulette
                 Level.SetCurrentMode(difficulty);
                 var boss = RouletteData.Bosses[result.Boss];
                 SetActiveChallenge(
-                    uglyMode ? RouletteData.Modifiers[result.Modifier].Name : "",
+                    uglyMode
+                        ? RouletteData.Modifiers[result.Modifier].Id
+                        : ModifierId.None,
                     result.Boss);
                 BeginBattleResultHudSession();
                 if (!PrepareBattleResultHud())
@@ -1361,7 +1527,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             catch (Exception exception)
             {
-                status = "NO SE PUDO CARGAR. REVISA LOGOUTPUT.LOG";
+                status = RouletteStatus.LoadFailed;
                 RestoreOriginalLoadouts(false);
                 ClearActiveChallenge();
                 EndBattleResultHudSession();
@@ -1511,7 +1677,7 @@ namespace Gilomx.CupheadBossRoulette
                 Quaternion.identity,
                 new Vector3(scale, scale, 1f));
 
-
+            DrawLanguageTestNotice();
             if (CanUseRouletteOnMap() && cardVisibility > 0.001f)
                 DrawRoulette();
 
@@ -1532,8 +1698,10 @@ namespace Gilomx.CupheadBossRoulette
             GUI.color = Ink;
             GUI.DrawTexture(new Rect(22f, 18f, 1126f, 61f), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            GUI.Label(new Rect(35f, 17f, 1100f, 58f), "CUPHEAD · BOSS ROULETTE", titleStyle);
-            GUI.Label(new Rect(35f, 76f, 1100f, 30f), "¡EL DESTINO DECIDE TU PRÓXIMO COMBATE!", subtitleStyle);
+            GUI.Label(new Rect(35f, 17f, 1100f, 58f),
+                L(ModText.Brand), titleStyle);
+            GUI.Label(new Rect(35f, 76f, 1100f, 30f),
+                L(ModText.Tagline), subtitleStyle);
 
             var bossIndex = DisplayPoolIndex(
                 0, result.Boss, availableBossIndices, 0);
@@ -1552,29 +1720,38 @@ namespace Gilomx.CupheadBossRoulette
                 4, result.Charm, availableCharmIndices,
                 availableCharmIndices.Count / 4);
 
-            DrawEquipmentCard(new Rect(360f, 127f, 225f, 151f), "ARMA A",
-                RouletteData.Weapons[weapon1].Name, RouletteData.Weapons[weapon1].Image,
+            DrawEquipmentCard(new Rect(360f, 127f, 225f, 151f),
+                L(ModText.SlotWeaponA),
+                LocalizedEquipmentName(RouletteData.Weapons[weapon1]),
+                RouletteData.Weapons[weapon1].Image,
                 RouletteData.Weapons[weapon1].NativeSprite, 1);
-            DrawEquipmentCard(new Rect(607f, 127f, 225f, 151f), "ARMA B",
-                RouletteData.Weapons[weapon2].Name, RouletteData.Weapons[weapon2].Image,
+            DrawEquipmentCard(new Rect(607f, 127f, 225f, 151f),
+                L(ModText.SlotWeaponB),
+                LocalizedEquipmentName(RouletteData.Weapons[weapon2]),
+                RouletteData.Weapons[weapon2].Image,
                 RouletteData.Weapons[weapon2].NativeSprite, 2);
-            DrawEquipmentCard(new Rect(854f, 127f, 225f, 151f), "SÚPER",
-                RouletteData.Supers[super].Name, RouletteData.Supers[super].Image,
+            DrawEquipmentCard(new Rect(854f, 127f, 225f, 151f),
+                L(ModText.SlotSuper),
+                LocalizedEquipmentName(RouletteData.Supers[super]),
+                RouletteData.Supers[super].Image,
                 RouletteData.Supers[super].NativeSprite, 3);
 
             var charmRect = uglyMode
                 ? new Rect(484f, 302f, 225f, 151f)
                 : new Rect(607f, 302f, 225f, 151f);
-            DrawEquipmentCard(charmRect, "AMULETO",
-                RouletteData.Charms[charm].Name, RouletteData.Charms[charm].Image,
+            DrawEquipmentCard(charmRect, L(ModText.SlotCharm),
+                LocalizedEquipmentName(RouletteData.Charms[charm]),
+                RouletteData.Charms[charm].Image,
                 RouletteData.Charms[charm].NativeSprite, 4);
 
             if (uglyMode)
             {
                 var rollingModifier = CurrentRollingModifier(bossIndex);
                 var modifier = DisplayIndex(5, result.Modifier, RouletteData.Modifiers.Length, rollingModifier - ticker);
-                DrawEquipmentCard(new Rect(731f, 302f, 225f, 151f), "RETO",
-                    RouletteData.Modifiers[modifier].Name, RouletteData.Modifiers[modifier].Image,
+                DrawEquipmentCard(new Rect(731f, 302f, 225f, 151f),
+                    L(ModText.SlotChallenge),
+                    LocalizedModifierName(RouletteData.Modifiers[modifier].Id),
+                    RouletteData.Modifiers[modifier].Image,
                     null, 5);
             }
 
@@ -1623,37 +1800,49 @@ namespace Gilomx.CupheadBossRoulette
 
             GUI.Label(new Rect(rect.x + 96f, rect.y + 46f, rect.width - 106f, 73f), value.ToUpperInvariant(), bodyStyle);
             GUI.Label(new Rect(rect.x + 13f, rect.y + 124f, rect.width - 26f, 20f),
-                revealed > field ? "SELECCIONADO" : "GIRANDO...", smallStyle);
+                revealed > field
+                    ? L(ModText.ValueSelected)
+                    : L(ModText.ValueRolling), smallStyle);
         }
 
         private void DrawBottomControls()
         {
-            GUI.Label(new Rect(40f, 473f, 170f, 31f), "DIFICULTAD", cardTitleStyle);
-            DrawModeButton(new Rect(210f, 469f, 132f, 38f), "SIMPLE", Level.Mode.Easy);
-            DrawModeButton(new Rect(351f, 469f, 132f, 38f), "NORMAL", Level.Mode.Normal);
-            DrawModeButton(new Rect(492f, 469f, 132f, 38f), "EXPERTO", Level.Mode.Hard);
+            GUI.Label(new Rect(40f, 473f, 170f, 31f),
+                L(ModText.SettingDifficulty), cardTitleStyle);
+            DrawModeButton(new Rect(210f, 469f, 132f, 38f),
+                L(ModText.DifficultyEasy), Level.Mode.Easy);
+            DrawModeButton(new Rect(351f, 469f, 132f, 38f),
+                L(ModText.DifficultyNormal), Level.Mode.Normal);
+            DrawModeButton(new Rect(492f, 469f, 132f, 38f),
+                L(ModText.DifficultyHard), Level.Mode.Hard);
 
             if (GUI.Button(new Rect(657f, 469f, 208f, 38f),
-                uglyMode ? "?  MODO FEO" : "MODO FEO", uglyMode ? buttonActiveStyle : buttonStyle))
+                (uglyMode ? "?  " : "") + L(ModText.SettingChallenge),
+                uglyMode ? buttonActiveStyle : buttonStyle))
                 uglyMode = !uglyMode;
             if (GUI.Button(new Rect(878f, 469f, 214f, 38f),
-                autoLoad.Value ? "?  CARGA AUTO" : "CARGA AUTO", autoLoad.Value ? buttonActiveStyle : buttonStyle))
+                (autoLoad.Value ? "?  " : "") +
+                L(ModText.SettingAutoLoad),
+                autoLoad.Value ? buttonActiveStyle : buttonStyle))
                 autoLoad.Value = !autoLoad.Value;
 
-            GUI.Label(new Rect(42f, 518f, 1050f, 31f), status, subtitleStyle);
+            GUI.Label(new Rect(42f, 518f, 1050f, 31f),
+                modLocalization.StatusText(status), subtitleStyle);
             GUI.enabled = !running && !pendingLoad;
             var spinRect = new Rect(385f, 558f, 287f, 58f);
-            if (GUI.Button(spinRect, "¡GIRAR!   F7", buttonActiveStyle))
+            if (GUI.Button(spinRect,
+                L(ModText.ActionSpin) + "   F7", buttonActiveStyle))
                 StartRoulette();
             GUI.enabled = true;
-            if (GUI.Button(new Rect(688f, 558f, 148f, 58f), "CERRAR", buttonStyle))
+            if (GUI.Button(new Rect(688f, 558f, 148f, 58f),
+                L(ModText.ActionClose), buttonStyle))
                 SetVisible(false);
 
             if (spinRect.Contains(Event.current.mousePosition))
                 theme.DrawSprite("hand_cursor_boil_0001", new Rect(spinRect.x - 59f, spinRect.y + 4f, 54f, 54f), Color.white);
 
             GUI.Label(new Rect(35f, 625f, 1100f, 24f),
-                "F6  ABRIR/CERRAR     ·     F7  GIRAR     ·     CTRL+I  SELECCIÓN FORZADA", smallStyle);
+                L(ModText.ControlsLegacy), smallStyle);
         }
 
         private void DrawModeButton(Rect rect, string label, Level.Mode mode)
@@ -1665,7 +1854,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateBlackAndWhiteTransition()
         {
-            var challengeSelected = activeChallenge == BlackAndWhiteChallenge;
+            var challengeSelected =
+                activeChallenge == ModifierId.BlackAndWhite;
             var activeFight = false;
             var levelInstanceId = -1;
 
@@ -1876,17 +2066,18 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private void SetActiveChallenge(string challenge, int bossIndex)
+        private void SetActiveChallenge(ModifierId challenge, int bossIndex)
         {
             soloMiniRestartPending = false;
-            activeChallenge = challenge == "Nada" ? "" : challenge;
-            activeChallengeBoss = string.IsNullOrEmpty(activeChallenge) ? -1 : bossIndex;
+            activeChallenge = challenge;
+            activeChallengeBoss = activeChallenge == ModifierId.None
+                ? -1 : bossIndex;
         }
 
         private void ClearActiveChallenge()
         {
             soloMiniRestartPending = false;
-            activeChallenge = "";
+            activeChallenge = ModifierId.None;
             activeChallengeBoss = -1;
             SetNativeChallengePromptVisible(false);
         }
@@ -1968,7 +2159,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockDash()
         {
-            return activeChallenge == "No Dash" && ShouldShowActiveChallenge();
+            return activeChallenge == ModifierId.NoDash &&
+                   ShouldShowActiveChallenge();
         }
 
         private static bool BlockMiniPlanePrefix()
@@ -1979,7 +2171,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockMiniPlane()
         {
-            return activeChallenge == "No mini avión" &&
+            return activeChallenge == ModifierId.NoMiniPlane &&
                    ShouldShowActiveChallenge();
         }
 
@@ -2001,7 +2193,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldRestartOnNonMiniPlaneDamage()
         {
-            return activeChallenge == "Solo mini avión" &&
+            return activeChallenge == ModifierId.MiniPlaneOnly &&
                    ShouldShowActiveChallenge();
         }
 
@@ -2021,7 +2213,7 @@ namespace Gilomx.CupheadBossRoulette
             yield return null;
 
             if (soloMiniRestartPending &&
-                activeChallenge == "Solo mini avión" &&
+                activeChallenge == ModifierId.MiniPlaneOnly &&
                 !SceneLoader.CurrentlyLoading)
                 SceneLoader.ReloadLevel();
 
@@ -2078,14 +2270,14 @@ namespace Gilomx.CupheadBossRoulette
 
             var isChalice =
                 RouletteData.Charms[result.Charm].Value == Charm.charm_chalice;
-            if (activeChallenge == "No disparo bombas")
+            if (activeChallenge == ModifierId.NoBombs)
             {
                 weapon = isChalice
                     ? Weapon.plane_chalice_weapon_3way
                     : Weapon.plane_weapon_peashot;
                 return true;
             }
-            if (activeChallenge == "No disparo Peashooter")
+            if (activeChallenge == ModifierId.NoPeashooter)
             {
                 weapon = isChalice
                     ? Weapon.plane_chalice_weapon_bomb
@@ -2104,8 +2296,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldLockPlaneWeapon()
         {
-            return (activeChallenge == "No disparo bombas" ||
-                    activeChallenge == "No disparo Peashooter") &&
+            return (activeChallenge == ModifierId.NoBombs ||
+                    activeChallenge == ModifierId.NoPeashooter) &&
                    ShouldShowActiveChallenge();
         }
 
@@ -2129,7 +2321,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockEx()
         {
-            return activeChallenge == "No EX" &&
+            return activeChallenge == ModifierId.NoEx &&
                    ShouldShowActiveChallenge();
         }
 
@@ -2157,7 +2349,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateActiveChallengeLifecycle()
         {
-            if (string.IsNullOrEmpty(activeChallenge) || SceneLoader.CurrentlyLoading)
+            if (activeChallenge == ModifierId.None ||
+                SceneLoader.CurrentlyLoading)
                 return;
 
             try
@@ -2181,7 +2374,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldShowActiveChallenge()
         {
-            if (string.IsNullOrEmpty(activeChallenge) || SceneLoader.CurrentlyLoading)
+            if (activeChallenge == ModifierId.None ||
+                SceneLoader.CurrentlyLoading)
                 return false;
 
             try
@@ -2433,8 +2627,14 @@ namespace Gilomx.CupheadBossRoulette
             return texture;
         }
 
+        private void OnApplicationQuit()
+        {
+            RestoreOriginalTestLanguage();
+        }
+
         private void OnDestroy()
         {
+            RestoreOriginalTestLanguage();
             if (harmony != null)
                 harmony.UnpatchSelf();
             if (activeInstance == this)
@@ -2453,6 +2653,12 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             StopSpinAudio();
+            if (modLocalization != null)
+            {
+                modLocalization.LanguageChanged -= OnModLanguageChanged;
+                modLocalization.Dispose();
+                modLocalization = null;
+            }
             if (theme != null)
                 theme.Dispose();
             foreach (var texture in textures.Values)

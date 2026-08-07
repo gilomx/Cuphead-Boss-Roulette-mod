@@ -89,13 +89,17 @@ namespace Gilomx.CupheadBossRoulette
                 4, result.Charm, availableCharmIndices,
                 availableCharmIndices.Count / 4);
 
-            DrawEquipSlot(ShotACenter, "TIRO A", RouletteData.Weapons[weapon1].Image,
+            DrawEquipSlot(ShotACenter, L(ModText.SlotWeaponA),
+                RouletteData.Weapons[weapon1].Image,
                 RouletteData.Weapons[weapon1].NativeSprite, 1);
-            DrawEquipSlot(ShotBCenter, "TIRO B", RouletteData.Weapons[weapon2].Image,
+            DrawEquipSlot(ShotBCenter, L(ModText.SlotWeaponB),
+                RouletteData.Weapons[weapon2].Image,
                 RouletteData.Weapons[weapon2].NativeSprite, 2);
-            DrawEquipSlot(SuperCenter, "SÚPER", RouletteData.Supers[super].Image,
+            DrawEquipSlot(SuperCenter, L(ModText.SlotSuper),
+                RouletteData.Supers[super].Image,
                 RouletteData.Supers[super].NativeSprite, 3);
-            DrawEquipSlot(CharmCenter, "AMULETO", RouletteData.Charms[charm].Image,
+            DrawEquipSlot(CharmCenter, L(ModText.SlotCharm),
+                RouletteData.Charms[charm].Image,
                 RouletteData.Charms[charm].NativeSprite, 4);
             DrawModifierSlot(bossIndex);
 
@@ -149,15 +153,23 @@ namespace Gilomx.CupheadBossRoulette
                 theme.DrawSprite(sheen, rect, new Color(1f, 1f, 1f, 0.28f));
             }
             GUI.Label(new Rect(ChallengeCenter.x - 49f,
-                ChallengeCenter.y + halfSize + EquipLabelGap, 98f, 23f), "RETO",
+                ChallengeCenter.y + halfSize + EquipLabelGap, 98f, 23f),
+                L(ModText.SlotChallenge),
                 equipSlotStyle);
         }
 
         private void DrawChecklistSettings()
         {
-            DrawChecklistRow(0, 468f, "DIFICULTAD", DifficultyLabel());
-            DrawChecklistRow(1, 498f, "RETO", uglyMode ? "ACTIVADO" : "DESACTIVADO");
-            DrawChecklistRow(2, 528f, "CARGA AUTOMÁTICA", autoLoad.Value ? "ACTIVADA" : "DESACTIVADA");
+            DrawChecklistRow(0, 468f, L(ModText.SettingDifficulty),
+                DifficultyLabel());
+            DrawChecklistRow(1, 498f, L(ModText.SettingChallenge),
+                uglyMode
+                    ? L(ModText.ValueEnabled)
+                    : L(ModText.ValueDisabled));
+            DrawChecklistRow(2, 528f, L(ModText.SettingAutoLoad),
+                autoLoad.Value
+                    ? L(ModText.ValueEnabledFeminine)
+                    : L(ModText.ValueDisabledFeminine));
         }
 
         private void DrawChecklistRow(int index, float y, string label, string value)
@@ -182,22 +194,22 @@ namespace Gilomx.CupheadBossRoulette
             if (navigationIndex == 3 && !running && !pendingLoad)
                 DrawNavigationCursor(new Rect(202f, 590f, 42f, 42f));
 
-            var label = running ? "GIRANDO..." :
-                pendingLoad ? "PREPARANDO COMBATE..." :
-                resultReady ? "¡JUGAR!" :
-                status.IndexOf("PARTIDA", StringComparison.OrdinalIgnoreCase) >= 0
-                    ? "SELECCIONA UNA PARTIDA"
-                    : "¡GIRAR!";
+            var label = running ? L(ModText.ActionSpinning) :
+                pendingLoad ? L(ModText.ActionPreparing) :
+                resultReady ? L(ModText.ActionPlay) :
+                status == RouletteStatus.SaveRequired
+                    ? L(ModText.ActionSelectSave)
+                    : L(ModText.ActionSpin);
             GUI.Label(band, label, checklistSpinStyle);
         }
 
         private string DifficultyLabel()
         {
             if (difficulty == Level.Mode.Easy)
-                return "SIMPLE";
+                return L(ModText.DifficultyEasy);
             if (difficulty == Level.Mode.Hard)
-                return "EXPERTO";
-            return "NORMAL";
+                return L(ModText.DifficultyHard);
+            return L(ModText.DifficultyNormal);
         }
 
         private string LocalizedBossName(BossEntry boss)
