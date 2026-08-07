@@ -1,6 +1,6 @@
 using System;
-using HarmonyLib;
-using UnityEngine;
+        using HarmonyLib;
+        using UnityEngine;
 using UnityEngine.UI;
 
 namespace Gilomx.CupheadBossRoulette
@@ -53,7 +53,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool battleHudFollowNativeVictoryLayer;
         private bool battleHudHoldOverlayThroughVictory;
         private RouletteResult battleHudResultSnapshot;
-        private string battleHudChallengeSnapshot = "";
+        private ModifierId battleHudChallengeSnapshot = ModifierId.None;
         private int battleHudImpactPlayedCount;
 
         private void UpdateBattleResultHud()
@@ -131,7 +131,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudPresentationActive = true;
             battleHudFollowNativeVictoryLayer = false;
             battleHudHoldOverlayThroughVictory = false;
-            battleHudChallengeSnapshot = activeChallenge ?? "";
+            battleHudChallengeSnapshot = activeChallenge;
             battleHudResultSnapshot = new RouletteResult
             {
                 Boss = result.Boss,
@@ -174,7 +174,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudFollowNativeVictoryLayer = false;
             battleHudHoldOverlayThroughVictory = false;
             battleHudResultSnapshot = null;
-            battleHudChallengeSnapshot = "";
+            battleHudChallengeSnapshot = ModifierId.None;
             battleHudWasVisible = false;
             battleHudRevealStartedAt = -1f;
             battleHudImpactPlayedCount = 0;
@@ -433,16 +433,17 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             battleHudChallengeText.text =
-                string.IsNullOrEmpty(battleHudChallengeSnapshot)
+                battleHudChallengeSnapshot == ModifierId.None
                 ? ""
-                : "RETO: " + battleHudChallengeSnapshot.ToUpperInvariant();
+                : LocalizedChallengeLabel(battleHudChallengeSnapshot)
+                    .ToUpperInvariant();
             UpdateBattleResultHudLayout();
         }
 
         private void ApplyBattleHudChallengeIcon(RawImage image,
             int modifier)
         {
-            if (string.IsNullOrEmpty(battleHudChallengeSnapshot))
+            if (battleHudChallengeSnapshot == ModifierId.None)
                 ApplyNativeBattleHudIcon(image,
                     "equip_icon_empty_0001", "weapons/vacio.png");
             else
@@ -739,9 +740,7 @@ namespace Gilomx.CupheadBossRoulette
             // black-and-white transition, avoiding an unnecessary custom
             // shared-material path during ordinary combat.
             var useSaturationMaterial = !battleHudOnNativeCanvas &&
-                string.Equals(battleHudChallengeSnapshot,
-                    BlackAndWhiteChallenge,
-                    StringComparison.OrdinalIgnoreCase);
+                battleHudChallengeSnapshot == ModifierId.BlackAndWhite;
             if (useSaturationMaterial)
             {
                 EnsureBattleHudSaturationMaterial();
@@ -1180,7 +1179,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudFollowNativeVictoryLayer = false;
             battleHudHoldOverlayThroughVictory = false;
             battleHudResultSnapshot = null;
-            battleHudChallengeSnapshot = "";
+            battleHudChallengeSnapshot = ModifierId.None;
         }
     }
 }

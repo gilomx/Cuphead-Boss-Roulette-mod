@@ -9,6 +9,18 @@ namespace Gilomx.CupheadBossRoulette
         Both
     }
 
+    internal enum ModifierId
+    {
+        None,
+        NoDash,
+        NoMiniPlane,
+        MiniPlaneOnly,
+        NoBombs,
+        NoPeashooter,
+        NoEx,
+        BlackAndWhite
+    }
+
     internal sealed class BossEntry
     {
         internal readonly string Fight;
@@ -56,13 +68,13 @@ namespace Gilomx.CupheadBossRoulette
 
     internal sealed class ModifierEntry
     {
-        internal readonly string Name;
+        internal readonly ModifierId Id;
         internal readonly ModifierKind Kind;
         internal readonly string Image;
 
-        internal ModifierEntry(string name, ModifierKind kind, string image)
+        internal ModifierEntry(ModifierId id, ModifierKind kind, string image)
         {
-            Name = name;
+            Id = id;
             Kind = kind;
             Image = image;
         }
@@ -149,14 +161,14 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static readonly ModifierEntry[] Modifiers =
         {
-            new ModifierEntry("No Dash", ModifierKind.Ground, "modifiers/nodash_01.png"),
-            new ModifierEntry("No mini avión", ModifierKind.Plane, "modifiers/nomini_01.png"),
-            new ModifierEntry("Solo mini avión", ModifierKind.Plane, "modifiers/mini_01.png"),
-            new ModifierEntry("No disparo bombas", ModifierKind.Plane, "modifiers/nobombs_01.png"),
-            new ModifierEntry("No disparo Peashooter", ModifierKind.Plane, "modifiers/nopeashooter_01.png"),
-            new ModifierEntry("No EX", ModifierKind.Both, "modifiers/noex_01.png"),
-            new ModifierEntry("Blanco y negro", ModifierKind.Both, "modifiers/blacknwhite_01.png"),
-            new ModifierEntry("Nada", ModifierKind.Both, "weapons/vacio.png")
+            new ModifierEntry(ModifierId.NoDash, ModifierKind.Ground, "modifiers/nodash_01.png"),
+            new ModifierEntry(ModifierId.NoMiniPlane, ModifierKind.Plane, "modifiers/nomini_01.png"),
+            new ModifierEntry(ModifierId.MiniPlaneOnly, ModifierKind.Plane, "modifiers/mini_01.png"),
+            new ModifierEntry(ModifierId.NoBombs, ModifierKind.Plane, "modifiers/nobombs_01.png"),
+            new ModifierEntry(ModifierId.NoPeashooter, ModifierKind.Plane, "modifiers/nopeashooter_01.png"),
+            new ModifierEntry(ModifierId.NoEx, ModifierKind.Both, "modifiers/noex_01.png"),
+            new ModifierEntry(ModifierId.BlackAndWhite, ModifierKind.Both, "modifiers/blacknwhite_01.png"),
+            new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
 
         internal static List<int> ValidModifierIndices(BossEntry boss)
@@ -165,7 +177,7 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < Modifiers.Length; i++)
             {
                 var modifier = Modifiers[i];
-                if (modifier.Name == "Nada")
+                if (modifier.Id == ModifierId.None)
                     continue;
                 if (modifier.Kind == ModifierKind.Both ||
                     (boss.IsPlane && modifier.Kind == ModifierKind.Plane) ||
