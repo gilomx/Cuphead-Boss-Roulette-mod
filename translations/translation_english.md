@@ -1,12 +1,11 @@
-# English translation
+# Traducción activa — English
 
-Status: **approved and active in version 0.5.111**.
+Estado: **aprobada y activa en la versión 0.5.118**.
 
-This file records the exact wording supplied by the user for the 29 visible
-mod-owned strings. IDs not listed here are internal, legacy, supplied by
-Cuphead, or intentionally hidden.
+Esta tabla reproduce exactamente la columna `Traducción aprobada` de la
+entrega revisada archivada en `translations/review_by_language/`.
 
-| ID | Approved English text |
+| ID | Traducción aprobada |
 | --- | --- |
 | `ui.slot.weapon_a` | SHOT-A |
 | `ui.slot.weapon_b` | SHOT-B |

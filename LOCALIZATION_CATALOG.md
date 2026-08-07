@@ -1,11 +1,6 @@
 # Catálogo de localización
 
-Estado: **arquitectura implementada; inglés, francés, italiano, alemán y ambos
-españoles aprobados y activos**. La versión 0.5.115 usa las entregas de
-`English`, `French`, `Italian` y `German`; `SpanishSpain` y `SpanishAmerica`
-comparten explícitamente el español original. Los otros idiomas conservan ese
-español como respaldo provisional. Las propuestas aún no aprobadas están en
-`LOCALIZATION_TRANSLATIONS.md`.
+Estado: **los 12 idiomas de Cuphead usan sus entregas revisadas en 0.5.119**. Las propuestas de `SpanishSpain` y `SpanishAmerica` son idénticas, por lo que ambas variantes comparten una sola tabla revisada. `LOCALIZATION_TRANSLATIONS.md` queda sólo como registro de borradores históricos.
 
 ## Alcance visible verificado en 0.5.110 y aplicado en 0.5.111
 
@@ -28,14 +23,7 @@ herramientas técnicas y no pertenecen a la traducción pública de la primera
 versión. `LOCALIZATION_TRANSLATIONS.md` conserva propuestas históricas, pero
 sus filas adicionales no son una solicitud de traducción.
 
-Las entregas aprobadas están versionadas en
-`translations/translation_english.md` y
-`translations/translation_french.md`, además de
-`translations/translation_italian.md` y `translations/translation_german.md`.
-Las dos variantes de español comparten
-`translations/translation_spanish_shared.md`. Cada grupo de 29 valores se carga
-sólo para su idioma; cualquier ID interno que no forme parte de las entregas
-sigue usando el respaldo español.
+Las diez tablas no españolas activas están versionadas como `translations/translation_<idioma>.md`; las dos variantes de español comparten `translations/translation_spanish_shared.md`. Las 12 entregas revisadas completas se conservan en `translations/review_by_language/`. Cada grupo contiene exactamente 29 valores y se carga sólo para su enum.
 
 ## Base técnica implementada en 0.5.109
 
@@ -55,9 +43,7 @@ sigue usando el respaldo español.
 - La interfaz antigua puede consultar nombres de equipo mediante
   `WeaponProperties.GetDisplayName()`, pero la Equip Card activa sólo muestra
   sus iconos y no requiere traducir esos nombres.
-- Inglés, francés, italiano, alemán y las dos variantes de español usan ya sus
-  tablas aprobadas. Los idiomas todavía pendientes caen al mismo español usado
-  antes de esta refactorización.
+- Los 12 enums de `Localization.Languages` resuelven una tabla activa. Las dos variantes de español comparten la misma; los diez idiomas restantes usan su catálogo revisado independiente.
 - La herramienta temporal de 0.5.110 usa `Ctrl+F8` para recorrer los 12 idiomas
   reales sin depender del menú de opciones. Se desactiva con una sola constante
   antes de publicar.
@@ -232,18 +218,15 @@ buscar, y traducir sólo los avisos que ayudan directamente al jugador.
 - Valores internos de `Weapon`, `Charm`, `Super`, `Levels` y retos.
 - Nombres propios oficiales cuando Cuphead ya proporciona la forma localizada.
 
-## Requisitos técnicos de activación restantes
+## Verificación visual restante
 
-1. Aprobar las seis traducciones restantes: coreano, ruso, polaco, portugués de
-   Brasil, japonés y chino simplificado.
-2. Añadir cada tabla aprobada a `ModLocalization`. Inglés ya está activo; el
-   español actual continúa como fallback provisional para las tablas pendientes.
-3. Seleccionar fuentes nativas compatibles con cada idioma. Esto es esencial
-   para cirílico, coreano, japonés y chino simplificado.
-4. Revisar anchos y saltos de línea: alemán, francés, ruso y portugués pueden
-   ocupar más espacio que el español; CJK necesita fuentes y tamaños propios.
-5. Ejecutar la matriz visual completa cambiando el idioma con la tarjeta
-   abierta, en el mapa y durante un reto activo.
+1. Recorrer los 12 idiomas con `Ctrl+F8` en tarjeta, mapa y HUD de reto.
+2. Confirmar glifos y métricas de las fuentes nativas para Hangul, cirílico,
+   japonés y chino simplificado en ventana y pantalla completa.
+3. Los rótulos de configuración disponen de 360 unidades, sin salto de línea,
+   desde 0.5.117. Revisar especialmente ruso, alemán y portugués de Brasil.
+4. No modificar el español compartido al corregir ajustes visuales de otros
+   idiomas.
 
 ## Decisiones reservadas para el usuario
 

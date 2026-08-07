@@ -182,7 +182,7 @@ namespace Gilomx.CupheadBossRoulette
                 DrawNavigationCursor(new Rect(29f, y - 7f, 42f, 42f));
             }
 
-            GUI.Label(new Rect(72f, y, 250f, 27f), label, checklistLabelStyle);
+            GUI.Label(new Rect(72f, y, 360f, 27f), label, checklistLabelStyle);
             GUI.Label(new Rect(316f, y, 207f, 27f),
                 index == 0 ? "‹  " + value + "  ›" : value, checklistValueStyle);
             DrawInkLine(new Rect(72f, y + 27f, 451f, 1f));
@@ -304,6 +304,8 @@ namespace Gilomx.CupheadBossRoulette
             equipFightStyle = NewStyle(theme.BodyFont, 14, TextAnchor.MiddleCenter, secondaryText, FontStyle.Normal);
             equipSlotStyle = NewStyle(theme.BodyFont, 14, TextAnchor.MiddleCenter, nativeInk, FontStyle.Bold);
             checklistLabelStyle = NewStyle(theme.BodyFont, 17, TextAnchor.MiddleLeft, cardText, FontStyle.Normal);
+            checklistLabelStyle.wordWrap = false;
+            checklistLabelStyle.clipping = TextClipping.Clip;
             checklistValueStyle = NewStyle(theme.TitleFont, 17, TextAnchor.MiddleRight, cardText, FontStyle.Normal);
             checklistSpinStyle = NewStyle(theme.TitleFont, 27, TextAnchor.MiddleCenter, nativeInk, FontStyle.Normal);
         }

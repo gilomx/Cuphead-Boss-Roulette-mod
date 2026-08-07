@@ -77,6 +77,18 @@ namespace Gilomx.CupheadBossRoulette
             new Dictionary<ModText, string>();
         private readonly Dictionary<ModText, string> german =
             new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> korean =
+            new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> russian =
+            new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> polish =
+            new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> portugueseBrazil =
+            new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> japanese =
+            new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> simplifiedChinese =
+            new Dictionary<ModText, string>();
 
         internal event Action LanguageChanged;
 
@@ -89,6 +101,12 @@ namespace Gilomx.CupheadBossRoulette
             AddFrenchTexts();
             AddItalianTexts();
             AddGermanTexts();
+            AddKoreanTexts();
+            AddRussianTexts();
+            AddPolishTexts();
+            AddPortugueseBrazilTexts();
+            AddJapaneseTexts();
+            AddSimplifiedChineseTexts();
             CurrentLanguage = ReadCurrentLanguage();
             Localization.OnLanguageChangedEvent += HandleLanguageChanged;
         }
@@ -112,9 +130,26 @@ namespace Gilomx.CupheadBossRoulette
             if (CurrentLanguage == Localization.Languages.German &&
                 german.TryGetValue(id, out value))
                 return value;
+            if (CurrentLanguage == Localization.Languages.Korean &&
+                korean.TryGetValue(id, out value))
+                return value;
+            if (CurrentLanguage == Localization.Languages.Russian &&
+                russian.TryGetValue(id, out value))
+                return value;
+            if (CurrentLanguage == Localization.Languages.Polish &&
+                polish.TryGetValue(id, out value))
+                return value;
+            if (CurrentLanguage == Localization.Languages.PortugueseBrazil &&
+                portugueseBrazil.TryGetValue(id, out value))
+                return value;
+            if (CurrentLanguage == Localization.Languages.Japanese &&
+                japanese.TryGetValue(id, out value))
+                return value;
+            if (CurrentLanguage == Localization.Languages.SimplifiedChinese &&
+                simplifiedChinese.TryGetValue(id, out value))
+                return value;
 
-            // Languages without an approved table intentionally fall back to
-            // the accepted Spanish copy.
+            // Unknown or future languages fall back to the accepted Spanish copy.
             return spanish.TryGetValue(id, out value) ? value : id.ToString();
         }
 
@@ -213,7 +248,7 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.ValueDisabledFeminine] = "DESACTIVADA";
             spanish[ModText.ValueSelected] = "SELECCIONADO";
             spanish[ModText.ValueRolling] = "GIRANDO...";
-            spanish[ModText.DifficultyEasy] = "SIMPLE";
+            spanish[ModText.DifficultyEasy] = "FÁCIL";
             spanish[ModText.DifficultyNormal] = "NORMAL";
             spanish[ModText.DifficultyHard] = "EXPERTO";
             spanish[ModText.ActionSpin] = "¡GIRAR!";
@@ -241,13 +276,13 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.CommonNone] = "Nada";
             spanish[ModText.CharmCursedRelic] = "Reliquia Maldita";
             spanish[ModText.CharmDivineRelic] = "Reliquia Divina";
-            spanish[ModText.ChallengeNoDash] = "No Dash";
-            spanish[ModText.ChallengeNoMiniPlane] = "No mini avión";
-            spanish[ModText.ChallengeMiniPlaneOnly] = "Solo mini avión";
-            spanish[ModText.ChallengeNoBombs] = "No disparo bombas";
-            spanish[ModText.ChallengeNoPeashooter] = "No disparo Peashooter";
-            spanish[ModText.ChallengeNoEx] = "No EX";
-            spanish[ModText.ChallengeBlackAndWhite] = "Blanco y negro";
+            spanish[ModText.ChallengeNoDash] = "NO DASH";
+            spanish[ModText.ChallengeNoMiniPlane] = "NO MINIAVIÓN";
+            spanish[ModText.ChallengeMiniPlaneOnly] = "SOLO BALAS DE MINIAVIÓN";
+            spanish[ModText.ChallengeNoBombs] = "NO DISPARO BOMBAS";
+            spanish[ModText.ChallengeNoPeashooter] = "SIN DISPARO NORMAL";
+            spanish[ModText.ChallengeNoEx] = "NO EX";
+            spanish[ModText.ChallengeBlackAndWhite] = "BLANCO Y NEGRO";
             spanish[ModText.ChallengeNone] = "Nada";
         }
 
@@ -286,8 +321,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void AddFrenchTexts()
         {
-            french[ModText.SlotWeaponA] = "TIR-A";
-            french[ModText.SlotWeaponB] = "TIR-B";
+            french[ModText.SlotWeaponA] = "ARME A";
+            french[ModText.SlotWeaponB] = "ARME B";
             french[ModText.SlotSuper] = "SUPER";
             french[ModText.SlotCharm] = "CHARME";
             french[ModText.SlotChallenge] = "DÉFI";
@@ -298,8 +333,8 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.ValueDisabled] = "DÉSACTIVÉ";
             french[ModText.ValueEnabledFeminine] = "ACTIVÉ";
             french[ModText.ValueDisabledFeminine] = "DÉSACTIVÉ";
-            french[ModText.DifficultyEasy] = "SIMPLE";
-            french[ModText.DifficultyNormal] = "RÉGULIER";
+            french[ModText.DifficultyEasy] = "FACILE";
+            french[ModText.DifficultyNormal] = "NORMAL";
             french[ModText.DifficultyHard] = "EXPERT";
             french[ModText.ActionSpin] = "LANCER !";
             french[ModText.ActionPlay] = "JOUER !";
@@ -312,15 +347,15 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.ChallengeNoMiniPlane] = "SANS MINI-AVION";
             french[ModText.ChallengeMiniPlaneOnly] = "MINI-AVION UNIQUEMENT";
             french[ModText.ChallengeNoBombs] = "SANS MINI-BOMBES";
-            french[ModText.ChallengeNoPeashooter] = "SANS LANCE-POIS";
+            french[ModText.ChallengeNoPeashooter] = "SANS TIR PRINCIPAL";
             french[ModText.ChallengeNoEx] = "SANS EX";
             french[ModText.ChallengeBlackAndWhite] = "NOIR ET BLANC";
         }
 
         private void AddItalianTexts()
         {
-            italian[ModText.SlotWeaponA] = "COLPO A";
-            italian[ModText.SlotWeaponB] = "COLPO B";
+            italian[ModText.SlotWeaponA] = "SPARO A";
+            italian[ModText.SlotWeaponB] = "SPARO B";
             italian[ModText.SlotSuper] = "SUPER";
             italian[ModText.SlotCharm] = "AMULETO";
             italian[ModText.SlotChallenge] = "SFIDA";
@@ -331,29 +366,29 @@ namespace Gilomx.CupheadBossRoulette
             italian[ModText.ValueDisabled] = "DISATTIVA";
             italian[ModText.ValueEnabledFeminine] = "ATTIVO";
             italian[ModText.ValueDisabledFeminine] = "DISATTIVO";
-            italian[ModText.DifficultyEasy] = "SEMPLICE";
-            italian[ModText.DifficultyNormal] = "REGOLARE";
+            italian[ModText.DifficultyEasy] = "FACILE";
+            italian[ModText.DifficultyNormal] = "NORMALE";
             italian[ModText.DifficultyHard] = "ESPERTO";
             italian[ModText.ActionSpin] = "GIRA!";
             italian[ModText.ActionPlay] = "GIOCA!";
-            italian[ModText.ActionOpenRoulette] = "APRI LA RULETTA";
+            italian[ModText.ActionOpenRoulette] = "APRI LA ROULETTE";
             italian[ModText.ActionSpinAgain] = "GIRA DI NUOVO";
             italian[ModText.ActionPreparing] = "PREPARAZIONE SCONTRO...";
             italian[ModText.ActionSpinning] = "GIRO IN CORSO...";
             italian[ModText.ChallengePrefix] = "SFIDA:";
-            italian[ModText.ChallengeNoDash] = "SENZA SCATTO";
+            italian[ModText.ChallengeNoDash] = "SENZA DASH";
             italian[ModText.ChallengeNoMiniPlane] = "SENZA MINI-AEREO";
             italian[ModText.ChallengeMiniPlaneOnly] = "SOLO MINI-AEREO";
-            italian[ModText.ChallengeNoBombs] = "SENZA MINI-BOMBE";
-            italian[ModText.ChallengeNoPeashooter] = "SENZA SPARASEMI";
+            italian[ModText.ChallengeNoBombs] = "SENZA MINI BOMBE";
+            italian[ModText.ChallengeNoPeashooter] = "SENZA MITRAGLIATRICE";
             italian[ModText.ChallengeNoEx] = "SENZA EX";
-            italian[ModText.ChallengeBlackAndWhite] = "BIANCO E NERO";
+            italian[ModText.ChallengeBlackAndWhite] = "MONOCROMO";
         }
 
         private void AddGermanTexts()
         {
-            german[ModText.SlotWeaponA] = "SCHUSS-A";
-            german[ModText.SlotWeaponB] = "SCHUSS-B";
+            german[ModText.SlotWeaponA] = "WAFFE A";
+            german[ModText.SlotWeaponB] = "WAFFE B";
             german[ModText.SlotSuper] = "SUPER";
             german[ModText.SlotCharm] = "AMULETT";
             german[ModText.SlotChallenge] = "CHALLENGE";
@@ -370,17 +405,215 @@ namespace Gilomx.CupheadBossRoulette
             german[ModText.ActionSpin] = "DREHEN!";
             german[ModText.ActionPlay] = "SPIELEN!";
             german[ModText.ActionOpenRoulette] = "ROULETTE ÖFFNEN";
-            german[ModText.ActionSpinAgain] = "ERNEUT DREHEN";
+            german[ModText.ActionSpinAgain] = "NOCHMAL DREHEN";
             german[ModText.ActionPreparing] = "KAMPF WIRD VORBEREITET...";
             german[ModText.ActionSpinning] = "ROULETTE DREHT SICH...";
             german[ModText.ChallengePrefix] = "CHALLENGE:";
             german[ModText.ChallengeNoDash] = "OHNE DASH";
             german[ModText.ChallengeNoMiniPlane] = "OHNE MINIFLUGZEUG";
             german[ModText.ChallengeMiniPlaneOnly] = "NUR MINIFLUGZEUG";
-            german[ModText.ChallengeNoBombs] = "OHNE MINI-BOMBEN";
-            german[ModText.ChallengeNoPeashooter] = "OHNE PEASHOOTER";
+            german[ModText.ChallengeNoBombs] = "OHNE MINIBOMBEN";
+            german[ModText.ChallengeNoPeashooter] = "OHNE MASCHINENGEWEHR";
             german[ModText.ChallengeNoEx] = "OHNE EX";
             german[ModText.ChallengeBlackAndWhite] = "SCHWARZ-WEISS";
+        }
+
+        private void AddKoreanTexts()
+        {
+            korean[ModText.SlotWeaponA] = "무기 A";
+            korean[ModText.SlotWeaponB] = "무기 B";
+            korean[ModText.SlotSuper] = "필살기";
+            korean[ModText.SlotCharm] = "능력";
+            korean[ModText.SlotChallenge] = "도전";
+            korean[ModText.SettingDifficulty] = "난이도";
+            korean[ModText.SettingChallenge] = "도전";
+            korean[ModText.SettingAutoLoad] = "자동 로드";
+            korean[ModText.ValueEnabled] = "켜짐";
+            korean[ModText.ValueDisabled] = "꺼짐";
+            korean[ModText.ValueEnabledFeminine] = "켜짐";
+            korean[ModText.ValueDisabledFeminine] = "꺼짐";
+            korean[ModText.DifficultyEasy] = "쉬움";
+            korean[ModText.DifficultyNormal] = "보통";
+            korean[ModText.DifficultyHard] = "어려움";
+            korean[ModText.ActionSpin] = "돌리기!";
+            korean[ModText.ActionPlay] = "시작!";
+            korean[ModText.ActionOpenRoulette] = "룰렛 열기";
+            korean[ModText.ActionSpinAgain] = "다시 돌리기";
+            korean[ModText.ActionPreparing] = "전투 준비 중...";
+            korean[ModText.ActionSpinning] = "회전 중...";
+            korean[ModText.ChallengePrefix] = "도전:";
+            korean[ModText.ChallengeNoDash] = "대시 금지";
+            korean[ModText.ChallengeNoMiniPlane] = "소형 비행기 금지";
+            korean[ModText.ChallengeMiniPlaneOnly] = "소형 비행기 총알만";
+            korean[ModText.ChallengeNoBombs] = "소형 폭탄 금지";
+            korean[ModText.ChallengeNoPeashooter] = "기본 공격 금지";
+            korean[ModText.ChallengeNoEx] = "EX 공격 금지";
+            korean[ModText.ChallengeBlackAndWhite] = "흑백";
+        }
+
+        private void AddRussianTexts()
+        {
+            russian[ModText.SlotWeaponA] = "УДАР 1";
+            russian[ModText.SlotWeaponB] = "УДАР 2";
+            russian[ModText.SlotSuper] = "СПЕЦАТАКА";
+            russian[ModText.SlotCharm] = "НАВЫК";
+            russian[ModText.SlotChallenge] = "ИСПЫТАНИЕ";
+            russian[ModText.SettingDifficulty] = "СЛОЖНОСТЬ";
+            russian[ModText.SettingChallenge] = "ИСПЫТАНИЕ";
+            russian[ModText.SettingAutoLoad] = "АВТОЗАГРУЗКА";
+            russian[ModText.ValueEnabled] = "ВКЛ.";
+            russian[ModText.ValueDisabled] = "ВЫКЛ.";
+            russian[ModText.ValueEnabledFeminine] = "ВКЛ.";
+            russian[ModText.ValueDisabledFeminine] = "ВЫКЛ.";
+            russian[ModText.DifficultyEasy] = "НИЗКАЯ";
+            russian[ModText.DifficultyNormal] = "ОБЫЧНАЯ";
+            russian[ModText.DifficultyHard] = "ВЫСОКАЯ";
+            russian[ModText.ActionSpin] = "КРУТИТЬ!";
+            russian[ModText.ActionPlay] = "ИГРАТЬ!";
+            russian[ModText.ActionOpenRoulette] = "ОТКРЫТЬ РУЛЕТКУ";
+            russian[ModText.ActionSpinAgain] = "КРУТИТЬ ЕЩЁ РАЗ";
+            russian[ModText.ActionPreparing] = "ПОДГОТОВКА К БОЮ...";
+            russian[ModText.ActionSpinning] = "РУЛЕТКА КРУТИТСЯ...";
+            russian[ModText.ChallengePrefix] = "ИСПЫТАНИЕ:";
+            russian[ModText.ChallengeNoDash] = "БЕЗ РЫВКА";
+            russian[ModText.ChallengeNoMiniPlane] = "БЕЗ МИНИ-САМОЛЁТА";
+            russian[ModText.ChallengeMiniPlaneOnly] = "ТОЛЬКО МИНИ-ПУЛИ";
+            russian[ModText.ChallengeNoBombs] = "БЕЗ МИНИ-БОМБ";
+            russian[ModText.ChallengeNoPeashooter] = "БЕЗ ОБЫЧНОГО ВЫСТРЕЛА";
+            russian[ModText.ChallengeNoEx] = "БЕЗ EX";
+            russian[ModText.ChallengeBlackAndWhite] = "ЧЕРНО-БЕЛЫЙ";
+        }
+
+        private void AddPolishTexts()
+        {
+            polish[ModText.SlotWeaponA] = "BROŃ A";
+            polish[ModText.SlotWeaponB] = "BROŃ B";
+            polish[ModText.SlotSuper] = "SUPER";
+            polish[ModText.SlotCharm] = "CZAR";
+            polish[ModText.SlotChallenge] = "WYZWANIE";
+            polish[ModText.SettingDifficulty] = "TRUDNOŚĆ";
+            polish[ModText.SettingChallenge] = "WYZWANIE";
+            polish[ModText.SettingAutoLoad] = "AUTOMATYCZNE ŁADOWANIE";
+            polish[ModText.ValueEnabled] = "WŁĄCZONE";
+            polish[ModText.ValueDisabled] = "WYŁĄCZONE";
+            polish[ModText.ValueEnabledFeminine] = "WŁĄCZONE";
+            polish[ModText.ValueDisabledFeminine] = "WYŁĄCZONE";
+            polish[ModText.DifficultyEasy] = "PROSTY";
+            polish[ModText.DifficultyNormal] = "ZWYKŁY";
+            polish[ModText.DifficultyHard] = "EKSPERCKI";
+            polish[ModText.ActionSpin] = "ZAKRĘĆ!";
+            polish[ModText.ActionPlay] = "GRAJ!";
+            polish[ModText.ActionOpenRoulette] = "OTWÓRZ RULETKĘ";
+            polish[ModText.ActionSpinAgain] = "ZAKRĘĆ PONOWNIE";
+            polish[ModText.ActionPreparing] = "PRZYGOTOWANIE DO WALKI...";
+            polish[ModText.ActionSpinning] = "RULETKA SIĘ KRĘCI...";
+            polish[ModText.ChallengePrefix] = "WYZWANIE:";
+            polish[ModText.ChallengeNoDash] = "BEZ DASHA";
+            polish[ModText.ChallengeNoMiniPlane] = "BEZ MAŁEGO SAMOLOTU";
+            polish[ModText.ChallengeMiniPlaneOnly] = "TYLKO MAŁY SAMOLOT";
+            polish[ModText.ChallengeNoBombs] = "BEZ BOMB";
+            polish[ModText.ChallengeNoPeashooter] = "BEZ DZIAŁKA";
+            polish[ModText.ChallengeNoEx] = "BEZ EX";
+            polish[ModText.ChallengeBlackAndWhite] = "CZARNO-BIAŁY";
+        }
+
+        private void AddPortugueseBrazilTexts()
+        {
+            portugueseBrazil[ModText.SlotWeaponA] = "TIRO-A";
+            portugueseBrazil[ModText.SlotWeaponB] = "TIRO-B";
+            portugueseBrazil[ModText.SlotSuper] = "SUPER";
+            portugueseBrazil[ModText.SlotCharm] = "RELÍQUIAS";
+            portugueseBrazil[ModText.SlotChallenge] = "DESAFIO";
+            portugueseBrazil[ModText.SettingDifficulty] = "DIFICULDADE";
+            portugueseBrazil[ModText.SettingChallenge] = "DESAFIO";
+            portugueseBrazil[ModText.SettingAutoLoad] = "CARREGAMENTO AUTOMÁTICO";
+            portugueseBrazil[ModText.ValueEnabled] = "ATIVADO";
+            portugueseBrazil[ModText.ValueDisabled] = "DESATIVADO";
+            portugueseBrazil[ModText.ValueEnabledFeminine] = "ATIVADO";
+            portugueseBrazil[ModText.ValueDisabledFeminine] = "DESATIVADO";
+            portugueseBrazil[ModText.DifficultyEasy] = "FÁCIL";
+            portugueseBrazil[ModText.DifficultyNormal] = "NORMAL";
+            portugueseBrazil[ModText.DifficultyHard] = "ESPECIALISTA";
+            portugueseBrazil[ModText.ActionSpin] = "GIRAR!";
+            portugueseBrazil[ModText.ActionPlay] = "JOGAR!";
+            portugueseBrazil[ModText.ActionOpenRoulette] = "ABRIR ROLETA";
+            portugueseBrazil[ModText.ActionSpinAgain] = "GIRAR NOVAMENTE";
+            portugueseBrazil[ModText.ActionPreparing] = "PREPARANDO COMBATE...";
+            portugueseBrazil[ModText.ActionSpinning] = "GIRANDO...";
+            portugueseBrazil[ModText.ChallengePrefix] = "DESAFIO:";
+            portugueseBrazil[ModText.ChallengeNoDash] = "SEM DASH";
+            portugueseBrazil[ModText.ChallengeNoMiniPlane] = "SEM MINIAVIÃO";
+            portugueseBrazil[ModText.ChallengeMiniPlaneOnly] = "SÓ MINIAVIÃO";
+            portugueseBrazil[ModText.ChallengeNoBombs] = "SEM MINIBOMBAS";
+            portugueseBrazil[ModText.ChallengeNoPeashooter] = "SEM METRALHADORA";
+            portugueseBrazil[ModText.ChallengeNoEx] = "SEM EX";
+            portugueseBrazil[ModText.ChallengeBlackAndWhite] = "PRETO E BRANCO";
+        }
+
+        private void AddJapaneseTexts()
+        {
+            japanese[ModText.SlotWeaponA] = "ショットA";
+            japanese[ModText.SlotWeaponB] = "ショットB";
+            japanese[ModText.SlotSuper] = "必殺技";
+            japanese[ModText.SlotCharm] = "お守り";
+            japanese[ModText.SlotChallenge] = "チャレンジ";
+            japanese[ModText.SettingDifficulty] = "難易度";
+            japanese[ModText.SettingChallenge] = "チャレンジ";
+            japanese[ModText.SettingAutoLoad] = "自動ロード";
+            japanese[ModText.ValueEnabled] = "オン";
+            japanese[ModText.ValueDisabled] = "オフ";
+            japanese[ModText.ValueEnabledFeminine] = "オン";
+            japanese[ModText.ValueDisabledFeminine] = "オフ";
+            japanese[ModText.DifficultyEasy] = "シンプル";
+            japanese[ModText.DifficultyNormal] = "レギュラー";
+            japanese[ModText.DifficultyHard] = "エキスパート";
+            japanese[ModText.ActionSpin] = "回す！";
+            japanese[ModText.ActionPlay] = "プレイ！";
+            japanese[ModText.ActionOpenRoulette] = "ルーレットを開く";
+            japanese[ModText.ActionSpinAgain] = "もう一度回す";
+            japanese[ModText.ActionPreparing] = "バトル準備中...";
+            japanese[ModText.ActionSpinning] = "回転中...";
+            japanese[ModText.ChallengePrefix] = "チャレンジ：";
+            japanese[ModText.ChallengeNoDash] = "ダッシュ禁止";
+            japanese[ModText.ChallengeNoMiniPlane] = "ミニ化禁止";
+            japanese[ModText.ChallengeMiniPlaneOnly] = "ミニショットのみ";
+            japanese[ModText.ChallengeNoBombs] = "ミニボム禁止";
+            japanese[ModText.ChallengeNoPeashooter] = "通常ショット禁止";
+            japanese[ModText.ChallengeNoEx] = "EXショット禁止";
+            japanese[ModText.ChallengeBlackAndWhite] = "モノクロ";
+        }
+
+        private void AddSimplifiedChineseTexts()
+        {
+            simplifiedChinese[ModText.SlotWeaponA] = "武器A";
+            simplifiedChinese[ModText.SlotWeaponB] = "武器B";
+            simplifiedChinese[ModText.SlotSuper] = "必杀技";
+            simplifiedChinese[ModText.SlotCharm] = "护符";
+            simplifiedChinese[ModText.SlotChallenge] = "挑战";
+            simplifiedChinese[ModText.SettingDifficulty] = "难度";
+            simplifiedChinese[ModText.SettingChallenge] = "挑战";
+            simplifiedChinese[ModText.SettingAutoLoad] = "自动加载";
+            simplifiedChinese[ModText.ValueEnabled] = "开启";
+            simplifiedChinese[ModText.ValueDisabled] = "关闭";
+            simplifiedChinese[ModText.ValueEnabledFeminine] = "开启";
+            simplifiedChinese[ModText.ValueDisabledFeminine] = "关闭";
+            simplifiedChinese[ModText.DifficultyEasy] = "简单";
+            simplifiedChinese[ModText.DifficultyNormal] = "普通";
+            simplifiedChinese[ModText.DifficultyHard] = "专家";
+            simplifiedChinese[ModText.ActionSpin] = "转动！";
+            simplifiedChinese[ModText.ActionPlay] = "开始！";
+            simplifiedChinese[ModText.ActionOpenRoulette] = "打开轮盘";
+            simplifiedChinese[ModText.ActionSpinAgain] = "再转一次";
+            simplifiedChinese[ModText.ActionPreparing] = "战斗准备中...";
+            simplifiedChinese[ModText.ActionSpinning] = "转动中...";
+            simplifiedChinese[ModText.ChallengePrefix] = "挑战：";
+            simplifiedChinese[ModText.ChallengeNoDash] = "禁止冲刺";
+            simplifiedChinese[ModText.ChallengeNoMiniPlane] = "禁止缩小";
+            simplifiedChinese[ModText.ChallengeMiniPlaneOnly] = "仅限小飞机子弹";
+            simplifiedChinese[ModText.ChallengeNoBombs] = "禁止迷你炸弹";
+            simplifiedChinese[ModText.ChallengeNoPeashooter] = "禁止普通射击";
+            simplifiedChinese[ModText.ChallengeNoEx] = "禁止EX攻击";
+            simplifiedChinese[ModText.ChallengeBlackAndWhite] = "黑白";
         }
     }
 }
