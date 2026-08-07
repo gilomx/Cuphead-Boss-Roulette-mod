@@ -58,6 +58,12 @@ El archivo de configuración se crea en:
 
 `BepInEx\config\mx.gilomx.cuphead.bossroulette.cfg`
 
+## Documentación del proyecto
+
+Las propuestas que todavía no forman parte del mod se conservan en
+[Ideas para versiones futuras](FUTURE_IDEAS.md). Este archivo también registra
+la investigación y las pruebas necesarias antes de implementar cada idea.
+
 ## Compilación
 
 La ruta predeterminada del proyecto es la instalación habitual de Steam:
