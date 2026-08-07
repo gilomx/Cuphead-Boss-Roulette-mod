@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
-Last updated: 2026-08-06
-Current local version: 0.5.115
+Last updated: 2026-08-07
+Current local version: 0.5.119
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -10,6 +10,26 @@ coordinates and avoid broad rewrites.
 The accepted HUD architecture, layer matrix, layout invariants and extension
 checklist now live in [HUD_INTEGRATION.md](HUD_INTEGRATION.md). Read that guide
 before adding any new battle indicator.
+
+## Reviewed 12-language localization (0.5.119)
+
+- All 12 submitted files were validated at 29/29 IDs with no blanks.
+- The ten non-Spanish tables use their reviewed independent catalogs.
+- `SpanishSpain` and `SpanishAmerica` submitted identical reviewed values
+  and share that reviewed table from 0.5.119 onward.
+- Notable Spanish changes include `FÁCIL`, `NO MINIAVIÓN`,
+  `SOLO BALAS DE MINIAVIÓN` and `SIN DISPARO NORMAL`.
+- An unknown future language alone falls back to Spanish.
+- Do not change approved wording to solve font or layout issues.
+- Automated validation reports 29/29 values and zero differences for all 12 enums. Release build: 0 errors, 0 warnings. Compiled and installed DLL SHA-256: `A9F36AC54D9FC37544720481184E0EE7850A13E0E9BF6D138EAE0D4EC1E1E528`; `LogOutput.log` confirms version 0.5.119.
+
+### Checklist localization layout (0.5.117)
+
+- Checklist labels use a fixed 360-unit rectangle beginning at `x = 72`.
+- `wordWrap` is disabled for these labels so long approved translations remain
+  on one line without changing their wording or font size.
+- The right-side value keeps its original rectangle and right alignment; the
+  longest current value, Italian `DISATTIVO`, remains clear of the label.
 
 ## Goal
 
@@ -43,16 +63,11 @@ dependencies.
 
 ## Current Git state
 
-This handoff documents the roulette implementation through version 0.5.115.
+This handoff documents the roulette implementation through version 0.5.119.
 Always inspect `git status` before editing, and do not reset, restore, or
 overwrite unrelated user changes.
 
-Localization activation is intentionally deferred, but its safe runtime
-architecture is implemented. `LOCALIZATION_CATALOG.md` records the completed
-ID migration and remaining work. `LOCALIZATION_TRANSLATIONS.md` contains an
-inactive first draft for the remaining languages. English, French, Italian,
-German and both Spanish variants are approved and active; no other foreign
-wording should be enabled before the user reviews it.
+Localization activation is complete for Cuphead's 12 language enums. Version 0.5.119 uses reviewed deliveries for every language. Spanish Spain and Spanish America have identical reviewed values and therefore continue to share one dictionary.
 
 ## Localization-safe internal model (0.5.109)
 
@@ -78,11 +93,7 @@ a language event so its width is measured again. The battle snapshot stores a
 rule. Helpers for the unused legacy interface can still resolve equipment names
 through Cuphead, but the active Equip Card displays only equipment icons.
 
-Before enabling another language, review `LOCALIZATION_TRANSLATIONS.md`, add
-its approved table to `ModLocalization`, establish English then Spanish
-fallback, and validate native fonts plus width in windowed/fullscreen play.
-Keep the accepted policy that fight subtitles appear only in the two Spanish
-variants unless the user explicitly changes it.
+When adjusting localization, use the exact 29-value active catalogs in `translations/` and the full reviewed deliveries in `translations/review_by_language/`. Preserve the policy that fight subtitles appear only in the two Spanish variants unless the user explicitly changes it. Validate native fonts and widths before changing approved wording.
 
 ## Temporary language review shortcut (0.5.110)
 
@@ -132,44 +143,37 @@ The exact accepted copy is preserved in
 `SHOT-A`, `SHOT-B`, `AUTO-LOAD`, `REGULAR`, `NO MINI-BOMBS` and
 `BLACK & WHITE`; do not normalize these without asking the user.
 
-All unapproved languages still use the accepted Spanish dictionary. Switching
-to English with the temporary `Ctrl+F8` tester should update the active Equip
-Card, map prompt and challenge HUD through Cuphead's normal language event.
+All ten non-Spanish languages now use an approved independent dictionary. Switching languages with the temporary `Ctrl+F8` tester should update the active Equip Card, map prompt and challenge HUD through Cuphead's normal language event.
 
-## Approved French localization (0.5.112)
+## Reviewed French, Italian and German localizations (0.5.118)
 
-The user's second completed delivery contains all 29 French public IDs. Its
-exact copy is preserved in `translations/translation_french.md` and selected
-only for `Localization.Languages.French`. Deliberate wording includes `TIR-A`,
-`RÉGULIER`, `LANCER !`, `SANS MINI-BOMBES` and `SANS LANCE-POIS`; do not alter
-it without asking. English remains independent, and every unapproved language
-still falls back to Spanish.
+The reviewed 29-value deliveries replace the earlier 0.5.112–0.5.114 tables.
+French now deliberately uses `ARME A/B`, `FACILE`, `NORMAL` and
+`SANS TIR PRINCIPAL`. Italian uses `SPARO A/B`, `FACILE`, `NORMALE`,
+`APRI LA ROULETTE`, `SENZA DASH`, `SENZA MINI BOMBE`,
+`SENZA MITRAGLIATRICE` and `MONOCROMO`. German uses `WAFFE A/B`,
+`NOCHMAL DREHEN`, `OHNE MINIBOMBEN` and `OHNE MASCHINENGEWEHR`.
+These reviewed values supersede all older wording in this handoff.
 
-## Approved Italian localization (0.5.113)
+## Reviewed shared Spanish localization (0.5.119)
 
-The third completed delivery contains all 29 Italian public IDs. The exact
-approved copy lives in `translations/translation_italian.md` and is selected
-only for `Localization.Languages.Italian`. Preserve the submitted grammatical
-pair `ATTIVA/DISATTIVA` for the challenge setting and `ATTIVO/DISATTIVO` for
-automatic loading. Other deliberate terms include `REGOLARE`, `RULETTA`,
-`SENZA MINI-BOMBE` and `SENZA SPARASEMI`.
+`SpanishSpain` and `SpanishAmerica` supplied identical 29-value reviewed
+tables. Both enums still route to the same `spanish` dictionary, but that
+dictionary now uses the reviewed copy rather than the original 0.5.115 text.
+The active values are in `translations/translation_spanish_shared.md`; the
+two exact source deliveries remain in `translations/review_by_language/`.
+Do not introduce regional differences unless future deliveries diverge.
 
-## Approved German localization (0.5.114)
+## Reviewed Korean and five newly active languages (0.5.118)
 
-The fourth completed delivery contains all 29 German public IDs. Its exact
-copy lives in `translations/translation_german.md` and is selected only for
-`Localization.Languages.German`. Preserve deliberate labels including
-`CHALLENGE`, `AUTO-LADEN`, `MINIFLUGZEUG`, `OHNE MINI-BOMBEN` and
-`SCHWARZ-WEISS`.
-
-## Shared Spanish localization (0.5.115)
-
-The user explicitly chose the mod's original Spanish for both
-`Localization.Languages.SpanishSpain` and `SpanishAmerica`. `ModLocalization`
-routes both enums to the same `spanish` dictionary before checking the approved
-foreign tables. The 29 public values are recorded once in
-`translations/translation_spanish_shared.md`. Do not introduce regional copy
-differences unless the user reverses this decision.
+The reviewed Korean delivery replaces the 0.5.116 wording; notable changes
+include `무기 A/B`, `필살기`, `능력`, `보통`, `어려움`,
+`소형 비행기 총알만`, `소형 폭탄 금지`, `기본 공격 금지` and
+`EX 공격 금지`. Russian, Polish, Portuguese Brazil, Japanese and Simplified
+Chinese also receive independent 29-value tables. All exact deliveries are in
+`translations/review_by_language/`; the active snapshots are in
+`translations/`. Runtime font and fit verification is still required for
+Hangul, Cyrillic and CJK.
 
 Important correction from runtime diagnosis: the reported hotkey failure was
 not caused by DLC filtering or by any keyboard backend. The Steam instance
@@ -1503,6 +1507,23 @@ renderer. Avoid editing it unless deliberately removing legacy code.
 - Challenge restrictions are informational; they do not need to enforce input.
 
 ## Verification status at handoff
+
+- Version 0.5.117 builds with zero errors and zero warnings on 2026-08-07.
+  Checklist labels now use a 360-unit single-line area while the value retains
+  its original right-aligned rectangle. Release DLL SHA-256:
+  `015F5AF17164EB8A83A71ACA2C619C2B080D2F18E6D31D1E48727F25D805CBC9`.
+  The installed DLL has the same hash and `LogOutput.log` confirms
+  `Gilomx Boss Roulette 0.5.117` loaded. Visual verification remains for Italian
+  `CARICAMENTO AUTOMATICO` beside `DISATTIVO`.
+
+- Version 0.5.116 builds with zero errors and zero warnings on 2026-08-07.
+  Direct ordered comparison reports 29 Korean delivery entries, 29 dictionary
+  entries and zero differences. Release DLL SHA-256:
+  `222244391CD5F4BC3EA087CF319564C55A0DFA1254A669654287398C6FCCCD45`.
+  The installed BepInEx DLL has the same hash, and `LogOutput.log` confirms
+  `Gilomx Boss Roulette 0.5.116` loaded. Runtime visual verification remains:
+  press `Ctrl+F8` seven times and inspect Hangul fit in the Equip Card, both map
+  prompts and the battle challenge HUD.
 
 - Version 0.5.115 builds with zero errors and zero warnings on 2026-08-06.
   Ordered comparison confirms that the 29 shared Spanish public values exactly

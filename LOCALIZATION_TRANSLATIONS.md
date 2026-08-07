@@ -1,9 +1,6 @@
 # Borrador de traducciones de la interfaz
 
-Estado: **inglés, francés, italiano, alemán y ambas variantes de español están
-aprobados y activos; los otros idiomas siguen pendientes**. Los dos enums de
-español usan exactamente el texto original del mod. Los idiomas sin tabla
-aprobada todavía reciben ese español como respaldo provisional.
+Estado: **registro histórico, sustituido por las 12 entregas revisadas activas en 0.5.119**. Las tablas activas viven en `translations/`; los originales revisados se conservan en `translations/review_by_language/`. Las propuestas de ambas variantes de español son idénticas y comparten una sola tabla activa.
 
 > **Importante:** este archivo conserva propuestas históricas para IDs de la
 > interfaz antigua. La lista vigente para revisión pública es
@@ -104,7 +101,11 @@ actual. Para portugués, polaco y ruso deben revisarse junto con los mensajes de
 error antes de activarlos; no aparecen en el diseño normal salvo en fallos o en
 la interfaz antigua.
 
-## Coreano, japonés y chino simplificado
+## Borrador histórico de coreano, japonés y chino simplificado
+
+La columna coreana siguiente es sólo el borrador histórico. La entrega aprobada
+y activa se conserva en `translations/translation_korean.md`; cuando sus valores
+difieren de esta tabla, siempre prevalece el archivo aprobado.
 
 | ID | 한국어 | 日本語 | 简体中文 |
 | --- | --- | --- | --- |
@@ -149,8 +150,8 @@ la interfaz antigua.
   terminología oficial de Cuphead en cada idioma.
 - Confirmar la terminología del disparo normal del avión; `Peashooter` se dejó
   como nombre reconocible provisional.
-- Revisar especialmente coreano, ruso, polaco, japonés y chino con una persona
-  nativa o con la terminología mostrada por el juego.
+- Revisar especialmente ruso, polaco, japonés y chino con una persona nativa o
+  con la terminología mostrada por el juego.
 - Probar los textos largos en 16:9, 16:10, pantalla completa y ventana.
-- Verificar fuentes para cirílico, hangul, japonés y chino antes de habilitar
-  esas tablas.
+- Verificar Hangul en la tabla coreana activa y fuentes para cirílico, japonés y
+  chino antes de habilitar las tablas restantes.

@@ -3,6 +3,64 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.119 — 2026-08-07
+
+### Propuestas revisadas de español activas
+
+- `SpanishSpain` y `SpanishAmerica` entregaron los mismos 29 valores; ambos
+  enums siguen compartiendo un catálogo único, ahora actualizado con esa
+  propuesta revisada.
+- Entre los cambios visibles están `FÁCIL`, `NO MINIAVIÓN`,
+  `SOLO BALAS DE MINIAVIÓN`, `SIN DISPARO NORMAL` y los nombres de reto en
+  mayúsculas.
+- La tabla activa queda registrada en
+  `translations/translation_spanish_shared.md`; las dos entregas completas
+  permanecen archivadas por separado para comprobar su procedencia.
+- La comparación automática confirma 29/29 valores y cero diferencias en los 12 enums. La compilación terminó con 0 errores y 0 advertencias.
+- El DLL compilado e instalado comparte SHA-256 `A9F36AC54D9FC37544720481184E0EE7850A13E0E9BF6D138EAE0D4EC1E1E528`; BepInEx confirmó `Gilomx Boss Roulette 0.5.119`.
+
+## 0.5.118 — 2026-08-07
+
+### Doce entregas de traducción revisadas
+
+- Se validaron los 12 archivos entregados: cada uno contiene exactamente los
+  29 IDs públicos, sin campos vacíos ni identificadores adicionales.
+- Las tablas revisadas de inglés, francés, italiano, alemán y coreano sustituyen
+  sus versiones anteriores; se activan además ruso, polaco, portugués de Brasil,
+  japonés y chino simplificado.
+- `Localization.Languages` selecciona ahora una tabla propia para sus 12
+  valores. Sólo un idioma futuro o desconocido utiliza el español de respaldo.
+- Las propuestas revisadas de `SpanishSpain` y `SpanishAmerica` se conservan
+  para auditoría, pero ambos enums continúan usando exactamente el español
+  compartido que ya tenía el mod, según la decisión del proyecto.
+- Las entregas completas quedan en `translations/review_by_language/`; los
+  diez catálogos no españoles activos se sincronizan en `translations/`.
+- La comparación automática verificó 29/29 valores y cero diferencias en cada
+  tabla no española; la compilación terminó con 0 errores y 0 advertencias.
+- El DLL instalado coincide con el compilado (SHA-256 `8F7D15A1E7598E47672DF2C9B5E52D3A651B89E9FE3500E25CAC95603064B1A9`) y BepInEx confirmó `Gilomx Boss Roulette 0.5.118`.
+
+## 0.5.117 — 2026-08-07
+
+### Etiquetas de configuración en una sola línea
+
+- El área izquierda de las filas de configuración crece de 250 a 360 unidades,
+  aprovechando el espacio libre antes del valor alineado a la derecha.
+- Los rótulos dejan de usar salto de línea; `CARICAMENTO AUTOMATICO` cabe completo
+  sin reducir la tipografía y `DISATTIVO` conserva su posición.
+- Las traducciones aprobadas permanecen sin cambios.
+
+## 0.5.116 — 2026-08-07
+
+### Traducción coreana aprobada
+
+- Se incorporan exactamente los 29 textos entregados en
+  `translation_korean.md`.
+- `Localization.Languages.Korean` selecciona su tabla propia en la Equip Card,
+  prompts del mapa y HUD de reto.
+- Inglés, francés, italiano, alemán, coreano y ambos españoles quedan activos;
+  los idiomas pendientes continúan usando el respaldo español.
+- La entrega exacta se conserva en `translations/translation_korean.md`.
+
 ## 0.5.115 — 2026-08-06
 
 ### Español compartido para ambas regiones

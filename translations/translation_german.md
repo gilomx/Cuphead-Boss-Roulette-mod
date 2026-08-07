@@ -1,14 +1,14 @@
-# Deutsche Übersetzung
+# Traducción activa — German
 
-Status: **genehmigt und aktiv in Version 0.5.114**.
+Estado: **aprobada y activa en la versión 0.5.118**.
 
-Diese Datei bewahrt den exakten, vom Benutzer gelieferten Wortlaut für die 29
-sichtbaren mod-eigenen Texte auf.
+Esta tabla reproduce exactamente la columna `Traducción aprobada` de la
+entrega revisada archivada en `translations/review_by_language/`.
 
-| ID | Genehmigter deutscher Text |
+| ID | Traducción aprobada |
 | --- | --- |
-| `ui.slot.weapon_a` | SCHUSS-A |
-| `ui.slot.weapon_b` | SCHUSS-B |
+| `ui.slot.weapon_a` | WAFFE A |
+| `ui.slot.weapon_b` | WAFFE B |
 | `ui.slot.super` | SUPER |
 | `ui.slot.charm` | AMULETT |
 | `ui.slot.challenge` | CHALLENGE |
@@ -25,14 +25,14 @@ sichtbaren mod-eigenen Texte auf.
 | `ui.action.spin` | DREHEN! |
 | `ui.action.play` | SPIELEN! |
 | `ui.action.open_roulette` | ROULETTE ÖFFNEN |
-| `ui.action.spin_again` | ERNEUT DREHEN |
+| `ui.action.spin_again` | NOCHMAL DREHEN |
 | `ui.action.preparing` | KAMPF WIRD VORBEREITET... |
 | `ui.action.spinning` | ROULETTE DREHT SICH... |
 | `ui.challenge_prefix` | CHALLENGE: |
 | `challenge.no_dash` | OHNE DASH |
 | `challenge.no_mini_plane` | OHNE MINIFLUGZEUG |
 | `challenge.mini_plane_only` | NUR MINIFLUGZEUG |
-| `challenge.no_bombs` | OHNE MINI-BOMBEN |
-| `challenge.no_peashooter` | OHNE PEASHOOTER |
+| `challenge.no_bombs` | OHNE MINIBOMBEN |
+| `challenge.no_peashooter` | OHNE MASCHINENGEWEHR |
 | `challenge.no_ex` | OHNE EX |
 | `challenge.black_and_white` | SCHWARZ-WEISS |

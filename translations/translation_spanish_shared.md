@@ -1,12 +1,11 @@
-# Español compartido
+# Traducción española compartida
 
-Estado: **aprobado para `SpanishSpain` y `SpanishAmerica` en la versión
-0.5.115**.
+Estado: **propuestas revisadas y activas en la versión 0.5.119**.
 
-Por decisión del usuario, las dos variantes de español de Cuphead usan
-exactamente el texto original del mod, sin diferencias regionales.
+`SpanishSpain` y `SpanishAmerica` entregaron exactamente los mismos 29
+valores, por lo que ambos enums continúan compartiendo una sola tabla.
 
-| ID | Texto español original |
+| ID | Traducción aprobada |
 | --- | --- |
 | `ui.slot.weapon_a` | TIRO A |
 | `ui.slot.weapon_b` | TIRO B |
@@ -20,7 +19,7 @@ exactamente el texto original del mod, sin diferencias regionales.
 | `ui.value.disabled` | DESACTIVADO |
 | `ui.value.enabled_feminine` | ACTIVADA |
 | `ui.value.disabled_feminine` | DESACTIVADA |
-| `ui.difficulty.easy` | SIMPLE |
+| `ui.difficulty.easy` | FÁCIL |
 | `ui.difficulty.normal` | NORMAL |
 | `ui.difficulty.hard` | EXPERTO |
 | `ui.action.spin` | ¡GIRAR! |
@@ -30,10 +29,10 @@ exactamente el texto original del mod, sin diferencias regionales.
 | `ui.action.preparing` | PREPARANDO COMBATE... |
 | `ui.action.spinning` | GIRANDO... |
 | `ui.challenge_prefix` | RETO: |
-| `challenge.no_dash` | No Dash |
-| `challenge.no_mini_plane` | No mini avión |
-| `challenge.mini_plane_only` | Solo mini avión |
-| `challenge.no_bombs` | No disparo bombas |
-| `challenge.no_peashooter` | No disparo Peashooter |
-| `challenge.no_ex` | No EX |
-| `challenge.black_and_white` | Blanco y negro |
+| `challenge.no_dash` | NO DASH |
+| `challenge.no_mini_plane` | NO MINIAVIÓN |
+| `challenge.mini_plane_only` | SOLO BALAS DE MINIAVIÓN |
+| `challenge.no_bombs` | NO DISPARO BOMBAS |
+| `challenge.no_peashooter` | SIN DISPARO NORMAL |
+| `challenge.no_ex` | NO EX |
+| `challenge.black_and_white` | BLANCO Y NEGRO |
