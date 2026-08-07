@@ -25,6 +25,7 @@ Los valores están concentrados al inicio de `BattleResultHud.cs`:
 | Constante | Valor | Propósito |
 | --- | ---: | --- |
 | `BattleHudAlpha` | `0.70` | Alpha propio de iconos y texto. |
+| `BattleHudImpactVolume` | `1.0` | Ganancia neutra; la sonoridad ya está incorporada en el WAV procesado. |
 | `BattleHudPauseAlphaMultiplier` | `0.70` | Alpha del `CanvasGroup` mientras la pausa está visible. |
 | `BattleHudResumeAlphaDuration` | `0.30 s` | Regreso suave del `CanvasGroup` a `1.0` al reanudar. |
 | `BattleHudIconSize` | `48` | Ancho y alto de cada icono. |
@@ -66,6 +67,13 @@ Los objetos nativos usan `ApplyNativeBattleHudIcon()`: busca el primer frame con
 del mod si el sprite no existe. Los retos usan una textura estática. El HUD no
 reproduce continuamente las animaciones de la Equip Card; sólo muestra el primer
 frame para no distraer durante el combate.
+
+Cuando un disparo, súper, amuleto o reto queda vacío, el HUD no usa el arte
+negro directamente: `ApplyWhiteBattleHudEmptyIcon()` conserva el alpha del
+primer frame nativo y lo convierte en una silueta blanca. Si el recorte del
+atlas no es seguro, genera un círculo blanco segmentado de 72×72. Esta regla
+es exclusiva del HUD de combate; la Equip Card conserva el círculo oscuro y
+anima sus tres frames nativos.
 
 ## Ciclo de vida
 
@@ -146,7 +154,14 @@ La entrada usa tiempo real para seguir funcionando aunque el juego cambie
 - Separación entre iconos: `0.28 s`.
 - Pulso por icono: `0.38 s`, con un máximo de `1.075x`.
 - Aparición del texto: `0.28 s` después de los iconos.
-- Sonido: `impact_01.wav`, una sola vez por icono revelado, volumen `0.85`.
+- Sonido: `impact_01.wav`, una sola vez por icono revelado, volumen relativo `1.0`.
+
+El WAV está procesado con +20 dB antes de un limitador rápido a −1 dB. Sus
+mediciones pasan de aproximadamente −20.01 a −12.4 LUFS y de −20.2 a
+−11.4 dB de volumen medio. El valor `1.0` evita volver a amplificarlo en
+`PlayOneShot()`. `effectsAudioSource` continúa conectado a
+`AudioManagerMixer.GetGroups().sfx`, por lo que los controles Principal y
+Efectos del juego lo atenúan y cualquiera de ellos en cero lo silencia.
 
 Después de esa entrada los iconos quedan en escala `1`, el texto deja de
 animarse y toda la fila permanece quieta. `battleHudImpactPlayedCount` evita
@@ -208,18 +223,19 @@ Antes de publicar una extensión del HUD, probar:
 
 ## Selectores temporales de prueba
 
-En la versión `0.5.108` el estado de los selectores temporales es:
+En la versión `0.5.122`:
 
 - `ForceFiveSuperCardsForHudTest = false`.
-- `ForcedTestChallenge = ""`.
+- `ForcedTestChallenge = ModifierId.None`.
+- `ForceRelicTestSequence = false`.
+- `ForcePlaneRelicChallengeTestSequence = false`.
 - `ForceTestBoss = false`.
-- `ForcedTestBossLevel = Levels.DicePalaceMain`.
+- `ForcedTestBossSequence = { Levels.Saltbaker, Levels.Devil }`.
+- `EnableLanguageTestShortcut = false`.
 
-El primero sólo modifica el valor entregado al renderer del HUD nativo; no toca
-el medidor real cuando se habilita. El segundo permite forzar un reto y un jefe
-compatible durante pruebas. Los dos últimos permiten forzar un jefe concreto;
-Rey Dado se conserva únicamente como objetivo dormido para una prueba futura.
-No publicar una versión normal con alguno de estos selectores activo.
+La secuencia Saltbaker/Diablo y el atajo `Ctrl+F8` permanecen disponibles sólo
+como mecanismos de diagnóstico, pero ambos están desactivados. Todos los
+selectores temporales están apagados en la compilación normal.
 
 ## Errores que no deben reintroducirse
 

@@ -3,6 +3,37 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.122 — 2026-08-07
+
+### Ruleta, HUD y cierre de pruebas
+
+- El fondo `assets/card/roulette-card.png` se sustituyó por la tercera versión
+  entregada por el usuario, manteniendo intactos el tamaño 595×668 y todo el
+  layout. El atajo interno `Ctrl+F8` queda deshabilitado para la compilación normal.
+- Las entradas `Nada` de disparos, súper y amuleto apuntan ahora a
+  `equip_icon_empty_0001`; la Equip Card reproduce los tres frames nativos igual
+  que el reto desactivado, tanto durante el giro como después de detenerse.
+- Tiro A continúa siendo obligatorio. Tiro B tiene exactamente 20 % de
+  probabilidad de quedar en `Weapon.None`; en el otro 80 % elige un disparo no
+  vacío distinto de Tiro A.
+- Sólo en el HUD de batalla, cualquier resultado vacío se convierte en una
+  silueta blanca del círculo nativo conservando su alpha. Si la extracción del
+  atlas falla, se genera un círculo blanco segmentado seguro; la ruleta no cambia
+  de color y conserva su animación nativa.
+- `impact_01.wav` se reprocesó con +20 dB antes de un limitador rápido a
+  −1 dB: la sonoridad integrada pasa aproximadamente de −20.01 a −12.4 LUFS
+  y el volumen medio de −20.2 a −11.4 dB. La ganancia de runtime vuelve a
+  `1.0`; el clip sigue en el grupo SFX nativo, así que Principal o Efectos en
+  cero lo silencian completamente.
+- El regreso de Saltbaker al mapa busca primero la puerta nativa
+  `MapBakeryLoader` antes de los fallbacks de cocina. Así se ejecuta
+  `SetPlayerReturnPos()` y no se reutiliza la posición guardada del jefe anterior.
+- Se desactivaron el giro forzado que alternaba Saltbaker y el Diablo y el atajo
+  temporal `Ctrl+F8`; la ruleta vuelve a elegir jefes aleatoriamente.
+- Verificación local: compilación con 0 errores y 0 advertencias; la DLL
+  compilada e instalada comparte SHA-256 `689C1EF0FE1D528F19B5ACA0C94BD23B09B6C367BB05BB0B57DB397FEE82100C`; el WAV
+  procesado e instalado comparte `F44C76F5A12C7356E608915BC48D010C9613B2FCE4FD0D658800DD3EC63BAB98`.
+
 ## 0.5.121 — 2026-08-07
 
 ### Regreso a la puerta del jefe y bloqueo de interacción del mapa

@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.121";
+        public const string PluginVersion = "0.5.122";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -30,10 +30,14 @@ namespace Gilomx.CupheadBossRoulette
             false;
         // TEMPORARY VISUAL TEST. It does not change either player's real meter.
         private static readonly bool ForceFiveSuperCardsForHudTest = false;
-        // TEMPORARY BOSS TEST. Disable before publishing a normal build.
+        // Dormant boss-test selector. Keep false in normal builds.
         private static readonly bool ForceTestBoss = false;
-        private static readonly Levels ForcedTestBossLevel = Levels.DicePalaceMain;
-        // TEMPORARY LOCALIZATION TEST. Set false before the public release.
+        private static readonly Levels[] ForcedTestBossSequence =
+        {
+            Levels.Saltbaker,
+            Levels.Devil
+        };
+        // Dormant localization test shortcut. Keep false in normal builds.
         private const bool EnableLanguageTestShortcut = false;
         private static readonly KeyboardShortcut LanguageTestLeftShortcut =
             new KeyboardShortcut(KeyCode.F8, KeyCode.LeftControl);
@@ -118,6 +122,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly System.Random random = new System.Random();
         private int forcedRelicTestSpin;
         private int forcedPlaneRelicChallengeTestSpin;
+        private int forcedBossTestSpin;
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
         private readonly List<int> availableBossIndices = new List<int>();
         private readonly List<int> availableWeaponIndices = new List<int>();
@@ -1281,10 +1286,16 @@ namespace Gilomx.CupheadBossRoulette
                     : RandomPoolIndex(availableBossIndices);
             var weapon1 = RandomNonEmptyPoolIndex(
                 availableWeaponIndices, RouletteData.Weapons.Length - 1);
+            var emptyWeaponIndex = RouletteData.Weapons.Length - 1;
             int weapon2;
-            do weapon2 = RandomNonEmptyPoolIndex(
-                availableWeaponIndices, RouletteData.Weapons.Length - 1);
-            while (weapon2 == weapon1);
+            if (random.NextDouble() < 0.2)
+                weapon2 = emptyWeaponIndex;
+            else
+            {
+                do weapon2 = RandomNonEmptyPoolIndex(
+                    availableWeaponIndices, emptyWeaponIndex);
+                while (weapon2 == weapon1);
+            }
 
             var super = random.NextDouble() < 0.2
                 ? RouletteData.Supers.Length - 1
@@ -1345,14 +1356,17 @@ namespace Gilomx.CupheadBossRoulette
 
         private int ForcedTestBossIndex()
         {
-            if (!ForceTestBoss)
+            if (!ForceTestBoss || ForcedTestBossSequence.Length == 0)
                 return -1;
 
+            var forcedLevel = ForcedTestBossSequence[forcedBossTestSpin];
+            forcedBossTestSpin =
+                (forcedBossTestSpin + 1) % ForcedTestBossSequence.Length;
             for (var i = 0; i < availableBossIndices.Count; i++)
             {
                 var bossIndex = availableBossIndices[i];
                 var boss = RouletteData.Bosses[bossIndex];
-                if (boss.Level == ForcedTestBossLevel)
+                if (boss.Level == forcedLevel)
                 {
                     Logger.LogInfo(
                         "Forced test boss: " + boss.Character + ".");
@@ -1361,7 +1375,7 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             Logger.LogWarning(
-                "Could not force test boss " + ForcedTestBossLevel +
+                "Could not force test boss " + forcedLevel +
                 " because it is unavailable.");
             return -1;
         }
@@ -1726,6 +1740,19 @@ namespace Gilomx.CupheadBossRoulette
 
             if (bossLevel == Levels.Saltbaker)
             {
+                // The DLC bakery door is a dedicated interactive entity, not
+                // a MapLevelLoader. It already owns the native return offsets
+                // for both players, so use it before the scene-loader fallback.
+                var bakeryEntrances =
+                    Resources.FindObjectsOfTypeAll<MapBakeryLoader>();
+                for (var i = 0; i < bakeryEntrances.Length; i++)
+                {
+                    var entrance = bakeryEntrances[i];
+                    if (entrance != null &&
+                        entrance.gameObject.scene.IsValid())
+                        return entrance;
+                }
+
                 var sceneField = AccessTools.Field(
                     typeof(MapSceneLoader), "scene");
                 if (sceneField != null)
