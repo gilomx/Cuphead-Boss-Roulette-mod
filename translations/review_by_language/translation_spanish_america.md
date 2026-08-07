@@ -33,7 +33,7 @@ La tabla siguiente conserva sin cambios los 29 campos y el español de referenci
 | `challenge.no_mini_plane` | No mini avión | Nombre de reto en el HUD | NO MINIAVIÓN |
 | `challenge.mini_plane_only` | Solo mini avión | Nombre de reto en el HUD | SOLO BALAS DE MINIAVIÓN |
 | `challenge.no_bombs` | No disparo bombas | Nombre de reto en el HUD | NO DISPARO BOMBAS |
-| `challenge.no_peashooter` | No disparo Peashooter | Nombre de reto en el HUD | SIN DISPARO NORMAL |
+| `challenge.no_peashooter` | No disparo Peashooter | Nombre de reto en el HUD | SIN PEASHOOTER |
 | `challenge.no_ex` | No EX | Nombre de reto en el HUD | NO EX |
 | `challenge.black_and_white` | Blanco y negro | Nombre de reto en el HUD | BLANCO Y NEGRO |
 

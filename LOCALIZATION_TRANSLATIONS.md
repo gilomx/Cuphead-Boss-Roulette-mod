@@ -1,6 +1,6 @@
 # Borrador de traducciones de la interfaz
 
-Estado: **registro histórico, sustituido por las 12 entregas revisadas activas en 0.5.119**. Las tablas activas viven en `translations/`; los originales revisados se conservan en `translations/review_by_language/`. Las propuestas de ambas variantes de español son idénticas y comparten una sola tabla activa.
+Estado: **registro histórico, sustituido por las tablas activas de 0.5.120**. `SpanishSpain` conserva `SIN DISPARO NORMAL`; `SpanishAmerica` usa la revisión posterior `SIN PEASHOOTER`. Los catálogos vigentes viven en `translations/`.
 
 > **Importante:** este archivo conserva propuestas históricas para IDs de la
 > interfaz antigua. La lista vigente para revisión pública es

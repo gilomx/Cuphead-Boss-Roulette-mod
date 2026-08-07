@@ -69,6 +69,8 @@ namespace Gilomx.CupheadBossRoulette
     {
         private readonly Dictionary<ModText, string> spanish =
             new Dictionary<ModText, string>();
+        private readonly Dictionary<ModText, string> spanishAmerica =
+            new Dictionary<ModText, string>();
         private readonly Dictionary<ModText, string> english =
             new Dictionary<ModText, string>();
         private readonly Dictionary<ModText, string> french =
@@ -97,6 +99,7 @@ namespace Gilomx.CupheadBossRoulette
         internal ModLocalization()
         {
             AddSpanishTexts();
+            AddSpanishAmericaTexts();
             AddEnglishTexts();
             AddFrenchTexts();
             AddItalianTexts();
@@ -114,8 +117,10 @@ namespace Gilomx.CupheadBossRoulette
         internal string Text(ModText id)
         {
             string value;
-            if ((CurrentLanguage == Localization.Languages.SpanishSpain ||
-                 CurrentLanguage == Localization.Languages.SpanishAmerica) &&
+            if (CurrentLanguage == Localization.Languages.SpanishAmerica &&
+                spanishAmerica.TryGetValue(id, out value))
+                return value;
+            if (CurrentLanguage == Localization.Languages.SpanishSpain &&
                 spanish.TryGetValue(id, out value))
                 return value;
             if (CurrentLanguage == Localization.Languages.English &&
@@ -284,6 +289,13 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.ChallengeNoEx] = "NO EX";
             spanish[ModText.ChallengeBlackAndWhite] = "BLANCO Y NEGRO";
             spanish[ModText.ChallengeNone] = "Nada";
+        }
+
+        private void AddSpanishAmericaTexts()
+        {
+            foreach (var pair in spanish)
+                spanishAmerica[pair.Key] = pair.Value;
+            spanishAmerica[ModText.ChallengeNoPeashooter] = "SIN PEASHOOTER";
         }
 
         private void AddEnglishTexts()

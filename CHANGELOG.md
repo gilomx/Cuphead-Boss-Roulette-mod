@@ -3,6 +3,19 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.120 — 2026-08-07
+
+### Texto regional y nuevo fondo de la ruleta
+
+- En `SpanishAmerica`, el reto `NoPeashooter` cambia de
+  `SIN DISPARO NORMAL` a `SIN PEASHOOTER`.
+- `SpanishSpain` conserva `SIN DISPARO NORMAL`; una tabla regional hereda
+  el resto del español base y sobrescribe únicamente esta cadena.
+- `assets/card/roulette-card.png` se reemplaza por el nuevo fondo de 595×668
+  proporcionado por el usuario. No cambian coordenadas, tamaños, textos,
+  animaciones ni lógica de la tarjeta.
+- La compilación terminó con 0 errores y 0 advertencias. El DLL instalado coincide con el compilado (SHA-256 `88DA9E3E6F61E0F9B0AF9DF0D71A3BECB5ECD06F88D96F30B07ED1DA0FE87067`) y BepInEx confirmó la carga de 0.5.120.
+
 ## 0.5.119 — 2026-08-07
 
 ### Propuestas revisadas de español activas
