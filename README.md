@@ -100,6 +100,11 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
   desde la pantalla de derrota; vuelve a estar disponible al salir al mapa.
 - Los jugadores no pueden caminar por el mapa mientras la ruleta está abierta;
   el movimiento se recupera inmediatamente al cerrarla.
+- Enter/Z y el botón de aceptar no atraviesan la ruleta: una puerta situada
+  detrás no puede abrir su selector de nivel mientras la card está visible.
+- Al ganar o abandonar el combate elegido, Cuphead vuelve a la isla y a la
+  entrada nativa de ese jefe, aunque la ruleta se haya abierto en otro punto o
+  en otra isla.
 - Durante el combate, el resultado de la ruleta aparece en el margen inferior
   derecho y alineado verticalmente con el HUD de vida: tiro A, tiro B, súper,
   amuleto, reto y el nombre del reto. En niveles de avión sólo aparecen amuleto
