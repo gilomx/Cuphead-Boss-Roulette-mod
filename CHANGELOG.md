@@ -3,6 +3,30 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.121 — 2026-08-07
+
+### Regreso a la puerta del jefe y bloqueo de interacción del mapa
+
+- Antes de cargar el combate, la ruleta cambia PlayerData.CurrentMap a la isla
+  nativa del jefe elegido usando las listas de mundos de Level.
+- Al crear los jugadores de ese mapa, un prefijo de Map.CreatePlayers() busca
+  el MapLevelLoader real del jefe y ejecuta SetPlayerReturnPos(). Así Cuphead
+  coloca desde el primer frame a uno o dos jugadores en la entrada del jefe, no
+  en el lugar donde se abrió la ruleta.
+- Hay fallbacks para la entrada del Rey Dado, el casino del Diablo y la cocina
+  de Saltbaker; Ángel y Demonio vuelve al mapa del DLC.
+- Mientras la card está visible o terminando su animación de salida, el
+  Update() nativo de AbstractMapInteractiveEntity queda bloqueado. Enter/Z
+  sigue controlando la ruleta pero ya no activa una puerta situada detrás.
+- La prueba manual confirmó tanto el regreso a la puerta elegida como el bloqueo
+  de Enter/Z sobre una entrada situada detrás de la ruleta.
+- La build candidata a publicación deja desactivados los selectores forzados de
+  jefe, reto, reliquia y cartas, además del atajo interno Ctrl+F8 de idioma.
+- La compilación terminó con 0 errores y 0 advertencias. El DLL compilado e
+  instalado comparte SHA-256
+  EB6E2FD62CCF76365E0D7C488CE644E16958D25C242919D549ACB11D179772F8;
+  BepInEx confirmó la carga de 0.5.121.
+
 ## 0.5.120 — 2026-08-07
 
 ### Texto regional y nuevo fondo de la ruleta

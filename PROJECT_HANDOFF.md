@@ -1,7 +1,7 @@
 # Cuphead Boss Roulette - Project Handoff
 
 Last updated: 2026-08-07
-Current local version: 0.5.120
+Current local version: 0.5.121
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -10,6 +10,38 @@ coordinates and avoid broad rewrites.
 The accepted HUD architecture, layer matrix, layout invariants and extension
 checklist now live in [HUD_INTEGRATION.md](HUD_INTEGRATION.md). Read that guide
 before adding any new battle indicator.
+
+## Native boss-door return and covered map input (0.5.121)
+
+- LoadResult() resolves the selected boss to its native map with Cuphead's
+  public Level.world*BossLevels arrays, records that map as
+  PlayerData.Data.CurrentMap, and keeps the target level until the map returns.
+- A Harmony prefix on private Map.CreatePlayers() runs before Cuphead reads
+  CurrentMapData. It finds the loaded entrance, marks the map session started,
+  clears stale enteringFrom, then calls the game's own
+  AbstractMapInteractiveEntity.SetPlayerReturnPos(). Native player creation
+  therefore starts at the boss door and supports both players without a visible
+  post-load teleport.
+- Entrance lookup accepts an exact MapLevelLoader.level; Saltbaker can use
+  Levels.Kitchen or a MapSceneLoader for scene_level_kitchen; King Dice and
+  Devil can use MapDicePalaceSceneLoader.
+- The map association is World 1/2/3/4 from Cuphead's native arrays, DLC from
+  worldDLCBossLevelsWithSaltbaker, plus explicit Levels.Graveyard.
+- A Harmony prefix skips AbstractMapInteractiveEntity.Update() while the
+  roulette is visible or its card is still exiting. This prevents the same
+  Accept/Enter/Z edge from activating a boss entrance behind the card.
+- Do not replace this with stored coordinates: entrance transforms and
+  returnPositions are owned by the scene and SetPlayerReturnPos() already
+  handles single-player and multiplayer offsets.
+- User manual validation passed: returning from the selected fight places the
+  player at that boss entrance, and Accept/Enter/Z no longer opens a native
+  boss selector behind the roulette card.
+- Release-candidate state: ForcedTestChallenge is None; relic, plane-relic,
+  five-card HUD and boss selectors are false; EnableLanguageTestShortcut is
+  also false.
+- Build/install verification: 0 errors, 0 warnings; DLL SHA-256
+  EB6E2FD62CCF76365E0D7C488CE644E16958D25C242919D549ACB11D179772F8;
+  LogOutput.log confirms 0.5.121.
 
 ## Spanish-America regional override (0.5.120)
 

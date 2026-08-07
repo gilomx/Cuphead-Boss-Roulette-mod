@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.120";
+        public const string PluginVersion = "0.5.121";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -34,7 +34,7 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels ForcedTestBossLevel = Levels.DicePalaceMain;
         // TEMPORARY LOCALIZATION TEST. Set false before the public release.
-        private const bool EnableLanguageTestShortcut = true;
+        private const bool EnableLanguageTestShortcut = false;
         private static readonly KeyboardShortcut LanguageTestLeftShortcut =
             new KeyboardShortcut(KeyCode.F8, KeyCode.LeftControl);
         private static readonly KeyboardShortcut LanguageTestRightShortcut =
@@ -196,6 +196,9 @@ namespace Gilomx.CupheadBossRoulette
         private bool loanedLoadoutsActive;
         private bool loanedBattleSeen;
         private bool returnToMapAfterRouletteFinalBossWin;
+        private bool rouletteReturnDestinationPending;
+        private Levels rouletteReturnLevel;
+        private Scenes rouletteReturnMap;
         private static int curseRelicRuntimeSetupDepth;
         private bool languageTestOriginalCaptured;
         private Localization.Languages languageTestOriginalLanguage;
@@ -411,6 +414,31 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning(
                     "Could not install the roulette map movement guard.");
+
+            var mapInteractiveUpdate = AccessTools.Method(
+                typeof(AbstractMapInteractiveEntity), "Update");
+            var blockMapInteractionPrefix = AccessTools.Method(
+                typeof(Plugin), "BlockMapInteractionPrefix");
+            if (mapInteractiveUpdate != null &&
+                blockMapInteractionPrefix != null)
+                harmony.Patch(mapInteractiveUpdate,
+                    prefix: new HarmonyMethod(blockMapInteractionPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette map interaction guard.");
+
+            var mapCreatePlayers = AccessTools.Method(
+                typeof(Map), "CreatePlayers");
+            var applyRouletteReturnDestinationPrefix = AccessTools.Method(
+                typeof(Plugin), "ApplyRouletteReturnDestinationPrefix");
+            if (mapCreatePlayers != null &&
+                applyRouletteReturnDestinationPrefix != null)
+                harmony.Patch(mapCreatePlayers,
+                    prefix: new HarmonyMethod(
+                        applyRouletteReturnDestinationPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette boss-door return guard.");
 
             if (ForceFiveSuperCardsForHudTest)
             {
@@ -744,6 +772,20 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin != null && plugin.visible)
                 __result = false;
+        }
+
+        private static bool BlockMapInteractionPrefix()
+        {
+            var plugin = activeInstance;
+            return plugin == null ||
+                   (!plugin.visible && plugin.cardVisibility <= 0.001f);
+        }
+
+        private static void ApplyRouletteReturnDestinationPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin != null)
+                plugin.ApplyRouletteReturnDestination();
         }
 
         private static void OverrideBlackAndWhiteFilterPostfix(
@@ -1493,6 +1535,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void LoadResult()
         {
+            var previousMap = default(Scenes);
+            var returnDestinationPrepared = false;
             try
             {
                 if (!PlayerData.Initialized || PlayerData.Data == null)
@@ -1508,6 +1552,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
 
                 resultReady = false;
+                previousMap = PlayerData.Data.CurrentMap;
                 CaptureOriginalLoadouts();
                 ApplyLoadout(PlayerId.PlayerOne);
                 ApplyLoadout(PlayerId.PlayerTwo);
@@ -1522,11 +1567,19 @@ namespace Gilomx.CupheadBossRoulette
                 if (!PrepareBattleResultHud())
                     Logger.LogWarning(
                         "Could not prepare the roulette battle HUD before loading.");
+                PrepareRouletteReturnDestination(boss.Level);
+                returnDestinationPrepared = true;
                 Logger.LogInfo("Cargando " + boss.Character + " (" + boss.Level + ")");
                 SceneLoader.LoadLevel(boss.Level, SceneLoader.Transition.Iris, SceneLoader.Icon.None);
             }
             catch (Exception exception)
             {
+                if (returnDestinationPrepared &&
+                    PlayerData.Initialized && PlayerData.Data != null)
+                {
+                    PlayerData.Data.CurrentMap = previousMap;
+                    rouletteReturnDestinationPending = false;
+                }
                 status = RouletteStatus.LoadFailed;
                 RestoreOriginalLoadouts(false);
                 ClearActiveChallenge();
@@ -1534,6 +1587,164 @@ namespace Gilomx.CupheadBossRoulette
                 Logger.LogError(exception);
                 SetVisible(true);
             }
+        }
+
+        private void PrepareRouletteReturnDestination(Levels bossLevel)
+        {
+            Scenes targetMap;
+            if (!TryGetBossMap(bossLevel, out targetMap))
+                throw new InvalidOperationException(
+                    "Could not determine the return map for " + bossLevel + ".");
+
+            rouletteReturnLevel = bossLevel;
+            rouletteReturnMap = targetMap;
+            rouletteReturnDestinationPending = true;
+            PlayerData.Data.CurrentMap = targetMap;
+            Logger.LogInfo(
+                "Roulette return destination prepared: " + bossLevel +
+                " on " + targetMap + ".");
+        }
+
+        private static bool TryGetBossMap(Levels bossLevel, out Scenes map)
+        {
+            if (ContainsLevel(Level.world1BossLevels, bossLevel))
+            {
+                map = Scenes.scene_map_world_1;
+                return true;
+            }
+            if (ContainsLevel(Level.world2BossLevels, bossLevel))
+            {
+                map = Scenes.scene_map_world_2;
+                return true;
+            }
+            if (ContainsLevel(Level.world3BossLevels, bossLevel))
+            {
+                map = Scenes.scene_map_world_3;
+                return true;
+            }
+            if (ContainsLevel(Level.world4BossLevels, bossLevel))
+            {
+                map = Scenes.scene_map_world_4;
+                return true;
+            }
+            if (ContainsLevel(Level.worldDLCBossLevelsWithSaltbaker, bossLevel) ||
+                bossLevel == Levels.Graveyard)
+            {
+                map = Scenes.scene_map_world_DLC;
+                return true;
+            }
+
+            map = default(Scenes);
+            return false;
+        }
+
+        private static bool ContainsLevel(Levels[] levels, Levels target)
+        {
+            if (levels == null)
+                return false;
+            for (var i = 0; i < levels.Length; i++)
+            {
+                if (levels[i] == target)
+                    return true;
+            }
+            return false;
+        }
+
+        private void ApplyRouletteReturnDestination()
+        {
+            if (!rouletteReturnDestinationPending ||
+                !PlayerData.Initialized || PlayerData.Data == null ||
+                PlayerData.Data.CurrentMap != rouletteReturnMap)
+                return;
+
+            try
+            {
+                var entrance = FindRouletteBossEntrance(rouletteReturnLevel);
+                if (entrance == null)
+                {
+                    Logger.LogWarning(
+                        "Could not find the map entrance for " +
+                        rouletteReturnLevel + " on " + rouletteReturnMap +
+                        "; keeping the map's saved position.");
+                    return;
+                }
+
+                var mapData = PlayerData.Data.CurrentMapData;
+                mapData.sessionStarted = true;
+                mapData.enteringFrom =
+                    PlayerData.MapData.EntryMethod.None;
+                entrance.SetPlayerReturnPos();
+                rouletteReturnDestinationPending = false;
+                Logger.LogInfo(
+                    "Returning roulette players to the native entrance for " +
+                    rouletteReturnLevel + " on " + rouletteReturnMap + ".");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(
+                    "Could not apply the roulette boss-door return position: " +
+                    exception);
+            }
+        }
+
+        private static AbstractMapInteractiveEntity FindRouletteBossEntrance(
+            Levels bossLevel)
+        {
+            var levelField = AccessTools.Field(
+                typeof(MapLevelLoader), "level");
+            if (levelField != null)
+            {
+                var loaders =
+                    Resources.FindObjectsOfTypeAll<MapLevelLoader>();
+                for (var i = 0; i < loaders.Length; i++)
+                {
+                    var loader = loaders[i];
+                    if (loader == null ||
+                        !loader.gameObject.scene.IsValid())
+                        continue;
+                    var entranceLevel = (Levels)levelField.GetValue(loader);
+                    if (entranceLevel == bossLevel ||
+                        (bossLevel == Levels.Saltbaker &&
+                         entranceLevel == Levels.Kitchen))
+                        return loader;
+                }
+            }
+
+            if (bossLevel == Levels.DicePalaceMain ||
+                bossLevel == Levels.Devil)
+            {
+                var diceEntrances =
+                    Resources.FindObjectsOfTypeAll<MapDicePalaceSceneLoader>();
+                for (var i = 0; i < diceEntrances.Length; i++)
+                {
+                    var entrance = diceEntrances[i];
+                    if (entrance != null &&
+                        entrance.gameObject.scene.IsValid())
+                        return entrance;
+                }
+            }
+
+            if (bossLevel == Levels.Saltbaker)
+            {
+                var sceneField = AccessTools.Field(
+                    typeof(MapSceneLoader), "scene");
+                if (sceneField != null)
+                {
+                    var sceneEntrances =
+                        Resources.FindObjectsOfTypeAll<MapSceneLoader>();
+                    for (var i = 0; i < sceneEntrances.Length; i++)
+                    {
+                        var entrance = sceneEntrances[i];
+                        if (entrance == null ||
+                            !entrance.gameObject.scene.IsValid())
+                            continue;
+                        if ((Scenes)sceneField.GetValue(entrance) ==
+                            Scenes.scene_level_kitchen)
+                            return entrance;
+                    }
+                }
+            }
+            return null;
         }
 
         private void ApplyLoadout(PlayerId playerId)
