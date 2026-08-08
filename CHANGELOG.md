@@ -3,6 +3,18 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.128 — 2026-08-08
+
+- Las cinco etiquetas bajo los iconos de equipo usan un único tamaño de
+  fuente por idioma: parten de 14 y bajan juntas hasta 11 si alguna no cabe.
+- Las etiquetas permanecen en una sola línea dentro de su área de 98 × 23;
+  se conserva un ancho seguro de 94 para evitar roces con los iconos vecinos.
+- La medición usa la fuente real de Cuphead, se guarda en caché y sólo se
+  recalcula al cambiar el idioma o reconstruir el estilo.
+- Se validaron manualmente en ruso `СПЕЦАТАКА` e `ИСПЫТАНИЕ` sin recortes ni
+  saltos de línea. No fue necesario acortar las traducciones aprobadas.
+- El atajo temporal de idiomas `Ctrl+F8` vuelve a quedar desactivado.
+
 ## 0.5.127 — 2026-08-08
 
 - Se conserva la corrección inglesa `Angel and Demon` del jefe secreto.

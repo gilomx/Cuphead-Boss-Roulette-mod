@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.127";
+        public const string PluginVersion = "0.5.128";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -290,6 +290,7 @@ namespace Gilomx.CupheadBossRoulette
             // Every visible string is resolved while drawing. Reset the one
             // cached native layout so its measured width is rebuilt too.
             nativeRoulettePromptLayoutToken = null;
+            equipSlotLabelsFitReady = false;
         }
 
         private void UpdateLanguageTestShortcut()

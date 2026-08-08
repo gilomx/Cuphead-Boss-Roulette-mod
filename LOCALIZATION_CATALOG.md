@@ -2,6 +2,19 @@
 
 Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `SpanishSpain` usa la tabla española base; `SpanishAmerica` hereda esa tabla y cambia sólo `challenge.no_peashooter` a `SIN PEASHOOTER`. `LOCALIZATION_TRANSLATIONS.md` queda como registro histórico.
 
+## Ajuste uniforme de etiquetas de equipo (0.5.128)
+
+Las cinco etiquetas bajo los iconos comparten un solo tamaño de fuente por
+idioma. Se mide la tipografía real de Cuphead con `GUIStyle.CalcSize`, se
+prueban tamaños de 14 a 11 y se elige el primero en que las cinco cadenas
+quepan dentro de un ancho seguro de 94 unidades. Sus rectángulos siguen
+midiendo 98 × 23 y no permiten salto de línea. El cálculo queda en caché hasta
+que cambia el idioma o se reconstruye el estilo.
+
+La variante rusa fue validada manualmente con `СПЕЦАТАКА` e `ИСПЫТАНИЕ`
+completos. Las traducciones aprobadas no se acortaron. `Ctrl+F8` es únicamente
+una herramienta temporal de revisión y está desactivado en la versión normal.
+
 ## Alcance visible verificado en 0.5.110 y aplicado en 0.5.111
 
 La fuente de verdad para solicitar traducciones es
