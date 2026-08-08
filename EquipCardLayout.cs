@@ -216,7 +216,28 @@ namespace Gilomx.CupheadBossRoulette
         {
             try
             {
-                var element = Localization.Find(boss.Level.ToString());
+                // The secret Graveyard card exposes its English boss-name
+                // artwork without usable text. Avoid leaking the Spanish
+                // BossEntry fallback into English screenshots and UI.
+                if (boss.Level == Levels.Graveyard &&
+                    Localization.language == Localization.Languages.English)
+                    return "Angel and Demon";
+
+                var levelKey = boss.Level.ToString();
+                // Match MapDifficultySelectStartUI: Cuphead stores the boss
+                // name under <level>WorldMap. Graveyard has no usable plain
+                // level entry, so the old lookup fell back to Spanish.
+                var element = Localization.Find(levelKey + "WorldMap");
+                if (element != null)
+                {
+                    var translated = element.translation.text;
+                    if (!string.IsNullOrEmpty(translated))
+                        return translated.Replace("\\N", " ").Replace("\\n", " ");
+                }
+
+                // Preserve the former key as a compatibility fallback for any
+                // exceptional or temporarily incomplete localization entry.
+                element = Localization.Find(levelKey);
                 if (element != null)
                 {
                     var translated = element.translation.text;

@@ -3,6 +3,48 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.127 — 2026-08-08
+
+- Se conserva la corrección inglesa `Angel and Demon` del jefe secreto.
+- Se retiró por completo el diagnóstico temporal de F6 después de comprobar
+  que la ruleta abrió y giró sin rechazos internos.
+- `Ctrl+F8` vuelve a quedar desactivado para la distribución pública.
+- El instalable listo para pegar incluye `README-LEEME.txt` en inglés y español
+  en la raíz del ZIP.
+- Se generó `dist/Las-Pichi-Ruleta-0.5.127.zip`, con BepInEx x64 y
+  todos los assets, sin configuraciones, logs ni plugins ajenos.
+- `README-LEEME.txt` se convirtió a texto plano real, sin marcadores de
+  encabezado, negritas, cursivas, código ni separadores de Markdown.
+
+## 0.5.125 — 2026-08-07 (build temporal para capturas)
+
+- La entrada inglesa del jefe secreto `Graveyard` no expone texto utilizable
+  aunque Cuphead pueda presentar su nombre mediante arte localizado.
+- Para inglés, la ruleta usa ahora el respaldo textual `Angel and Demon` antes
+  de consultar ese recurso; así nunca vuelve al `Ángel y Demonio` español.
+- Los otros jefes y las demás rutas nativas de localización permanecen sin
+  cambios. `Ctrl+F8` continúa activo temporalmente para las capturas.
+
+## 0.5.124 — 2026-08-07 (build temporal para capturas)
+
+- El nombre grande del jefe consulta primero la clave nativa
+  `<nivel>WorldMap`, igual que `MapDifficultySelectStartUI` de Cuphead.
+- Esto corrige a Ángel y Demonio: `Graveyard` no ofrece el nombre localizado y
+  antes activaba el respaldo español incluso al probar inglés;
+  `GraveyardWorldMap` sí corresponde al nombre que usa el juego.
+- La antigua clave `<nivel>` permanece como respaldo de compatibilidad para
+  cualquier entrada excepcional. `Ctrl+F8` sigue activo sólo para las capturas
+  de GameBanana.
+
+## 0.5.123 — 2026-08-07 (build temporal para capturas)
+
+- Se reactiva temporalmente `Ctrl+F8` para recorrer los idiomas de Cuphead y
+  tomar capturas para GameBanana; la primera pulsación selecciona inglés.
+- El idioma original continúa restaurándose al cerrar el juego y no se guarda
+  mediante `SettingsData.Save()`.
+- Antes de producir el siguiente paquete público debe volver a establecerse
+  `EnableLanguageTestShortcut = false`.
+
 ## 0.5.122 — 2026-08-07
 
 ### Ruleta, HUD y cierre de pruebas
@@ -33,6 +75,19 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 - Verificación local: compilación con 0 errores y 0 advertencias; la DLL
   compilada e instalada comparte SHA-256 `689C1EF0FE1D528F19B5ACA0C94BD23B09B6C367BB05BB0B57DB397FEE82100C`; el WAV
   procesado e instalado comparte `F44C76F5A12C7356E608915BC48D010C9613B2FCE4FD0D658800DD3EC63BAB98`.
+- Después de sincronizar otra PC, se recompiló e instaló la misma 0.5.122 y se
+  generó `dist/Gilomx-Boss-Roulette-0.5.122-BepInEx-x64.zip`, listo para pegar
+  sobre Cuphead. El paquete contiene 122 archivos, los 18 componentes core de
+  BepInEx y sólo este mod; no incluye configuración, logs, caché ni plugins
+  ajenos. ZIP SHA-256:
+  `8BB029AA69DD723E943C167AAB80A7862B01E8B82C1D8B673DF1B4B8D6ECF64E`.
+- `tools/build_challenge_gifs.py` genera previews GIF de los siete retos usando
+  sus tres PNG reales y la cadencia exacta de la Equip Card: 12.5 FPS u 80 ms
+  por frame. Cada archivo repite 42 ciclos completos, dura 10.08 segundos y se
+  detiene en el tercer frame. El paquete
+  `dist/Gilomx-Boss-Roulette-Challenge-GIFs-0.5.122.zip` contiene los siete GIF
+  y un README; SHA-256:
+  `EBB36B6FF7AE0EA8E2BA5AA3365ACA134FFEA84B79D02D832514796CBED3A71E`.
 
 ## 0.5.121 — 2026-08-07
 
