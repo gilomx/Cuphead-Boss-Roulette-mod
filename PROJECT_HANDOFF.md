@@ -1,5 +1,21 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Uniform localized equipment labels (0.5.128)
+
+The five labels below the equipment icons now share one fitted font size per
+language. Their rectangles remain at the accepted 98 × 23 layout coordinates,
+with 94 units reserved as the safe text width. `FitEquipSlotLabels()` measures
+the active Cuphead font with `GUIStyle.CalcSize`, tries sizes 14 through 11 and
+applies the first size that fits every label. Word wrapping is disabled so no
+translation can spill into the settings rows. The result is cached and is
+invalidated when the language changes or the GUI style is rebuilt.
+
+Russian was manually accepted with the full approved `СПЕЦАТАКА` and
+`ИСПЫТАНИЕ` strings. Do not shorten translations or move the five explicitly
+tuned icon coordinates to solve future language issues; extend the shared-fit
+rule only if another real font needs it. The temporary `Ctrl+F8` language
+cycle is disabled in this release. The release build completed with zero errors and zero warnings; its DLL SHA-256 is `71318EB76146ABF4C4963EAA2A6B64CB5232CA6F285B64F87A880E4410910298`.
+
 ## Public package preparation (0.5.127)
 
 The temporary 0.5.126 roulette-open diagnostic confirmed that BepInEx loaded,
@@ -24,7 +40,7 @@ bold, italics, code spans or Markdown separators. Numbered instructions use
 UTF-8, including Spanish accents.
 
 Last updated: 2026-08-08
-Current local version: 0.5.127
+Current local version: 0.5.128
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit

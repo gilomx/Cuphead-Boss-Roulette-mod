@@ -13,6 +13,7 @@ namespace Gilomx.CupheadBossRoulette
         private GUIStyle checklistValueStyle;
         private GUIStyle checklistSpinStyle;
         private Font equipStylesFont;
+        private bool equipSlotLabelsFitReady;
         // AJUSTE VISUAL DE LOS CIRCULOS (X/Y).
         // X mueve horizontalmente: menor = izquierda, mayor = derecha.
         // Y mueve verticalmente: menor = arriba, mayor = abajo.
@@ -23,6 +24,10 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly Vector2 ChallengeCenter = new Vector2(497.1f, 399f);
         private const float EquipIconSize = 80f;
         private const float EquipLabelGap = 4f;
+        private const float EquipLabelWidth = 98f;
+        private const float EquipLabelInnerWidth = 94f;
+        private const int EquipLabelBaseFontSize = 14;
+        private const int EquipLabelMinimumFontSize = 11;
         private const float EquipIconFramesPerSecond = 12.5f;
 
         private void DrawRoulette()
@@ -63,6 +68,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void DrawEquipCardContents()
         {
+            FitEquipSlotLabels();
+
             var bossIndex = DisplayPoolIndex(
                 0, result.Boss, availableBossIndices, 0);
             var boss = RouletteData.Bosses[bossIndex];
@@ -107,6 +114,41 @@ namespace Gilomx.CupheadBossRoulette
             DrawSpinBand();
         }
 
+        private void FitEquipSlotLabels()
+        {
+            if (equipSlotLabelsFitReady || equipSlotStyle == null)
+                return;
+
+            var labels = new[]
+            {
+                L(ModText.SlotWeaponA),
+                L(ModText.SlotWeaponB),
+                L(ModText.SlotSuper),
+                L(ModText.SlotCharm),
+                L(ModText.SlotChallenge)
+            };
+
+            equipSlotStyle.wordWrap = false;
+            equipSlotStyle.clipping = TextClipping.Clip;
+            for (var size = EquipLabelBaseFontSize;
+                 size >= EquipLabelMinimumFontSize; size--)
+            {
+                equipSlotStyle.fontSize = size;
+                var allFit = true;
+                for (var i = 0; i < labels.Length; i++)
+                {
+                    var content = new GUIContent(labels[i] ?? string.Empty);
+                    if (equipSlotStyle.CalcSize(content).x <= EquipLabelInnerWidth)
+                        continue;
+                    allFit = false;
+                    break;
+                }
+                if (allFit)
+                    break;
+            }
+            equipSlotLabelsFitReady = true;
+        }
+
         private void DrawEquipSlot(Vector2 center, string label, string fallbackImage,
             string nativeSprite, int field)
         {
@@ -124,7 +166,7 @@ namespace Gilomx.CupheadBossRoulette
                 theme.DrawSprite(sheen, rect, new Color(1f, 1f, 1f, 0.28f));
             }
             GUI.Label(new Rect(center.x - 49f, center.y + halfSize + EquipLabelGap,
-                98f, 23f), label, equipSlotStyle);
+                EquipLabelWidth, 23f), label, equipSlotStyle);
         }
 
         private void DrawModifierSlot(int bossIndex)
@@ -153,7 +195,7 @@ namespace Gilomx.CupheadBossRoulette
                 theme.DrawSprite(sheen, rect, new Color(1f, 1f, 1f, 0.28f));
             }
             GUI.Label(new Rect(ChallengeCenter.x - 49f,
-                ChallengeCenter.y + halfSize + EquipLabelGap, 98f, 23f),
+                ChallengeCenter.y + halfSize + EquipLabelGap, EquipLabelWidth, 23f),
                 L(ModText.SlotChallenge),
                 equipSlotStyle);
         }
@@ -323,12 +365,13 @@ namespace Gilomx.CupheadBossRoulette
             equipBossShadowStyle = NewStyle(theme.TitleFont, 27, TextAnchor.MiddleCenter,
                 new Color(0.12f, 0.07f, 0.10f, 0.58f), FontStyle.Normal);
             equipFightStyle = NewStyle(theme.BodyFont, 14, TextAnchor.MiddleCenter, secondaryText, FontStyle.Normal);
-            equipSlotStyle = NewStyle(theme.BodyFont, 14, TextAnchor.MiddleCenter, nativeInk, FontStyle.Bold);
+            equipSlotStyle = NewStyle(theme.BodyFont, EquipLabelBaseFontSize, TextAnchor.MiddleCenter, nativeInk, FontStyle.Bold);
             checklistLabelStyle = NewStyle(theme.BodyFont, 17, TextAnchor.MiddleLeft, cardText, FontStyle.Normal);
             checklistLabelStyle.wordWrap = false;
             checklistLabelStyle.clipping = TextClipping.Clip;
             checklistValueStyle = NewStyle(theme.TitleFont, 17, TextAnchor.MiddleRight, cardText, FontStyle.Normal);
             checklistSpinStyle = NewStyle(theme.TitleFont, 27, TextAnchor.MiddleCenter, nativeInk, FontStyle.Normal);
+            equipSlotLabelsFitReady = false;
         }
     }
 }
