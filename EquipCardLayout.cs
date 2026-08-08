@@ -258,12 +258,11 @@ namespace Gilomx.CupheadBossRoulette
         {
             try
             {
-                // The secret Graveyard card exposes its English boss-name
-                // artwork without usable text. Avoid leaking the Spanish
-                // BossEntry fallback into English screenshots and UI.
-                if (boss.Level == Levels.Graveyard &&
-                    Localization.language == Localization.Languages.English)
-                    return "Angel and Demon";
+                // Unlike regular bosses, Graveyard has no WorldMap/Selection
+                // localization entry. Keep its reviewed display name here for
+                // every language supported by the game.
+                if (boss.Level == Levels.Graveyard)
+                    return LocalizedGraveyardBossName(Localization.language);
 
                 var levelKey = boss.Level.ToString();
                 // Match MapDifficultySelectStartUI: Cuphead stores the boss
@@ -291,6 +290,37 @@ namespace Gilomx.CupheadBossRoulette
             {
             }
             return boss.Character;
+        }
+
+        private static string LocalizedGraveyardBossName(Localization.Languages language)
+        {
+            switch (language)
+            {
+                case Localization.Languages.French:
+                    return "Ange et Démon";
+                case Localization.Languages.Italian:
+                    return "Angelo e Demone";
+                case Localization.Languages.German:
+                    return "Engel und Dämon";
+                case Localization.Languages.SpanishSpain:
+                case Localization.Languages.SpanishAmerica:
+                    return "Ángel y Demonio";
+                case Localization.Languages.Korean:
+                    return "천사와 악마";
+                case Localization.Languages.Russian:
+                    return "Ангел и Демон";
+                case Localization.Languages.Polish:
+                    return "Anioł i Demon";
+                case Localization.Languages.PortugueseBrazil:
+                    return "Anjo e Demônio";
+                case Localization.Languages.Japanese:
+                    return "天使と悪魔";
+                case Localization.Languages.SimplifiedChinese:
+                    return "天使与恶魔";
+                case Localization.Languages.English:
+                default:
+                    return "Angel and Demon";
+            }
         }
 
         private string LocalizedFightName(BossEntry boss)
