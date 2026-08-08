@@ -134,6 +134,41 @@ Probar como mínimo:
 - Jefes que exigen atravesar rápidamente la pantalla.
 - Interacción con otros bloqueos de movimiento del propio nivel.
 
+## Opción para jugar como Cáliz
+
+### Idea
+
+Agregar a los ajustes de la ruleta una opción persistente llamada
+`Jugar como Cáliz`. Cuando esté activada, el resultado del espacio de amuleto
+será siempre la Galletita Astral, de modo que el jugador entre a cada combate
+como Ms. Chalice sin depender del resultado aleatorio.
+
+La ruleta y el HUD deben mostrar la Galletita Astral como el resultado real;
+no debe aplicarse como una sustitución oculta después del giro. Mientras esta
+opción esté activa, los demás amuletos y el resultado vacío quedan excluidos
+de ese espacio.
+
+### Comportamiento propuesto
+
+- Guardar la preferencia junto con dificultad, reto y carga automática.
+- Si se cambia después de haber girado, invalidar el resultado pendiente y
+  volver a mostrar `¡Girar!`, igual que con los demás ajustes.
+- Mantener el préstamo temporal de equipamiento: al ganar o abandonar, se
+  restaura el amuleto que el jugador tenía antes de usar la ruleta.
+- Aplicar correctamente el armamento de avión de Cáliz cuando corresponda.
+- No exigir que la Galletita Astral esté comprada o equipada previamente,
+  siguiendo la regla actual de usar el catálogo completo.
+
+### Cooperativo e investigación necesaria
+
+Definir si la opción afecta a ambos jugadores o solamente a quien abrió la
+ruleta. Si se aplica a los dos, debe resolverse primero el bloqueo nativo de
+dos Ms. Chalice y el posible estado híbrido descrito en la sección
+`Dos Ms. Chalice en cooperativo y variante morada`.
+
+Probar P1, P2, reintentos, niveles terrestres, niveles de avión, Palacio de
+Dados, supers, HUD y restauración del equipamiento al volver al mapa.
+
 ## Criterio general para incorporar estas ideas
 
 Cada idea debe implementarse detrás de un selector temporal, documentarse en
