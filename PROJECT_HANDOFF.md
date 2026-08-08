@@ -1,7 +1,30 @@
 # Cuphead Boss Roulette - Project Handoff
 
-Last updated: 2026-08-07
-Current local version: 0.5.122
+## Public package preparation (0.5.127)
+
+The temporary 0.5.126 roulette-open diagnostic confirmed that BepInEx loaded,
+F6 opened the roulette and spins ran without any rejected-map log. Version
+0.5.127 removes that diagnostic completely and restores the original single
+`KeyboardShortcut.IsDown()` input path. The screenshot-only `Ctrl+F8` language
+cycle is disabled again. The English `Angel and Demon` correction remains.
+
+The ready-to-paste package includes the user-provided bilingual instructions as
+`README-LEEME.txt` in the ZIP root, alongside the x64 BepInEx bootstrap and mod.
+The verified artifact is
+`dist/Las-Pichi-Ruleta-0.5.127.zip` (10,604,725 bytes, SHA-256
+`2C458AA88A4B6F1A1E2864B5AD18E5709BB5DB8DB102E540D84125BB63798B42`).
+It contains 123 files (plus two ZIP directory entries): x64 Doorstop, 18 BepInEx
+core files, the 0.5.127 DLL, 99 mod assets and the bilingual README. The packed
+DLL matches the build at SHA-256
+`1BBAA142A775B79E44422E73F2F048672ED4E50AFEC174402E4ADF2518AA2E11`.
+The package contains no config, cache, logs, saves, patchers or unrelated
+plugins. `README-LEEME.txt` is actual plain text: no Markdown headings, lists,
+bold, italics, code spans or Markdown separators. Numbered instructions use
+`1)` notation and lists use plain Unicode bullets. It was round-trip verified as
+UTF-8, including Spanish accents.
+
+Last updated: 2026-08-08
+Current local version: 0.5.127
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit
@@ -12,6 +35,35 @@ checklist now live in [HUD_INTEGRATION.md](HUD_INTEGRATION.md). Read that guide
 before adding any new battle indicator.
 
 ## Current 0.5.122 state
+
+Temporary local override: version 0.5.123 re-enables
+`EnableLanguageTestShortcut` solely for GameBanana screenshots. The first
+`Ctrl+F8` press selects English; cleanup still restores the original language.
+Set the flag back to `false` before the next public ZIP. The existing 0.5.122
+ready-to-paste package remains the release build with the shortcut disabled.
+The temporary DLL built and installed with zero errors and zero warnings;
+SHA-256 `CCF7A8040430C56E814F8E0F28158CA7CA8A0C163B5FCBA55EF8D7CB423B9CE6`.
+
+Version 0.5.124 fixes the localized boss-name source while retaining the
+temporary screenshot shortcut. `LocalizedBossName()` now mirrors Cuphead's
+`MapDifficultySelectStartUI`: it requests `<level>WorldMap` first and only then
+falls back to the former `<level>` key. This matters for `Levels.Graveyard`,
+whose plain lookup produced no text and exposed the Spanish `BossEntry` fallback
+under English. Do not replace this with a hardcoded English exception; the
+native WorldMap key supports every game language.
+The 0.5.124 build was installed after Cuphead closed; compiled and installed
+DLLs match at SHA-256
+`14C0A738CD36B2D77FC3450831691776BD3870529A8FAE81B3D9EA115BCBB6C0`.
+
+Runtime testing showed that `GraveyardWorldMap` still has no usable English
+text, consistent with a native artwork-only boss-name entry. Version 0.5.125
+therefore returns the approved textual fallback `Angel and Demon` for
+`Levels.Graveyard` while `Localization.language == English`, before either
+native text lookup can fall through to the Spanish `BossEntry.Character`.
+Keep this exception until a complete official textual catalog for the
+artwork-only languages is available. Ctrl+F8 remains enabled for screenshots.
+The 0.5.125 compiled and installed DLLs match at SHA-256
+`9AD3B6A6FB41F4EF6C4B650D4546185A20AB5E244E2B5887C6238819B0652D13`.
 
 - `assets/card/roulette-card.png` is the user-provided third background
   revision (595×668). No card coordinate or layout value changed.
@@ -42,6 +94,22 @@ before adding any new battle indicator.
 - Current verification: build completed with 0 errors and 0 warnings. The
   compiled and installed DLLs match at SHA-256 `689C1EF0FE1D528F19B5ACA0C94BD23B09B6C367BB05BB0B57DB397FEE82100C`.
   The processed and installed WAVs match at `F44C76F5A12C7356E608915BC48D010C9613B2FCE4FD0D658800DD3EC63BAB98`.
+- After pulling 0.5.122 on this PC, a fresh rebuild was installed with DLL
+  SHA-256 `1B4E2F5AE403F75166065D72751032A7A98071B4A7774C7132C693A4201AE4EE`;
+  its card and WAV also match the repository. The ready-to-paste artifact is
+  `dist/Gilomx-Boss-Roulette-0.5.122-BepInEx-x64.zip` (10,602,141 bytes,
+  SHA-256 `8BB029AA69DD723E943C167AAB80A7862B01E8B82C1D8B673DF1B4B8D6ECF64E`).
+  Its 122 entries were inspected: x64 Doorstop, 18 BepInEx core files, the
+  current DLL and all 99 assets. It contains no config, log, cache, save or
+  unrelated plugin files.
+- Challenge GIF previews can be regenerated with
+  `tools/build_challenge_gifs.py` using the bundled Codex Python/Pillow runtime.
+  The script mirrors `EquipIconFramesPerSecond = 12.5f`: 80 ms per frame,
+  three frames, 42 complete cycles, 126 frames and 10.08 seconds. It omits the
+  GIF loop extension so playback stops on frame 3. The verified seven-file
+  artifact plus README is
+  `dist/Gilomx-Boss-Roulette-Challenge-GIFs-0.5.122.zip` (54,941 bytes,
+  SHA-256 `EBB36B6FF7AE0EA8E2BA5AA3365ACA134FFEA84B79D02D832514796CBED3A71E`).
 
 ## Native boss-door return and covered map input (0.5.121)
 
@@ -127,6 +195,12 @@ Equip Card in layout, typography, input, animation, sound, and native prompts.
 
 The PC already has GitHub SSH access. Do not install SSH tooling or unrelated
 dependencies.
+
+The user explicitly authorizes the agent to close Cuphead when a local test
+build must replace the loaded DLL, then relaunch the game normally through
+Steam. Prefer a graceful window close when available and use process
+termination only if the game does not exit; never relaunch Cuphead directly
+outside Steam because that bypasses Steam Input and can hide the controller.
 
 ## Current Git state
 
