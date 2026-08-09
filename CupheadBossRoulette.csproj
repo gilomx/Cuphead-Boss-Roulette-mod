@@ -4,7 +4,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>Gilomx.CupheadBossRoulette</RootNamespace>
     <AssemblyName>Gilomx.CupheadBossRoulette</AssemblyName>
-    <Version>0.5.128</Version>
+    <Version>0.5.129</Version>
     <CupheadDir Condition="'$(CupheadDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Cuphead</CupheadDir>
     <RestoreAdditionalProjectSources>https://api.nuget.org/v3/index.json;https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
   </PropertyGroup>

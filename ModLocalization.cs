@@ -62,6 +62,7 @@ namespace Gilomx.CupheadBossRoulette
         ChallengeNoPeashooter,
         ChallengeNoEx,
         ChallengeBlackAndWhite,
+        ChallengeRgbShift,
         ChallengeNone
     }
 
@@ -197,6 +198,8 @@ namespace Gilomx.CupheadBossRoulette
                     return Text(ModText.ChallengeNoEx);
                 case ModifierId.BlackAndWhite:
                     return Text(ModText.ChallengeBlackAndWhite);
+                case ModifierId.RgbShift:
+                    return Text(ModText.ChallengeRgbShift);
                 default:
                     return Text(ModText.ChallengeNone);
             }
@@ -288,6 +291,7 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.ChallengeNoPeashooter] = "SIN DISPARO NORMAL";
             spanish[ModText.ChallengeNoEx] = "NO EX";
             spanish[ModText.ChallengeBlackAndWhite] = "BLANCO Y NEGRO";
+            spanish[ModText.ChallengeRgbShift] = "RGB";
             spanish[ModText.ChallengeNone] = "Nada";
         }
 
@@ -329,6 +333,7 @@ namespace Gilomx.CupheadBossRoulette
             english[ModText.ChallengeNoPeashooter] = "NO PEASHOOTER";
             english[ModText.ChallengeNoEx] = "NO EX";
             english[ModText.ChallengeBlackAndWhite] = "BLACK & WHITE";
+            english[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddFrenchTexts()
@@ -362,6 +367,7 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.ChallengeNoPeashooter] = "SANS TIR PRINCIPAL";
             french[ModText.ChallengeNoEx] = "SANS EX";
             french[ModText.ChallengeBlackAndWhite] = "NOIR ET BLANC";
+            french[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddItalianTexts()
@@ -395,6 +401,7 @@ namespace Gilomx.CupheadBossRoulette
             italian[ModText.ChallengeNoPeashooter] = "SENZA MITRAGLIATRICE";
             italian[ModText.ChallengeNoEx] = "SENZA EX";
             italian[ModText.ChallengeBlackAndWhite] = "MONOCROMO";
+            italian[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddGermanTexts()
@@ -428,6 +435,7 @@ namespace Gilomx.CupheadBossRoulette
             german[ModText.ChallengeNoPeashooter] = "OHNE MASCHINENGEWEHR";
             german[ModText.ChallengeNoEx] = "OHNE EX";
             german[ModText.ChallengeBlackAndWhite] = "SCHWARZ-WEISS";
+            german[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddKoreanTexts()
@@ -461,6 +469,7 @@ namespace Gilomx.CupheadBossRoulette
             korean[ModText.ChallengeNoPeashooter] = "기본 공격 금지";
             korean[ModText.ChallengeNoEx] = "EX 공격 금지";
             korean[ModText.ChallengeBlackAndWhite] = "흑백";
+            korean[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddRussianTexts()
@@ -494,6 +503,7 @@ namespace Gilomx.CupheadBossRoulette
             russian[ModText.ChallengeNoPeashooter] = "БЕЗ ОБЫЧНОГО ВЫСТРЕЛА";
             russian[ModText.ChallengeNoEx] = "БЕЗ EX";
             russian[ModText.ChallengeBlackAndWhite] = "ЧЕРНО-БЕЛЫЙ";
+            russian[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddPolishTexts()
@@ -527,6 +537,7 @@ namespace Gilomx.CupheadBossRoulette
             polish[ModText.ChallengeNoPeashooter] = "BEZ DZIAŁKA";
             polish[ModText.ChallengeNoEx] = "BEZ EX";
             polish[ModText.ChallengeBlackAndWhite] = "CZARNO-BIAŁY";
+            polish[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddPortugueseBrazilTexts()
@@ -560,6 +571,7 @@ namespace Gilomx.CupheadBossRoulette
             portugueseBrazil[ModText.ChallengeNoPeashooter] = "SEM METRALHADORA";
             portugueseBrazil[ModText.ChallengeNoEx] = "SEM EX";
             portugueseBrazil[ModText.ChallengeBlackAndWhite] = "PRETO E BRANCO";
+            portugueseBrazil[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddJapaneseTexts()
@@ -593,6 +605,7 @@ namespace Gilomx.CupheadBossRoulette
             japanese[ModText.ChallengeNoPeashooter] = "通常ショット禁止";
             japanese[ModText.ChallengeNoEx] = "EXショット禁止";
             japanese[ModText.ChallengeBlackAndWhite] = "モノクロ";
+            japanese[ModText.ChallengeRgbShift] = "RGB";
         }
 
         private void AddSimplifiedChineseTexts()
@@ -626,6 +639,7 @@ namespace Gilomx.CupheadBossRoulette
             simplifiedChinese[ModText.ChallengeNoPeashooter] = "禁止普通射击";
             simplifiedChinese[ModText.ChallengeNoEx] = "禁止EX攻击";
             simplifiedChinese[ModText.ChallengeBlackAndWhite] = "黑白";
+            simplifiedChinese[ModText.ChallengeRgbShift] = "RGB";
         }
     }
 }

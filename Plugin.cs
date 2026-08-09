@@ -15,14 +15,17 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.128";
+        public const string PluginVersion = "0.5.129";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
         // TEMPORARY TEST SELECTOR. Keep non-None while developing a challenge.
         // Compatible bosses are still chosen randomly.
         private static readonly ModifierId ForcedTestChallenge =
-            ModifierId.None;
+            ExperimentalFeatures.EnableRgbShiftChallenge &&
+            ExperimentalFeatures.ForceRgbShiftChallengeForTesting
+                ? ModifierId.RgbShift
+                : ModifierId.None;
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
         // Dormant test selector: exercise both restricted plane weapons.
@@ -1025,6 +1028,7 @@ namespace Gilomx.CupheadBossRoulette
             UpdateLanguageTestShortcut();
             UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
+            UpdateRgbShiftTransition();
             UpdateBlackAndWhiteTransition();
             UpdateBlackAndWhiteRenderEffects();
             var controllerRerollPressed = PollControllerRerollPressed();
@@ -1787,7 +1791,11 @@ namespace Gilomx.CupheadBossRoulette
             loadout.charm = RouletteData.Charms[result.Charm].Value;
             loadout.HasEquippedSecondaryRegularWeapon =
                 loadout.secondaryWeapon != Weapon.None;
-            loadout.MustNotifySwitchRegularWeapon = true;
+            // The roulette HUD already explains the temporary loadout. The
+            // native switch tutorial would otherwise remain forever when
+            // Weapon B is None because no weapon-change event can dismiss it.
+            loadout.MustNotifySwitchRegularWeapon = false;
+            loadout.MustNotifySwitchSHMUPWeapon = false;
         }
 
         private void CaptureOriginalLoadouts()
@@ -2308,6 +2316,8 @@ namespace Gilomx.CupheadBossRoulette
         private void SetActiveChallenge(ModifierId challenge, int bossIndex)
         {
             soloMiniRestartPending = false;
+            if (!ExperimentalFeatures.IsChallengeEnabled(challenge))
+                challenge = ModifierId.None;
             activeChallenge = challenge;
             activeChallengeBoss = activeChallenge == ModifierId.None
                 ? -1 : bossIndex;
@@ -2882,6 +2892,7 @@ namespace Gilomx.CupheadBossRoulette
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
             DestroyBattleResultHud();
+            ResetRgbShiftChallenge();
             ResetBlackAndWhiteRenderEffects();
             blackAndWhiteTransitionShader = null;
             battleHudSaturationShader = null;

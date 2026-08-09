@@ -179,8 +179,10 @@ namespace Gilomx.CupheadBossRoulette
                 var rollingModifier = CurrentRollingModifier(bossIndex);
                 var modifier = DisplayIndex(5, result.Modifier, RouletteData.Modifiers.Length,
                     rollingModifier - ticker);
+                var modifierEntry = RouletteData.Modifiers[modifier];
                 DrawTexture(rect, AnimatedTexturePath(
-                    RouletteData.Modifiers[modifier].Image, 3, EquipIconFramesPerSecond));
+                    modifierEntry.Image, modifierEntry.FrameCount,
+                    EquipIconFramesPerSecond));
             }
             else
             {

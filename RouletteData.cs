@@ -18,7 +18,8 @@ namespace Gilomx.CupheadBossRoulette
         NoBombs,
         NoPeashooter,
         NoEx,
-        BlackAndWhite
+        BlackAndWhite,
+        RgbShift
     }
 
     internal sealed class BossEntry
@@ -71,12 +72,15 @@ namespace Gilomx.CupheadBossRoulette
         internal readonly ModifierId Id;
         internal readonly ModifierKind Kind;
         internal readonly string Image;
+        internal readonly int FrameCount;
 
-        internal ModifierEntry(ModifierId id, ModifierKind kind, string image)
+        internal ModifierEntry(ModifierId id, ModifierKind kind, string image,
+            int frameCount = 3)
         {
             Id = id;
             Kind = kind;
             Image = image;
+            FrameCount = frameCount;
         }
     }
 
@@ -168,6 +172,8 @@ namespace Gilomx.CupheadBossRoulette
             new ModifierEntry(ModifierId.NoPeashooter, ModifierKind.Plane, "modifiers/nopeashooter_01.png"),
             new ModifierEntry(ModifierId.NoEx, ModifierKind.Both, "modifiers/noex_01.png"),
             new ModifierEntry(ModifierId.BlackAndWhite, ModifierKind.Both, "modifiers/blacknwhite_01.png"),
+            new ModifierEntry(ModifierId.RgbShift, ModifierKind.Both,
+                "modifiers/rgb.png", 1),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
 
@@ -178,6 +184,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var modifier = Modifiers[i];
                 if (modifier.Id == ModifierId.None)
+                    continue;
+                if (!ExperimentalFeatures.IsChallengeEnabled(modifier.Id))
                     continue;
                 if (modifier.Kind == ModifierKind.Both ||
                     (boss.IsPlane && modifier.Kind == ModifierKind.Plane) ||

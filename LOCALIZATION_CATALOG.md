@@ -2,6 +2,13 @@
 
 Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `SpanishSpain` usa la tabla española base; `SpanishAmerica` hereda esa tabla y cambia sólo `challenge.no_peashooter` a `SIN PEASHOOTER`. `LOCALIZATION_TRANSLATIONS.md` queda como registro histórico.
 
+## Placeholder del reto RGB (0.5.129)
+
+El reto experimental usa temporalmente `RGB` como nombre visible en las 12
+tablas. Esto evita que otro idioma reciba un respaldo español mientras el reto
+está forzado para pruebas. Antes de habilitarlo públicamente hay que decidir su
+nombre final y solicitar las traducciones correspondientes.
+
 ## Ajuste uniforme de etiquetas de equipo (0.5.128)
 
 Las cinco etiquetas bajo los iconos comparten un solo tamaño de fuente por

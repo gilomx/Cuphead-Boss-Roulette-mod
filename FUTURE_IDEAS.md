@@ -55,7 +55,14 @@ Antes de intentar la duplicación completa también puede corregirse solamente
 el estado híbrido, usando el `isChalice` real de cada jugador para elegir su
 armamento de avión.
 
-## Reto de desfase RGB inspirado en Cagney
+## Reto de desfase RGB inspirado en Cagney — HECHO
+
+Estado: funcionalidad terminada y aceptada en 0.5.129. Queda desactivada por
+decisión del proyecto: `EnableRgbShiftChallenge` y
+`ForceRgbShiftChallengeForTesting` están en `false`, por lo que no aparece en
+la ruleta. Para publicarla después se activa sólo el primer interruptor. El arte
+final de tres frames y el nombre localizado siguen pendientes como presentación,
+no como desarrollo funcional.
 
 ### Idea
 
@@ -88,8 +95,14 @@ Nombre provisional: `Desfase RGB`.
   postproceso nativo y evitar procesamiento de imagen en CPU.
 - Probar niveles terrestres, niveles de avión, P1 y cooperativo.
 
-También puede evaluarse una variante por pulsos, pero la primera prueba debe
-ser un efecto estable para poder comparar su fidelidad con el de Cagney.
+La implementación terminada reutiliza `ChromaticAberrationFilmGrain`, espera los
+mismos 1.5 segundos de apertura normal que `Blanco y negro` y entra durante
+1.25 segundos. La configuración aceptada usa amplitud base 32 y una
+trayectoria sinusoidal 2D: velocidad vertical 10 y horizontal 7.3, con 70% de
+amplitud horizontal. Rojo usa 120% de fuerza, verde 60% y azul 90%. También
+controla `BlurGamma` sin corutinas: conserva el ciclo nativo de 2.2 segundos a
+70% de fuerza. El placeholder es un único PNG transparente de 80 × 80 con el
+texto `RGB`; el arte final animado sigue pendiente.
 
 ## Reto de fijado permanente
 
