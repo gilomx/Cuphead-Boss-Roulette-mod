@@ -1,5 +1,102 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Native weapon-switch notification suppressed (0.5.129)
+
+Roulette fights no longer show Cuphead's native `E`/weapon-switch tutorial,
+regardless of whether Weapon B is equipped. The root cause was in
+`Plugin.ApplyLoadout()`: it always set `MustNotifySwitchRegularWeapon = true`.
+`LevelHUDPlayer.Init()` then activated `weaponSwitchNotification`, and native
+`OnWeaponChanged()` was the only path that cleared and faded it. With Weapon B
+set to `Weapon.None`, the player could never generate that event, so the prompt
+remained for the entire fight.
+
+`ApplyLoadout()` now sets both `MustNotifySwitchRegularWeapon` and
+`MustNotifySwitchSHMUPWeapon` to `false` for each temporary roulette loadout.
+This covers ground and plane fights, one or two players, Weapon B present or
+empty, retries and the Dice Palace chain. It does not patch `LevelHUDPlayer` or
+alter normal Cuphead fights. `LoadoutSnapshot` already captures both original
+flags and restores them on win/exit, so a tutorial legitimately pending before
+the roulette is preserved after returning to the map.
+
+Manual acceptance: test one roulette fight with Weapon B `Nada` and one with
+two weapons; neither should show the switch notice. Retry both once, then leave
+to the map and confirm ordinary non-roulette behavior is unchanged. Build
+verification: 0 errors, 0 warnings. DLL SHA-256
+`DBA0BD2444B85F0651DE2B6C2E32DD9B2DD13194DD2CCFA9B4E13EBA3A9559D6`.
+
+## Completed dormant RGB challenge (0.5.129)
+
+`ModifierId.RgbShift` is now an experimental ground-and-plane challenge. It
+uses Cuphead's persistent `ChromaticAberrationFilmGrain` component rather than
+shipping another shader. Reverse engineering confirmed Cagney's pollen calls
+`CupheadRenderer.TouchFuzzy(15f, 8f, 1.2f)`: the native coroutine drives red
+up, green up at half amplitude and blue down using `sin(time * 8) * 15`.
+
+`RgbShiftChallenge.cs` owns those three vectors and the camera's `BlurGamma`
+directly instead of repeatedly calling `TouchFuzzy`, which would accumulate
+psychedelic and blur coroutines. Reverse engineering the native blur coroutine
+confirmed that it jumps to baseline +1, rises at one unit per second for 0.6 s
+to baseline +1.6, then falls at the same rate for 1.6 s. A complete assembly
+reference scan also confirmed that the pollen coroutine writes only vertical
+RGB vectors; its apparent horizontal movement comes from `BlurGamma` sampling
+diagonally. The full repeated blur was rejected visually as too strong.
+
+The current deliberately exaggerated test returns to smooth sinusoidal motion
+after irregular target bounces were rejected visually. Base amplitude is 32
+and vertical speed is 10. Horizontal motion runs at 73% speed (7.3), 70%
+amplitude and a quarter-cycle phase offset, creating a continuous 2D path. Red
+uses 120% strength, green 60% and blue 90% in the opposite direction; their
+maximum vertical displacements are 38.4, 19.2 and 28.8. The native 2.2-second
+blur timing runs at 70% strength (baseline +0.7 initially, peaking at +1.12).
+This is a difficulty-boundary test, not a claim that Cagney's native coroutine
+has this 2D amplitude. The challenge does not reproduce Cagney's `AudioWarble`
+because it is visual.
+
+Neither effect changes the camera transform, world positions, controls or
+hitboxes. The perceived screen motion comes only from RGB samples being drawn
+at different offsets and `BlurGamma` sampling the rendered image diagonally.
+
+During active RGB gameplay, `PlaceBattleHudOnGameplayLayer()` reparents the
+roulette row to `LevelHUD.Canvas`. The normal persistent HUD is a
+`ScreenSpaceOverlay` rendered after camera postprocessing, so it could not
+receive RGB or blur. This exception is restricted to `ModifierId.RgbShift`;
+every other challenge retains the accepted independent overlay and its parry
+isolation. Pause, game over, victory and scene-transition paths remain
+unchanged. Manual acceptance must parry repeatedly in ground, plane and King
+Dice fights to ensure the RGB-only native-Canvas route behaves like Cuphead's
+health/super HUD without reviving the old custom-HUD blink.
+
+It captures the native RGB vectors and `blurSize`, waits the accepted
+`BlackAndWhiteEntryDelay` (1.5 s), fades both effects in over
+`BlackAndWhiteFadeInDuration` (1.25 s), applies them in `LateUpdate`, fades out
+over 0.9 s and restores every captured value. `LateUpdate` also prevents
+Cagney's own pollen coroutines from fighting the owned values. Transient scene
+loading preserves the current state, matching the black-and-white lifecycle;
+once a genuinely new battle `Level` instance is available, its normal opening
+starts again. Retry keeps the challenge but also starts its opening again.
+`OnDestroy` performs an immediate final restore.
+
+The user accepted the challenge behavior, then requested that it remain dormant
+for ongoing development. `ExperimentalFeatures.EnableRgbShiftChallenge` and
+`ForceRgbShiftChallengeForTesting` are therefore both `false`. RGB is absent
+from `ValidModifierIndices`, cannot be selected or forced, and its runtime
+ownership stays disabled; the completed implementation and assets remain in
+the project. To publish it later, set Enable true and keep Force false. Set both
+true only for a new forced local test.
+
+The placeholder `assets/modifiers/rgb.png` is one transparent 80 × 80 frame
+generated from the existing challenge-icon visual language. `ModifierEntry`
+now carries `FrameCount` (default 3); RGB passes 1 so the Equip Card does not
+request missing `_02`/`_03` files or blink. The HUD already consumes the same
+first texture. The temporary displayed name is `RGB` in all 12 language tables.
+The functionality is complete. Final localized copy and the user's final
+three-frame art are still pending presentation assets, not code blockers.
+
+Build verification: 0 errors, 0 warnings. DLL SHA-256
+`DBA0BD2444B85F0651DE2B6C2E32DD9B2DD13194DD2CCFA9B4E13EBA3A9559D6`;
+placeholder SHA-256
+`F5D81433B50BA114FBCF69F23A67F7FF7D42E0C111947781CA08A5BBF8D5218A`.
+
 ## Uniform localized equipment labels (0.5.128)
 
 The five labels below the equipment icons now share one fitted font size per
@@ -40,7 +137,7 @@ bold, italics, code spans or Markdown separators. Numbered instructions use
 UTF-8, including Spanish accents.
 
 Last updated: 2026-08-08
-Current local version: 0.5.128
+Current local version: 0.5.129
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit

@@ -1152,12 +1152,33 @@ namespace Gilomx.CupheadBossRoulette
                        TrySwapBattleHudToNativeVictoryLayer(nativeCanvas);
             }
 
+            // Screen Space Overlay is composited after camera postprocessing.
+            // RGB therefore uses LevelHUD's camera Canvas so the roulette row
+            // receives exactly the same chromatic split and blur as Cuphead's
+            // health and super HUD. Other challenges retain the independent
+            // overlay that isolates them from the native parry flash.
+            if (battleHudChallengeSnapshot == ModifierId.RgbShift)
+                return PlaceBattleHudOnNativeGameplayLayer(nativeCanvas);
+
             // The camera that renders LevelHUD also receives Cuphead's parry
             // flash. Keep the roulette row on its independent overlay Canvas
             // during active play so that flash cannot tint or pulse it. On a
             // final victory it moves back to LevelHUD above, allowing the
             // native knockout transition to remove both HUDs together.
             return PlaceBattleHudOnPersistentOverlay();
+        }
+
+        private bool PlaceBattleHudOnNativeGameplayLayer(Canvas nativeCanvas)
+        {
+            if (battleHudRoot == null || nativeCanvas == null)
+                return false;
+            if (battleHudRoot.transform.parent != nativeCanvas.transform)
+                battleHudRoot.transform.SetParent(nativeCanvas.transform, false);
+            battleHudRoot.transform.SetAsLastSibling();
+            battleHudOnNativeCanvas = true;
+            battleHudOnPauseLayer = false;
+            FadeBattleHudRootAlphaToFull();
+            return true;
         }
 
         private bool PlaceBattleHudOnSceneTransitionLayer()

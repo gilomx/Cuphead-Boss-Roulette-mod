@@ -3,6 +3,45 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## 0.5.129 — 2026-08-08 (desarrollo RGB)
+
+- Las partidas de ruleta ya no muestran el aviso nativo para cambiar de arma,
+  tenga Tiro B equipado o en `Nada`. El equipo temporal establece en `false`
+  los avisos terrestre y de avión; el snapshot restaura los valores originales
+  al ganar o volver al mapa. Las partidas normales de Cuphead no se modifican.
+- Se añadió el reto experimental `RGB`, compatible con jefes terrestres y de
+  avión, reutilizando `ChromaticAberrationFilmGrain`, el postproceso nativo que
+  activa el polen de Cagney.
+- El combate comienza normal durante 1.5 segundos y el desfase entra suavemente
+  durante 1.25 segundos, exactamente con los tiempos de `Blanco y negro`.
+- La prueba exagerada regresa al movimiento sinusoidal después de descartar los
+  rebotes irregulares. Usa amplitud base 32, velocidad vertical 10 y movimiento
+  horizontal a velocidad 7.3 y amplitud 70% con desfase de un cuarto de ciclo.
+- Rojo usa 120% de fuerza, verde 60% y azul 90% en dirección contraria. Sus
+  recorridos verticales máximos son 38.4, 19.2 y 28.8 respectivamente.
+- El pulso conserva el ritmo nativo de 2.2 s y usa el 70% del desenfoque:
+  comienza en +0.7, alcanza +1.12 y regresa al valor original.
+- Los dos efectos se aplican en `LateUpdate`, sin acumular corutinas. Se guardan
+  y restauran los vectores RGB y `BlurGamma.blurSize` al reintentar, ganar,
+  abandonar, cambiar de escena o descargar el mod.
+- La cámara, posiciones, controles e hitboxes no se mueven; la sensación de
+  movimiento procede únicamente de las muestras RGB desplazadas y el blur diagonal.
+- Durante RGB, la fila del HUD de la ruleta se coloca en `LevelHUD.Canvas` para
+  recibir el mismo desfase y desenfoque que vidas y cartas. Los demás retos
+  conservan el overlay independiente que evita el parpadeo del parry.
+- Durante una carga transitoria conserva su estado igual que `Blanco y negro`;
+  al aparecer una instancia de combate realmente nueva vuelve a ejecutar la
+  entrada normal, sin apagarse a mitad de la carga.
+- La funcionalidad fue aceptada y marcada como terminada. Por decisión del
+  proyecto, los interruptores para habilitarla y forzarla quedan ambos en
+  `false`: RGB no aparece en la ruleta de este build, pero su implementación se
+  conserva lista para activarse después.
+- Se añadió un placeholder estático transparente de 80 × 80 con el texto `RGB`.
+  `ModifierEntry.FrameCount` permite que use un solo frame sin parpadear; los
+  retos existentes conservan sus tres frames.
+- El nombre de desarrollo es `RGB` en los 12 idiomas hasta recibir las
+  traducciones y el arte finales.
+
 ## 0.5.128 — 2026-08-08
 
 - Las cinco etiquetas bajo los iconos de equipo usan un único tamaño de

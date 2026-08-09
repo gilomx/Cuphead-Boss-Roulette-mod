@@ -32,6 +32,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             UpdateBattleResultHud();
             UpdateNativeRoulettePrompt();
+            ApplyRgbShiftEffectLate();
         }
 
         private void UpdateNativeRoulettePrompt()
