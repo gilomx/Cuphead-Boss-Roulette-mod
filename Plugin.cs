@@ -601,6 +601,20 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning("Could not install the No airplane bombs guard.");
 
+            var touchFuzzy = AccessTools.Method(
+                typeof(CupheadRenderer), "TouchFuzzy",
+                new[] { typeof(float), typeof(float), typeof(float) });
+            var suppressCagneyFuzzyDuringRgbPrefix = AccessTools.Method(
+                typeof(Plugin), "SuppressCagneyFuzzyDuringRgbPrefix");
+            if (touchFuzzy != null &&
+                suppressCagneyFuzzyDuringRgbPrefix != null)
+                harmony.Patch(touchFuzzy,
+                    prefix: new HarmonyMethod(
+                        suppressCagneyFuzzyDuringRgbPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the Cagney RGB overlap guard.");
+
             var switchPlaneWeapon = AccessTools.Method(
                 typeof(PlanePlayerWeaponManager), "SwitchWeapon",
                 new[] { typeof(Weapon) });

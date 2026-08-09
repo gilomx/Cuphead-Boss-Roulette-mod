@@ -165,6 +165,25 @@ namespace Gilomx.CupheadBossRoulette
                 (pulseTime - RgbBlurRiseDuration));
         }
 
+        private static bool SuppressCagneyFuzzyDuringRgbPrefix()
+        {
+            var plugin = activeInstance;
+            return plugin == null ||
+                   !plugin.ShouldSuppressCagneyFuzzyDuringRgb();
+        }
+
+        private bool ShouldSuppressCagneyFuzzyDuringRgb()
+        {
+            if (activeChallenge != ModifierId.RgbShift ||
+                activeChallengeBoss < 0 ||
+                activeChallengeBoss >= RouletteData.Bosses.Length ||
+                RouletteData.Bosses[activeChallengeBoss].Level !=
+                    Levels.Flower)
+                return false;
+
+            return ShouldShowActiveChallenge();
+        }
+
         private bool TryAcquireRgbShiftEffect()
         {
             if (rgbShiftEffect == null)
