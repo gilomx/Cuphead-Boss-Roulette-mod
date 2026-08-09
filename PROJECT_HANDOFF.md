@@ -1657,12 +1657,12 @@ capsule keeps its separate compact sizing. Preserve the right edge constant
 The roulette dim layer must be behind the card and the native F7 prompt must be
 in front of it.
 
-Physical-controller validation is still pending. This PC currently uses Steam
-Link, whose exposed controls do not include LT, so the complete open combo and
-navigation/reroll flow could not be exercised end to end here. On the next PC,
-test with a real Xbox/PlayStation/Switch-style controller: prompt order and
-glyph, open/close combo, D-pad/stick navigation, Accept/Cancel, and RT/R2/ZR
-reroll with automatic loading disabled. Keyboard F6/F7 was tested locally.
+Physical-controller validation is complete. The user tested the full flow with
+a real controller and accepted it: prompt order and glyph, LT/L2/ZL plus Equip
+open/close combo, D-pad/stick navigation, Accept/Cancel, and RT/R2/ZR reroll
+with automatic loading disabled all work correctly. Keyboard F6/F7 remains
+validated as well; the earlier Steam Link limitation is no longer an
+outstanding test item.
 
 Version 0.5.44 adds the controller open/close combo. `Plugin.cs` reads
 Cuphead's `EquipMenu` action from each `Rewired.Player`, then scans only that
