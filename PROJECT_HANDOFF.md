@@ -1,5 +1,31 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Cagney native fuzzy suppression during RGB (0.5.129)
+
+When a roulette fight combines `Levels.Flower` with `ModifierId.RgbShift`, a
+Harmony prefix now skips `CupheadRenderer.TouchFuzzy(float, float, float)`.
+Direct IL inspection confirmed that this method only calls
+`ChromaticAberrationFilmGrain.PsychedelicEffect(...)` and starts
+`CupheadRenderer.change_blur_cr(...)`; it does not own hit detection, damage or
+audio. Suppressing the whole method therefore prevents the two native visual
+coroutines from running behind the permanent challenge without changing the
+attack itself.
+
+The prefix returns normally for every other boss, every non-RGB fight and all
+gameplay outside the active roulette challenge. It also requires
+`ShouldShowActiveChallenge()`, so stale roulette state during map/scene loading
+cannot suppress a normal Cuphead effect.
+
+Manual acceptance passed with `ForcedTestBossSequence` restricted to
+`Levels.Flower`: receiving the pollen hit after the RGB transition caused no
+visual jump or additional blur, while damage remained normal. After validation,
+`ExperimentalFeatures.EnableRgbShiftChallenge`,
+`ForceRgbShiftChallengeForTesting` and `Plugin.ForceTestBoss` were restored to
+`false`. The guard remains compiled and ready for the future RGB release, but
+neither the challenge nor the Cagney selector is active in the public build.
+Final verification: 0 errors, 0 warnings. DLL SHA-256
+`38CAB27C384B19713B24575FDB1BC5BDB1D2345850F7520F1593D1ADFEBE8469`.
+
 ## Native weapon-switch notification suppressed (0.5.129)
 
 Roulette fights no longer show Cuphead's native `E`/weapon-switch tutorial,

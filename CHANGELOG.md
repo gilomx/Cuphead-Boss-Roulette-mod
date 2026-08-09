@@ -5,6 +5,14 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
 ## 0.5.129 — 2026-08-08 (desarrollo RGB)
 
+- Durante la combinación Cagney + reto RGB, se omite el `TouchFuzzy` nativo
+  del polen para que no cree corrutinas de RGB y desenfoque que compitan en
+  segundo plano. El método nativo es exclusivamente visual; el impacto, daño y
+  cualquier otro comportamiento del ataque no se modifican.
+- La combinación fue validada manualmente: el polen conserva su daño normal y
+  no produce saltos adicionales de color ni desenfoque. Los interruptores que
+  habilitan/fuerzan RGB y el selector de Cagney volvieron a `false` para que el
+  desarrollo permanezca inactivo en la versión pública.
 - Las partidas de ruleta ya no muestran el aviso nativo para cambiar de arma,
   tenga Tiro B equipado o en `Nada`. El equipo temporal establece en `false`
   los avisos terrestre y de avión; el snapshot restaura los valores originales
