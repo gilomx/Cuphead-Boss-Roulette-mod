@@ -8,7 +8,6 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const float UpsideDownEntryDelay = 0.25f;
         private const float UpsideDownEntryDuration = 0.45f;
-        private const float UpsideDownDefeatReturnDelay = 1f;
         private const float UpsideDownVictoryReturnDelay = 1f;
         private const float UpsideDownTurnSoundVolume = 1f;
 

@@ -9,7 +9,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool challengeVisualRetryResetPending;
         private int challengeVisualRetryPreviousLevelInstanceId = -1;
         private bool challengeVisualDefeatUnwindActive;
-        private bool challengeVisualPauseRestartWaitingForBlack;
+        private bool challengeVisualRestartWaitingForBlack;
 
         private static void BeginChallengeVisualDefeatUnwindPrefix()
         {
@@ -30,10 +30,10 @@ namespace Gilomx.CupheadBossRoulette
                         0f, 0f, ChallengeDefeatVisualResetDuration);
                     break;
                 case ModifierId.UpsideDown:
-                    BeginUpsideDownTransition(
-                        0f, UpsideDownDefeatReturnDelay,
-                        UpsideDownEntryDuration);
-                    break;
+                    challengeVisualDefeatUnwindActive = true;
+                    Logger.LogInfo(
+                        "Holding upside-down frame through defeat.");
+                    return;
                 case ModifierId.BlackAndWhite:
                     BeginBlackAndWhiteTransition(
                         0f, 0f, ChallengeDefeatVisualResetDuration);
@@ -74,12 +74,34 @@ namespace Gilomx.CupheadBossRoulette
                 plugin.PrepareChallengeVisualsForPauseRestart();
         }
 
+        private static void PrepareChallengeVisualsForPauseExitPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin != null)
+                plugin.PrepareChallengeVisualsForPauseExit();
+        }
+
+        private static void PrepareChallengeVisualsForDefeatExitPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin != null)
+                plugin.PrepareChallengeVisualsForDefeatExit();
+        }
+
         private void PrepareChallengeVisualsForRetry()
         {
             if (activeChallenge == ModifierId.None)
                 return;
 
             CaptureChallengeVisualRestartLevel();
+            if (activeChallenge == ModifierId.UpsideDown)
+            {
+                challengeVisualRestartWaitingForBlack = true;
+                Logger.LogInfo(
+                    "Holding upside-down frame through defeat retry fade.");
+                return;
+            }
+
             ResetChallengeVisualsForReload();
         }
 
@@ -99,9 +121,31 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             CaptureChallengeVisualRestartLevel();
-            challengeVisualPauseRestartWaitingForBlack = true;
+            challengeVisualRestartWaitingForBlack = true;
             Logger.LogInfo(
                 "Holding challenge render effect through pause restart fade.");
+        }
+
+        private void PrepareChallengeVisualsForPauseExit()
+        {
+            if (activeChallenge != ModifierId.UpsideDown)
+                return;
+
+            CaptureChallengeVisualRestartLevel();
+            challengeVisualRestartWaitingForBlack = true;
+            Logger.LogInfo(
+                "Holding upside-down frame through pause exit-to-map fade.");
+        }
+
+        private void PrepareChallengeVisualsForDefeatExit()
+        {
+            if (activeChallenge != ModifierId.UpsideDown)
+                return;
+
+            CaptureChallengeVisualRestartLevel();
+            challengeVisualRestartWaitingForBlack = true;
+            Logger.LogInfo(
+                "Holding upside-down frame through defeat exit-to-map fade.");
         }
 
         private void CaptureChallengeVisualRestartLevel()
@@ -122,12 +166,12 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private void CompleteChallengeVisualPauseRestartOnFadeInEnd()
+        private void CompleteChallengeVisualRestartOnFadeInEnd()
         {
-            if (!challengeVisualPauseRestartWaitingForBlack)
+            if (!challengeVisualRestartWaitingForBlack)
                 return;
 
-            challengeVisualPauseRestartWaitingForBlack = false;
+            challengeVisualRestartWaitingForBlack = false;
             ResetChallengeVisualsForReload();
             Logger.LogInfo(
                 "Cleared challenge render effects behind opaque restart fade.");
@@ -136,9 +180,9 @@ namespace Gilomx.CupheadBossRoulette
         private void ResetChallengeVisualsForReload()
         {
 
-            // Clear every camera-wide challenge before ReloadLevel() starts.
-            // Defeat Retry calls this before ReloadLevel(). Pause Restart calls
-            // it only after Cuphead's fade has reached full black.
+            // RGB and Black and White clear before defeat ReloadLevel().
+            // UpsideDown and Pause Restart call this only after Cuphead's
+            // fade has reached full black, hiding the return to normal.
             ResetRgbShiftChallenge();
             ResetUpsideDownChallenge();
             ResetBlackAndWhiteChallengeForRetry();
@@ -190,7 +234,7 @@ namespace Gilomx.CupheadBossRoulette
         private void ClearChallengeVisualRetryGate()
         {
             challengeVisualDefeatUnwindActive = false;
-            challengeVisualPauseRestartWaitingForBlack = false;
+            challengeVisualRestartWaitingForBlack = false;
             challengeVisualRetryResetPending = false;
             challengeVisualRetryPreviousLevelInstanceId = -1;
         }

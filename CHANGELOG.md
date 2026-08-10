@@ -5,6 +5,10 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
 ## 0.5.129 — 2026-08-08 (desarrollo RGB y 180°)
 
+- Se documentó el reto futuro `Just 1 UP`: cada jugador comienza y permanece
+  con 1 HP; Corazón y Corazón Doble son incompatibles, y las reliquias, Anillo
+  de Corazón y cualquier otra curación no pueden superar ese límite.
+
 - Se preparó la primera build del reto experimental `180°`, compatible con
   niveles terrestres y de avión. La cadencia final de prueba espera 0.25
   segundos con el combate normal y gira el fotograma de 0 a 180 grados durante
@@ -17,33 +21,21 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 - La primera prueba reveló que `_FlipY = 1` cancelaba la inversión vertical del
   quad y dejaba el resultado como espejo horizontal. La corrección adicional se
   eliminó: el giro geométrico ahora invierte ambos ejes y termina de cabeza.
-- La siguiente prueba definió el resultado final deseado: además del giro, se
-  aplica un espejo horizontal para que un personaje conserve su posición X al
-  quedar de cabeza. La compresión durante toda la entrada fue descartada
-  visualmente y dos intentos de fundido no escribieron la versión reflejada en
-  el render final de Cuphead. El cambio instantáneo de espejo a mitad del giro
-  parecía un retroceso. Una nueva mezcla con dos pasadas transparentes de
-  `Sprites/Default` dejó negro el render final incluso después de proporcionar
-  `_Flip` y `_RendererColor`, por lo que fue retirada por completo. La versión
-  activa vuelve a la única pasada opaca ya validada; cambia el espejo en el punto
-  lateral y prioriza no perder nunca la imagen del combate.
-- `LevelGameOverGUI.Retry()` limpia preventivamente RGB, Blanco y negro y 180°
-  antes de llamar a `SceneLoader.ReloadLevel()`. Un guard conserva esos efectos
-  en cero durante la carga y los rearma sólo cuando existe una instancia nueva
-  de `Level`, evitando mostrar por una fracción de segundo el estado anterior.
-- El reset dejaba un cambio visible justo al pulsar `Reintentar`. Ahora
-  `Level._OnLose()` inicia antes una salida acelerada hacia el estado normal:
-  0.35 segundos para RGB/Blanco y negro y 0.45 para 180°. Durante la derrota
-  el controlador permanece bloqueado en normal; `Retry()` queda sólo como
-  respaldo y la nueva partida vuelve a ejecutar su entrada habitual.
-- Sólo para el reto `180°`, la espera inicial baja de 1.5 a 0.25 segundos y el
-  giro dura 0.45 segundos, igualando la velocidad de su regreso al perder. Así
-  la orientación queda lista prácticamente al comienzo del combate, antes de
-  que el jugador lleve tiempo moviéndose; los demás retos conservan su cadencia.
-- Al perder con `180°`, la pantalla permanece invertida durante 1 segundo antes
-  de comenzar el regreso de 0.45 segundos. Al ganar con K.O. ahora también
-  espera 1 segundo antes de ejecutar su regreso rápido, en vez de girar de
-  inmediato durante la celebración.
+- Una variante intermedia añadió espejo horizontal para conservar la posición X,
+  pero fue rechazada porque el resultado se percibía reflejado. La versión final
+  elimina por completo la escala de espejo y aplica únicamente una rotación
+  plana: a 180 grados ambos ejes se invierten y los lados intercambian lugar de
+  forma natural.
+- Al perder con `180°`, la tarjeta permanece invertida. Tanto `Reintentar` como
+  `Salir al mapa` conservan la orientación durante el fundido y restablecen el
+  efecto solamente cuando el fader ya está completamente negro.
+- `Pausa → Volver a empezar` y `Pausa → Salir al mapa` comparten el mismo reset
+  oculto. El mapa y cada intento nuevo aparecen normales sin mostrar el giro de
+  regreso. RGB y Blanco y negro conservan su comportamiento anterior.
+- La victoria mantiene su presentación independiente: sostiene el K.O. invertido
+  durante 1 segundo y después vuelve visiblemente a normal en 0.45 segundos
+  antes de la calificación.
+
 - El whoosh sintético y el silbido hueco de objeto/cartoon generados durante las
   pruebas fueron rechazados. El reemplazo activo usa el efecto de violín cartoon
   proporcionado por el usuario, comprimido a 0.450 segundos, normalizado a
@@ -60,9 +52,9 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
   transparente para conservar el pico y sin alterar duración ni enrutamiento.
 - Una última afinación añade otros 0.5 dB al sonido del giro y conserva el
   limitador de techo 0.988, su duración de 0.450 segundos y el canal de Efectos.
-- Los giros rápidos de `180°` y su audio sincronizado aumentan 0.1 segundos: la
-  entrada, el regreso tras derrota y el regreso tras K.O. duran ahora 0.45
-  segundos. RGB y Blanco y negro mantienen sus velocidades anteriores.
+- La entrada y el regreso tras K.O. de `180°` duran 0.45 segundos y conservan
+  su audio sincronizado. Derrota, reintento y salidas al mapa usan un reset
+  instantáneo oculto bajo negro total, sin reproducir un giro visible.
 - Reintentar comienza nuevamente normal. Las escenas internas diferentes del
   Palacio de Dados conservan el giro terminado sin repetir la entrada.
 - `LevelPauseGUI.Restart()` ya no limpia el efecto en su prefijo, porque eso hacía
@@ -76,7 +68,7 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
   actualización futura sin exponerlo todavía en la ruleta pública.
 - El placeholder de `180°` fue reemplazado por un icono transparente de 80 × 80
   sin texto: una flecha crema de trazo negro, inclinada como un aro en perspectiva
-  para sugerir simultáneamente giro 3D y espejo. Sigue usando un solo frame y el
+  para sugerir un giro plano de 180 grados. Sigue usando un solo frame y el
   arte animado final permanece pendiente.
 - El simple cambio de dirección del icono tampoco expresaba profundidad y fue
   reemplazado por un tercer diseño: el aro se adelgaza al alejarse por arriba y

@@ -14,8 +14,6 @@ namespace Gilomx.CupheadBossRoulette
         private Camera targetCamera;
         private Material rotationMaterial;
         private float angleDegrees;
-        private float rotationProgress;
-        private float horizontalMirrorScale = 1f;
         private bool disposed;
 
         internal static bool TryCreate(
@@ -88,11 +86,6 @@ namespace Gilomx.CupheadBossRoulette
         internal void SetAngle(float value)
         {
             angleDegrees = Mathf.Clamp(value, 0f, 180f);
-            rotationProgress = angleDegrees / 180f;
-            // Keep the known-good single opaque pass. A transparent two-pass
-            // mirror crossfade blacked out Cuphead's final render target on
-            // this Unity build and is intentionally not used.
-            horizontalMirrorScale = rotationProgress < 0.5f ? 1f : -1f;
         }
 
         private void OnRenderImage(
@@ -132,8 +125,7 @@ namespace Gilomx.CupheadBossRoulette
                     Graphics.Blit(source, destination);
                     return;
                 }
-                DrawQuad(
-                    aspect, cosine, sine, horizontalMirrorScale);
+                DrawQuad(aspect, cosine, sine);
                 GL.PopMatrix();
                 source.wrapMode = previousWrapMode;
             }
@@ -144,7 +136,7 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private static void DrawQuad(
-            float aspect, float cosine, float sine, float mirrorScaleX)
+            float aspect, float cosine, float sine)
         {
             // Draw a full-screen destination quad and rotate its UVs in the
             // opposite direction. Samples that land outside the captured
@@ -152,25 +144,20 @@ namespace Gilomx.CupheadBossRoulette
             // corners. The complete central frame stays at 1:1 scale: no zoom
             // and no black wedges.
             GL.Begin(GL.QUADS);
-            DrawVertex(
-                0f, 0f, aspect, cosine, sine, mirrorScaleX);
-            DrawVertex(
-                1f, 0f, aspect, cosine, sine, mirrorScaleX);
-            DrawVertex(
-                1f, 1f, aspect, cosine, sine, mirrorScaleX);
-            DrawVertex(
-                0f, 1f, aspect, cosine, sine, mirrorScaleX);
+            DrawVertex(0f, 0f, aspect, cosine, sine);
+            DrawVertex(1f, 0f, aspect, cosine, sine);
+            DrawVertex(1f, 1f, aspect, cosine, sine);
+            DrawVertex(0f, 1f, aspect, cosine, sine);
             GL.End();
         }
 
         private static void DrawVertex(
-            float x, float y, float aspect, float cosine, float sine,
-            float mirrorScaleX)
+            float x, float y, float aspect, float cosine, float sine)
         {
             var destinationX = (x - 0.5f) * aspect;
             var destinationY = y - 0.5f;
-            var sourceX = (destinationX * cosine +
-                           destinationY * sine) * mirrorScaleX;
+            var sourceX = destinationX * cosine +
+                          destinationY * sine;
             var sourceY = -destinationX * sine +
                           destinationY * cosine;
             var sourceU = sourceX /

@@ -33,62 +33,28 @@ shader's `_FlipY` to 1 canceled the rotated quad's vertical inversion, so the
 sets `_FlipY` to 0. The geometry alone performs both axis inversions and the
 endpoint is genuinely upside down.
 
-The user then clarified that the final character must keep the same horizontal
-screen position it had before the transition. The target is therefore flat
-rotation plus an additional horizontal reflection: mathematically the final
-transform preserves X and reverses Y. The first continuous reflection compressed
-the quad for the entire transition and was rejected visually. Two subsequent
-alpha-crossfade attempts (`UI/Default`, then the bundled UI saturation shader)
-loaded without errors but did not write the mirrored pass into Cuphead's final
-render target. The later instant mirror switch at the exact sideways midpoint
-avoided compression but looked like the rotation briefly reversed. A subsequent
-two-pass crossfade using `Sprites/Default` blacked out Cuphead's final render
-target. Explicit `_Flip = (1,1)`, white `_RendererColor`, white `_Color`, and
-disabled external alpha did not resolve it in runtime testing. That entire
-transparent path has therefore been removed, not left as an optional branch.
-The current build again uses only the proven bundled opaque saturation material
-and the midpoint geometry switch. At 180 degrees, `R(PI) * MirrorX` still
-preserves screen X and reverses Y. A future smoother mirror transition must use
-a shader compiled into the existing AssetBundle, not another built-in UI pass.
+The intermediate design added a horizontal reflection so characters would keep
+their original screen X position. Runtime testing ultimately rejected that
+behavior because the result looked mirrored. The final implementation removes
+`rotationProgress`, `horizontalMirrorScale` and the midpoint sign change
+entirely. `DrawVertex()` now applies only the inverse rotation. At 180 degrees
+both screen axes reverse, so left and right exchange places naturally as they
+would on a physical image rotated half a turn; no reflection occurs at any
+point in the transition.
 
-Runtime testing also exposed a one-frame stale-effect flash after defeat/retry
-for UpsideDown and RGB, with Black and White sharing the same architectural
-risk. A Harmony prefix on `LevelGameOverGUI.Retry()` now clears all three visual
-challenge controllers before native `SceneLoader.ReloadLevel()` begins. The
-prefix records the old `Level` instance ID. `Plugin.Update()` holds the three
-visual controllers at zero throughout loading and releases them only when a
-different live `Level` instance exists; that new attempt then performs its
-normal 1.5-second opening. This hook applies to native Dice Palace retry too,
-while ordinary internal Dice scene loads never call `Retry()` and therefore
-retain their special continuous lifecycle.
+UpsideDown now remains fully inverted throughout the defeat card.
+`LevelGameOverGUI.Retry()` and `LevelGameOverGUI.ExitToMap()` capture the old
+level and hold the frame through the native fade. `LevelPauseGUI.Restart()` and
+`LevelPauseGUI.Exit()` use the same covered-transition path.
+`SceneLoader.OnFadeInEndEvent` resets the visual controllers only after the
+fader is completely opaque, so a retry starts from the normal frame and either
+map-exit route arrives upright without exposing the return. RGB and Black and
+White retain their existing defeat unwind behavior. Tower of Power's
+confirmation-only pause Restart branch remains excluded.
 
-Pause-menu restart is a distinct native path and originally bypassed that
-prefix: `LevelPauseGUI.Restart()` exposed the old inverted frame, then the new
-scene reset to normal and replayed the entry turn. Clearing in its prefix fixed
-the stale frame but made the return to normal visible before Cuphead faded out.
-It now uses `PrepareChallengeVisualsForPauseRestartPrefix()` only to capture the
-old `Level` and arm a pending reset. `SceneLoader.OnFadeInEndEvent` fires after
-the native fader completes its 0-to-1 opaque-black transition; the handler then
-resets RGB/UpsideDown/Black-and-White behind the covered screen and enables the
-existing new-instance gate. Tower of Power's confirmation-only Restart branch
-is excluded so it cannot arm an unrelated later fade.
-
-The preventive Retry cleanup initially produced a visible orientation change
-at the exact moment the user pressed Retry. A second Harmony prefix now starts
-earlier at `Level._OnLose()`, before native game-over UI creation. If the active
-roulette challenge is RGB, Black and White or UpsideDown, it begins a 0.35-second
-transition back to the normal frame. `Plugin.Update()` advances only that exit
-transition while the defeat screen is active, preventing the still-matching
-battle `Level` from restarting the challenge. By the time Retry is available,
-the screen is already normal; the Retry reset remains a silent safety net.
-
-UpsideDown is the one timing exception to that immediate defeat unwind: it
-holds the inverted frame for 1 second, then performs the same 0.45-second return.
-Victory now has its own equivalent path: `ClearChallengeOnWinPrefix()` calls
-`BeginUpsideDownVictoryReturn()` before clearing the active challenge. That
-marks the ordinary fade-out as already owned, holds the K.O. frame for 1 second,
-then returns in 0.45 seconds instead of being overwritten by the generic
-immediate 0.9-second exit.
+Victory intentionally keeps its separate presentation: the inverted K.O. frame
+holds for 1 second and then visibly returns to normal in 0.45 seconds before
+grading.
 
 Both generated sound directions were rejected: the 0.38-second noise whoosh and
 the 0.41-second hollow object/cartoon whistle. The active replacement is
@@ -113,8 +79,8 @@ it to the new camera without replaying the entry.
 The temporary display name is `180°` in all 12 language dictionaries. The
 single-frame `assets/modifiers/upside_down.png` is now an 80 × 80 transparent
 text-free icon: a cream arrow with black vintage ink, tilted as an elliptical
-ring in perspective so its wide front arc and narrow rear arc imply both a 3D
-turn and mirror flip. The merely vertically reversed second draft was rejected.
+ring in perspective so its wide front arc and narrow rear arc imply a flat
+180-degree turn. The merely vertically reversed second draft was rejected.
 The current third draft narrows into the upper/rear arc, then grows into a large
 foreshortened arrowhead that emerges from the back toward the viewer. Runtime
 feedback found the first export too horizontal, so the active asset rotates the
@@ -128,12 +94,12 @@ The source MP3 is 2.377 seconds and its useful gesture ends near 1.90 seconds.
 The earlier -17 LUFS preview was judged too quiet; the active WAV uses the
 stronger processing and runtime volume described above.
 
-Manual acceptance passed for the core ground-fight flow: orientation and turn
-direction, edge extension, native/mod HUD rotation, defeat and K.O. returns,
-ordinary retry, pause-menu restart, synchronized SFX and exit cleanup. Before
-the future public activation, complete the remaining plane, co-op, repeated-
-parry and full Dice Palace matrix. Final dormant build verification: 0 errors,
-0 warnings.
+Manual acceptance passed for the core ground-fight flow: pure rotation without
+mirroring, turn direction, edge extension, native/mod HUD rotation, defeat
+hold, defeat Retry, defeat Exit to Map, pause Restart, pause Exit to Map, K.O.
+return, synchronized SFX and hidden cleanup. Before public activation, complete
+the remaining plane, co-op, repeated-parry and full Dice Palace matrix. Final
+art remains pending; both experimental switches are disabled.
 
 ## Cagney native fuzzy suppression during RGB (0.5.129)
 

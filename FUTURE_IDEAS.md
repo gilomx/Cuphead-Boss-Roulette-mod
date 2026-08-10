@@ -184,43 +184,36 @@ Dados, supers, HUD y restauración del equipamiento al volver al mapa.
 
 ## Reto de jugar al revés (pantalla volteada) — HECHO
 
-Estado: implementación y pruebas manuales terminadas en 0.5.129. Los interruptores
+Estado: implementación y pruebas manuales terrestres terminadas en 0.5.129.
 `EnableUpsideDownChallenge` y `ForceUpsideDownChallengeForTesting` están en
-`false`, por lo que queda compilado pero dormido igual que RGB hasta su futura
-activación. La variante elegida combina un giro plano real de 180 grados con
-espejo horizontal, de modo que los personajes terminan de cabeza sin cambiar
-su posición izquierda/derecha.
+`false`, por lo que queda compilado pero dormido hasta recibir el nuevo icono
+animado y completar su matriz final de pruebas.
 
-### Diseño elegido
+### Diseño final
 
-Crear un reto visual en el que el combate se muestre con una transformación
-invertida. El combate comienza normal durante 0.25 segundos y después el
-fotograma final gira suavemente durante 0.45 segundos alrededor de su centro
-hasta quedar completamente de cabeza. El espejo geométrico cambia de signo en
-una ventana muy corta alrededor de los 90 grados para conservar las posiciones
-horizontales sin mantener la imagen comprimida durante el giro. No se aplica
-zoom: el cuadro central conserva escala 1:1 y los píxeles de borde se extienden
-sólo sobre los huecos de los ángulos intermedios.
+El combate permanece normal durante 0.25 segundos y después el fotograma final
+gira suavemente durante 0.45 segundos alrededor de su centro hasta quedar a
+180 grados. Es una rotación plana pura: no existe espejo, cambio de escala
+horizontal ni salto en el punto medio. Al terminar, izquierda y derecha
+intercambian lugares como en una imagen física girada media vuelta.
 
-La transformación debe afectar la presentación del combate sin modificar las
-posiciones reales, hitboxes, física ni entradas del jugador. La dificultad
-procede de interpretar los controles a través de la imagen transformada, no de
-invertir también los controles por separado.
+No se aplica zoom. El cuadro central conserva escala 1:1 y los píxeles de borde
+se extienden únicamente sobre los huecos de los ángulos intermedios. La
+transformación no modifica posiciones reales, hitboxes, física, entradas ni
+controles.
 
-### Implementación y pruebas
+### Ciclo de vida aceptado
 
-- La primera build rota un quad con el fotograma final después del postproceso
-  nativo; no gira la cámara ni altera el mundo.
-- El HUD nativo y la fila del HUD de la ruleta giran con el combate. Pausa,
-  derrota y calificación permanecen derechos.
-- Mantener sin transformar pausa, derrota, calificación, mapa y Equip Card.
-- La prueba manual confirmó el flujo terrestre principal, la derrota, K.O.,
-  reintento normal y reinicio desde pausa. Antes de activarlo públicamente aún
-  conviene completar la matriz de avión, cooperativo, supers y Palacio de Dados.
-- Verificar que no interfiera con `Blanco y negro`, el reto RGB u otros efectos
-  que también operen al final del render de la cámara.
-- El icono temporal es un PNG transparente de 80 × 80 sin texto, con una flecha
-  en perspectiva. El arte animado final se creará antes de publicarlo.
+- El HUD nativo y la fila de la ruleta giran junto con el combate.
+- Al perder, la tarjeta permanece invertida. Reintentar o salir al mapa mantiene
+  la orientación durante el fundido y la limpia solamente bajo negro total.
+- Reiniciar o salir al mapa desde pausa usa exactamente el mismo reset oculto.
+- Al ganar, conserva el K.O. invertido durante 1 segundo y regresa visiblemente
+  a normal en 0.45 segundos antes de la calificación.
+- La prueba terrestre confirmó derrota, reintento, ambas salidas al mapa,
+  reinicio desde pausa, sonido y limpieza. Antes de publicarlo faltan avión,
+  cooperativo, parrys repetidos y la cadena completa del Palacio de Dados.
+- El icono actual es temporal; el nuevo arte animado sigue pendiente.
 
 ## Reto aleatorio por intervalos
 
@@ -264,6 +257,149 @@ confirmar únicamente si el siguiente reto puede repetir el anterior.
   crear recursión.
 - Probar P1, cooperativo, terrestre, avión, reintentos, pausa, knockout,
   Palacio de Dados y cambios de escena.
+
+## Reto Just 1 UP
+
+### Idea
+
+Crear un reto compatible con niveles terrestres y de avión en el que cada
+jugador comience el intento con exactamente 1 HP y nunca pueda superar ese
+valor durante la pelea. Perder, reintentar o entrar a una nueva escena interna
+del Palacio de Dados debe conservar la regla y restaurar el estado normal al
+ganar o volver al mapa.
+
+### Reglas propuestas
+
+- Excluir `Corazón` y `Corazón Doble` del resultado de amuleto cuando este reto
+  sea seleccionado; esas combinaciones se consideran incompatibles.
+- Permitir que `Reliquia Maldita`, `Reliquia Divina` y `Anillo de Corazón`
+  conserven sus demás efectos, pero bloquear cualquier aumento o recuperación
+  de HP que produzcan.
+- Aplicar un límite real de 1 HP, no solamente cambiar el valor inicial. Cualquier
+  curación posterior debe mantener `currentHealth <= 1`.
+- Revisar también Galletita Astral, deseos de Djimmi, corazones del Palacio de
+  Dados y cualquier otra ruta nativa capaz de aumentar vida.
+- En cooperativo, aplicar la regla de forma independiente a P1 y P2, incluyendo
+  incorporación tardía y reanimación.
+- Reintentar debe comenzar nuevamente con 1 HP sin acumular modificaciones en
+  el perfil guardado ni alterar el equipamiento restaurado al volver al mapa.
+- La ruleta y el HUD deben mostrar el amuleto realmente equipado; la restricción
+  de vida pertenece al reto y no debe ocultarse como sustitución de amuleto.
+
+### Investigación y pruebas
+
+Localizar el punto nativo común donde Cuphead inicializa y aumenta la vida. La
+implementación preferida debe fijar el máximo temporal del combate y bloquear
+las rutas de curación antes de que actualicen HUD, logros o estadísticas, en
+vez de corregir el número visualmente cada cuadro. Probar como mínimo niveles
+terrestres, avión, Ms. Chalice, ambas reliquias, Anillo de Corazón, Palacio de
+Dados, reintentos, pausa, victoria, salida al mapa y cooperativo.
+
+## Overlay local para streamers
+
+### Objetivo
+
+Ofrecer una fuente transparente para OBS, Streamlabs u otro programa compatible
+con fuentes de navegador. Al comenzar un combate elegido por la ruleta, el
+overlay debe mostrar los mismos resultados que el HUD del mod, pero con un
+diseño pensado para poder verse más grande en una transmisión: los iconos en
+una fila superior y el texto del reto debajo.
+
+Debe funcionar completamente en la computadora del jugador, sin internet, una
+cuenta, un servicio remoto ni una aplicación auxiliar. El overlay no debe
+convertirse en una segunda fuente de estado: debe reutilizar la sesión y el
+snapshot inmutable que ya controlan el HUD de combate.
+
+### Arquitectura propuesta
+
+- Integrar en el plugin un servidor HTTP mínimo basado en `TcpListener`,
+  enlazado exclusivamente a `127.0.0.1`. Evitar `HttpListener` por sus posibles
+  requisitos de URL ACL y evitar WebSockets por la complejidad adicional en el
+  runtime antiguo de Unity/Mono usado por Cuphead.
+- Servir una página HTML con fondo transparente en una URL estable, por ejemplo
+  `http://127.0.0.1:18080/`, además de los recursos locales y un endpoint de
+  estado JSON de solo lectura.
+- Enlazar la publicación con `BeginBattleResultHudSession()` y usar
+  `battleHudResultSnapshot` como fuente de verdad. Limpiar el estado junto con
+  `EndBattleResultHudSession()` al regresar al mapa.
+- Mantener el overlay durante pausa, derrota, reintento y victoria con las
+  mismas reglas que el HUD. No crear otro ciclo de vida para el reto o el
+  equipamiento.
+- Publicar una revisión o identificador de sesión y el número de elementos ya
+  revelados. Esto permite que el navegador muestre cada icono y después el
+  texto al mismo tiempo que el HUD, sin intentar calcular por separado el
+  momento de la animación.
+- El hilo de red nunca debe acceder a objetos de Unity. El hilo principal debe
+  preparar un DTO o JSON inmutable y sustituirlo de forma segura; el servidor
+  únicamente devuelve ese estado ya construido.
+- Detener el listener limpiamente al cerrar el plugin o el juego. Si el puerto
+  está ocupado, registrar el problema y desactivar solo el overlay, sin afectar
+  la ruleta ni Cuphead.
+
+### Diseño del overlay
+
+- Fondo completamente transparente.
+- Iconos del resultado en una fila superior y el texto localizado del reto
+  debajo de ellos.
+- Reutilizar los primeros frames estáticos aceptados para el HUD de combate y
+  los recursos incluidos en el mod; el navegador debe cargarlos una vez y
+  conservarlos en caché.
+- Respetar el contenido reducido definido para niveles de avión.
+- Ocultar el resultado anterior si Cuphead se cierra o el navegador deja de
+  recibir estado durante aproximadamente dos segundos.
+- La vista previa debe usar datos simulados y desactivarse automáticamente al
+  comenzar una pelea real para no sustituir un resultado válido.
+
+### Integración propuesta en los menús de Cuphead
+
+Agregar una entrada `LA PICHI RULETA` tanto en el menú principal como en el
+menú disponible desde el mapa. Dentro de ella, reservar
+`HERRAMIENTAS DE STREAMING` para esta función y posibles herramientas futuras,
+con un submenú `OVERLAY PARA STREAMING`.
+
+Opciones iniciales:
+
+- `ACTIVADO`: sí/no. Inicia o detiene el servicio local y conserva la
+  preferencia.
+- `TAMAÑO`: 1x/2x. Generar internamente una versión de mayor resolución evita
+  depender únicamente del escalado de OBS y mejora la lectura de iconos
+  pequeños.
+- `ALINEACIÓN`: izquierda/centro/derecha dentro del lienzo transparente.
+- `OPACIDAD`: 25-100 %.
+- `VISTA PREVIA`: activada/desactivada, para acomodar la fuente mientras se
+  observa OBS.
+- `COPIAR URL DEL OVERLAY`: copia la URL estable al portapapeles, reproduce la
+  confirmación nativa y muestra temporalmente `URL COPIADA`. No debe abrir un
+  navegador ni sacar al jugador del menú.
+
+Los cambios de tamaño, alineación y opacidad deben reflejarse automáticamente
+en una fuente de OBS que ya esté abierta, sin recargarla ni volver a copiar la
+URL. El puerto puede permanecer fuera del menú normal y exponerse únicamente
+en la configuración avanzada de BepInEx para resolver conflictos excepcionales.
+
+### Actualización y rendimiento
+
+- La página puede consultar el pequeño estado JSON cada 250 ms cuando el
+  resultado esté visible y cada 1 segundo cuando no haya una pelea activa.
+- Todo el tráfico permanece dentro de `127.0.0.1`; el JSON esperado mide solo
+  unos pocos kilobytes y los iconos no se transfieren en cada consulta.
+- El mod debe devolver un JSON previamente preparado, sin buscar componentes
+  de Unity por solicitud. Con estas reglas, el coste de CPU, memoria y red debe
+  ser imperceptible incluso en equipos modestos.
+- Usar `Cache-Control: no-store` para el estado y caché normal para imágenes,
+  fuentes y estilos.
+- Limitar la primera versión a solicitudes GET de solo lectura, sin endpoints
+  que permitan controlar el juego desde el navegador.
+
+### Implementación por etapas
+
+1. Servidor local, página transparente, estado sincronizado e invalidación de
+   resultados antiguos.
+2. Menús, persistencia, copia de URL y vista previa.
+3. Ajustes visuales, localización completa y sincronización fina de la aparición
+   de iconos y texto.
+4. Evaluar como ampliación opcional el nombre, imagen del jefe, dificultad o
+   temas visuales, sin recargar la primera versión.
 
 ## Criterio general para incorporar estas ideas
 

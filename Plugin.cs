@@ -410,7 +410,7 @@ namespace Gilomx.CupheadBossRoulette
             RouteModAudioToGameSfxMixer();
             activeInstance = this;
             SceneLoader.OnFadeInEndEvent +=
-                CompleteChallengeVisualPauseRestartOnFadeInEnd;
+                CompleteChallengeVisualRestartOnFadeInEnd;
             harmony = new Harmony(PluginGuid);
             var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
             var mapPausePostfix = AccessTools.Method(typeof(Plugin), "BlockMapPausePostfix");
@@ -551,6 +551,21 @@ namespace Gilomx.CupheadBossRoulette
                 Logger.LogWarning(
                     "Could not install the challenge retry render reset.");
 
+            var exitToMapAfterDefeat = AccessTools.Method(
+                typeof(LevelGameOverGUI), "ExitToMap");
+            var prepareChallengeVisualsForDefeatExitPrefix =
+                AccessTools.Method(
+                    typeof(Plugin),
+                    "PrepareChallengeVisualsForDefeatExitPrefix");
+            if (exitToMapAfterDefeat != null &&
+                prepareChallengeVisualsForDefeatExitPrefix != null)
+                harmony.Patch(exitToMapAfterDefeat,
+                    prefix: new HarmonyMethod(
+                        prepareChallengeVisualsForDefeatExitPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the defeat exit-to-map render reset.");
+
             var restartFromPause = AccessTools.Method(
                 typeof(LevelPauseGUI), "Restart");
             var prepareChallengeVisualsForPauseRestartPrefix =
@@ -565,6 +580,21 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning(
                     "Could not install the pause restart render reset.");
+
+            var exitToMapFromPause = AccessTools.Method(
+                typeof(LevelPauseGUI), "Exit");
+            var prepareChallengeVisualsForPauseExitPrefix =
+                AccessTools.Method(
+                    typeof(Plugin),
+                    "PrepareChallengeVisualsForPauseExitPrefix");
+            if (exitToMapFromPause != null &&
+                prepareChallengeVisualsForPauseExitPrefix != null)
+                harmony.Patch(exitToMapFromPause,
+                    prefix: new HarmonyMethod(
+                        prepareChallengeVisualsForPauseExitPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the pause exit-to-map render reset.");
 
             var levelLose = AccessTools.Method(typeof(Level), "_OnLose");
             var beginChallengeVisualDefeatUnwindPrefix = AccessTools.Method(
@@ -2961,7 +2991,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             RestoreOriginalTestLanguage();
             SceneLoader.OnFadeInEndEvent -=
-                CompleteChallengeVisualPauseRestartOnFadeInEnd;
+                CompleteChallengeVisualRestartOnFadeInEnd;
             if (harmony != null)
                 harmony.UnpatchSelf();
             if (activeInstance == this)
