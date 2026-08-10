@@ -19,7 +19,8 @@ namespace Gilomx.CupheadBossRoulette
         NoPeashooter,
         NoEx,
         BlackAndWhite,
-        RgbShift
+        RgbShift,
+        UpsideDown
     }
 
     internal sealed class BossEntry
@@ -174,6 +175,8 @@ namespace Gilomx.CupheadBossRoulette
             new ModifierEntry(ModifierId.BlackAndWhite, ModifierKind.Both, "modifiers/blacknwhite_01.png"),
             new ModifierEntry(ModifierId.RgbShift, ModifierKind.Both,
                 "modifiers/rgb.png", 1),
+            new ModifierEntry(ModifierId.UpsideDown, ModifierKind.Both,
+                "modifiers/upside_down.png", 1),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
 

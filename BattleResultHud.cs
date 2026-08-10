@@ -1153,11 +1153,13 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             // Screen Space Overlay is composited after camera postprocessing.
-            // RGB therefore uses LevelHUD's camera Canvas so the roulette row
-            // receives exactly the same chromatic split and blur as Cuphead's
-            // health and super HUD. Other challenges retain the independent
-            // overlay that isolates them from the native parry flash.
-            if (battleHudChallengeSnapshot == ModifierId.RgbShift)
+            // Camera-wide challenges use LevelHUD's camera Canvas so the
+            // roulette row receives exactly the same final-frame effect as
+            // Cuphead's health and super HUD. Other challenges retain the
+            // independent overlay that isolates them from the native parry
+            // flash.
+            if (battleHudChallengeSnapshot == ModifierId.RgbShift ||
+                battleHudChallengeSnapshot == ModifierId.UpsideDown)
                 return PlaceBattleHudOnNativeGameplayLayer(nativeCanvas);
 
             // The camera that renders LevelHUD also receives Cuphead's parry

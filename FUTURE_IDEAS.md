@@ -182,6 +182,89 @@ dos Ms. Chalice y el posible estado híbrido descrito en la sección
 Probar P1, P2, reintentos, niveles terrestres, niveles de avión, Palacio de
 Dados, supers, HUD y restauración del equipamiento al volver al mapa.
 
+## Reto de jugar al revés (pantalla volteada) — HECHO
+
+Estado: implementación y pruebas manuales terminadas en 0.5.129. Los interruptores
+`EnableUpsideDownChallenge` y `ForceUpsideDownChallengeForTesting` están en
+`false`, por lo que queda compilado pero dormido igual que RGB hasta su futura
+activación. La variante elegida combina un giro plano real de 180 grados con
+espejo horizontal, de modo que los personajes terminan de cabeza sin cambiar
+su posición izquierda/derecha.
+
+### Diseño elegido
+
+Crear un reto visual en el que el combate se muestre con una transformación
+invertida. El combate comienza normal durante 0.25 segundos y después el
+fotograma final gira suavemente durante 0.45 segundos alrededor de su centro
+hasta quedar completamente de cabeza. El espejo geométrico cambia de signo en
+una ventana muy corta alrededor de los 90 grados para conservar las posiciones
+horizontales sin mantener la imagen comprimida durante el giro. No se aplica
+zoom: el cuadro central conserva escala 1:1 y los píxeles de borde se extienden
+sólo sobre los huecos de los ángulos intermedios.
+
+La transformación debe afectar la presentación del combate sin modificar las
+posiciones reales, hitboxes, física ni entradas del jugador. La dificultad
+procede de interpretar los controles a través de la imagen transformada, no de
+invertir también los controles por separado.
+
+### Implementación y pruebas
+
+- La primera build rota un quad con el fotograma final después del postproceso
+  nativo; no gira la cámara ni altera el mundo.
+- El HUD nativo y la fila del HUD de la ruleta giran con el combate. Pausa,
+  derrota y calificación permanecen derechos.
+- Mantener sin transformar pausa, derrota, calificación, mapa y Equip Card.
+- La prueba manual confirmó el flujo terrestre principal, la derrota, K.O.,
+  reintento normal y reinicio desde pausa. Antes de activarlo públicamente aún
+  conviene completar la matriz de avión, cooperativo, supers y Palacio de Dados.
+- Verificar que no interfiera con `Blanco y negro`, el reto RGB u otros efectos
+  que también operen al final del render de la cámara.
+- El icono temporal es un PNG transparente de 80 × 80 sin texto, con una flecha
+  en perspectiva. El arte animado final se creará antes de publicarlo.
+
+## Reto aleatorio por intervalos
+
+### Idea
+
+Crear un reto dinámico llamado provisionalmente `Aleatorio` que alterne dos
+fases durante todo el intento:
+
+1. `5 segundos sin reto`: el combate funciona normalmente.
+2. `10 segundos con reto`: se elige uno de los retos compatibles con ese nivel,
+   se muestra su nombre junto al contador y se mantiene activo hasta llegar a
+   cero.
+
+Al terminar los 10 segundos se limpia por completo el reto activo, comienza una
+nueva pausa de 5 segundos sin reto y después se selecciona el siguiente. El
+ciclo `5 sin reto → 10 con reto` se repite hasta terminar el intento. Queda por
+confirmar únicamente si el siguiente reto puede repetir el anterior.
+
+### Reglas y arquitectura propuestas
+
+- Crear una lista de compatibilidad específica para retos que puedan activarse
+  y retirarse a mitad de una pelea. Ser compatible con un jefe al iniciar el
+  nivel no garantiza que el cambio en caliente sea seguro.
+- Limpiar por completo el reto anterior antes de activar el siguiente; nunca
+  permitir que bloqueos, filtros o restricciones de daño se acumulen.
+- Usar tiempo de juego para ambos contadores, de modo que la pausa no consuma
+  ni los 5 segundos de descanso ni los 10 segundos de reto.
+- Mostrar en el HUD tanto el nombre del reto actual como los segundos restantes,
+  sin sustituir permanentemente la etiqueta `Aleatorio` del resultado original.
+- Reiniciar el ciclo en la fase de 5 segundos sin reto al perder y reintentar.
+  En el Palacio de Dados, tratar toda la cadena como un solo intento y no
+  reiniciar la animación ni el contador por cada escena interna.
+- Al ganar, abandonar o volver al mapa, cancelar el temporizador y restaurar
+  inmediatamente cualquier estado controlado por el reto activo.
+- Definir el comportamiento de restricciones de avión que necesitan imponer
+  un arma inicial (`No bombas` y `No peashooter`) cuando aparezcan a mitad del
+  combate.
+- Evaluar individualmente `Solo mini avión`, filtros visuales y cualquier reto
+  que reinicie el nivel por una infracción ocurrida durante el cambio de estado.
+- Evitar seleccionar el propio reto `Aleatorio` dentro de su catálogo para no
+  crear recursión.
+- Probar P1, cooperativo, terrestre, avión, reintentos, pausa, knockout,
+  Palacio de Dados y cambios de escena.
+
 ## Criterio general para incorporar estas ideas
 
 Cada idea debe implementarse detrás de un selector temporal, documentarse en

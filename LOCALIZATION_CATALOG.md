@@ -9,6 +9,14 @@ tablas. Esto evita que otro idioma reciba un respaldo español mientras el reto
 está forzado para pruebas. Antes de habilitarlo públicamente hay que decidir su
 nombre final y solicitar las traducciones correspondientes.
 
+## Placeholder del reto 180° (0.5.129, desarrollo)
+
+El reto experimental `ModifierId.UpsideDown` usa temporalmente `180°` como
+nombre visible en las 12 tablas. El texto se entiende durante la prueba sin
+introducir un respaldo español en otros idiomas. Todavía no se suma a los 29
+textos de la plantilla pública: antes de habilitarlo hay que elegir el nombre
+final y solicitar sus traducciones.
+
 ## Ajuste uniforme de etiquetas de equipo (0.5.128)
 
 Las cinco etiquetas bajo los iconos comparten un solo tamaño de fuente por

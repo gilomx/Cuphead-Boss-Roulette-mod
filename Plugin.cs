@@ -22,8 +22,11 @@ namespace Gilomx.CupheadBossRoulette
         // TEMPORARY TEST SELECTOR. Keep non-None while developing a challenge.
         // Compatible bosses are still chosen randomly.
         private static readonly ModifierId ForcedTestChallenge =
-            ExperimentalFeatures.EnableRgbShiftChallenge &&
-            ExperimentalFeatures.ForceRgbShiftChallengeForTesting
+            ExperimentalFeatures.EnableUpsideDownChallenge &&
+            ExperimentalFeatures.ForceUpsideDownChallengeForTesting
+                ? ModifierId.UpsideDown
+                : ExperimentalFeatures.EnableRgbShiftChallenge &&
+                  ExperimentalFeatures.ForceRgbShiftChallengeForTesting
                 ? ModifierId.RgbShift
                 : ModifierId.None;
         // Dormant test selector: alternate cursed/divine relic each spin.
@@ -147,6 +150,7 @@ namespace Gilomx.CupheadBossRoulette
         private AudioClip openClip;
         private AudioClip closeClip;
         private AudioClip battleHudImpactClip;
+        private AudioClip upsideDownTurnClip;
         private AssetBundle blackAndWhiteShaderBundle;
         private Shader blackAndWhiteTransitionShader;
         private Shader battleHudSaturationShader;
@@ -405,6 +409,8 @@ namespace Gilomx.CupheadBossRoulette
             effectsAudioSource.ignoreListenerPause = true;
             RouteModAudioToGameSfxMixer();
             activeInstance = this;
+            SceneLoader.OnFadeInEndEvent +=
+                CompleteChallengeVisualPauseRestartOnFadeInEnd;
             harmony = new Harmony(PluginGuid);
             var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
             var mapPausePostfix = AccessTools.Method(typeof(Plugin), "BlockMapPausePostfix");
@@ -531,6 +537,47 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning(
                     "Could not install the roulette defeat equipment guard.");
+
+            var retryAfterDefeat = AccessTools.Method(
+                typeof(LevelGameOverGUI), "Retry");
+            var prepareChallengeVisualsForRetryPrefix = AccessTools.Method(
+                typeof(Plugin), "PrepareChallengeVisualsForRetryPrefix");
+            if (retryAfterDefeat != null &&
+                prepareChallengeVisualsForRetryPrefix != null)
+                harmony.Patch(retryAfterDefeat,
+                    prefix: new HarmonyMethod(
+                        prepareChallengeVisualsForRetryPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the challenge retry render reset.");
+
+            var restartFromPause = AccessTools.Method(
+                typeof(LevelPauseGUI), "Restart");
+            var prepareChallengeVisualsForPauseRestartPrefix =
+                AccessTools.Method(
+                    typeof(Plugin),
+                    "PrepareChallengeVisualsForPauseRestartPrefix");
+            if (restartFromPause != null &&
+                prepareChallengeVisualsForPauseRestartPrefix != null)
+                harmony.Patch(restartFromPause,
+                    prefix: new HarmonyMethod(
+                        prepareChallengeVisualsForPauseRestartPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the pause restart render reset.");
+
+            var levelLose = AccessTools.Method(typeof(Level), "_OnLose");
+            var beginChallengeVisualDefeatUnwindPrefix = AccessTools.Method(
+                typeof(Plugin),
+                "BeginChallengeVisualDefeatUnwindPrefix");
+            if (levelLose != null &&
+                beginChallengeVisualDefeatUnwindPrefix != null)
+                harmony.Patch(levelLose,
+                    prefix: new HarmonyMethod(
+                        beginChallengeVisualDefeatUnwindPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the challenge defeat unwind.");
 
             var handleDash = AccessTools.Method(typeof(LevelPlayerMotor), "HandleDash");
             var handleDashPrefix = AccessTools.Method(typeof(Plugin), "BlockDashPrefix");
@@ -1042,9 +1089,16 @@ namespace Gilomx.CupheadBossRoulette
             UpdateLanguageTestShortcut();
             UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
-            UpdateRgbShiftTransition();
-            UpdateBlackAndWhiteTransition();
-            UpdateBlackAndWhiteRenderEffects();
+            if (challengeVisualDefeatUnwindActive)
+                UpdateChallengeVisualDefeatUnwind();
+            else if (!ShouldHoldChallengeVisualsForRetry())
+            {
+                UpdateRgbShiftTransition();
+                UpdateUpsideDownTransition();
+                UpdateUpsideDownRenderEffects();
+                UpdateBlackAndWhiteTransition();
+                UpdateBlackAndWhiteRenderEffects();
+            }
             var controllerRerollPressed = PollControllerRerollPressed();
             var onMap = CanUseRouletteOnMap();
             if (!onMap)
@@ -2329,6 +2383,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SetActiveChallenge(ModifierId challenge, int bossIndex)
         {
+            ClearChallengeVisualRetryGate();
             soloMiniRestartPending = false;
             if (!ExperimentalFeatures.IsChallengeEnabled(challenge))
                 challenge = ModifierId.None;
@@ -2339,6 +2394,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ClearActiveChallenge()
         {
+            ClearChallengeVisualRetryGate();
             soloMiniRestartPending = false;
             activeChallenge = ModifierId.None;
             activeChallengeBoss = -1;
@@ -2367,7 +2423,10 @@ namespace Gilomx.CupheadBossRoulette
                 plugin.RestoreOriginalLoadouts(false);
             }
             if (plugin.ShouldClearChallengeOnWin(__instance))
+            {
+                plugin.BeginUpsideDownVictoryReturn();
                 plugin.ClearActiveChallenge();
+            }
         }
 
         private static bool ReturnRouletteFinalBossWinToMapPrefix(
@@ -2757,6 +2816,9 @@ namespace Gilomx.CupheadBossRoulette
             yield return StartCoroutine(LoadClip("sounds/cerrar.wav", AudioType.WAV, clip => closeClip = clip));
             yield return StartCoroutine(LoadClip("sounds/impact_01.wav", AudioType.WAV,
                 clip => battleHudImpactClip = clip));
+            yield return StartCoroutine(LoadClip(
+                "sounds/upside_down_turn.wav", AudioType.WAV,
+                clip => upsideDownTurnClip = clip));
         }
 
         private IEnumerator LoadClip(string relativePath, AudioType type, Action<AudioClip> assign)
@@ -2898,6 +2960,8 @@ namespace Gilomx.CupheadBossRoulette
         private void OnDestroy()
         {
             RestoreOriginalTestLanguage();
+            SceneLoader.OnFadeInEndEvent -=
+                CompleteChallengeVisualPauseRestartOnFadeInEnd;
             if (harmony != null)
                 harmony.UnpatchSelf();
             if (activeInstance == this)
@@ -2906,7 +2970,9 @@ namespace Gilomx.CupheadBossRoulette
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
             DestroyBattleResultHud();
+            ClearChallengeVisualRetryGate();
             ResetRgbShiftChallenge();
+            ResetUpsideDownChallenge();
             ResetBlackAndWhiteRenderEffects();
             blackAndWhiteTransitionShader = null;
             battleHudSaturationShader = null;

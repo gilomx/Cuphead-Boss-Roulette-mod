@@ -1,5 +1,140 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Completed dormant flat 180-degree challenge (0.5.129)
+
+`ModifierId.UpsideDown` is a new experimental ground-and-plane challenge.
+`ExperimentalFeatures.EnableUpsideDownChallenge` and
+`ForceUpsideDownChallengeForTesting` are both `false` after completed manual
+validation. The implementation remains compiled but dormant, following the
+same release-gate pattern as RGB, so normal spins cannot select it.
+
+The selected design is a literal flat rotation around screen center, not a
+horizontal mirror or a card flip. Each fresh attempt stays normal for only a
+challenge-specific 0.25-second delay, then uses a 0.45-second smoothstep to
+rotate from 0 to 180 degrees. The orientation therefore settles near the start
+of the fight instead of changing after the player is already moving, and it
+matches the accelerated defeat return without changing Black and White/RGB
+timing. A minimum angle-aware overscan experiment removed black
+wedges but cropped almost half the fight and was rejected. The current pass
+instead draws a full-screen quad with inverse-rotated UVs and clamp sampling:
+the central captured frame remains at 1:1 scale while only its outermost pixels
+extend into otherwise empty intermediate-angle corners.
+
+`FlatRotationRenderEffect` is appended to each battle camera and receives the
+final frame after Cuphead's image effects. It draws that texture as an
+aspect-correct rotated GL quad using the already bundled saturation shader at
+full color. It never changes the camera transform, input, world coordinates,
+physics, culling decisions or hitboxes. `UpsideDownChallenge.cs` owns effect
+discovery, lifecycle, transition state and cleanup.
+
+The first runtime test exposed a double-transform bug: setting the reused
+shader's `_FlipY` to 1 canceled the rotated quad's vertical inversion, so the
+180-degree endpoint looked like a horizontal mirror. The rotation pass now
+sets `_FlipY` to 0. The geometry alone performs both axis inversions and the
+endpoint is genuinely upside down.
+
+The user then clarified that the final character must keep the same horizontal
+screen position it had before the transition. The target is therefore flat
+rotation plus an additional horizontal reflection: mathematically the final
+transform preserves X and reverses Y. The first continuous reflection compressed
+the quad for the entire transition and was rejected visually. Two subsequent
+alpha-crossfade attempts (`UI/Default`, then the bundled UI saturation shader)
+loaded without errors but did not write the mirrored pass into Cuphead's final
+render target. The later instant mirror switch at the exact sideways midpoint
+avoided compression but looked like the rotation briefly reversed. A subsequent
+two-pass crossfade using `Sprites/Default` blacked out Cuphead's final render
+target. Explicit `_Flip = (1,1)`, white `_RendererColor`, white `_Color`, and
+disabled external alpha did not resolve it in runtime testing. That entire
+transparent path has therefore been removed, not left as an optional branch.
+The current build again uses only the proven bundled opaque saturation material
+and the midpoint geometry switch. At 180 degrees, `R(PI) * MirrorX` still
+preserves screen X and reverses Y. A future smoother mirror transition must use
+a shader compiled into the existing AssetBundle, not another built-in UI pass.
+
+Runtime testing also exposed a one-frame stale-effect flash after defeat/retry
+for UpsideDown and RGB, with Black and White sharing the same architectural
+risk. A Harmony prefix on `LevelGameOverGUI.Retry()` now clears all three visual
+challenge controllers before native `SceneLoader.ReloadLevel()` begins. The
+prefix records the old `Level` instance ID. `Plugin.Update()` holds the three
+visual controllers at zero throughout loading and releases them only when a
+different live `Level` instance exists; that new attempt then performs its
+normal 1.5-second opening. This hook applies to native Dice Palace retry too,
+while ordinary internal Dice scene loads never call `Retry()` and therefore
+retain their special continuous lifecycle.
+
+Pause-menu restart is a distinct native path and originally bypassed that
+prefix: `LevelPauseGUI.Restart()` exposed the old inverted frame, then the new
+scene reset to normal and replayed the entry turn. Clearing in its prefix fixed
+the stale frame but made the return to normal visible before Cuphead faded out.
+It now uses `PrepareChallengeVisualsForPauseRestartPrefix()` only to capture the
+old `Level` and arm a pending reset. `SceneLoader.OnFadeInEndEvent` fires after
+the native fader completes its 0-to-1 opaque-black transition; the handler then
+resets RGB/UpsideDown/Black-and-White behind the covered screen and enables the
+existing new-instance gate. Tower of Power's confirmation-only Restart branch
+is excluded so it cannot arm an unrelated later fade.
+
+The preventive Retry cleanup initially produced a visible orientation change
+at the exact moment the user pressed Retry. A second Harmony prefix now starts
+earlier at `Level._OnLose()`, before native game-over UI creation. If the active
+roulette challenge is RGB, Black and White or UpsideDown, it begins a 0.35-second
+transition back to the normal frame. `Plugin.Update()` advances only that exit
+transition while the defeat screen is active, preventing the still-matching
+battle `Level` from restarting the challenge. By the time Retry is available,
+the screen is already normal; the Retry reset remains a silent safety net.
+
+UpsideDown is the one timing exception to that immediate defeat unwind: it
+holds the inverted frame for 1 second, then performs the same 0.45-second return.
+Victory now has its own equivalent path: `ClearChallengeOnWinPrefix()` calls
+`BeginUpsideDownVictoryReturn()` before clearing the active challenge. That
+marks the ordinary fade-out as already owned, holds the K.O. frame for 1 second,
+then returns in 0.45 seconds instead of being overwritten by the generic
+immediate 0.9-second exit.
+
+Both generated sound directions were rejected: the 0.38-second noise whoosh and
+the 0.41-second hollow object/cartoon whistle. The active replacement is
+`assets/sounds/upside_down_turn.wav`, derived from the user-provided cartoon
+violin MP3. FFmpeg takes its first 1.90 active seconds, compresses them to exactly
+0.450 seconds with Rubber Band tempo 4.222222/pitch 0.96, high-passes at 90 Hz,
+compresses dynamics, applies 8 ms and 45 ms fades, and normalizes to -5
+LUFS/-0.2 dBTP after three requested loudness lifts (2 dB, 2.5 dB, then about
+1.5 dB with stronger compression), followed by final 0.75 dB and 0.5 dB
+post-gain passes with a 0.988 ceiling limiter. `LoadAudio()` loads it and every actual UpsideDown transition
+queues it at volume 1.0 when its delay expires; Cuphead's Master and SFX settings
+still control the result. Verify the source MP3's redistribution license before
+a public package.
+
+The roulette HUD row is reparented to `LevelHUD.Canvas` only for RGB and
+UpsideDown, so lives, cards and the mod HUD rotate together. Pause/game-over
+layers remain upright. A retry of the same level instance sequence starts from
+0 degrees again. During a Dice Palace chain, a new internal scene with a
+different `Levels` value preserves the completed 180-degree state and attaches
+it to the new camera without replaying the entry.
+
+The temporary display name is `180°` in all 12 language dictionaries. The
+single-frame `assets/modifiers/upside_down.png` is now an 80 × 80 transparent
+text-free icon: a cream arrow with black vintage ink, tilted as an elliptical
+ring in perspective so its wide front arc and narrow rear arc imply both a 3D
+turn and mirror flip. The merely vertically reversed second draft was rejected.
+The current third draft narrows into the upper/rear arc, then grows into a large
+foreshortened arrowhead that emerges from the back toward the viewer. Runtime
+feedback found the first export too horizontal, so the active asset rotates the
+same high-resolution transparent art clockwise by 28 degrees before its final
+80 Ã— 80 Lanczos downscale. It was
+generated with the built-in image tool on chroma
+green, keyed locally with the image skill helper, tightly padded and downscaled
+with Lanczos. Final three-frame art and localized copy remain pending.
+
+The source MP3 is 2.377 seconds and its useful gesture ends near 1.90 seconds.
+The earlier -17 LUFS preview was judged too quiet; the active WAV uses the
+stronger processing and runtime volume described above.
+
+Manual acceptance passed for the core ground-fight flow: orientation and turn
+direction, edge extension, native/mod HUD rotation, defeat and K.O. returns,
+ordinary retry, pause-menu restart, synchronized SFX and exit cleanup. Before
+the future public activation, complete the remaining plane, co-op, repeated-
+parry and full Dice Palace matrix. Final dormant build verification: 0 errors,
+0 warnings.
+
 ## Cagney native fuzzy suppression during RGB (0.5.129)
 
 When a roulette fight combines `Levels.Flower` with `ModifierId.RgbShift`, a

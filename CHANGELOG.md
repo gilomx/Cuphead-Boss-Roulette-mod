@@ -3,8 +3,86 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
-## 0.5.129 — 2026-08-08 (desarrollo RGB)
+## 0.5.129 — 2026-08-08 (desarrollo RGB y 180°)
 
+- Se preparó la primera build del reto experimental `180°`, compatible con
+  niveles terrestres y de avión. La cadencia final de prueba espera 0.25
+  segundos con el combate normal y gira el fotograma de 0 a 180 grados durante
+  0.45 segundos, sin alterar cámara, controles, posiciones, física ni hitboxes.
+- El giro es plano. Una prueba de acercamiento dinámico eliminó las esquinas
+  negras, pero recortaba demasiado el combate y fue descartada. La versión
+  actual conserva el cuadro central a escala normal y extiende sus píxeles de
+  borde sólo sobre los huecos del giro. El HUD nativo y la fila del mod giran
+  con el gameplay; pausa y resultados permanecen derechos.
+- La primera prueba reveló que `_FlipY = 1` cancelaba la inversión vertical del
+  quad y dejaba el resultado como espejo horizontal. La corrección adicional se
+  eliminó: el giro geométrico ahora invierte ambos ejes y termina de cabeza.
+- La siguiente prueba definió el resultado final deseado: además del giro, se
+  aplica un espejo horizontal para que un personaje conserve su posición X al
+  quedar de cabeza. La compresión durante toda la entrada fue descartada
+  visualmente y dos intentos de fundido no escribieron la versión reflejada en
+  el render final de Cuphead. El cambio instantáneo de espejo a mitad del giro
+  parecía un retroceso. Una nueva mezcla con dos pasadas transparentes de
+  `Sprites/Default` dejó negro el render final incluso después de proporcionar
+  `_Flip` y `_RendererColor`, por lo que fue retirada por completo. La versión
+  activa vuelve a la única pasada opaca ya validada; cambia el espejo en el punto
+  lateral y prioriza no perder nunca la imagen del combate.
+- `LevelGameOverGUI.Retry()` limpia preventivamente RGB, Blanco y negro y 180°
+  antes de llamar a `SceneLoader.ReloadLevel()`. Un guard conserva esos efectos
+  en cero durante la carga y los rearma sólo cuando existe una instancia nueva
+  de `Level`, evitando mostrar por una fracción de segundo el estado anterior.
+- El reset dejaba un cambio visible justo al pulsar `Reintentar`. Ahora
+  `Level._OnLose()` inicia antes una salida acelerada hacia el estado normal:
+  0.35 segundos para RGB/Blanco y negro y 0.45 para 180°. Durante la derrota
+  el controlador permanece bloqueado en normal; `Retry()` queda sólo como
+  respaldo y la nueva partida vuelve a ejecutar su entrada habitual.
+- Sólo para el reto `180°`, la espera inicial baja de 1.5 a 0.25 segundos y el
+  giro dura 0.45 segundos, igualando la velocidad de su regreso al perder. Así
+  la orientación queda lista prácticamente al comienzo del combate, antes de
+  que el jugador lleve tiempo moviéndose; los demás retos conservan su cadencia.
+- Al perder con `180°`, la pantalla permanece invertida durante 1 segundo antes
+  de comenzar el regreso de 0.45 segundos. Al ganar con K.O. ahora también
+  espera 1 segundo antes de ejecutar su regreso rápido, en vez de girar de
+  inmediato durante la celebración.
+- El whoosh sintético y el silbido hueco de objeto/cartoon generados durante las
+  pruebas fueron rechazados. El reemplazo activo usa el efecto de violín cartoon
+  proporcionado por el usuario, comprimido a 0.450 segundos, normalizado a
+  -5 LUFS/-0.2 dBTP y reproducido a volumen 1.0 por el canal de Efectos. La licencia
+  del MP3 original debe verificarse antes de una publicación pública.
+- Después de probarlo en combate, el violín de `180°` subió otros 2 dB sin tocar
+  ningún otro sonido. Sigue conectado exclusivamente al grupo SFX nativo, por lo
+  que lo regulan Principal + Efectos y no el volumen de Música.
+- Una segunda prueba pidió todavía más presencia: el WAV recibió otros 2.5 dB
+  percibidos y mayor compresión, conservando un pico limitado a -0.3 dBTP.
+- El último ajuste aumenta aproximadamente otros 1.5 dB percibidos y limita el
+  pico a -0.2 dBTP, manteniendo aislado este cambio al audio de `180°`.
+- El ajuste final de escucha añade 0.75 dB al WAV ya procesado, con limitador
+  transparente para conservar el pico y sin alterar duración ni enrutamiento.
+- Una última afinación añade otros 0.5 dB al sonido del giro y conserva el
+  limitador de techo 0.988, su duración de 0.450 segundos y el canal de Efectos.
+- Los giros rápidos de `180°` y su audio sincronizado aumentan 0.1 segundos: la
+  entrada, el regreso tras derrota y el regreso tras K.O. duran ahora 0.45
+  segundos. RGB y Blanco y negro mantienen sus velocidades anteriores.
+- Reintentar comienza nuevamente normal. Las escenas internas diferentes del
+  Palacio de Dados conservan el giro terminado sin repetir la entrada.
+- `LevelPauseGUI.Restart()` ya no limpia el efecto en su prefijo, porque eso hacía
+  visible un giro repentino al elegir Volver a empezar. Conserva la orientación
+  durante el fundido nativo y espera `SceneLoader.OnFadeInEndEvent`; sólo cuando
+  el fader está totalmente negro restablece los retos visuales y los mantiene en
+  cero hasta detectar la nueva instancia de nivel.
+- Tras aprobar las pruebas, `EnableUpsideDownChallenge` y
+  `ForceUpsideDownChallengeForTesting` volvieron a `false`. El reto `180°`
+  queda terminado pero dormido, igual que RGB, para activarlo en una
+  actualización futura sin exponerlo todavía en la ruleta pública.
+- El placeholder de `180°` fue reemplazado por un icono transparente de 80 × 80
+  sin texto: una flecha crema de trazo negro, inclinada como un aro en perspectiva
+  para sugerir simultáneamente giro 3D y espejo. Sigue usando un solo frame y el
+  arte animado final permanece pendiente.
+- El simple cambio de dirección del icono tampoco expresaba profundidad y fue
+  reemplazado por un tercer diseño: el aro se adelgaza al alejarse por arriba y
+  su punta nace en el arco posterior, crece y sale hacia la vista en primer plano.
+- El tercer diseño aún se percibía demasiado horizontal; el arte activo conserva
+  toda su perspectiva y se inclina 28 grados para reforzar la rotación diagonal.
 - Durante la combinación Cagney + reto RGB, se omite el `TouchFuzzy` nativo
   del polen para que no cree corrutinas de RGB y desenfoque que compitan en
   segundo plano. El método nativo es exclusivamente visual; el impacto, daño y
