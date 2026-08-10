@@ -16,12 +16,19 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool ForceUpsideDownChallengeForTesting =
             false;
 
+        // HP.1 is enabled and forced temporarily while its gameplay and
+        // Chalice Super II rejection effect are being tested.
+        internal static readonly bool EnableHpOneChallenge = true;
+        internal static readonly bool ForceHpOneChallengeForTesting = true;
+
         internal static bool IsChallengeEnabled(ModifierId id)
         {
             if (id == ModifierId.RgbShift)
                 return EnableRgbShiftChallenge;
             if (id == ModifierId.UpsideDown)
                 return EnableUpsideDownChallenge;
+            if (id == ModifierId.HpOne)
+                return EnableHpOneChallenge;
             return true;
         }
     }

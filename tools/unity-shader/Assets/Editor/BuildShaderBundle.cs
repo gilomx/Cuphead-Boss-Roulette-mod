@@ -29,6 +29,18 @@ public static class BuildShaderBundle
         uiImporter.assetBundleName = BundleName;
         uiImporter.SaveAndReimport();
 
+        const string rejectedHeartShaderPath =
+            "Assets/BossRouletteRejectedHeart.shader";
+        var rejectedHeartImporter =
+            AssetImporter.GetAtPath(rejectedHeartShaderPath);
+        if (rejectedHeartImporter == null)
+            throw new InvalidOperationException(
+                "Rejected-heart shader was not found: " +
+                rejectedHeartShaderPath);
+
+        rejectedHeartImporter.assetBundleName = BundleName;
+        rejectedHeartImporter.SaveAndReimport();
+
         const string outputDirectory = "AssetBundles";
         Directory.CreateDirectory(outputDirectory);
         var manifest = BuildPipeline.BuildAssetBundles(
@@ -55,7 +67,8 @@ public static class BuildShaderBundle
             var expectedShaderPaths = new[]
             {
                 "Assets/BossRouletteSaturation.shader",
-                "Assets/BossRouletteUiSaturation.shader"
+                "Assets/BossRouletteUiSaturation.shader",
+                "Assets/BossRouletteRejectedHeart.shader"
             };
             for (var i = 0; i < expectedShaderPaths.Length; i++)
             {

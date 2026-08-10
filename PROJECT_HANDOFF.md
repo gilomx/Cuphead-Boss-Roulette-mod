@@ -1,5 +1,68 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Experimental HP.1 challenge (0.5.129, forced test build)
+
+`ModifierId.HpOne` implements the ground-and-plane `HP.1` challenge. The
+roulette and battle HUD use `assets/modifiers/hp1.png`, an 80 x 80 temporary
+single-frame icon with a padlock and the joined `HP.1` label. All localization
+dictionaries currently use `HP.1` as the challenge name.
+
+The runtime rule is a real health lock, not a cosmetic HUD override.
+`HpOneChallenge.cs` patches the `PlayerStatsManager.Health` and `HealthMax`
+setters: values above one are clamped to one while zero and damage/death values
+are preserved. Therefore every player starts with one current/max HP and any
+valid hit still kills normally. Native health sources continue executing their
+other behavior but cannot raise health: Heart and Twin Heart keep their damage
+penalties, Heart Ring is intentionally useless, Cursed/Divine Relic keep their
+non-healing behavior, and King Dice hearts, Djimmi wishes and other native
+heals cannot exceed one HP. Astral Cookie still selects Ms. Chalice.
+
+The guard applies only while the roulette's matching boss battle is active.
+It uses `Level.Current` plus `ActiveChallengeMatches()` and a narrow LevelInit
+fallback tied to the active battle HUD/loaned-loadout session. It does not
+change map health or saved profile data, and normal behavior returns after the
+battle lifecycle clears the challenge.
+
+Co-op patches force `PartnerCanSteal` true so P2 can join a one-HP run and skip
+the donor-health subtraction in `OnPartnerStealHealth`; both players remain at
+one HP independently. Native revive health is also clamped to one.
+
+Ms. Chalice Super II is rejected instead of granting a shield. Calls to
+`SetChaliceShield(true)` are forced false, the player is made vulnerable, and
+the spawned heart remains for a 1.15-second rejection effect before being
+destroyed. `HpOneRejectedHeartEffect.cs` renders it grayscale at roughly 50%
+opacity with deterministic horizontal/vertical jitter, flicker, scanlines and
+a final fade. It deliberately avoids Unity's random generator so the visual
+cannot alter gameplay RNG. The shader is
+`tools/unity-shader/Assets/BossRouletteRejectedHeart.shader`; the rebuilt
+`assets/shaders/gilomx-boss-roulette-shaders` bundle now contains three
+shaders. A narrowly scoped `PlayerDamageReceiver.OnRevive` guard suppresses
+only the same-frame native revive/invulnerability cleanup caused by destroying
+this rejected heart.
+
+### Important temporary test state
+
+- `ExperimentalFeatures.EnableHpOneChallenge = true`.
+- `ExperimentalFeatures.ForceHpOneChallengeForTesting = true`, so every
+  challenge-enabled spin selects `HP.1` while compatible bosses remain random.
+- `Plugin.ForceHpOneChaliceSuperTest = true`, so every forced HP.1 result also
+  equips Astral Cookie and Ms. Chalice Super II.
+- These force flags are intentionally committed for the next agent's manual
+  Super II test. They must be disabled before a public build.
+
+### Manual validation still required
+
+The implementation compiles and loads, but the full combination matrix has
+not been approved. Test at minimum: Cuphead/Mugman and Ms. Chalice; ground and
+plane fights; one and two players; late co-op join and revive; retry, victory,
+pause exit and defeat exit; Dice Palace internal fights; Heart, Twin Heart,
+Heart Ring, Astral Cookie, Cursed Relic and Divine Relic; King Dice hearts;
+Djimmi wishes; every super, especially Chalice Super II; and interactions with
+all other challenge types. Confirm health always starts/ends at one, every
+valid hit kills, equipment penalties/secondary effects remain intact, the
+rejected heart never grants invulnerability, and normal health is restored
+outside the roulette battle.
+
 ## Completed dormant flat 180-degree challenge (0.5.129)
 
 `ModifierId.UpsideDown` is a new experimental ground-and-plane challenge.

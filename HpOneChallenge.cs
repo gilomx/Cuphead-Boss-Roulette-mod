@@ -1,0 +1,221 @@
+using System;
+using HarmonyLib;
+using UnityEngine;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    public sealed partial class Plugin
+    {
+        private static int rejectedHeartReviveReceiverId = -1;
+        private static int rejectedHeartReviveFrame = -1;
+
+        private void InstallHpOneChallengePatches()
+        {
+            var healthSetter = AccessTools.PropertySetter(
+                typeof(PlayerStatsManager), "Health");
+            var healthMaxSetter = AccessTools.PropertySetter(
+                typeof(PlayerStatsManager), "HealthMax");
+            var clampHealthPrefix = AccessTools.Method(
+                typeof(Plugin), "ClampHpOneHealthPrefix");
+            var forceHealthMaxPrefix = AccessTools.Method(
+                typeof(Plugin), "ForceHpOneHealthMaxPrefix");
+            if (healthSetter != null && healthMaxSetter != null &&
+                clampHealthPrefix != null && forceHealthMaxPrefix != null)
+            {
+                harmony.Patch(healthSetter,
+                    prefix: new HarmonyMethod(clampHealthPrefix));
+                harmony.Patch(healthMaxSetter,
+                    prefix: new HarmonyMethod(forceHealthMaxPrefix));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the HP.1 health clamps.");
+
+            var partnerCanSteal = AccessTools.PropertyGetter(
+                typeof(PlayerStatsManager), "PartnerCanSteal");
+            var allowPartnerJoinPostfix = AccessTools.Method(
+                typeof(Plugin), "AllowHpOnePartnerJoinPostfix");
+            var partnerStealHealth = AccessTools.Method(
+                typeof(PlayerStatsManager), "OnPartnerStealHealth");
+            var preservePartnerHealthPrefix = AccessTools.Method(
+                typeof(Plugin), "PreserveHpOnePartnerHealthPrefix");
+            if (partnerCanSteal != null && allowPartnerJoinPostfix != null &&
+                partnerStealHealth != null &&
+                preservePartnerHealthPrefix != null)
+            {
+                harmony.Patch(partnerCanSteal,
+                    postfix: new HarmonyMethod(allowPartnerJoinPostfix));
+                harmony.Patch(partnerStealHealth,
+                    prefix: new HarmonyMethod(preservePartnerHealthPrefix));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the HP.1 cooperative join guards.");
+
+            var setChaliceShield = AccessTools.Method(
+                typeof(PlayerStatsManager), "SetChaliceShield",
+                new[] { typeof(bool) });
+            var rejectChaliceShieldPrefix = AccessTools.Method(
+                typeof(Plugin), "RejectHpOneChaliceShieldPrefix");
+            var createChaliceHeart = AccessTools.Method(
+                typeof(PlayerSuperChaliceShield), "CreateHeart");
+            var decorateChaliceHeartPostfix = AccessTools.Method(
+                typeof(Plugin), "DecorateRejectedChaliceHeartPostfix");
+            var destroyChaliceHeart = AccessTools.Method(
+                typeof(PlayerSuperChaliceShieldHeart), "Destroy");
+            var keepRejectedHeartPrefix = AccessTools.Method(
+                typeof(Plugin), "KeepRejectedChaliceHeartForGlitchPrefix");
+            var damageReceiverRevive = AccessTools.Method(
+                typeof(PlayerDamageReceiver), "OnRevive",
+                new[] { typeof(Vector3) });
+            var suppressRejectedHeartRevivePrefix = AccessTools.Method(
+                typeof(Plugin), "SuppressRejectedHeartRevivePrefix");
+            if (setChaliceShield != null &&
+                rejectChaliceShieldPrefix != null &&
+                createChaliceHeart != null &&
+                decorateChaliceHeartPostfix != null &&
+                destroyChaliceHeart != null &&
+                keepRejectedHeartPrefix != null &&
+                damageReceiverRevive != null &&
+                suppressRejectedHeartRevivePrefix != null)
+            {
+                harmony.Patch(setChaliceShield,
+                    prefix: new HarmonyMethod(rejectChaliceShieldPrefix));
+                harmony.Patch(createChaliceHeart,
+                    postfix: new HarmonyMethod(
+                        decorateChaliceHeartPostfix));
+                harmony.Patch(destroyChaliceHeart,
+                    prefix: new HarmonyMethod(keepRejectedHeartPrefix));
+                harmony.Patch(damageReceiverRevive,
+                    prefix: new HarmonyMethod(
+                        suppressRejectedHeartRevivePrefix));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the HP.1 Chalice shield rejection effect.");
+        }
+
+        private static bool IsHpOneRuntimeActive()
+        {
+            var plugin = activeInstance;
+            return plugin != null && plugin.ShouldApplyHpOneHealthLock();
+        }
+
+        private bool ShouldApplyHpOneHealthLock()
+        {
+            if (!ExperimentalFeatures.EnableHpOneChallenge ||
+                activeChallenge != ModifierId.HpOne ||
+                activeChallengeBoss < 0 ||
+                activeChallengeBoss >= RouletteData.Bosses.Length)
+                return false;
+
+            try
+            {
+                var level = Level.Current;
+                if (level != null)
+                    return level.LevelType == Level.Type.Battle &&
+                           ActiveChallengeMatches(level);
+            }
+            catch
+            {
+                // Level.Current can be unavailable while LevelInit builds the
+                // battle. The HUD session below is already tied to the result.
+            }
+
+            return battleHudPresentationActive && loanedLoadoutsActive;
+        }
+
+        private static void ClampHpOneHealthPrefix(ref int __0)
+        {
+            if (IsHpOneRuntimeActive() && __0 > 1)
+                __0 = 1;
+        }
+
+        private static void ForceHpOneHealthMaxPrefix(ref int __0)
+        {
+            if (IsHpOneRuntimeActive())
+                __0 = 1;
+        }
+
+        private static void AllowHpOnePartnerJoinPostfix(ref bool __result)
+        {
+            if (IsHpOneRuntimeActive())
+                __result = true;
+        }
+
+        private static bool PreserveHpOnePartnerHealthPrefix()
+        {
+            return !IsHpOneRuntimeActive();
+        }
+
+        private static void RejectHpOneChaliceShieldPrefix(ref bool __0)
+        {
+            if (IsHpOneRuntimeActive())
+                __0 = false;
+        }
+
+        private static void DecorateRejectedChaliceHeartPostfix(
+            PlayerSuperChaliceShield __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                !plugin.ShouldApplyHpOneHealthLock())
+                return;
+
+            try
+            {
+                var heart = Traverse.Create(__instance)
+                    .Field("shieldHeart").GetValue<GameObject>();
+                var player = Traverse.Create(__instance)
+                    .Field("player").GetValue<LevelPlayerController>();
+                if (heart == null)
+                    return;
+
+                var effect = heart.GetComponent<HpOneRejectedHeartEffect>();
+                if (effect == null)
+                    effect = heart.AddComponent<HpOneRejectedHeartEffect>();
+                effect.Initialize(plugin.hpOneRejectedHeartShader, player);
+
+                if (player != null && player.damageReceiver != null)
+                    player.damageReceiver.Vulnerable();
+            }
+            catch (Exception exception)
+            {
+                plugin.Logger.LogWarning(
+                    "Could not decorate the rejected Chalice heart: " +
+                    exception.Message);
+            }
+        }
+
+        private static bool KeepRejectedChaliceHeartForGlitchPrefix(
+            PlayerSuperChaliceShieldHeart __instance)
+        {
+            if (!IsHpOneRuntimeActive() || __instance == null)
+                return true;
+
+            var effect = __instance.GetComponent<HpOneRejectedHeartEffect>();
+            if (effect == null)
+                return true;
+
+            var receiver = effect.Receiver;
+            if (receiver != null)
+            {
+                rejectedHeartReviveReceiverId = receiver.GetInstanceID();
+                rejectedHeartReviveFrame = Time.frameCount;
+            }
+            return false;
+        }
+
+        private static bool SuppressRejectedHeartRevivePrefix(
+            PlayerDamageReceiver __instance)
+        {
+            if (__instance == null || rejectedHeartReviveFrame != Time.frameCount ||
+                rejectedHeartReviveReceiverId != __instance.GetInstanceID())
+                return true;
+
+            rejectedHeartReviveReceiverId = -1;
+            rejectedHeartReviveFrame = -1;
+            return false;
+        }
+    }
+}

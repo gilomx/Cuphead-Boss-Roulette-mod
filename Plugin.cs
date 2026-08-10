@@ -22,7 +22,10 @@ namespace Gilomx.CupheadBossRoulette
         // TEMPORARY TEST SELECTOR. Keep non-None while developing a challenge.
         // Compatible bosses are still chosen randomly.
         private static readonly ModifierId ForcedTestChallenge =
-            ExperimentalFeatures.EnableUpsideDownChallenge &&
+            ExperimentalFeatures.EnableHpOneChallenge &&
+            ExperimentalFeatures.ForceHpOneChallengeForTesting
+                ? ModifierId.HpOne
+                : ExperimentalFeatures.EnableUpsideDownChallenge &&
             ExperimentalFeatures.ForceUpsideDownChallengeForTesting
                 ? ModifierId.UpsideDown
                 : ExperimentalFeatures.EnableRgbShiftChallenge &&
@@ -36,6 +39,8 @@ namespace Gilomx.CupheadBossRoulette
             false;
         // TEMPORARY VISUAL TEST. It does not change either player's real meter.
         private static readonly bool ForceFiveSuperCardsForHudTest = false;
+        // TEMPORARY HP.1 TEST: force Ms. Chalice and her Super II shield.
+        private static readonly bool ForceHpOneChaliceSuperTest = true;
         // Dormant boss-test selector. Keep false in normal builds.
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels[] ForcedTestBossSequence =
@@ -154,6 +159,7 @@ namespace Gilomx.CupheadBossRoulette
         private AssetBundle blackAndWhiteShaderBundle;
         private Shader blackAndWhiteTransitionShader;
         private Shader battleHudSaturationShader;
+        private Shader hpOneRejectedHeartShader;
         private GUIStyle titleStyle;
         private GUIStyle subtitleStyle;
         private GUIStyle bossStyle;
@@ -707,6 +713,7 @@ namespace Gilomx.CupheadBossRoulette
                     "Could not install the cursed relic airplane weapon guard.");
 
             InstallCurseRelicLevelOverridePatches();
+            InstallHpOneChallengePatches();
 
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion +
@@ -855,6 +862,13 @@ namespace Gilomx.CupheadBossRoulette
             if (battleHudSaturationShader == null)
                 Logger.LogWarning(
                     "El bundle no contiene el shader de saturación para el HUD.");
+
+            hpOneRejectedHeartShader =
+                blackAndWhiteShaderBundle.LoadAsset<Shader>(
+                    "Assets/BossRouletteRejectedHeart.shader");
+            if (hpOneRejectedHeartShader == null)
+                Logger.LogWarning(
+                    "El bundle no contiene el shader del corazón rechazado de HP.1.");
         }
 
         private static void BlockMapPausePostfix(ref bool __result)
@@ -1412,6 +1426,15 @@ namespace Gilomx.CupheadBossRoulette
                     : RandomNonEmptyPoolIndex(
                         availableCharmIndices, RouletteData.Charms.Length - 1);
 
+            if (ForceHpOneChaliceSuperTest &&
+                ForcedTestChallenge == ModifierId.HpOne)
+            {
+                super = FindSuperIndex(Super.level_super_invincible);
+                charm = FindCharmIndex(Charm.charm_chalice);
+                Logger.LogWarning(
+                    "TEMP HP.1 test: forcing Astral Cookie and Super II.");
+            }
+
             var modifier = forcedModifier >= 0
                 ? forcedModifier
                 : RouletteData.Modifiers.Length - 1;
@@ -1481,6 +1504,26 @@ namespace Gilomx.CupheadBossRoulette
                 "Could not force test boss " + forcedLevel +
                 " because it is unavailable.");
             return -1;
+        }
+
+        private static int FindSuperIndex(Super value)
+        {
+            for (var i = 0; i < RouletteData.Supers.Length; i++)
+            {
+                if (RouletteData.Supers[i].Value.Equals(value))
+                    return i;
+            }
+            return RouletteData.Supers.Length - 1;
+        }
+
+        private static int FindCharmIndex(Charm value)
+        {
+            for (var i = 0; i < RouletteData.Charms.Length; i++)
+            {
+                if (RouletteData.Charms[i].Value.Equals(value))
+                    return i;
+            }
+            return RouletteData.Charms.Length - 1;
         }
 
         private int ForcedRelicTestCharmIndex()
@@ -3006,6 +3049,7 @@ namespace Gilomx.CupheadBossRoulette
             ResetBlackAndWhiteRenderEffects();
             blackAndWhiteTransitionShader = null;
             battleHudSaturationShader = null;
+            hpOneRejectedHeartShader = null;
             if (blackAndWhiteShaderBundle != null)
             {
                 blackAndWhiteShaderBundle.Unload(true);

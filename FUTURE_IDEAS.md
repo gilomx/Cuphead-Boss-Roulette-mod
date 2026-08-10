@@ -258,43 +258,51 @@ confirmar únicamente si el siguiente reto puede repetir el anterior.
 - Probar P1, cooperativo, terrestre, avión, reintentos, pausa, knockout,
   Palacio de Dados y cambios de escena.
 
-## Reto Just 1 UP
+## Reto HP.1 (implementación experimental)
 
-### Idea
+### Estado actual
 
-Crear un reto compatible con niveles terrestres y de avión en el que cada
-jugador comience el intento con exactamente 1 HP y nunca pueda superar ese
-valor durante la pelea. Perder, reintentar o entrar a una nueva escena interna
-del Palacio de Dados debe conservar la regla y restaurar el estado normal al
-ganar o volver al mapa.
+La primera implementación ya existe y está activada/forzada para pruebas. Es
+compatible con niveles terrestres y de avión y fija la vida actual y máxima de
+cada jugador en exactamente 1 HP durante la pelea. Perder, reintentar o entrar
+a una nueva escena interna debe conservar la regla; ganar o volver al mapa debe
+restaurar el comportamiento normal.
 
-### Reglas propuestas
+### Reglas aprobadas
 
-- Excluir `Corazón` y `Corazón Doble` del resultado de amuleto cuando este reto
-  sea seleccionado; esas combinaciones se consideran incompatibles.
+- Permitir `Corazón` y `Corazón Doble` en el resultado. No aumentan HP, pero
+  conservan su penalización normal de daño; una mala combinación sigue siendo
+  parte de la diversión de la ruleta.
 - Permitir que `Reliquia Maldita`, `Reliquia Divina` y `Anillo de Corazón`
   conserven sus demás efectos, pero bloquear cualquier aumento o recuperación
   de HP que produzcan.
-- Aplicar un límite real de 1 HP, no solamente cambiar el valor inicial. Cualquier
-  curación posterior debe mantener `currentHealth <= 1`.
-- Revisar también Galletita Astral, deseos de Djimmi, corazones del Palacio de
-  Dados y cualquier otra ruta nativa capaz de aumentar vida.
+- Aplicar un límite real de 1 HP, no solamente cambiar el valor inicial.
+  Cualquier curación posterior debe mantener `currentHealth <= 1`.
+- Galletita Astral conserva a Ms. Chalice. Deseos de Djimmi, corazones del
+  Palacio de Dados y cualquier otra ruta nativa capaz de aumentar vida no
+  pueden superar 1 HP.
 - En cooperativo, aplicar la regla de forma independiente a P1 y P2, incluyendo
-  incorporación tardía y reanimación.
+  incorporación tardía y reanimación; el jugador donante no pierde su única
+  vida al incorporar a P2.
 - Reintentar debe comenzar nuevamente con 1 HP sin acumular modificaciones en
   el perfil guardado ni alterar el equipamiento restaurado al volver al mapa.
 - La ruleta y el HUD deben mostrar el amuleto realmente equipado; la restricción
   de vida pertenece al reto y no debe ocultarse como sustitución de amuleto.
+- El Súper II de Ms. Chalice no concede escudo. El corazón rechazado aparece en
+  blanco y negro, aproximadamente al 50% de opacidad, con jitter, parpadeo y
+  scanlines breves antes de desvanecerse; cualquier golpe válido sigue matando.
+- El icono temporal es un candado con `HP.1` unido como en el HUD nativo.
 
-### Investigación y pruebas
+### Pruebas pendientes
 
-Localizar el punto nativo común donde Cuphead inicializa y aumenta la vida. La
-implementación preferida debe fijar el máximo temporal del combate y bloquear
-las rutas de curación antes de que actualicen HUD, logros o estadísticas, en
-vez de corregir el número visualmente cada cuadro. Probar como mínimo niveles
-terrestres, avión, Ms. Chalice, ambas reliquias, Anillo de Corazón, Palacio de
-Dados, reintentos, pausa, victoria, salida al mapa y cooperativo.
-
+La implementación intercepta los setters nativos de vida/máximo, no corrige el
+HUD cada cuadro. Aún falta probar exhaustivamente todas las combinaciones:
+niveles terrestres y de avión; Cuphead, Mugman y Ms. Chalice; uno y dos
+jugadores; incorporación tardía y reanimación; todos los amuletos y supers;
+ambas reliquias; Anillo de Corazón; deseos de Djimmi; corazones y escenas
+internas del Palacio de Dados; reintentos; pausa; victoria; salida al mapa; y
+la combinación con cada uno de los demás retos. La build actual fuerza HP.1,
+Galletita Astral y Súper II para validar primero el corazón rechazado.
 ## Overlay local para streamers
 
 ### Objetivo

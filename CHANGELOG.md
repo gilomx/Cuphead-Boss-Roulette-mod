@@ -5,9 +5,23 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
 ## 0.5.129 — 2026-08-08 (desarrollo RGB y 180°)
 
-- Se documentó el reto futuro `Just 1 UP`: cada jugador comienza y permanece
-  con 1 HP; Corazón y Corazón Doble son incompatibles, y las reliquias, Anillo
-  de Corazón y cualquier otra curación no pueden superar ese límite.
+- Se implementó la primera versión experimental del reto `HP.1` para niveles
+  terrestres y de avión. Cada jugador inicia y permanece con un máximo de una
+  vida; las curaciones no pueden aumentarla, pero Corazón y Corazón Doble
+  conservan su penalización de daño y los amuletos/reliquias mantienen sus
+  demás efectos.
+- En cooperativo, ambos jugadores conservan una vida; se permite la entrada
+  tardía de P2 sin restarle la única vida al jugador donante y una reanimación
+  vuelve con una vida.
+- El Súper II de Ms. Chalice no concede escudo durante `HP.1`. Su corazón se
+  muestra temporalmente en blanco y negro, semitransparente y con un efecto
+  sencillo de televisor antiguo antes de desaparecer; el jugador continúa
+  vulnerable.
+- Se agregó el icono temporal `HP.1`, el shader correspondiente y el tercer
+  recurso al AssetBundle de shaders. La build actual fuerza `HP.1 + Galletita
+  astral + Súper II` exclusivamente para continuar las pruebas. Falta validar
+  toda la matriz de personajes, amuletos, reliquias, curaciones, supers,
+  niveles, reintentos y cooperativo antes de publicarlo.
 
 - Se preparó la primera build del reto experimental `180°`, compatible con
   niveles terrestres y de avión. La cadencia final de prueba espera 0.25
