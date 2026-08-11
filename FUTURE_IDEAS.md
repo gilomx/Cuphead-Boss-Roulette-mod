@@ -258,57 +258,53 @@ confirmar únicamente si el siguiente reto puede repetir el anterior.
 - Probar P1, cooperativo, terrestre, avión, reintentos, pausa, knockout,
   Palacio de Dados y cambios de escena.
 
-## Reto HP.1 (implementación experimental)
+## Reto HP.1 (implementación terminada, en espera de arte)
 
 ### Estado actual
 
-La primera implementación ya existe y está activada/forzada para pruebas. Es
-compatible con niveles terrestres y de avión y fija la vida actual y máxima de
-cada jugador en exactamente 1 HP durante la pelea. Perder, reintentar o entrar
-a una nueva escena interna debe conservar la regla; ganar o volver al mapa debe
-restaurar el comportamiento normal.
+La implementación funcional está terminada y superó su matriz manual. Permanece
+desactivada mediante `ExperimentalFeatures.EnableHpOneChallenge = false` y
+`ForceHpOneChallengeForTesting = false` únicamente porque falta sustituir el
+icono temporal por el icono animado definitivo de ruleta/HUD. Hasta entonces no
+puede aparecer en giros normales.
 
-### Reglas aprobadas
+El reto funciona en niveles terrestres y de avión y fija la vida actual y
+máxima de cada jugador en exactamente 1 HP durante toda la sesión de batalla.
+Perder, reintentar, revivir o incorporar tarde a P2 conserva la regla; ganar o
+volver al mapa restaura el comportamiento normal sin modificar el perfil.
 
-- Permitir `Corazón` y `Corazón Doble` en el resultado. No aumentan HP, pero
-  conservan su penalización normal de daño; una mala combinación sigue siendo
-  parte de la diversión de la ruleta.
-- Permitir que `Reliquia Maldita`, `Reliquia Divina` y `Anillo de Corazón`
-  conserven sus demás efectos, pero bloquear cualquier aumento o recuperación
-  de HP que produzcan.
-- Aplicar un límite real de 1 HP, no solamente cambiar el valor inicial.
-  Cualquier curación posterior debe mantener `currentHealth <= 1`.
-- Galletita Astral conserva a Ms. Chalice. Deseos de Djimmi, corazones del
-  Palacio de Dados y cualquier otra ruta nativa capaz de aumentar vida no
-  pueden superar 1 HP.
-- En cooperativo, aplicar la regla de forma independiente a P1 y P2, incluyendo
-  incorporación tardía y reanimación; el jugador donante no pierde su única
-  vida al incorporar a P2.
-- Reintentar debe comenzar nuevamente con 1 HP sin acumular modificaciones en
-  el perfil guardado ni alterar el equipamiento restaurado al volver al mapa.
-- La ruleta y el HUD deben mostrar el amuleto realmente equipado; la restricción
-  de vida pertenece al reto y no debe ocultarse como sustitución de amuleto.
-- El Súper II de Ms. Chalice no concede escudo. El corazón rechazado aparece en
-  blanco y negro, aproximadamente al 50% de opacidad, con jitter, parpadeo y
-  scanlines breves antes de desvanecerse; cualquier golpe válido sigue matando.
-- El Anillo de Corazón y ambas reliquias comparten la ruta nativa
-  `HealerCharm()`. Cuando un parry alcanza su intervalo de curación durante
-  `HP.1`, el efecto raíz y sus cinco partículas reciben desde su primer frame
-  el mismo efecto blanco y negro glitchoso del corazón rechazado, aunque la
-  vida permanece fijada en uno.
-- El icono temporal es un candado con `HP.1` unido como en el HUD nativo.
+### Reglas implementadas y validadas
 
-### Pruebas pendientes
+- `Corazón` y `Corazón Doble` pueden salir. No aumentan HP y conservan sus
+  multiplicadores nativos de daño recibido (`0.95` y `0.90`, respectivamente).
+- `Reliquia Maldita`, `Reliquia Divina` y `Anillo de Corazón` conservan sus
+  demás efectos, pero no pueden aumentar ni recuperar vida.
+- Las curaciones rechazadas de Anillo/Reliquias usan el efecto blanco y negro,
+  semitransparente y glitchoso, además de
+  `assets/sounds/hp_one_rejected_parry.wav` en lugar del golpe de parry de
+  curación habitual. La misma ruta funciona en tierra y avión.
+- Galletita Astral conserva a Ms. Chalice. Su Súper II no concede escudo; el
+  corazón rechazado se vuelve blanco y negro, semitransparente y glitchoso
+  antes de desaparecer, y el jugador continúa vulnerable.
+- Los corazones del Palacio de Dados, las reliquias y cualquier otra curación
+  nativa permanecen limitados a 1 HP.
+- `RouletteDjimmiGuard` suprime los deseos de Djimmi en cualquier pelea iniciada
+  mediante la ruleta, no sólo durante HP.1. No consume ni borra el deseo: al
+  entrar manualmente a otro nivel vuelve a aplicarse. La prueba en Normal dio
+  3 HP con ruleta y 9 HP sin ruleta. Cuphead ya excluye Djimmi nativamente en
+  Experto.
+- En cooperativo, P1 y P2 comienzan con 1 HP; un fantasma revive con 1 HP; un
+  P2 incorporado durante la pelea entra con 1 HP; volver a intentar conserva
+  una vida para ambos; salir de la ruleta restaura la vida normal.
+- El icono actual de candado `HP.1` es temporal y de un solo frame.
 
-La implementación intercepta los setters nativos de vida/máximo, no corrige el
-HUD cada cuadro. Aún falta probar exhaustivamente todas las combinaciones:
-niveles terrestres y de avión; Cuphead, Mugman y Ms. Chalice; uno y dos
-jugadores; incorporación tardía y reanimación; todos los amuletos y supers;
-ambas reliquias; Anillo de Corazón; deseos de Djimmi; corazones y escenas
-internas del Palacio de Dados; reintentos; pausa; victoria; salida al mapa; y
-la combinación con cada uno de los demás retos. La build actual fuerza HP.1 y
-Anillo de Corazón para validar primero la animación de curación rechazada; el
-selector temporal de Galletita Astral y Súper II está desactivado.
+### Pendiente antes de reactivarlo
+
+Crear e integrar el icono animado definitivo para todas las apariciones del
+reto. Después conviene ejecutar una regresión corta de giro, HUD, reintento y
+cooperativo, habilitar `EnableHpOneChallenge` y mantener todos los selectores
+`Force...ForTesting` desactivados.
+
 ## Overlay local para streamers
 
 ### Objetivo

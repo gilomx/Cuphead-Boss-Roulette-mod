@@ -41,14 +41,19 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly bool ForceFiveSuperCardsForHudTest = false;
         // Dormant HP.1 test: force Ms. Chalice and her Super II shield.
         private static readonly bool ForceHpOneChaliceSuperTest = false;
-        // TEMPORARY HP.1 TEST: force Heart Ring to validate rejected parry heals.
-        private static readonly bool ForceHpOneHeartRingTest = true;
+        // TEMP HP.1 test: force Ms. Chalice with Super I.
+        private static readonly bool ForceHpOneChaliceMovementTest = false;
+        // Dormant HP.1 test: force Heart Ring to validate rejected parry heals.
+        private static readonly bool ForceHpOneHeartRingTest = false;
+        // TEMP HP.1 test: alternate Heart and Twin Heart each spin.
+        private static readonly bool ForceHpOneHealthCharmTestSequence = false;
+        // TEMP Djimmi guard test: base boss, Normal, no charm/challenge.
+        private static readonly bool ForceDjimmiGuardTest = false;
         // Dormant boss-test selector. Keep false in normal builds.
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels[] ForcedTestBossSequence =
         {
-            Levels.Saltbaker,
-            Levels.Devil
+            Levels.Slime
         };
         // Dormant localization test shortcut. Keep false in normal builds.
         private const bool EnableLanguageTestShortcut = false;
@@ -134,6 +139,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly System.Random random = new System.Random();
         private int forcedRelicTestSpin;
+        private int forcedHpOneHealthCharmTestSpin;
         private int forcedPlaneRelicChallengeTestSpin;
         private int forcedBossTestSpin;
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
@@ -158,6 +164,7 @@ namespace Gilomx.CupheadBossRoulette
         private AudioClip closeClip;
         private AudioClip battleHudImpactClip;
         private AudioClip upsideDownTurnClip;
+        private AudioClip hpOneRejectedParryClip;
         private AssetBundle blackAndWhiteShaderBundle;
         private Shader blackAndWhiteTransitionShader;
         private Shader battleHudSaturationShader;
@@ -716,6 +723,7 @@ namespace Gilomx.CupheadBossRoulette
 
             InstallCurseRelicLevelOverridePatches();
             InstallHpOneChallengePatches();
+            InstallRouletteDjimmiGuardPatch();
 
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion +
@@ -1397,6 +1405,8 @@ namespace Gilomx.CupheadBossRoulette
                 ForcedPlaneRelicChallengeModifierIndex();
             if (forcedModifier < 0)
                 forcedModifier = ForcedTestModifierIndex();
+            if (ForceDjimmiGuardTest)
+                forcedModifier = RouletteData.Modifiers.Length - 1;
             var forcedBoss = ForcedTestBossIndex();
             var boss = forcedBoss >= 0
                 ? forcedBoss
@@ -1428,7 +1438,35 @@ namespace Gilomx.CupheadBossRoulette
                     : RandomNonEmptyPoolIndex(
                         availableCharmIndices, RouletteData.Charms.Length - 1);
 
-            if (ForceHpOneChaliceSuperTest &&
+            if (ForceDjimmiGuardTest)
+            {
+                difficulty = Level.Mode.Normal;
+                charm = RouletteData.Charms.Length - 1;
+                Logger.LogWarning(
+                    "TEMP Djimmi test: forcing Normal, no challenge and no charm.");
+            }
+            else if (ForceHpOneChaliceMovementTest &&
+                ForcedTestChallenge == ModifierId.HpOne)
+            {
+                super = FindSuperIndex(Super.level_super_beam);
+                charm = FindCharmIndex(Charm.charm_chalice);
+                Logger.LogWarning(
+                    "TEMP HP.1 test: forcing Astral Cookie and Super I.");
+            }
+            else if (ForceHpOneHealthCharmTestSequence &&
+                ForcedTestChallenge == ModifierId.HpOne)
+            {
+                var healthCharm = forcedHpOneHealthCharmTestSpin++ % 2 == 0
+                    ? Charm.charm_health_up_1
+                    : Charm.charm_health_up_2;
+                charm = FindCharmIndex(healthCharm);
+                Logger.LogWarning(
+                    "TEMP HP.1 test: forcing " +
+                    (healthCharm == Charm.charm_health_up_1
+                        ? "Heart."
+                        : "Twin Heart."));
+            }
+            else if (ForceHpOneChaliceSuperTest &&
                 ForcedTestChallenge == ModifierId.HpOne)
             {
                 super = FindSuperIndex(Super.level_super_invincible);
@@ -2901,6 +2939,9 @@ namespace Gilomx.CupheadBossRoulette
             yield return StartCoroutine(LoadClip(
                 "sounds/upside_down_turn.wav", AudioType.WAV,
                 clip => upsideDownTurnClip = clip));
+            yield return StartCoroutine(LoadClip(
+                "sounds/hp_one_rejected_parry.wav", AudioType.WAV,
+                clip => hpOneRejectedParryClip = clip));
         }
 
         private IEnumerator LoadClip(string relativePath, AudioType type, Action<AudioClip> assign)

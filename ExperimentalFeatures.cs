@@ -16,10 +16,10 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool ForceUpsideDownChallengeForTesting =
             false;
 
-        // HP.1 is enabled and forced temporarily while its gameplay and
-        // Chalice Super II rejection effect are being tested.
-        internal static readonly bool EnableHpOneChallenge = true;
-        internal static readonly bool ForceHpOneChallengeForTesting = true;
+        // HP.1 passed its gameplay matrix but remains dormant until its final
+        // animated roulette/HUD icon is delivered.
+        internal static readonly bool EnableHpOneChallenge = false;
+        internal static readonly bool ForceHpOneChallengeForTesting = false;
 
         internal static bool IsChallengeEnabled(ModifierId id)
         {

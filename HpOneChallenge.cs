@@ -8,6 +8,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static int rejectedHeartReviveReceiverId = -1;
         private static int rejectedHeartReviveFrame = -1;
+        private static int rejectedHealerParrySoundFrame = -1;
 
         private void InstallHpOneChallengePatches()
         {
@@ -104,10 +105,17 @@ namespace Gilomx.CupheadBossRoulette
             var decorateRejectedHealParticleAwakePostfix = AccessTools.Method(
                 typeof(Plugin),
                 "DecorateRejectedHealParticleAwakePostfix");
+            var healerStartPlayerFlash = AccessTools.Method(
+                typeof(HealerCharmSparkEffect), "StartPlayerFlash");
+            var decorateRejectedPlayerFlashPostfix = AccessTools.Method(
+                typeof(Plugin),
+                "DecorateRejectedPlayerFlashPostfix");
             if (effectCreate != null &&
                 decorateRejectedHealRootPostfix != null &&
                 healerParticleAwake != null &&
-                decorateRejectedHealParticleAwakePostfix != null)
+                decorateRejectedHealParticleAwakePostfix != null &&
+                healerStartPlayerFlash != null &&
+                decorateRejectedPlayerFlashPostfix != null)
             {
                 harmony.Patch(effectCreate,
                     postfix: new HarmonyMethod(
@@ -115,10 +123,40 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(healerParticleAwake,
                     postfix: new HarmonyMethod(
                         decorateRejectedHealParticleAwakePostfix));
+                harmony.Patch(healerStartPlayerFlash,
+                    postfix: new HarmonyMethod(
+                        decorateRejectedPlayerFlashPostfix));
             }
             else
                 Logger.LogWarning(
                     "Could not install the HP.1 healer rejection effect.");
+
+            var healerCharm = AccessTools.Method(
+                typeof(PlayerStatsManager), "HealerCharm");
+            var trackHealerCharmPrefix = AccessTools.Method(
+                typeof(Plugin), "TrackHpOneHealerCharmPrefix");
+            var trackHealerCharmPostfix = AccessTools.Method(
+                typeof(Plugin), "TrackHpOneHealerCharmPostfix");
+            var audioPlay = AccessTools.Method(
+                typeof(AudioManager), "Play", new[] { typeof(string) });
+            var replaceRejectedParrySoundPrefix = AccessTools.Method(
+                typeof(Plugin), "ReplaceHpOneRejectedParrySoundPrefix");
+            if (healerCharm != null &&
+                trackHealerCharmPrefix != null &&
+                trackHealerCharmPostfix != null &&
+                audioPlay != null &&
+                replaceRejectedParrySoundPrefix != null)
+            {
+                harmony.Patch(healerCharm,
+                    prefix: new HarmonyMethod(trackHealerCharmPrefix),
+                    postfix: new HarmonyMethod(trackHealerCharmPostfix));
+                harmony.Patch(audioPlay,
+                    prefix: new HarmonyMethod(
+                        replaceRejectedParrySoundPrefix));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the HP.1 rejected parry sound replacement.");
         }
 
         private static bool IsHpOneRuntimeActive()
@@ -239,6 +277,104 @@ namespace Gilomx.CupheadBossRoulette
 
             plugin.DecorateRejectedHealObject(__instance.gameObject, null,
                 "healer particle");
+        }
+
+        private static void DecorateRejectedPlayerFlashPostfix(
+            HealerCharmSparkEffect __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                !plugin.ShouldApplyHpOneHealthLock())
+                return;
+
+            try
+            {
+                var startedFlash = Traverse.Create(__instance)
+                    .Field("startedFlash").GetValue<int>();
+                if (startedFlash >= 0)
+                    return;
+
+                var target = Traverse.Create(__instance)
+                    .Field("target").GetValue<AbstractPlayerController>();
+                if (target == null)
+                    return;
+
+                var effect = target.gameObject
+                    .GetComponent<HpOneRejectedPlayerFlashEffect>();
+                if (effect == null)
+                    effect = target.gameObject
+                        .AddComponent<HpOneRejectedPlayerFlashEffect>();
+                effect.Initialize(target);
+            }
+            catch (Exception exception)
+            {
+                plugin.Logger.LogWarning(
+                    "Could not grayscale rejected healer player flash: " +
+                    exception.Message);
+            }
+        }
+        private static void TrackHpOneHealerCharmPrefix(
+            PlayerStatsManager __instance,
+            out int __state)
+        {
+            __state = -1;
+            if (__instance == null || !IsHpOneRuntimeActive())
+                return;
+
+            try
+            {
+                __state = Traverse.Create(__instance)
+                    .Property("HealerHPReceived").GetValue<int>();
+            }
+            catch
+            {
+                __state = -1;
+            }
+        }
+
+        private static void TrackHpOneHealerCharmPostfix(
+            PlayerStatsManager __instance,
+            int __state)
+        {
+            if (__instance == null || __state < 0 ||
+                !IsHpOneRuntimeActive())
+                return;
+
+            try
+            {
+                var received = Traverse.Create(__instance)
+                    .Property("HealerHPReceived").GetValue<int>();
+                if (received > __state)
+                    rejectedHealerParrySoundFrame = Time.frameCount;
+            }
+            catch
+            {
+                rejectedHealerParrySoundFrame = -1;
+            }
+        }
+
+        private static bool ReplaceHpOneRejectedParrySoundPrefix(string key)
+        {
+            if (rejectedHealerParrySoundFrame != Time.frameCount ||
+                string.IsNullOrEmpty(key))
+                return true;
+
+            var normalized = key.ToLowerInvariant();
+            var isRegular = normalized == "player_parry_power_up";
+            var isFull = normalized == "player_parry_power_up_full";
+            if (!isRegular && !isFull)
+                return true;
+
+            rejectedHealerParrySoundFrame = -1;
+            var plugin = activeInstance;
+            if (plugin == null || plugin.hpOneRejectedParryClip == null)
+                return true;
+
+            plugin.PlayOneShot(plugin.hpOneRejectedParryClip, 1f);
+
+            // Keep the native full-meter cue as an additional layer. For an
+            // ordinary parry, replace only the randomized hit_01/hit_02 group.
+            return isFull;
         }
 
         private void DecorateRejectedHealObject(

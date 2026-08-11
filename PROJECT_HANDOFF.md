@@ -1,6 +1,6 @@
 # Cuphead Boss Roulette - Project Handoff
 
-## Experimental HP.1 challenge (0.5.129, forced test build)
+## Completed dormant HP.1 challenge (0.5.129, awaiting final animated icon)
 
 `ModifierId.HpOne` implements the ground-and-plane `HP.1` challenge. The
 roulette and battle HUD use `assets/modifiers/hp1.png`, an 80 x 80 temporary
@@ -70,36 +70,47 @@ component had only enumerated `SpriteRenderer`; it now captures every child
 `Renderer`, including particle-system or mesh renderers, and copies the source
 material's main texture into the rejection shader. Sprite tint is still forced
 white where applicable. This remains object-scoped and does not apply a global
-grayscale pass or alter the persistent health HUD. This final renderer-wide
-coverage builds, installs and loads without errors, but has not yet received
-manual visual confirmation. Next session must verify that no pink heart layer
-remains and that the player reliably returns from the native white flash.
+grayscale pass or alter the persistent health HUD. The renderer-wide coverage
+was manually accepted. A faint pink contribution from the native rotation can
+remain, but the rejected-heal result is clear, the player returns from the
+native flash correctly, and this visual is approved.
 
-### Important temporary test state
+The rejected heal also has its own approved cue:
+`assets/sounds/hp_one_rejected_parry.wav`. The Harmony audio hook is scoped to
+the same-frame real heal attempt from `HealerCharm()` and works in ground and
+plane fights. It replaces `player_parry_power_up`; for
+`player_parry_power_up_full` it adds the rejected cue while preserving the
+native full-meter sound.
 
-- `ExperimentalFeatures.EnableHpOneChallenge = true`.
-- `ExperimentalFeatures.ForceHpOneChallengeForTesting = true`, so every
-  challenge-enabled spin selects `HP.1` while compatible bosses remain random.
-- `Plugin.ForceHpOneChaliceSuperTest = false`; the Chalice Super II test is no
-  longer the active forced loadout.
-- `Plugin.ForceHpOneHeartRingTest = true`, so every forced HP.1 result equips
-  Heart Ring for the rejected parry-heal visual test.
-- These force flags are intentionally committed for the next agent's manual
-  Heart Ring test. They must be disabled before a public build.
+`RouletteDjimmiGuard.cs` is intentionally broader than HP.1. While
+`loanedLoadoutsActive` marks any roulette battle session, its postfix makes
+`PlayerData.DjimmiActivatedCurrentRegion()` return false. It does not consume,
+clear or save over the wish. Manual validation in Normal produced 3 HP in a
+roulette fight and restored the native wish (9 HP with the player's restored
+loadout) in a manually entered fight. Cuphead's own `DjimmiInUse()` excludes
+Expert (`Level.Mode` value 2), so Normal is the meaningful regression case.
 
-### Manual validation still required
+### Dormant state and completed validation
 
-The implementation compiles and loads, but the full combination matrix has
-not been approved. Test at minimum: Cuphead/Mugman and Ms. Chalice; ground and
-plane fights; one and two players; late co-op join and revive; retry, victory,
-pause exit and defeat exit; Dice Palace internal fights; Heart, Twin Heart,
-Heart Ring, Astral Cookie, Cursed Relic and Divine Relic; King Dice hearts;
-Djimmi wishes; every super, especially Chalice Super II; and interactions with
-all other challenge types. Confirm health always starts/ends at one, every
-valid hit kills, equipment penalties/secondary effects remain intact, the
-rejected heart never grants invulnerability, and normal health is restored
-outside the roulette battle.
+- `ExperimentalFeatures.EnableHpOneChallenge = false`.
+- `ExperimentalFeatures.ForceHpOneChallengeForTesting = false`.
+- Every HP.1 loadout/boss test selector and the generic boss selector are
+  `false`; normal builds do not select HP.1.
+- The only release gate is replacing the temporary single-frame `hp1.png` with
+  the final animated challenge icon. Re-enable the challenge only after that
+  asset is integrated; never re-enable a force selector for a public build.
 
+Manual validation completed for ground and plane, Cuphead/Mugman and Ms.
+Chalice-specific behavior, Heart, Twin Heart, Heart Ring, Cursed/Divine Relic,
+King Dice hearts, Djimmi, Chalice Super II, retry, exit/restoration and normal
+non-roulette entry. Heart/Twin Heart retained their native damage multipliers
+(0.95/0.90). The rejected-heal visual and custom sound were approved.
+
+Co-op validation also passed: two players joined from the map both started at
+1 HP; a revived ghost returned at 1 HP; retry preserved one HP for both; a P2
+joining after battle start entered at 1 HP; retry again preserved the rule;
+and leaving the roulette session restored normal health in a manually entered
+level.
 ## Completed dormant flat 180-degree challenge (0.5.129)
 
 `ModifierId.UpsideDown` is a new experimental ground-and-plane challenge.

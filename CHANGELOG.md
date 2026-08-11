@@ -39,11 +39,24 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
   corrección compila y carga, pero su resultado visual queda pendiente de la
   siguiente sesión porque el usuario no alcanzó a probar esta última build.
 - Se agregó el icono temporal `HP.1`, el shader correspondiente y el tercer
-  recurso al AssetBundle de shaders. La build actual fuerza `HP.1 + Anillo de
-  Corazón` exclusivamente para validar la curación de parry rechazada. Falta validar
-  toda la matriz de personajes, amuletos, reliquias, curaciones, supers,
-  niveles, reintentos y cooperativo antes de publicarlo.
+  recurso al AssetBundle de shaders. Durante el desarrollo se forzó
+  `HP.1 + Anillo de Corazón` para validar la curación rechazada; ese selector
+  temporal quedó retirado después de completar la matriz.
 
+- La matriz final de `HP.1` quedó aprobada en tierra, avión y cooperativo:
+  ambos jugadores comienzan con una vida, la reanimación y la incorporación
+  tardía de P2 regresan con una vida, los reintentos conservan la regla y salir
+  de la sesión restaura la vida normal.
+- Se validaron Corazón, Corazón Doble, Anillo de Corazón, ambas reliquias,
+  corazones del Palacio de Dados, Súper II de Ms. Chalice y deseos de Djimmi.
+  Corazón y Corazón Doble conservan sus penalizaciones nativas de daño.
+- Las curaciones rechazadas de Anillo/Reliquias ahora reproducen el sonido
+  dedicado `hp_one_rejected_parry.wav`, aprobado tanto para tierra como avión.
+- Se añadió una guardia global de Djimmi para toda pelea iniciada por la
+  ruleta. El deseo no se consume ni se borra y vuelve a funcionar al entrar
+  manualmente a un nivel; la prueba Normal dio 3 HP con ruleta y 9 HP sin ella.
+- `HP.1` y todos sus selectores forzados quedan desactivados hasta integrar el
+  icono animado definitivo. La implementación permanece compilada y lista.
 - Se preparó la primera build del reto experimental `180°`, compatible con
   niveles terrestres y de avión. La cadencia final de prueba espera 0.25
   segundos con el combate normal y gira el fotograma de 0 a 180 grados durante
