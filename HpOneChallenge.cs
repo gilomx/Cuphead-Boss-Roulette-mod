@@ -93,6 +93,32 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning(
                     "Could not install the HP.1 Chalice shield rejection effect.");
+
+            var effectCreate = AccessTools.Method(
+                typeof(Effect), "Create",
+                new[] { typeof(Vector3), typeof(Vector3) });
+            var decorateRejectedHealRootPostfix = AccessTools.Method(
+                typeof(Plugin), "DecorateRejectedHealRootPostfix");
+            var healerParticleAwake = AccessTools.Method(
+                typeof(HealerCharmParticleEffect), "Awake");
+            var decorateRejectedHealParticleAwakePostfix = AccessTools.Method(
+                typeof(Plugin),
+                "DecorateRejectedHealParticleAwakePostfix");
+            if (effectCreate != null &&
+                decorateRejectedHealRootPostfix != null &&
+                healerParticleAwake != null &&
+                decorateRejectedHealParticleAwakePostfix != null)
+            {
+                harmony.Patch(effectCreate,
+                    postfix: new HarmonyMethod(
+                        decorateRejectedHealRootPostfix));
+                harmony.Patch(healerParticleAwake,
+                    postfix: new HarmonyMethod(
+                        decorateRejectedHealParticleAwakePostfix));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the HP.1 healer rejection effect.");
         }
 
         private static bool IsHpOneRuntimeActive()
@@ -184,6 +210,57 @@ namespace Gilomx.CupheadBossRoulette
                 plugin.Logger.LogWarning(
                     "Could not decorate the rejected Chalice heart: " +
                     exception.Message);
+            }
+        }
+
+        private static void DecorateRejectedHealRootPostfix(
+            Effect __instance,
+            ref Effect __result)
+        {
+            if (!(__instance is HealerCharmSparkEffect) || __result == null)
+                return;
+
+            var plugin = activeInstance;
+            if (plugin == null ||
+                !plugin.ShouldApplyHpOneHealthLock())
+                return;
+
+            plugin.DecorateRejectedHealObject(__result.gameObject, null,
+                "healer root");
+        }
+
+        private static void DecorateRejectedHealParticleAwakePostfix(
+            HealerCharmParticleEffect __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                !plugin.ShouldApplyHpOneHealthLock())
+                return;
+
+            plugin.DecorateRejectedHealObject(__instance.gameObject, null,
+                "healer particle");
+        }
+
+        private void DecorateRejectedHealObject(
+            GameObject target,
+            LevelPlayerController player,
+            string label)
+        {
+            if (target == null)
+                return;
+
+            try
+            {
+                var effect = target.GetComponent<HpOneRejectedHeartEffect>();
+                if (effect == null)
+                    effect = target.AddComponent<HpOneRejectedHeartEffect>();
+                effect.Initialize(hpOneRejectedHeartShader, player,
+                    label != "healer root");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning("Could not decorate rejected " + label +
+                    ": " + exception.Message);
             }
         }
 

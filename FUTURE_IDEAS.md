@@ -291,6 +291,11 @@ restaurar el comportamiento normal.
 - El Súper II de Ms. Chalice no concede escudo. El corazón rechazado aparece en
   blanco y negro, aproximadamente al 50% de opacidad, con jitter, parpadeo y
   scanlines breves antes de desvanecerse; cualquier golpe válido sigue matando.
+- El Anillo de Corazón y ambas reliquias comparten la ruta nativa
+  `HealerCharm()`. Cuando un parry alcanza su intervalo de curación durante
+  `HP.1`, el efecto raíz y sus cinco partículas reciben desde su primer frame
+  el mismo efecto blanco y negro glitchoso del corazón rechazado, aunque la
+  vida permanece fijada en uno.
 - El icono temporal es un candado con `HP.1` unido como en el HUD nativo.
 
 ### Pruebas pendientes
@@ -301,8 +306,9 @@ niveles terrestres y de avión; Cuphead, Mugman y Ms. Chalice; uno y dos
 jugadores; incorporación tardía y reanimación; todos los amuletos y supers;
 ambas reliquias; Anillo de Corazón; deseos de Djimmi; corazones y escenas
 internas del Palacio de Dados; reintentos; pausa; victoria; salida al mapa; y
-la combinación con cada uno de los demás retos. La build actual fuerza HP.1,
-Galletita Astral y Súper II para validar primero el corazón rechazado.
+la combinación con cada uno de los demás retos. La build actual fuerza HP.1 y
+Anillo de Corazón para validar primero la animación de curación rechazada; el
+selector temporal de Galletita Astral y Súper II está desactivado.
 ## Overlay local para streamers
 
 ### Objetivo

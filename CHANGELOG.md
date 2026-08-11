@@ -17,9 +17,30 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
   muestra temporalmente en blanco y negro, semitransparente y con un efecto
   sencillo de televisor antiguo antes de desaparecer; el jugador continúa
   vulnerable.
+- Se confirmó en el código nativo que `Anillo de Corazón`, `Reliquia Maldita`
+  y `Reliquia Divina` comparten `HealerCharmParticleEffect`. Durante `HP.1`,
+  cada partícula de una curación rechazada recibe el mismo shader blanco y
+  negro, opacidad, jitter, parpadeo, scanlines y desvanecimiento del corazón
+  rechazado de Chalice, mientras el límite de una vida bloquea la curación.
+- La primera prueba mostró que la parte dominante de la animación era el
+  `HealerCharmSparkEffect` raíz y permanecía a color. El hook final decora ese
+  objeto en el retorno de `Effect.Create()` y cada partícula en su `Awake()`;
+  así todo el conjunto lleva el efecto desde su primer fotograma visible.
+- La siguiente prueba detectó un corazón todavía rosa y que el jugador podía
+  quedar como silueta blanca. El efecto raíz ya no se destruye al terminar el
+  glitch: queda invisible y Cuphead conserva su corrutina hasta restaurar el
+  material del personaje y eliminarlo de forma nativa. Durante la animación,
+  el material glitch también se reafirma cada frame para impedir que el
+  Animator vuelva a colocar temporalmente el corazón rosa.
+- Como aún quedaba una capa rosa, la captura visual dejó de limitarse a
+  `SpriteRenderer`: ahora procesa cualquier `Renderer` descendiente y copia la
+  textura del material original al shader glitch. Esto cubre las capas de
+  partículas o malla sin convertir en blanco y negro la pantalla completa. La
+  corrección compila y carga, pero su resultado visual queda pendiente de la
+  siguiente sesión porque el usuario no alcanzó a probar esta última build.
 - Se agregó el icono temporal `HP.1`, el shader correspondiente y el tercer
-  recurso al AssetBundle de shaders. La build actual fuerza `HP.1 + Galletita
-  astral + Súper II` exclusivamente para continuar las pruebas. Falta validar
+  recurso al AssetBundle de shaders. La build actual fuerza `HP.1 + Anillo de
+  Corazón` exclusivamente para validar la curación de parry rechazada. Falta validar
   toda la matriz de personajes, amuletos, reliquias, curaciones, supers,
   niveles, reintentos y cooperativo antes de publicarlo.
 

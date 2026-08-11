@@ -39,8 +39,10 @@ namespace Gilomx.CupheadBossRoulette
             false;
         // TEMPORARY VISUAL TEST. It does not change either player's real meter.
         private static readonly bool ForceFiveSuperCardsForHudTest = false;
-        // TEMPORARY HP.1 TEST: force Ms. Chalice and her Super II shield.
-        private static readonly bool ForceHpOneChaliceSuperTest = true;
+        // Dormant HP.1 test: force Ms. Chalice and her Super II shield.
+        private static readonly bool ForceHpOneChaliceSuperTest = false;
+        // TEMPORARY HP.1 TEST: force Heart Ring to validate rejected parry heals.
+        private static readonly bool ForceHpOneHeartRingTest = true;
         // Dormant boss-test selector. Keep false in normal builds.
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels[] ForcedTestBossSequence =
@@ -1433,6 +1435,13 @@ namespace Gilomx.CupheadBossRoulette
                 charm = FindCharmIndex(Charm.charm_chalice);
                 Logger.LogWarning(
                     "TEMP HP.1 test: forcing Astral Cookie and Super II.");
+            }
+            else if (ForceHpOneHeartRingTest &&
+                     ForcedTestChallenge == ModifierId.HpOne)
+            {
+                charm = FindCharmIndex(Charm.charm_healer);
+                Logger.LogWarning(
+                    "TEMP HP.1 test: forcing Heart Ring.");
             }
 
             var modifier = forcedModifier >= 0

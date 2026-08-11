@@ -40,15 +40,52 @@ shaders. A narrowly scoped `PlayerDamageReceiver.OnRevive` guard suppresses
 only the same-frame native revive/invulnerability cleanup caused by destroying
 this rejected heart.
 
+Heart Ring and both effective states of `Charm.charm_curse` (Cursed and Divine
+Relic) share Cuphead's native `PlayerStatsManager.HealerCharm()` path. When its
+parry interval produces a heal, the game creates five
+`HealerCharmParticleEffect` instances under a visible
+`HealerCharmSparkEffect` root. The first runtime test proved that decorating
+only the particles left the dominant root animation in color. The final hooks
+decorate the returned root in `Effect.Create(Vector3, Vector3)` and each
+particle in its `Awake()` postfix, before its first rendered frame. Both receive
+the same `HpOneRejectedHeartEffect` and shader while HP.1 is active. The
+attempted heal still executes its native secondary behavior but
+the health setter clamps it to one; visually, its particles are grayscale,
+roughly 50% opaque, deterministic-jittered, flickered, scanlined and faded.
+The patch is shared by ground and plane because both animation controllers use
+the same particle class.
+
+The second runtime test found one heart layer still pink and left the player as
+a permanent white silhouette. `HealerCharmSparkEffect` owns the delayed native
+`player_flash_cr()` cleanup; destroying its root on the visual effect's
+1.15-second timer could interrupt `SetOldMaterial()` after the five particles
+arrived. The root now fades to zero without destroying its GameObject and lets
+Cuphead finish that coroutine and destroy it natively. Particle objects retain
+the original timed destruction. While active, the component also reasserts its
+shader material every frame so an Animator material swap cannot expose a pink
+heart layer.
+
+One pink heart layer still remained after that lifecycle fix. The visual
+component had only enumerated `SpriteRenderer`; it now captures every child
+`Renderer`, including particle-system or mesh renderers, and copies the source
+material's main texture into the rejection shader. Sprite tint is still forced
+white where applicable. This remains object-scoped and does not apply a global
+grayscale pass or alter the persistent health HUD. This final renderer-wide
+coverage builds, installs and loads without errors, but has not yet received
+manual visual confirmation. Next session must verify that no pink heart layer
+remains and that the player reliably returns from the native white flash.
+
 ### Important temporary test state
 
 - `ExperimentalFeatures.EnableHpOneChallenge = true`.
 - `ExperimentalFeatures.ForceHpOneChallengeForTesting = true`, so every
   challenge-enabled spin selects `HP.1` while compatible bosses remain random.
-- `Plugin.ForceHpOneChaliceSuperTest = true`, so every forced HP.1 result also
-  equips Astral Cookie and Ms. Chalice Super II.
+- `Plugin.ForceHpOneChaliceSuperTest = false`; the Chalice Super II test is no
+  longer the active forced loadout.
+- `Plugin.ForceHpOneHeartRingTest = true`, so every forced HP.1 result equips
+  Heart Ring for the rejected parry-heal visual test.
 - These force flags are intentionally committed for the next agent's manual
-  Super II test. They must be disabled before a public build.
+  Heart Ring test. They must be disabled before a public build.
 
 ### Manual validation still required
 

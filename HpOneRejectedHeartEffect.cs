@@ -9,7 +9,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float JitterInterval = 0.055f;
         private const float BaseOpacity = 0.50f;
 
-        private SpriteRenderer[] renderers;
+        private Renderer[] renderers;
         private Material[] materials;
         private Vector3 originalLocalPosition;
         private PlayerDamageReceiver receiver;
@@ -17,6 +17,8 @@ namespace Gilomx.CupheadBossRoulette
         private float nextJitterAt;
         private int jitterStep;
         private bool initialized;
+        private bool destroyObjectAtEnd;
+        private bool finished;
 
         internal PlayerDamageReceiver Receiver
         {
@@ -25,13 +27,20 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void Initialize(Shader shader, LevelPlayerController player)
         {
+            Initialize(shader, player, true);
+        }
+
+        internal void Initialize(Shader shader, LevelPlayerController player,
+            bool destroyAtEnd)
+        {
             if (initialized)
                 return;
 
             initialized = true;
+            destroyObjectAtEnd = destroyAtEnd;
             originalLocalPosition = transform.localPosition;
             receiver = player == null ? null : player.damageReceiver;
-            renderers = GetComponentsInChildren<SpriteRenderer>(true);
+            renderers = GetComponentsInChildren<Renderer>(true);
             materials = new Material[renderers.Length];
 
             for (var i = 0; i < renderers.Length; i++)
@@ -40,12 +49,22 @@ namespace Gilomx.CupheadBossRoulette
                 if (source == null)
                     continue;
 
+                var originalMaterial = source.sharedMaterial;
                 var material = shader == null
-                    ? new Material(source.material)
+                    ? originalMaterial == null
+                        ? null
+                        : new Material(originalMaterial)
                     : new Material(shader);
+                if (material == null)
+                    continue;
+                if (originalMaterial != null &&
+                    originalMaterial.mainTexture != null)
+                    material.mainTexture = originalMaterial.mainTexture;
                 materials[i] = material;
-                source.material = material;
-                source.color = new Color(1f, 1f, 1f, 1f);
+                source.sharedMaterial = material;
+                var sprite = source as SpriteRenderer;
+                if (sprite != null)
+                    sprite.color = Color.white;
                 if (material.HasProperty("_Opacity"))
                     material.SetFloat("_Opacity", BaseOpacity);
             }
@@ -53,13 +72,20 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Update()
         {
-            if (!initialized)
+            if (!initialized || finished)
                 return;
 
             elapsed += Time.deltaTime;
             if (elapsed >= Lifetime)
             {
-                Destroy(gameObject);
+                if (destroyObjectAtEnd)
+                    Destroy(gameObject);
+                else
+                {
+                    SetOpacity(0f);
+                    transform.localPosition = originalLocalPosition;
+                    finished = true;
+                }
                 return;
             }
 
@@ -80,11 +106,25 @@ namespace Gilomx.CupheadBossRoulette
                 : 1f - Mathf.Clamp01(
                     (elapsed - FadeStart) / (Lifetime - FadeStart));
             var opacity = Mathf.Clamp01((BaseOpacity + flicker) * fade);
+            SetOpacity(opacity);
+        }
+
+        private void SetOpacity(float opacity)
+        {
             for (var i = 0; i < materials.Length; i++)
             {
                 var material = materials[i];
                 if (material == null)
                     continue;
+                var source = renderers[i];
+                if (source != null)
+                {
+                    if (source.sharedMaterial != material)
+                        source.sharedMaterial = material;
+                    var sprite = source as SpriteRenderer;
+                    if (sprite != null)
+                        sprite.color = Color.white;
+                }
                 if (material.HasProperty("_Opacity"))
                     material.SetFloat("_Opacity", opacity);
                 if (material.HasProperty("_ScanlinePhase"))
