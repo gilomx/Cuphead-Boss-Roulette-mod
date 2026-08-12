@@ -21,7 +21,8 @@ namespace Gilomx.CupheadBossRoulette
         BlackAndWhite,
         RgbShift,
         UpsideDown,
-        HpOne
+        HpOne,
+        InkRain
     }
 
     internal sealed class BossEntry
@@ -180,6 +181,8 @@ namespace Gilomx.CupheadBossRoulette
                 "modifiers/upside_down.png", 1),
             new ModifierEntry(ModifierId.HpOne, ModifierKind.Both,
                 "modifiers/hp1.png", 1),
+            new ModifierEntry(ModifierId.InkRain, ModifierKind.Both,
+                "modifiers/inkrain_01.png"),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
 

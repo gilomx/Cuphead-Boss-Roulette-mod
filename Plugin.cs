@@ -31,6 +31,9 @@ namespace Gilomx.CupheadBossRoulette
                 : ExperimentalFeatures.EnableRgbShiftChallenge &&
                   ExperimentalFeatures.ForceRgbShiftChallengeForTesting
                 ? ModifierId.RgbShift
+                : ExperimentalFeatures.EnableInkRainChallenge &&
+                  ExperimentalFeatures.ForceInkRainChallengeForTesting
+                ? ModifierId.InkRain
                 : ModifierId.None;
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
@@ -724,6 +727,8 @@ namespace Gilomx.CupheadBossRoulette
             InstallCurseRelicLevelOverridePatches();
             InstallHpOneChallengePatches();
             InstallRouletteDjimmiGuardPatch();
+            InstallInkRainChallengePatches();
+            InitializeInkRainChallenge();
 
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion +
@@ -1140,6 +1145,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Update()
         {
+            SafeUpdateInkRainChallenge();
             UpdateLanguageTestShortcut();
             UpdateLoanedLoadoutLifecycle();
             UpdateActiveChallengeLifecycle();
@@ -2514,6 +2520,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ClearActiveChallenge()
         {
+            ClearInkRainChallengeSession();
             ClearChallengeVisualRetryGate();
             soloMiniRestartPending = false;
             activeChallenge = ModifierId.None;
@@ -3097,6 +3104,7 @@ namespace Gilomx.CupheadBossRoulette
             ResetRgbShiftChallenge();
             ResetUpsideDownChallenge();
             ResetBlackAndWhiteRenderEffects();
+            DisposeInkRainChallenge();
             blackAndWhiteTransitionShader = null;
             battleHudSaturationShader = null;
             hpOneRejectedHeartShader = null;

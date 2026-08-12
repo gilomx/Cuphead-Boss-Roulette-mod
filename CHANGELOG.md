@@ -3,6 +3,27 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## Desarrollo experimental - Lluvia de tinta (2026-08-11)
+
+- Se agrego el primer prototipo jugable de `Lluvia de tinta` para niveles de
+  tierra y avion, actualmente habilitado y forzado para continuar sus pruebas.
+- Se integraron los 36 frames originales de las gotas, la capa y grupos de
+  manchas de pantalla, y las cuatro variantes originales de impacto de siete
+  frames. Los assets se exportaron como Sprite para evitar contaminacion del
+  atlas.
+- El oscurecimiento progresivo replica los incrementos y tiempos del pulpo de
+  Capitan Barbasalada. La capa oscura ahora se dibuja sobre las manchas; esto
+  elimino el halo blanco de sus bordes. La escala final aceptada para las
+  manchas es 0.65 horizontal y 0.115 vertical.
+- Las gotas ahora usan velocidad inicial y gravedad para caer en curvas
+  diagonales hacia la izquierda. La velocidad y densidad siguen pendientes de
+  ajuste mediante pruebas.
+- Se agrego un primer intento de detectar `Level_Ground` con Physics2D y mostrar
+  la animacion nativa `OnDeath`. Compila, pero la prueba manual confirmo que el
+  choque con el piso todavia no funciona y debe diagnosticarse.
+- Pendiente: definir cantidad y cadencia de gotas, ajustar velocidades, corregir
+  impactos de piso y mostrar una animacion breve del pulpo al iniciar cada
+  combate para identificar el origen del reto.
 ## 0.5.129 — 2026-08-08 (desarrollo RGB y 180°)
 
 - Se implementó la primera versión experimental del reto `HP.1` para niveles

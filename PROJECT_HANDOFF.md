@@ -1,5 +1,113 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Experimental Ink Rain challenge (2026-08-11 handoff)
+
+`ModifierId.InkRain` is a first playable ground-and-plane prototype named
+`LLUVIA DE TINTA` in Spanish and `INK RAIN` in the other localization tables.
+`RouletteData` currently points to the provisional `modifiers/inkrain_01.png`;
+three provisional icon files exist, but only frame 01 is referenced. The feature
+and its forced test selector are deliberately still enabled in
+`ExperimentalFeatures.cs` so the next session always rolls this challenge.
+Disable `ForceInkRainChallengeForTesting` after the remaining acceptance work,
+and keep the challenge experimental until every arena has been checked.
+
+Runtime implementation lives in `InkRainChallenge.cs`. `Plugin` installs its
+Level-init Harmony hook, updates the runtime every frame and clears it through
+the normal active-challenge lifecycle. The runtime is created only when the
+roulette-selected challenge is `InkRain`; battle end, scene loading, victory,
+map return and plugin destruction reset drops, screen ink and loaded textures.
+This lifecycle previously required several fixes because leaked runtime state
+could keep spawning drops on results, the map or later non-roulette battles.
+Do not weaken the `activeChallenge == ModifierId.InkRain` and battle-session
+guards while adjusting visuals.
+
+### Native behavior recovered from Cuphead
+
+The original classes were inspected directly in `Assembly-CSharp.dll` with
+Mono.Cecil. `PirateLevelSquidProjectile` stores velocity and gravity, advances
+its position every frame and subtracts gravity from vertical velocity. Its
+`OnTriggerEnter2D` calls `PirateLevelSquidInkOverlay.Hit()` for `PlayerId.One`
+or `PlayerId.Two`; for a collider named exactly `Level_Ground` it calls
+`Die()`. `Die()` disables the projectile collider and sends the `OnDeath`
+trigger to the same Animator. It does not use `Pirate_Squid_Splash` (that is a
+separate white water effect).
+
+`PirateLevelSquidInkOverlay.Hit()` raises the target darkness by 0.4, clamps it
+to 1.0, rises over 0.4 seconds, holds for 2.8 / 3.3 / 4.0 seconds on Easy /
+Normal / Expert and fades over 5 seconds. The mod mirrors those timings and
+chooses one of the three recovered native screen-splat layouts. The five native
+screen animation families `a` through `e` run at 12 fps with their individual
+completion durations.
+
+### Integrated native assets and rendering
+
+The committed `assets/inkrain` folder contains:
+
+- `projectiles`: 36 exact `pirate_squid_inkblob` Sprite exports used at 24 fps;
+- `screen`: the full-screen ink veil plus the normalized `a`-`e` screen splats;
+- `impacts`: four `pirate_squid_ink_death_[a-d]` variants, seven frames each at
+  24 fps. Their native pivots were normalized to a 214 x 60 transparent canvas
+  anchored at the lower center, preserving one particle that extends one pixel
+  beyond the nominal 212-pixel width.
+
+Assets were exported from the installed game with AssetStudio 2.4.1 using
+`Sprite:Both`, not rectangular atlas crops. Rectangular extraction caused
+neighboring pirate/ship artwork to leak into transparent frames and must not be
+used again.
+
+Screen-splat scale accepted manually is `SplatVisualScaleX = 0.65` and
+`SplatVisualScaleY = 0.115`. The full-screen darkness must render after the
+falling drops, ground impacts and screen splats. Rendering it before the splats
+made their translucent light fringe appear as a white halo; drawing the veil
+last removed the halo and was manually approved.
+
+The current test trajectory enters near the upper-right, moves left with
+horizontal velocity between `-0.20` and `-0.14` camera-heights per second,
+starts downward between `0.15` and `0.22`, and applies downward gravity between
+`0.15` and `0.21`. This produces the requested curved diagonal fall instead of
+a nearly vertical line. These numbers are provisional and need gameplay tuning.
+
+### Current ground-impact attempt (not working in manual test)
+
+The mod does not instantiate physical projectile GameObjects. It linecasts from
+each virtual drop's previous position to its new position and looks for a
+collider named `Level_Ground`; a match should remove the drop and play a random
+native `ink_death` sequence at the hit point. The project now references
+Cuphead's existing `UnityEngine.Physics2DModule.dll`; no extra runtime package is
+required.
+
+The latest manual test reported that the floor collision did not fire. Treat
+this feature as unfinished even though it builds. First add rate-limited runtime
+diagnostics for every linecast hit: GameObject/collider name, layer, tag,
+`isTrigger`, collider type and hit point. The current implementation rejects
+`collider.isTrigger`; this is a leading suspect because the original callback is
+`OnTriggerEnter2D`, but verify actual arena data before removing the filter.
+Also verify whether each level uses the exact `Level_Ground` name. If virtual
+linecasts remain unreliable, the higher-fidelity fallback is to instantiate or
+clone the native projectile/prefab flow instead of guessing a fixed floor Y.
+Plane levels or levels without a valid ground should allow drops to leave the
+screen without a fake impact.
+
+### Required follow-up tests and tasks
+
+1. Decide the final amount of ink rain by difficulty: maximum simultaneous
+   drops, wave size probabilities and spawn delays. Current values are only a
+   first prototype (`2/3/4` visible on Easy/Normal/Expert).
+2. Tune horizontal speed, initial fall speed and gravity through gameplay so the
+   diagonal arcs are readable and fair in both ground and plane fights.
+3. Fix and validate ground collision. Confirm the original four-way OnDeath
+   animation appears at native scale on real floors/platforms and never on
+   walls, enemies, results, the map or later non-roulette levels.
+4. Add a short native squid entrance/identification animation at the beginning
+   of every Ink Rain battle so players understand where the rain comes from.
+   Candidate native sequence names include `pirate_squid_entrance_0001...0018`;
+   define placement, duration and layering without spawning the actual pirate
+   boss or blocking gameplay.
+5. After the above, test defeat/retry, victory, abandon-to-map, results screens,
+   King Dice transitions, ground bosses, plane bosses, DLC bosses, pause and
+   two-player sessions. Finally disable the forced selector and replace the
+   provisional challenge icon with the user's finished animation.
+
 ## Completed dormant HP.1 challenge (0.5.129, awaiting final animated icon)
 
 `ModifierId.HpOne` implements the ground-and-plane `HP.1` challenge. The

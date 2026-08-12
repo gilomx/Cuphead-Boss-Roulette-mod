@@ -21,6 +21,11 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool EnableHpOneChallenge = false;
         internal static readonly bool ForceHpOneChallengeForTesting = false;
 
+        // First playable prototype. Keep it forced while its density,
+        // collisions and progressive blackout are validated in every arena.
+        internal static readonly bool EnableInkRainChallenge = true;
+        internal static readonly bool ForceInkRainChallengeForTesting = true;
+
         internal static bool IsChallengeEnabled(ModifierId id)
         {
             if (id == ModifierId.RgbShift)
@@ -29,6 +34,8 @@ namespace Gilomx.CupheadBossRoulette
                 return EnableUpsideDownChallenge;
             if (id == ModifierId.HpOne)
                 return EnableHpOneChallenge;
+            if (id == ModifierId.InkRain)
+                return EnableInkRainChallenge;
             return true;
         }
     }
