@@ -4,8 +4,12 @@
 
 `ModifierId.InkRain` is a first playable ground-and-plane prototype named
 `LLUVIA DE TINTA` in Spanish and `INK RAIN` in the other localization tables.
-`RouletteData` currently points to the provisional `modifiers/inkrain_01.png`;
-three provisional icon files exist, but only frame 01 is referenced. The feature
+`RouletteData` currently points to `modifiers/inkrain_01.png`. The three prepared
+icon frames now show three native ink blobs in separate, deliberately
+non-collinear lanes. Each travels down-left with its own trail leaning up-right,
+so the group reads as simultaneous diagonal rain rather than three poses of one
+projectile; only frame 01 is
+currently referenced by the roulette/HUD. The feature
 and its forced test selector are deliberately still enabled in
 `ExperimentalFeatures.cs` so the next session always rolls this challenge.
 Disable `ForceInkRainChallengeForTesting` after the remaining acceptance work,
@@ -48,12 +52,50 @@ The committed `assets/inkrain` folder contains:
 - `impacts`: four `pirate_squid_ink_death_[a-d]` variants, seven frames each at
   24 fps. Their native pivots were normalized to a 214 x 60 transparent canvas
   anchored at the lower center, preserving one particle that extends one pixel
-  beyond the nominal 212-pixel width.
+  beyond the nominal 212-pixel width;
+- `squid`: 18 native entrance frames, 19 numbered frames split by the game into
+  a 3-frame attack opening plus a 16-frame attack loop, and 22 leave frames.
+  The runtime reconstructs the native 29-frame exit from numbered frames 4-10
+  followed by leave frames 1-22. All 59 exported PNGs use Cuphead's fixed
+  `620 x 620` canvas and original lower-center pivot.
 
 Assets were exported from the installed game with AssetStudio 2.4.1 using
 `Sprite:Both`, not rectangular atlas crops. Rectangular extraction caused
 neighboring pirate/ship artwork to leak into transparent frames and must not be
 used again.
+
+The squid introduction sprites were extracted from the same installed
+`atlas_piratelevel` bundle with UnityPy 1.25.3. They are original Cuphead Sprite
+exports rather than screenshots or recreated art.
+
+The full-screen veil and animated splats are now composed by
+`InkRainPreFilmRenderer`, using a command buffer at
+`CameraEvent.BeforeImageEffects`. This matches the native pirate ordering: the
+ink enters the camera image first, then Cuphead's animated film effects add their
+grain, dust, scratches, chromatic aberration and selected filter. Previously the
+same sprites were drawn in `OnGUI`, after post-processing, which made maximum
+ink look unnaturally flat. The first integration moved only the screen ink and
+left drops/ground impacts in late `OnGUI`; manual testing exposed that those
+elements then appeared in front of the blackout and changed the perceived size
+of the hit splats. Drops, ground impacts and the full-screen veil now use the
+pre-film command buffer. `OnGUI` draws their complete fallback only when that
+renderer is unavailable.
+The renderer uses
+Cuphead's `Sprites/Default` shader with `Unlit/Transparent` as a secondary
+choice; if neither is supported, the old `OnGUI` screen-ink path is retained as
+a runtime fallback. Drawing each animated hit-splat sprite directly through the
+command buffer was rejected in manual testing: the unusually tall source canvases
+were visibly flattened and material-property reuse made frames look repeated.
+The runtime now rasterizes the whole group first into a screen-sized transparent
+`RenderTexture` during the repaint event using `Graphics.DrawTexture`, the exact
+sprite UVs, the original `0.65` horizontal / `0.115` vertical scale, positions,
+frame rate and stagger. On the following frame, the command buffer composites
+that one flat texture before the full-screen veil and film effects. The deliberate
+one-frame latency avoids per-sprite command-buffer distortion while retaining the
+accepted GUI footprint and correct layer order. Resolution changes recreate the
+temporary surface; reset/scene exit releases it. The literal old
+`GUI.DrawTextureWithTexCoords` implementation remains in the all-GUI fallback.
+This arrangement compiles cleanly and awaits manual visual validation.
 
 Screen-splat scale accepted manually is `SplatVisualScaleX = 0.65` and
 `SplatVisualScaleY = 0.115`. The full-screen darkness must render after the
@@ -64,25 +106,172 @@ last removed the halo and was manually approved.
 The current test trajectory enters near the upper-right, moves left with
 horizontal velocity between `-0.20` and `-0.14` camera-heights per second,
 starts downward between `0.15` and `0.22`, and applies downward gravity between
-`0.15` and `0.21`. This produces the requested curved diagonal fall instead of
+`0.22` and `0.28`. This produces the requested curved diagonal fall instead of
 a nearly vertical line. These numbers are provisional and need gameplay tuning.
 
-### Current ground-impact attempt (not working in manual test)
+### Native squid introduction (implemented, awaiting gameplay validation)
+
+The introduction must not modify Cuphead's gameplay timing. There is no patch on
+`Level.LevelIntroTime`; the original one-second pre-Ready window remains intact.
+`PlayerStatsManager.LevelInit()` now starts the sprites immediately after it
+configures the Ink Rain runtime, with an explicit 1.0-second visual/audio delay.
+At that point Cuphead has created the battle level but still covers it with its
+loading presentation. The sequence keeps its complete duration and starts 1.0
+seconds later than the immediate-`LevelInit` test; the first sprite and native
+entrance sound both wait for the same scheduled time. This does not change any
+gameplay clock. `Level._OnTransitionInComplete()`
+remains a no-op-safe fallback for special scenes where the early call cannot
+start. The sprites run at their
+native 24 fps. Fitting all 72 displayed source frames into one second would
+require an unwanted `10/3` speed-up, which manual testing rejected. The runtime
+therefore plays the complete source sequence concurrently with Cuphead's normal
+startup: 18 entrance frames (0.75 s), 3 attack-opening frames (0.125 s), 22
+displayed frames from the native 16-frame loop (0.917 s), and the reconstructed
+29-frame exit (1.208 s). `Ready/Wallop` begins on Cuphead's own unchanged
+schedule while the squid continues. The only transform movement is the native
+20-unit sinusoidal bob from `PirateLevelSquid.Update()`; the exit artwork carries
+the squid out of view at the same 24 fps as its entry.
+No additional squid artwork was missing; the problem was the earlier clip split
+and projectile-origin synchronization. After the first visual test,
+the lower-center anchor moved from 82% to 50% of screen width and its scale
+doubled from 55% to 110% of the exported sprite size relative to a 720p frame.
+The vertical anchor is now 4% below the viewport (`-0.04`) so the naturally
+cropped tentacle ends continue below the screen instead of making the sprite's
+lower boundary visible.
+
+The direct command-buffer sprite draw was invisible during Cuphead's camera
+transition. A temporary `OnGUI` path proved the animation but placed it above
+the film effects and therefore made it look unusually clean. A subsequent
+full-screen RenderTexture attempt was visible before the film effects, but
+double-composited the alpha and presented the previous frame, causing a pale
+appearance and visible trembling. The current path uses a real `SpriteRenderer`
+in front of the gameplay scene. Its 59 sprites are created with their original
+lower-center pivot, and its world scale is calculated from the camera viewport
+to preserve the requested screen size. The original exports were tightly
+cropped to different dimensions, even though Cuphead defines every frame on the
+same 620 x 620 canvas. All 59 PNGs were therefore rebuilt on that native canvas
+using each Sprite's `textureRectOffset`; this preserves the real per-frame
+alignment. The actor is also parented to the gameplay camera, eliminating
+relative motion caused by Cuphead finishing its camera transition after
+`Update`. Cuphead now applies its film effects to the actor once, without a
+frame of latency. Drops, impacts, splats and the veil retain their approved
+ordering.
+
+`PlayerStatsManager.LevelInit()` records the level instance, configures the
+runtime and calls `BeginInkRainSquidIntroOnce()`. That call schedules the actual
+start for `Time.time + 1.0`; the rain window remains relative to the delayed
+animation start. The guard is now session-based rather than derived from
+`Level.Current.GetInstanceID()`: Cuphead can replace or temporarily omit that
+object while constructing one battle, which previously made a second
+`LevelInit` look like a new session. The first `LevelInit` configures the
+session; later calls and the transition-complete fallback cannot reset or replay
+the squid. Defeat/retry, exit or a genuinely new battle clears both booleans.
+While `SceneLoader.CurrentlyLoading`
+remains true for that last fade, the plugin preserves the session and updates
+only the squid, its harmless intro drops and the pre-film compositor. It does
+not scan players or advance screen ink.
+
+Retry required a separate reset path. `ClearInkRainChallengeSession()` is tied
+to clearing the active roulette challenge and is not called by Cuphead's normal
+pause-menu/defeat reload, so the first session guard initially survived retry
+and blocked both squid and rain. `ResetChallengeVisualsForReload()` now also
+calls `ResetInkRainChallengeForRetry()`: it disables and clears the runtime
+behind the existing opaque restart fade, resets both session guards and lets the
+next `PlayerStatsManager.LevelInit()` create exactly one fresh attempt. Multiple
+`LevelInit` calls inside that reload still share the newly configured guard.
+
+The opening rain now follows the native animation events rather than a manually
+tuned window. The 18-frame entrance lasts 0.75 seconds, but its
+`OnEnterAnimationComplete` event occurs on frame 17 at exactly `16 / 24`, or
+0.6667 seconds. At that event the attack-loop sound starts and the first blob is
+created immediately from the initial native `InkOrigin` local position `(46,
+368)`. The visual attack clip begins at 0.75 seconds, plays the pop sound on its
+first frame and reaches the 16-frame attack loop at 0.875 seconds. That loop
+contains a compressed streamed Transform curve which was easy to miss because
+`m_PositionCurves` itself is empty. Its path CRC `2960652783` is exactly the
+CRC32 of `InkOrigin`, and it moves the child through all 16 nozzle positions.
+The mod now evaluates Cuphead's original cubic coefficients for X/Y on every
+spawn, including interpolation between the 24-fps keys. Therefore the first
+blobs precede the opened bottle from `(46, 368)`, then the emission point jumps
+to the sprayer and travels with it exactly as drawn. There is one animated
+origin, not a second projectile source.
+
+Subsequent intro blobs use Cuphead's exact per-difficulty delays: 0.21 seconds
+on Easy and 0.12 seconds on Normal or Expert. Overdue ticks are processed in
+order so frame-rate changes do not alter the stream. The temporary ceiling of
+20 remains only as a safety limit and is not normally reached with the native
+cadence. Emission stops when the shortened introduction enters its exit at
+`0.75 + 0.125 + 0.9167 = 1.7917` seconds, matching the original rule that the
+attack coroutine stops when the squid changes to its Exit state. The complete
+visual still lasts 3 seconds instead of retaining the real boss enemy for its
+native 5.5/7.5-second attack, so the approved non-blocking level introduction is
+not extended. At that cutoff
+the active ceiling immediately returns to the difficulty's `3/4/13`; no regular
+wave is added until enough existing drops have left the screen or hit the
+floor. They use the horizontal/vertical velocity
+ranges and gravity that
+`LevelProperties.Pirate` assigns to Easy, Normal or Hard. After the squid
+leaves, `SpawnWave()` automatically resumes the regular approved top-right
+origin, wave-size probabilities and `NextSpawnDelay()` cadence. These drops
+move and collide with the floor normally but cannot ink a player while Cuphead
+still has player control locked. Player ink effects
+remain disabled beyond the intro until exactly one scaled second after
+`Level.PlayAnnouncerBegin()` starts Cuphead's `Wallop` announcement. Drops remain
+visible and continue their normal movement/floor collisions during this grace
+period, but pass through players without adding darkness, splats or blackout
+audio. `_OnLevelStart()` starts the same one-second grace only as a fallback for
+Dice Palace, Tower of Power or another special scene that omits the announcer
+call; it never extends a grace period already started by `Wallop`. Native audio
+keys `level_pirate_squid_enter`,
+`level_pirate_squid_attack_pop`, `level_pirate_squid_attack_loop` and
+`level_pirate_squid_exit` are used, so the game's effects/master volume settings
+remain authoritative. Reset and scene exit always stop the loop.
+
+The squid actor also reproduces the native root motion from
+`PirateLevelSquid.Update()`: it moves 20 source units downward and back with
+`easeInOutSine(PingPong(t, 1))`, a complete two-second cycle. The offset is
+converted through the approved 2x visual scale and current camera resolution,
+so the sprite and its animated `InkOrigin` move together without changing the
+projectile trajectories after creation. The root bob and the 16-key child curve
+are applied independently, just as in the native prefab plus Animator.
+
+Cuphead pauses gameplay by setting `CupheadTime.GlobalSpeed` to zero rather than
+relying on Unity's `Time.timeScale`, so checking only `Time.deltaTime` allowed
+the virtual rain to keep moving. The runtime now returns immediately whenever
+`GlobalSpeed <= 0`. On unpause it shifts every absolute gameplay clock by the
+paused duration: next rain spawn, squid sequence, damage grace, player scan,
+ground-impact animation and screen-splat animation. Drop age, velocity, gravity,
+ink interpolation and hold time were already delta-driven and therefore remain
+unchanged while the update is suspended. The paused frame stays rendered in
+place instead of disappearing or catching up afterward.
+
+This does not instantiate `PirateLevelSquid`: no enemy HP, collider, damage
+receiver, Pirate `LevelProperties`, physical projectile prefab or boss event is
+created. Fitting the visual inside Cuphead's existing pre-battle window avoids
+changing `LevelIntroTime`, `Time.timeScale` or the start of player/boss control.
+If any of the 59 PNGs
+is missing, the runtime logs a warning, skips the visual and releases regular
+rain instead of leaving spawning disabled.
+
+### Ground-impact trigger fix (validated in Beppi)
 
 The mod does not instantiate physical projectile GameObjects. It linecasts from
 each virtual drop's previous position to its new position and looks for a
-collider named `Level_Ground`; a match should remove the drop and play a random
-native `ink_death` sequence at the hit point. The project now references
+collider named `Level_Ground`; a match removes the drop and plays a random
+native `ink_death` sequence at the hit point. The project references
 Cuphead's existing `UnityEngine.Physics2DModule.dll`; no extra runtime package is
 required.
 
-The latest manual test reported that the floor collision did not fire. Treat
-this feature as unfinished even though it builds. First add rate-limited runtime
-diagnostics for every linecast hit: GameObject/collider name, layer, tag,
-`isTrigger`, collider type and hit point. The current implementation rejects
-`collider.isTrigger`; this is a leading suspect because the original callback is
-`OnTriggerEnter2D`, but verify actual arena data before removing the filter.
-Also verify whether each level uses the exact `Level_Ground` name. If virtual
+The first Beppi test did not fire any ground impact because the implementation
+rejected `collider.isTrigger`, while the original projectile deliberately handles
+the floor in `OnTriggerEnter2D`. That rejection is now removed. The runtime also
+logs linecast hits at most once every two seconds, including hierarchy path,
+collider type, layer, tag, `isTrigger` and hit point. It logs the first accepted
+`Level_Ground` separately. The trigger fix was manually validated in Beppi. If
+another arena fails, use those diagnostics to verify whether it names the floor
+differently. Ground-impact sprites render at 60% of their exported PNG size so
+the splash remains proportional to the challenge's virtual drops.
+If virtual
 linecasts remain unreliable, the higher-fidelity fallback is to instantiate or
 clone the native projectile/prefab flow instead of guessing a fixed floor Y.
 Plane levels or levels without a valid ground should allow drops to leave the
@@ -92,21 +281,38 @@ screen without a fake impact.
 
 1. Decide the final amount of ink rain by difficulty: maximum simultaneous
    drops, wave size probabilities and spawn delays. Current values are only a
-   first prototype (`2/3/4` visible on Easy/Normal/Expert).
+   current prototype (`3/4/13` visible on Easy/Normal/Expert). Spawn intervals
+   and double-wave probabilities were intentionally left unchanged when these
+   caps and the gravity were raised.
 2. Tune horizontal speed, initial fall speed and gravity through gameplay so the
    diagonal arcs are readable and fair in both ground and plane fights.
-3. Fix and validate ground collision. Confirm the original four-way OnDeath
-   animation appears at native scale on real floors/platforms and never on
-   walls, enemies, results, the map or later non-roulette levels.
-4. Add a short native squid entrance/identification animation at the beginning
-   of every Ink Rain battle so players understand where the rain comes from.
-   Candidate native sequence names include `pirate_squid_entrance_0001...0018`;
-   define placement, duration and layering without spawning the actual pirate
-   boss or blocking gameplay.
-5. After the above, test defeat/retry, victory, abandon-to-map, results screens,
-   King Dice transitions, ground bosses, plane bosses, DLC bosses, pause and
-   two-player sessions. Finally disable the forced selector and replace the
-   provisional challenge icon with the user's finished animation.
+3. Validate ground collision beyond Beppi. Confirm the original four-way OnDeath
+   animation appears on real floors/platforms and never on walls, enemies,
+   results, the map or later non-roulette levels.
+4. Validate the new squid introduction in ground, plane, retry and co-op fights.
+   Specifically confirm the first drops cannot ink a locked player, the sequence
+   does not delay Ready/Wallop and the native attack loop always stops.
+5. King Dice is a known pending compatibility case, not a normal single-scene
+   boss. Reproduce and document the current Ink Rain errors across several
+   `DicePalace*` minions and `DicePalaceMain`, then verify that every internal
+   scene keeps the same challenge session without replaying the squid intro,
+   duplicating rain/compositors, losing the damage grace, or clearing the
+   challenge before the final boss. Camera and HUD replacement during those
+   transitions also needs explicit coverage. Do not treat an internal minion
+   victory as the end of Ink Rain.
+6. Decide the intended behavior when the roulette selects Ink Rain for Captain
+   Brineybeard (`Pirate`). His native fight already owns the same squid, ink
+   projectiles and full-screen overlay. The current experimental implementation
+   can coexist with those systems, but that may duplicate the introductory
+   squid, stack two rain sources and make the overlay/difficulty confusing.
+   Before public activation, choose and test one policy: exclude Ink Rain from
+   this boss, keep the extra rain but suppress only the mod's squid intro, or
+   deliberately allow both complete systems. This is a design decision, not a
+   resolved bug; do not silently disable the native boss attack.
+7. After the above, test defeat/retry, victory, abandon-to-map, results screens,
+   ground bosses, plane bosses, DLC bosses, pause and two-player sessions.
+   Finally disable the forced selector and replace the provisional challenge
+   icon with the user's finished animation.
 
 ## Completed dormant HP.1 challenge (0.5.129, awaiting final animated icon)
 

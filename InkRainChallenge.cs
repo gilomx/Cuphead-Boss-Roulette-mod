@@ -4,6 +4,7 @@ using System.IO;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Gilomx.CupheadBossRoulette
 {
@@ -11,6 +12,8 @@ namespace Gilomx.CupheadBossRoulette
     {
         private InkRainChallengeRuntime inkRainRuntime;
         private int inkRainLevelInstanceId = -1;
+        private bool inkRainLevelInitSessionConfigured;
+        private bool inkRainSquidIntroStartedThisSession;
         private bool inkRainUpdateHeartbeatLogged;
         private bool inkRainUpdateErrorLogged;
         private bool inkRainBattleSignaled;
@@ -65,6 +68,96 @@ namespace Gilomx.CupheadBossRoulette
 
             harmony.Patch(levelInit,
                 postfix: new HarmonyMethod(postfix));
+
+            var transitionComplete = AccessTools.Method(
+                typeof(Level), "_OnTransitionInComplete");
+            var transitionPostfix = AccessTools.Method(
+                typeof(Plugin),
+                "InkRainTransitionInCompletePostfix");
+            if (transitionComplete != null && transitionPostfix != null)
+                harmony.Patch(transitionComplete,
+                    postfix: new HarmonyMethod(transitionPostfix));
+            else
+                Logger.LogWarning(
+                    "No se pudo iniciar la animacion del pulpo de tinta.");
+
+            var announcerBegin = AccessTools.Method(
+                typeof(Level), "PlayAnnouncerBegin");
+            var announcerBeginPostfix = AccessTools.Method(
+                typeof(Plugin), "InkRainAnnouncerBeginPostfix");
+            if (announcerBegin != null && announcerBeginPostfix != null)
+                harmony.Patch(announcerBegin,
+                    postfix: new HarmonyMethod(announcerBeginPostfix));
+            else
+                Logger.LogWarning(
+                    "No se pudo sincronizar la gracia de tinta con Wallop.");
+
+            var levelStarted = AccessTools.Method(
+                typeof(Level), "_OnLevelStart");
+            var levelStartedPostfix = AccessTools.Method(
+                typeof(Plugin), "InkRainLevelStartedPostfix");
+            if (levelStarted != null && levelStartedPostfix != null)
+                harmony.Patch(levelStarted,
+                    postfix: new HarmonyMethod(levelStartedPostfix));
+            else
+                Logger.LogWarning(
+                    "No se pudo instalar el respaldo de gracia de tinta.");
+        }
+
+        private static void InkRainTransitionInCompletePostfix(
+            Level __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                !ExperimentalFeatures.EnableInkRainChallenge ||
+                plugin.activeChallenge != ModifierId.InkRain ||
+                !plugin.ActiveChallengeMatches(__instance))
+                return;
+
+            if (plugin.inkRainRuntime == null)
+                plugin.InitializeInkRainChallenge();
+            plugin.BeginInkRainSquidIntroOnce();
+        }
+
+        private void BeginInkRainSquidIntroOnce()
+        {
+            if (inkRainRuntime == null ||
+                inkRainSquidIntroStartedThisSession)
+                return;
+
+            if (inkRainRuntime.BeginSquidIntro())
+                inkRainSquidIntroStartedThisSession = true;
+        }
+
+        private static void InkRainAnnouncerBeginPostfix(Level __instance)
+        {
+            var plugin = activeInstance;
+            if (!InkRainPatchMatches(plugin, __instance))
+                return;
+
+            if (plugin.inkRainRuntime == null)
+                plugin.InitializeInkRainChallenge();
+            plugin.inkRainRuntime.BeginInkEffectGracePeriod(false);
+        }
+
+        private static void InkRainLevelStartedPostfix(Level __instance)
+        {
+            var plugin = activeInstance;
+            if (!InkRainPatchMatches(plugin, __instance))
+                return;
+
+            if (plugin.inkRainRuntime == null)
+                plugin.InitializeInkRainChallenge();
+            plugin.inkRainRuntime.BeginInkEffectGracePeriod(true);
+        }
+
+        private static bool InkRainPatchMatches(
+            Plugin plugin, Level level)
+        {
+            return plugin != null && level != null &&
+                   ExperimentalFeatures.EnableInkRainChallenge &&
+                   plugin.activeChallenge == ModifierId.InkRain &&
+                   plugin.ActiveChallengeMatches(level);
         }
 
         private static void InkRainLevelInitPostfix()
@@ -79,10 +172,31 @@ namespace Gilomx.CupheadBossRoulette
 
             plugin.inkRainBattleEnded = false;
             plugin.inkRainBattleSignaled = true;
+            var levelInstanceId = -1;
+            try
+            {
+                var level = Level.Current;
+                levelInstanceId = level != null
+                    ? level.GetInstanceID()
+                    : -1;
+            }
+            catch
+            {
+                levelInstanceId = -1;
+            }
+            var newLevelSession =
+                !plugin.inkRainLevelInitSessionConfigured;
+            plugin.inkRainLevelInstanceId = levelInstanceId;
+            if (newLevelSession)
+            {
+                plugin.inkRainLevelInitSessionConfigured = true;
+                plugin.inkRainSquidIntroStartedThisSession = false;
+            }
             if (plugin.inkRainRuntime == null)
                 plugin.InitializeInkRainChallenge();
             plugin.inkRainRuntime.Configure(
-                true, plugin.difficulty, true);
+                true, plugin.difficulty, newLevelSession);
+            plugin.BeginInkRainSquidIntroOnce();
             plugin.Logger.LogInfo(
                 "Lluvia de tinta activada por LevelInit.");
         }
@@ -104,8 +218,19 @@ namespace Gilomx.CupheadBossRoulette
                 if (inkRainRuntime != null)
                     inkRainRuntime.Configure(false, difficulty, false);
                 inkRainLevelInstanceId = -1;
+                inkRainLevelInitSessionConfigured = false;
+                inkRainSquidIntroStartedThisSession = false;
                 return;
             }
+
+            // LevelInit already configured the new Ink Rain session. Preserve
+            // it while Cuphead reveals the newly loaded scene so the squid can
+            // begin beneath that fade instead of being reset every frame.
+            if (SceneLoader.CurrentlyLoading &&
+                inkRainBattleSignaled &&
+                activeChallenge == ModifierId.InkRain &&
+                inkRainRuntime != null)
+                return;
 
             var activeFight = false;
             var levelInstanceId = -1;
@@ -160,7 +285,12 @@ namespace Gilomx.CupheadBossRoulette
                 InitializeInkRainChallenge();
 
             var newSession = activeFight &&
-                             inkRainLevelInstanceId != levelInstanceId;
+                             !inkRainLevelInitSessionConfigured;
+            if (newSession)
+            {
+                inkRainLevelInitSessionConfigured = true;
+                inkRainSquidIntroStartedThisSession = false;
+            }
             if (newSession)
                 Logger.LogInfo(
                     "Lluvia de tinta detectÃƒÆ’Ã‚Â³ una batalla activa.");
@@ -173,13 +303,33 @@ namespace Gilomx.CupheadBossRoulette
             inkRainBattleEnded = true;
             inkRainBattleSignaled = false;
             inkRainLevelInstanceId = -1;
+            inkRainLevelInitSessionConfigured = false;
+            inkRainSquidIntroStartedThisSession = false;
             if (inkRainRuntime != null)
                 inkRainRuntime.Configure(false, difficulty, false);
+        }
+
+        private void ResetInkRainChallengeForRetry()
+        {
+            if (activeChallenge != ModifierId.InkRain)
+                return;
+
+            inkRainBattleEnded = false;
+            inkRainBattleSignaled = false;
+            inkRainLevelInstanceId = -1;
+            inkRainLevelInitSessionConfigured = false;
+            inkRainSquidIntroStartedThisSession = false;
+            if (inkRainRuntime != null)
+                inkRainRuntime.Configure(false, difficulty, false);
+            Logger.LogInfo(
+                "Lluvia de tinta preparada para un nuevo intento.");
         }
 
         private void DisposeInkRainChallenge()
         {
             inkRainLevelInstanceId = -1;
+            inkRainLevelInitSessionConfigured = false;
+            inkRainSquidIntroStartedThisSession = false;
             if (inkRainRuntime == null)
                 return;
 
@@ -236,10 +386,83 @@ namespace Gilomx.CupheadBossRoulette
         private const float MaximumDropLifetime = 7f;
         private const float DropFrameRate = 24f;
         private const float GroundImpactFrameRate = 24f;
+        private const float GroundImpactVisualScale = 0.6f;
         private const float SplatFrameRate = 12f;
         private const float SplatDelayStep = 0.025f;
         private const float SplatVisualScaleX = 0.65f;
         private const float SplatVisualScaleY = 0.115f;
+        private const float SquidFrameRate = 24f;
+        private const float SquidVisualScale = 1.10f;
+        private const float SquidAnchorViewportY = -0.04f;
+        private const float SquidInkOriginX = 46f;
+        private const float SquidInkOriginY = 368f;
+        // The complete native sequence runs alongside Cuphead's untouched
+        // Ready/Wallop timing. Never compress it to fit the one-second
+        // pre-announcer window: every drawing stays at its original 24 fps.
+        private const float SquidEntranceDuration = 18f / SquidFrameRate;
+        private const float SquidAttackOpenDuration = 3f / SquidFrameRate;
+        private const float SquidAttackLoopDuration = 22f / SquidFrameRate;
+        private const float SquidExitDuration = 29f / SquidFrameRate;
+        private const float SquidIntroStartDelay = 1f;
+        // The native enter clip invokes OnEnterAnimationComplete on frame 17,
+        // two frames before its visual transition into the attack clip. That
+        // callback starts the attack loop and creates the first blob at once.
+        private const float SquidAttackEventTime = 16f / SquidFrameRate;
+        private const float SquidEasyBlobDelay = 0.21f;
+        private const float SquidNormalHardBlobDelay = 0.12f;
+        private const float SquidNativeBobDistance = 20f;
+        private const int SquidRainMaximumVisibleDrops = 20;
+        private const float InkEffectGraceAfterAnnouncer = 1f;
+
+        // anim_level_pirate_squid_attack_loop does more than swap the 16
+        // drawings: its streamed clip animates the child named InkOrigin
+        // (path CRC 2960652783 == CRC32("InkOrigin")). Each Vector4 is the
+        // native cubic polynomial a*t^3 + b*t^2 + c*t + d for one 1/24 s
+        // segment. Keeping the compressed curve here makes every new blob
+        // follow the bottle/nozzle exactly as it does in PirateLevelSquid.
+        private static readonly Vector4[] SquidInkOriginCurveX =
+        {
+            new Vector4(0f, 0f, -576f, -263f),
+            new Vector4(0f, 0f, -192f, -287f),
+            new Vector4(-0.00659179781f, 0.000274658232f,
+                -72.0000076f, -295f),
+            new Vector4(0f, 0f, 311.999969f, -298f),
+            new Vector4(0f, 0f, 600.000122f, -285f),
+            new Vector4(0f, 0f, 1103.99988f, -260f),
+            new Vector4(0f, 0f, 1080.00024f, -214f),
+            new Vector4(0f, 0f, 1199.99939f, -169f),
+            new Vector4(0f, 0f, 480.000122f, -119f),
+            new Vector4(0f, 0f, 360.000092f, -99f),
+            new Vector4(0f, 0f, 239.999893f, -84f),
+            new Vector4(0f, 0f, 48.0000114f, -74f),
+            new Vector4(0f, 0f, -935.999573f, -72f),
+            new Vector4(0f, 0f, -936.000916f, -111f),
+            new Vector4(0f, 0f, -1367.99939f, -150f),
+            new Vector4(0f, 0f, 0f, -207f)
+        };
+
+        private static readonly Vector4[] SquidInkOriginCurveY =
+        {
+            new Vector4(0f, 0f, -456f, 417f),
+            new Vector4(0f, 0f, -600f, 398f),
+            new Vector4(-0.0263671912f, 0.00109863293f,
+                -312.000031f, 373f),
+            new Vector4(0f, 0f, -167.999985f, 360f),
+            new Vector4(0f, 0f, 1176.00024f, 353f),
+            new Vector4(0.0527343564f, -0.00219726516f,
+                743.999939f, 402f),
+            new Vector4(0f, 0f, 288.000061f, 433f),
+            new Vector4(0f, 0f, -527.999756f, 445f),
+            new Vector4(0f, 0f, -120.000031f, 423f),
+            new Vector4(0f, 0f, -600.000122f, 418f),
+            new Vector4(0f, 0f, -479.999786f, 393f),
+            new Vector4(0f, 0f, -240.000061f, 373f),
+            new Vector4(0f, 0f, 959.999573f, 363f),
+            new Vector4(0f, 0f, 456.000427f, 403f),
+            new Vector4(-0.0263671502f, 0.00109863176f,
+                359.999817f, 422f),
+            new Vector4(0f, 0f, 0f, 437f)
+        };
 
         // Exact layouts from the three SplatGroup children of
         // Pirate_Ink_Overlay in the original pirate level.
@@ -308,8 +531,31 @@ namespace Gilomx.CupheadBossRoulette
             new List<Texture2D>();
         private Sprite[] inkDropFrames;
         private Sprite inkScreenOverlay;
+        private Sprite[] squidEntranceFrames;
+        private Sprite[] squidAttackFrames;
+        private Sprite[] squidAttackLoopFrames;
+        private Sprite[] squidLeaveFrames;
+        private Sprite[] squidExitFrames;
         private ManualLogSource log;
         private bool loggedFirstDrop;
+        private bool loggedFirstGroundImpact;
+        private float nextGroundProbeLogAt;
+        private InkRainPreFilmRenderer preFilmInkRenderer;
+        private RenderTexture splatComposite;
+        private GameObject squidActor;
+        private SpriteRenderer squidActorRenderer;
+        private float nextPreFilmRendererRetryAt;
+        private bool loggedPreFilmRendererFailure;
+        private bool squidIntroPending;
+        private bool squidIntroActive;
+        private bool squidAttackAudioActive;
+        private bool squidEnterSoundPlayed;
+        private bool squidExitSoundPlayed;
+        private bool squidAttackPopSoundPlayed;
+        private float squidIntroStartedAt;
+        private float inkEffectsEnabledAt = float.PositiveInfinity;
+        private bool gameplayPaused;
+        private float gameplayPauseStartedAt;
 
         internal void SetLogger(ManualLogSource value)
         {
@@ -328,7 +574,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 ResetState();
                 challengeActive = true;
-                nextSpawnAt = Time.time + FirstDropDelay;
+                squidIntroPending = true;
+                nextSpawnAt = float.PositiveInfinity;
                 EnsureInkAssets();
                 return;
             }
@@ -339,7 +586,8 @@ namespace Gilomx.CupheadBossRoulette
             challengeActive = active;
             if (challengeActive)
             {
-                nextSpawnAt = Time.time + FirstDropDelay;
+                squidIntroPending = true;
+                nextSpawnAt = float.PositiveInfinity;
                 EnsureInkAssets();
             }
             else
@@ -353,10 +601,22 @@ namespace Gilomx.CupheadBossRoulette
             if (!challengeActive)
                 return;
 
-            if (SceneLoader.CurrentlyLoading)
+            if (CupheadTime.GlobalSpeed <= 0f)
             {
-                ResetState();
+                if (!gameplayPaused)
+                {
+                    gameplayPaused = true;
+                    gameplayPauseStartedAt = Time.time;
+                }
                 return;
+            }
+
+            if (gameplayPaused)
+            {
+                ShiftTimersAfterPause(Mathf.Max(
+                    0f, Time.time - gameplayPauseStartedAt));
+                gameplayPaused = false;
+                gameplayPauseStartedAt = 0f;
             }
 
             if (!EnsureInkAssets())
@@ -370,16 +630,340 @@ namespace Gilomx.CupheadBossRoulette
             if (gameplayCamera == null)
                 return;
 
+            if (SceneLoader.CurrentlyLoading)
+            {
+                // During the final scene reveal, update only the visual squid
+                // sequence and its harmless intro drops. Player ink and the
+                // regular rain remain disabled until normal gameplay resumes.
+                UpdateDrops(delta);
+                UpdateSquidActor();
+                UpdateSquidIntro();
+                UpdateRainSpawning();
+                UpdatePreFilmInkRenderer();
+                return;
+            }
+
             UpdateInk(delta);
             UpdatePlayers();
             UpdateDrops(delta);
+            UpdateSquidActor();
+            UpdateSquidIntro();
+            UpdateRainSpawning();
 
-            if (Time.time >= nextSpawnAt &&
-                drops.Count < MaximumVisibleDrops())
+            UpdatePreFilmInkRenderer();
+        }
+
+        internal bool BeginSquidIntro()
+        {
+            if (!challengeActive || !squidIntroPending)
+                return false;
+
+            if (!EnsureInkAssets() || squidEntranceFrames == null ||
+                squidEntranceFrames.Length == 0 ||
+                squidAttackFrames == null || squidAttackFrames.Length == 0 ||
+                squidAttackLoopFrames == null ||
+                squidAttackLoopFrames.Length == 0 ||
+                squidExitFrames == null || squidExitFrames.Length == 0)
             {
-                SpawnWave();
-                nextSpawnAt = Time.time + NextSpawnDelay();
+                squidIntroPending = false;
+                nextSpawnAt = Time.time + FirstDropDelay;
+                if (log != null)
+                    log.LogWarning(
+                        "No se encontro la animacion del pulpo; la lluvia " +
+                        "comenzara sin introduccion.");
+                return false;
             }
+
+            squidIntroPending = false;
+            squidIntroActive = true;
+            squidEnterSoundPlayed = false;
+            squidExitSoundPlayed = false;
+            squidAttackPopSoundPlayed = false;
+            squidIntroStartedAt =
+                Time.time + SquidIntroStartDelay;
+            nextSpawnAt =
+                squidIntroStartedAt + SquidAttackEventTime;
+            if (log != null)
+                log.LogInfo(
+                    "Introduccion del pulpo iniciada antes de Ready/Wallop.");
+            return true;
+        }
+
+        internal void BeginInkEffectGracePeriod(bool fallback)
+        {
+            if (!float.IsPositiveInfinity(inkEffectsEnabledAt))
+                return;
+
+            inkEffectsEnabledAt =
+                Time.time + InkEffectGraceAfterAnnouncer;
+            if (log != null)
+            {
+                log.LogInfo(fallback
+                    ? "Gracia de tinta iniciada desde el comienzo real " +
+                      "del combate (escena sin anuncio Wallop)."
+                    : "Las bolitas podran entintar un segundo despues " +
+                      "del anuncio Wallop.");
+            }
+        }
+
+        private void UpdateSquidIntro()
+        {
+            if (!squidIntroActive)
+                return;
+
+            var elapsed = Time.time - squidIntroStartedAt;
+            if (elapsed < 0f)
+                return;
+
+            if (!squidEnterSoundPlayed)
+            {
+                squidEnterSoundPlayed = true;
+                try
+                {
+                    AudioManager.Play("level_pirate_squid_enter");
+                }
+                catch
+                {
+                }
+            }
+            var attackVisualStartsAt = SquidEntranceDuration;
+            var exitStartsAt = attackVisualStartsAt +
+                               SquidAttackOpenDuration +
+                               SquidAttackLoopDuration;
+            var endsAt = exitStartsAt + SquidExitDuration;
+
+            if (elapsed < exitStartsAt)
+            {
+                if (elapsed >= SquidAttackEventTime)
+                    StartSquidAttackAudio();
+
+                if (elapsed >= attackVisualStartsAt &&
+                    !squidAttackPopSoundPlayed)
+                {
+                    squidAttackPopSoundPlayed = true;
+                    try
+                    {
+                        AudioManager.Play(
+                            "level_pirate_squid_attack_pop");
+                    }
+                    catch
+                    {
+                    }
+                }
+                return;
+            }
+
+            if (elapsed >= exitStartsAt)
+            {
+                StopSquidAttackAudio();
+                if (!squidExitSoundPlayed)
+                {
+                    squidExitSoundPlayed = true;
+                    try
+                    {
+                        AudioManager.Play("level_pirate_squid_exit");
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            if (elapsed < endsAt)
+                return;
+
+            squidIntroActive = false;
+        }
+
+        private void UpdateRainSpawning()
+        {
+            var squidSpawning = SquidCanEmitRain() && squidActor != null &&
+                                squidActorRenderer != null &&
+                                squidActorRenderer.enabled;
+            var maximumDrops = squidSpawning
+                ? SquidRainMaximumVisibleDrops
+                : MaximumVisibleDrops();
+            if (Time.time < nextSpawnAt || drops.Count >= maximumDrops)
+                return;
+
+            if (squidSpawning)
+            {
+                while (Time.time >= nextSpawnAt &&
+                       drops.Count < SquidRainMaximumVisibleDrops &&
+                       SquidCanEmitRain())
+                {
+                    SpawnSquidIntroDrop();
+                    nextSpawnAt += NativeSquidBlobDelay();
+                }
+                return;
+            }
+
+            SpawnWave();
+            nextSpawnAt = Time.time + NextSpawnDelay();
+        }
+
+        private bool SquidCanEmitRain()
+        {
+            if (!squidIntroActive)
+                return false;
+
+            var fullDuration = SquidEntranceDuration +
+                               SquidAttackOpenDuration +
+                               SquidAttackLoopDuration;
+            var elapsed = Time.time - squidIntroStartedAt;
+            return elapsed >= SquidAttackEventTime &&
+                   elapsed < fullDuration;
+        }
+
+        private float NativeSquidBlobDelay()
+        {
+            return difficulty == Level.Mode.Easy
+                ? SquidEasyBlobDelay
+                : SquidNormalHardBlobDelay;
+        }
+
+        private void StartSquidAttackAudio()
+        {
+            if (squidAttackAudioActive)
+                return;
+
+            squidAttackAudioActive = true;
+            try
+            {
+                AudioManager.PlayLoop("level_pirate_squid_attack_loop");
+            }
+            catch
+            {
+            }
+        }
+
+        private void StopSquidAttackAudio()
+        {
+            if (!squidAttackAudioActive)
+                return;
+
+            squidAttackAudioActive = false;
+            try
+            {
+                AudioManager.Stop("level_pirate_squid_attack_loop");
+            }
+            catch
+            {
+            }
+        }
+
+        private void UpdatePreFilmInkRenderer()
+        {
+            if (preFilmInkRenderer != null &&
+                !preFilmInkRenderer.Matches(gameplayCamera))
+            {
+                preFilmInkRenderer.Dispose();
+                preFilmInkRenderer = null;
+            }
+
+            if (preFilmInkRenderer == null &&
+                Time.unscaledTime >= nextPreFilmRendererRetryAt)
+            {
+                string error;
+                if (!InkRainPreFilmRenderer.TryCreate(
+                        gameplayCamera, out preFilmInkRenderer, out error))
+                {
+                    nextPreFilmRendererRetryAt =
+                        Time.unscaledTime + 2f;
+                    if (!loggedPreFilmRendererFailure && log != null)
+                    {
+                        loggedPreFilmRendererFailure = true;
+                        log.LogWarning(
+                            "Lluvia de tinta usara el render alterno sin " +
+                            "grano: " + error);
+                    }
+                    return;
+                }
+
+                loggedPreFilmRendererFailure = false;
+                if (log != null)
+                    log.LogInfo(
+                        "Lluvia de tinta integrada antes de los efectos " +
+                        "de pelicula de Cuphead.");
+            }
+
+            if (preFilmInkRenderer == null)
+                return;
+
+            preFilmInkRenderer.BeginFrame();
+            for (var i = 0; i < drops.Count; i++)
+            {
+                var drop = drops[i];
+                var center = gameplayCamera.WorldToScreenPoint(
+                    new Vector3(drop.Position.x, drop.Position.y, 0f));
+                if (center.z < 0f)
+                    continue;
+
+                var edge = gameplayCamera.WorldToScreenPoint(
+                    new Vector3(drop.Position.x + drop.Radius,
+                        drop.Position.y, 0f));
+                var radiusPixels = Mathf.Max(
+                    7f, Mathf.Abs(edge.x - center.x));
+                var frameIndex = (Mathf.FloorToInt(
+                    drop.Age * DropFrameRate) + drop.FrameOffset) %
+                    inkDropFrames.Length;
+                var sprite = inkDropFrames[frameIndex];
+                var width = radiusPixels * 2f;
+                var height = width / SpriteAspect(sprite);
+                preFilmInkRenderer.DrawSprite(
+                    new Rect(
+                        center.x - width * 0.5f,
+                        Screen.height - center.y - height * 0.5f,
+                        width, height),
+                    sprite, Color.white);
+            }
+
+            for (var i = 0; i < groundImpacts.Count; i++)
+            {
+                var impact = groundImpacts[i];
+                if (impact.Frames == null || impact.Frames.Length == 0)
+                    continue;
+
+                var elapsed = Time.time - impact.StartTime;
+                var frameIndex = Mathf.FloorToInt(
+                    elapsed * GroundImpactFrameRate);
+                if (frameIndex < 0 || frameIndex >= impact.Frames.Length)
+                    continue;
+
+                var sprite = impact.Frames[frameIndex];
+                var center = gameplayCamera.WorldToScreenPoint(
+                    new Vector3(impact.Position.x, impact.Position.y, 0f));
+                if (center.z < 0f)
+                    continue;
+
+                var scale = Screen.height / 720f;
+                var width = sprite.rect.width * scale *
+                            GroundImpactVisualScale;
+                var height = sprite.rect.height * scale *
+                             GroundImpactVisualScale;
+                preFilmInkRenderer.DrawSprite(
+                    new Rect(
+                        center.x - width * 0.5f,
+                        Screen.height - center.y - height,
+                        width, height),
+                    sprite, Color.white);
+            }
+
+            if (inkAlpha > 0.001f)
+            {
+                if (splatComposite != null && splatComposite.IsCreated())
+                    preFilmInkRenderer.DrawComposite(splatComposite);
+
+                if (inkScreenOverlay != null)
+                {
+                    preFilmInkRenderer.DrawSprite(
+                        new Rect(0f, 0f, Screen.width, Screen.height),
+                        inkScreenOverlay,
+                        new Color(1f, 1f, 1f,
+                            Mathf.Clamp01(inkAlpha)));
+                }
+            }
+            preFilmInkRenderer.EndFrame();
         }
 
         private void UpdateInk(float delta)
@@ -444,7 +1028,9 @@ namespace Gilomx.CupheadBossRoulette
                 drop.Position += drop.Velocity * delta;
                 drop.Velocity.y -= drop.Gravity * delta;
 
-                if (TouchesPlayer(drop))
+                if (!squidIntroActive &&
+                    Time.time >= inkEffectsEnabledAt &&
+                    TouchesPlayer(drop))
                 {
                     RegisterInkHit(drop.Position);
                     drops.RemoveAt(i);
@@ -492,7 +1078,7 @@ namespace Gilomx.CupheadBossRoulette
             return false;
         }
 
-        private static bool TryFindGroundImpact(
+        private bool TryFindGroundImpact(
             Vector2 from, Vector2 to, out Vector2 point)
         {
             point = to;
@@ -501,13 +1087,82 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var collider = hits[i].collider;
                 if (collider == null || !collider.enabled ||
-                    collider.isTrigger || collider.name != "Level_Ground")
+                    collider.name != "Level_Ground")
                     continue;
 
                 point = hits[i].point;
+                if (!loggedFirstGroundImpact && log != null)
+                {
+                    loggedFirstGroundImpact = true;
+                    log.LogInfo(
+                        "Lluvia de tinta: suelo Level_Ground detectado en " +
+                        FormatColliderDiagnostic(collider, hits[i].point) +
+                        ".");
+                }
                 return true;
             }
+
+            LogGroundProbe(from, to, hits);
             return false;
+        }
+
+        private void LogGroundProbe(
+            Vector2 from, Vector2 to, RaycastHit2D[] hits)
+        {
+            if (log == null || hits == null || hits.Length == 0 ||
+                Time.unscaledTime < nextGroundProbeLogAt)
+                return;
+
+            nextGroundProbeLogAt = Time.unscaledTime + 2f;
+            var message = "Lluvia de tinta: linecast sin Level_Ground de " +
+                          from + " a " + to + "; impactos=" + hits.Length;
+            var count = Mathf.Min(hits.Length, 8);
+            for (var i = 0; i < count; i++)
+            {
+                var collider = hits[i].collider;
+                if (collider == null)
+                    continue;
+
+                message += " | " +
+                           FormatColliderDiagnostic(collider, hits[i].point);
+            }
+            log.LogInfo(message + ".");
+        }
+
+        private static string FormatColliderDiagnostic(
+            Collider2D collider, Vector2 point)
+        {
+            var layer = collider.gameObject.layer;
+            var layerName = LayerMask.LayerToName(layer);
+            var tag = "<sin tag>";
+            try
+            {
+                tag = collider.tag;
+            }
+            catch
+            {
+            }
+
+            return "ruta=" + GetTransformPath(collider.transform) +
+                   ", tipo=" + collider.GetType().Name +
+                   ", layer=" + layer + "(" + layerName + ")" +
+                   ", tag=" + tag +
+                   ", trigger=" + collider.isTrigger +
+                   ", punto=" + point;
+        }
+
+        private static string GetTransformPath(Transform transform)
+        {
+            if (transform == null)
+                return "<sin transform>";
+
+            var path = transform.name;
+            while (transform.parent != null)
+            {
+                transform = transform.parent;
+                path = transform.name + "/" + path;
+            }
+            return path;
         }
 
         private void SpawnGroundImpact(Vector2 position)
@@ -623,6 +1278,109 @@ namespace Gilomx.CupheadBossRoulette
                 SpawnDrop(i, count);
         }
 
+        private void SpawnSquidIntroDrop()
+        {
+            if (drops.Count >= SquidRainMaximumVisibleDrops ||
+                squidActor == null || squidActorRenderer == null ||
+                !squidActorRenderer.enabled)
+                return;
+
+            var sourceOrigin = CurrentSquidInkOrigin();
+            var localOrigin = new Vector3(
+                sourceOrigin.x / 100f,
+                sourceOrigin.y / 100f,
+                0f);
+            var origin = squidActor.transform.TransformPoint(localOrigin);
+            var cameraHeight = Mathf.Max(
+                1f, gameplayCamera.orthographicSize * 2f);
+
+            float minHorizontal;
+            float maxHorizontal;
+            float minVertical;
+            float maxVertical;
+            float gravity;
+            if (difficulty == Level.Mode.Easy)
+            {
+                minHorizontal = -330f / 720f;
+                maxHorizontal = 330f / 720f;
+                minVertical = 550f / 720f;
+                maxVertical = 700f / 720f;
+                gravity = 900f / 720f;
+            }
+            else if (difficulty == Level.Mode.Hard)
+            {
+                minHorizontal = -260f / 720f;
+                maxHorizontal = 330f / 720f;
+                minVertical = 550f / 720f;
+                maxVertical = 850f / 720f;
+                gravity = 1000f / 720f;
+            }
+            else
+            {
+                minHorizontal = -300f / 720f;
+                maxHorizontal = 300f / 720f;
+                minVertical = 500f / 720f;
+                maxVertical = 800f / 720f;
+                gravity = 1000f / 720f;
+            }
+
+            drops.Add(new InkDrop
+            {
+                Position = new Vector2(origin.x, origin.y),
+                Velocity = new Vector2(
+                    UnityEngine.Random.Range(
+                        minHorizontal, maxHorizontal) * cameraHeight,
+                    UnityEngine.Random.Range(
+                        minVertical, maxVertical) * cameraHeight),
+                Gravity = gravity * cameraHeight,
+                Radius = cameraHeight * UnityEngine.Random.Range(
+                    0.016f, 0.021f),
+                FrameOffset = 0
+            });
+
+            if (!loggedFirstDrop && log != null)
+            {
+                loggedFirstDrop = true;
+                log.LogInfo(
+                    "Primera gota lanzada desde InkOrigin del pulpo.");
+            }
+        }
+
+        private Vector2 CurrentSquidInkOrigin()
+        {
+            var fixedOrigin = new Vector2(
+                SquidInkOriginX, SquidInkOriginY);
+            if (!squidIntroActive)
+                return fixedOrigin;
+
+            var elapsed = Time.time - squidIntroStartedAt;
+            var loopStartsAt = SquidEntranceDuration +
+                               SquidAttackOpenDuration;
+            if (elapsed < loopStartsAt)
+                return fixedOrigin;
+
+            var loopDuration = SquidInkOriginCurveX.Length /
+                               SquidFrameRate;
+            var loopTime = Mathf.Repeat(
+                elapsed - loopStartsAt, loopDuration);
+            var segment = Mathf.Min(
+                SquidInkOriginCurveX.Length - 1,
+                Mathf.FloorToInt(loopTime * SquidFrameRate));
+            var segmentTime = loopTime - segment / SquidFrameRate;
+            return new Vector2(
+                EvaluateStreamedCurve(
+                    SquidInkOriginCurveX[segment], segmentTime),
+                EvaluateStreamedCurve(
+                    SquidInkOriginCurveY[segment], segmentTime));
+        }
+
+        private static float EvaluateStreamedCurve(
+            Vector4 coefficients, float time)
+        {
+            return ((coefficients.x * time + coefficients.y) * time +
+                    coefficients.z) * time + coefficients.w;
+        }
+
         private void SpawnDrop(int waveIndex, int waveCount)
         {
             // Native-style arc: enter from the upper-right, drift left and
@@ -645,7 +1403,7 @@ namespace Gilomx.CupheadBossRoulette
                 UnityEngine.Random.Range(-0.20f, -0.14f) * cameraHeight;
             var fallSpeed = UnityEngine.Random.Range(0.15f, 0.22f) *
                             cameraHeight;
-            var gravity = UnityEngine.Random.Range(0.15f, 0.21f) *
+            var gravity = UnityEngine.Random.Range(0.22f, 0.28f) *
                           cameraHeight;
 
             drops.Add(new InkDrop
@@ -669,10 +1427,35 @@ namespace Gilomx.CupheadBossRoulette
         private int MaximumVisibleDrops()
         {
             if (difficulty == Level.Mode.Easy)
-                return 2;
+                return 3;
             if (difficulty == Level.Mode.Hard)
-                return 4;
-            return 3;
+                return 13;
+            return 4;
+        }
+
+        private void ShiftTimersAfterPause(float pausedDuration)
+        {
+            if (pausedDuration <= 0f)
+                return;
+
+            ShiftFiniteTimer(ref nextSpawnAt, pausedDuration);
+            ShiftFiniteTimer(ref inkEffectsEnabledAt, pausedDuration);
+            ShiftFiniteTimer(ref nextPlayerScanAt, pausedDuration);
+            if (squidIntroStartedAt > 0f)
+                squidIntroStartedAt += pausedDuration;
+
+            for (var i = 0; i < groundImpacts.Count; i++)
+                groundImpacts[i].StartTime += pausedDuration;
+            for (var i = 0; i < splats.Count; i++)
+                splats[i].StartTime += pausedDuration;
+        }
+
+        private static void ShiftFiniteTimer(
+            ref float timer, float amount)
+        {
+            if (!float.IsInfinity(timer) && !float.IsNaN(timer) &&
+                timer > 0f)
+                timer += amount;
         }
 
         private float NextSpawnDelay()
@@ -720,9 +1503,29 @@ namespace Gilomx.CupheadBossRoulette
                 var projectileDirectory = Path.Combine(
                     inkRoot, "projectiles");
                 var screenDirectory = Path.Combine(inkRoot, "screen");
+                var squidDirectory = Path.Combine(inkRoot, "squid");
                 inkDropFrames = LoadSpriteSequence(
                     projectileDirectory,
                     "pirate_squid_inkblob_*.png");
+                squidEntranceFrames = LoadSpriteSequence(
+                    squidDirectory,
+                    "pirate_squid_entrance_*.png",
+                    new Vector2(0.5f, 0f));
+                var allSquidAttackFrames = LoadSpriteSequence(
+                    squidDirectory,
+                    "pirate_squid_????.png",
+                    new Vector2(0.5f, 0f));
+                squidLeaveFrames = LoadSpriteSequence(
+                    squidDirectory,
+                    "pirate_squid_leave_*.png",
+                    new Vector2(0.5f, 0f));
+                squidAttackFrames = SpriteRange(
+                    allSquidAttackFrames, 0, 3);
+                squidAttackLoopFrames = SpriteRange(
+                    allSquidAttackFrames, 3, 16);
+                squidExitFrames = JoinSpriteRanges(
+                    SpriteRange(allSquidAttackFrames, 3, 7),
+                    squidLeaveFrames);
 
                 groundImpactAnimations.Clear();
                 var impactDirectory = Path.Combine(inkRoot, "impacts");
@@ -773,7 +1576,15 @@ namespace Gilomx.CupheadBossRoulette
                         groundImpactAnimations.Count +
                         " impactos de suelo y " +
                         inkScreenAnimations.Count +
-                        " grupos de manchas.");
+                        " grupos de manchas y pulpo " +
+                        (squidEntranceFrames == null ? 0 :
+                            squidEntranceFrames.Length) + "/" +
+                        (squidAttackFrames == null ? 0 :
+                            squidAttackFrames.Length) + "/" +
+                        (squidAttackLoopFrames == null ? 0 :
+                            squidAttackLoopFrames.Length) + "/" +
+                        (squidExitFrames == null ? 0 :
+                            squidExitFrames.Length) + ".");
                 return true;
             }
             catch (Exception ex)
@@ -789,6 +1600,13 @@ namespace Gilomx.CupheadBossRoulette
 
         private Sprite[] LoadSpriteSequence(
             string directory, string searchPattern)
+        {
+            return LoadSpriteSequence(
+                directory, searchPattern, new Vector2(0.5f, 0.5f));
+        }
+
+        private Sprite[] LoadSpriteSequence(
+            string directory, string searchPattern, Vector2 pivot)
         {
             if (string.IsNullOrEmpty(directory) ||
                 !Directory.Exists(directory))
@@ -815,7 +1633,7 @@ namespace Gilomx.CupheadBossRoulette
                 var sprite = Sprite.Create(
                     texture,
                     new Rect(0f, 0f, texture.width, texture.height),
-                    new Vector2(0.5f, 0.5f),
+                    pivot,
                     100f);
                 sprite.name = texture.name;
                 frames.Add(sprite);
@@ -828,6 +1646,32 @@ namespace Gilomx.CupheadBossRoulette
             return string.CompareOrdinal(
                 left != null ? left.name : string.Empty,
                 right != null ? right.name : string.Empty);
+        }
+
+        private static Sprite[] SpriteRange(
+            Sprite[] source, int start, int count)
+        {
+            if (source == null || start < 0 || count <= 0 ||
+                start >= source.Length)
+                return new Sprite[0];
+
+            count = Mathf.Min(count, source.Length - start);
+            var result = new Sprite[count];
+            Array.Copy(source, start, result, 0, count);
+            return result;
+        }
+
+        private static Sprite[] JoinSpriteRanges(
+            Sprite[] first, Sprite[] second)
+        {
+            var firstLength = first == null ? 0 : first.Length;
+            var secondLength = second == null ? 0 : second.Length;
+            var result = new Sprite[firstLength + secondLength];
+            if (firstLength > 0)
+                Array.Copy(first, 0, result, 0, firstLength);
+            if (secondLength > 0)
+                Array.Copy(second, 0, result, firstLength, secondLength);
+            return result;
         }
 
         private void OnGUI()
@@ -846,65 +1690,18 @@ namespace Gilomx.CupheadBossRoulette
             GUI.depth = 40;
             GUI.matrix = Matrix4x4.identity;
 
-            for (var i = 0; i < drops.Count; i++)
-            {
-                var drop = drops[i];
-                var center = gameplayCamera.WorldToScreenPoint(
-                    new Vector3(drop.Position.x, drop.Position.y, 0f));
-                if (center.z < 0f)
-                    continue;
+            if (preFilmInkRenderer != null)
+                RenderSplatsToComposite();
 
-                var edge = gameplayCamera.WorldToScreenPoint(
-                    new Vector3(
-                        drop.Position.x + drop.Radius,
-                        drop.Position.y, 0f));
-                var radiusPixels = Mathf.Max(
-                    7f, Mathf.Abs(edge.x - center.x));
-                var frameIndex = (Mathf.FloorToInt(
-                    drop.Age * DropFrameRate) + drop.FrameOffset) %
-                    inkDropFrames.Length;
-                var sprite = inkDropFrames[frameIndex];
-                var width = radiusPixels * 2f;
-                var height = width / SpriteAspect(sprite);
-                var rect = new Rect(
-                    center.x - width * 0.5f,
-                    Screen.height - center.y - height * 0.5f,
-                    width,
-                    height);
-                DrawSprite(rect, sprite, Color.white);
+            if (preFilmInkRenderer == null)
+            {
+                DrawDropsWithGui();
+                DrawGroundImpactsWithGui();
             }
 
-            for (var i = 0; i < groundImpacts.Count; i++)
-            {
-                var impact = groundImpacts[i];
-                if (impact.Frames == null || impact.Frames.Length == 0)
-                    continue;
-
-                var elapsed = Time.time - impact.StartTime;
-                var frameIndex = Mathf.FloorToInt(
-                    elapsed * GroundImpactFrameRate);
-                if (frameIndex < 0 || frameIndex >= impact.Frames.Length)
-                    continue;
-
-                var sprite = impact.Frames[frameIndex];
-                var center = gameplayCamera.WorldToScreenPoint(
-                    new Vector3(impact.Position.x, impact.Position.y, 0f));
-                if (center.z < 0f)
-                    continue;
-
-                var scale = Screen.height / 720f;
-                var width = sprite.rect.width * scale;
-                var height = sprite.rect.height * scale;
-                DrawSprite(
-                    new Rect(
-                        center.x - width * 0.5f,
-                        Screen.height - center.y - height,
-                        width, height),
-                    sprite,
-                    Color.white);
-            }
-
-            if (inkAlpha > 0.001f)
+            // The normal path already draws hit splats before the veil. This
+            // exact GUI block remains only for the all-GUI fallback.
+            if (preFilmInkRenderer == null && inkAlpha > 0.001f)
             {
                 var scale = Mathf.Min(
                     Screen.width / 1280f, Screen.height / 720f);
@@ -936,10 +1733,11 @@ namespace Gilomx.CupheadBossRoulette
                         Color.white);
                 }
 
-                // The native full-screen ink veil sits in front of the
-                // individual splats. Drawing it last keeps their translucent
-                // fringe from glowing over an already-darkened scene.
-                if (inkScreenOverlay != null)
+                // Only the fallback draws the veil here. In the normal path it
+                // was already composed before Cuphead's film effects, while
+                // these short hit splats intentionally retain their exact old
+                // GUI rendering, scale and screen coordinates.
+                if (preFilmInkRenderer == null && inkScreenOverlay != null)
                 {
                     DrawSprite(
                         new Rect(0f, 0f, Screen.width, Screen.height),
@@ -954,6 +1752,288 @@ namespace Gilomx.CupheadBossRoulette
             GUI.matrix = previousMatrix;
             GUI.color = previousColor;
             GUI.depth = previousDepth;
+        }
+
+        private Sprite CurrentSquidIntroSprite()
+        {
+            if (!squidIntroActive)
+                return null;
+
+            var elapsed = Time.time - squidIntroStartedAt;
+            if (elapsed < 0f)
+                return null;
+            if (elapsed < SquidEntranceDuration)
+            {
+                var index = Mathf.Min(
+                    squidEntranceFrames.Length - 1,
+                    Mathf.FloorToInt(elapsed * SquidFrameRate));
+                return squidEntranceFrames[index];
+            }
+
+            elapsed -= SquidEntranceDuration;
+            if (elapsed < SquidAttackOpenDuration)
+            {
+                var index = Mathf.Min(
+                    squidAttackFrames.Length - 1,
+                    Mathf.FloorToInt(elapsed * SquidFrameRate));
+                return squidAttackFrames[index];
+            }
+
+            elapsed -= SquidAttackOpenDuration;
+            if (elapsed < SquidAttackLoopDuration)
+            {
+                var index = Mathf.FloorToInt(elapsed * SquidFrameRate) %
+                            squidAttackLoopFrames.Length;
+                return squidAttackLoopFrames[index];
+            }
+
+            elapsed -= SquidAttackLoopDuration;
+            if (elapsed < SquidExitDuration)
+            {
+                var index = Mathf.Min(
+                    squidExitFrames.Length - 1,
+                    Mathf.FloorToInt(elapsed * SquidFrameRate));
+                return squidExitFrames[index];
+            }
+            return null;
+        }
+
+        private void UpdateSquidActor()
+        {
+            var sprite = CurrentSquidIntroSprite();
+            if (!squidIntroActive || gameplayCamera == null || sprite == null)
+            {
+                if (squidActorRenderer != null)
+                    squidActorRenderer.enabled = false;
+                return;
+            }
+
+            if (squidActor == null || squidActorRenderer == null)
+            {
+                ReleaseSquidActor();
+                squidActor = new GameObject(
+                    "Gilomx native squid introduction actor");
+                squidActor.hideFlags = HideFlags.HideAndDontSave;
+                squidActorRenderer =
+                    squidActor.AddComponent<SpriteRenderer>();
+                var sortingLayers = SortingLayer.layers;
+                if (sortingLayers != null && sortingLayers.Length > 0)
+                {
+                    var highestLayer = sortingLayers[0];
+                    for (var i = 1; i < sortingLayers.Length; i++)
+                    {
+                        if (sortingLayers[i].value > highestLayer.value)
+                            highestLayer = sortingLayers[i];
+                    }
+                    squidActorRenderer.sortingLayerID = highestLayer.id;
+                }
+                squidActorRenderer.sortingOrder = short.MaxValue;
+                squidActorRenderer.color = Color.white;
+            }
+
+            if (squidActor.transform.parent != gameplayCamera.transform)
+                squidActor.transform.SetParent(
+                    gameplayCamera.transform, false);
+
+            var depth = Mathf.Max(
+                1f, gameplayCamera.nearClipPlane + 0.5f);
+            var anchor = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(0.5f, SquidAnchorViewportY, depth));
+            var viewportBottom = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(0.5f, 0f, depth));
+            var viewportTop = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(0.5f, 1f, depth));
+            var worldUnitsPerPixel = Vector3.Distance(
+                viewportBottom, viewportTop) /
+                Mathf.Max(1f, gameplayCamera.pixelHeight);
+            var spriteScale = Screen.height / 720f * SquidVisualScale *
+                              worldUnitsPerPixel * sprite.pixelsPerUnit;
+            var elapsed = Mathf.Max(
+                0f, Time.time - squidIntroStartedAt);
+            var bobPhase = Mathf.PingPong(elapsed, 1f);
+            var easedBob = 0.5f -
+                           Mathf.Cos(bobPhase * Mathf.PI) * 0.5f;
+            var bobPixels = SquidNativeBobDistance * easedBob;
+            anchor -= gameplayCamera.transform.up *
+                      (bobPixels * Screen.height / 720f *
+                       SquidVisualScale * worldUnitsPerPixel);
+
+            squidActorRenderer.sprite = sprite;
+            squidActorRenderer.enabled = true;
+            squidActor.transform.localPosition =
+                gameplayCamera.transform.InverseTransformPoint(anchor);
+            squidActor.transform.localRotation = Quaternion.identity;
+            squidActor.transform.localScale =
+                new Vector3(spriteScale, spriteScale, 1f);
+        }
+
+        private void ReleaseSquidActor()
+        {
+            if (squidActor != null)
+                Destroy(squidActor);
+            squidActor = null;
+            squidActorRenderer = null;
+        }
+
+        private void RenderSplatsToComposite()
+        {
+            EnsureSplatComposite();
+            if (splatComposite == null)
+                return;
+
+            var previousTarget = RenderTexture.active;
+            try
+            {
+                RenderTexture.active = splatComposite;
+                GL.PushMatrix();
+                GL.LoadPixelMatrix(
+                    0f, splatComposite.width,
+                    splatComposite.height, 0f);
+                GL.Clear(true, true, Color.clear);
+
+                if (inkAlpha <= 0.001f)
+                    return;
+
+                var scale = Mathf.Min(
+                    splatComposite.width / 1280f,
+                    splatComposite.height / 720f);
+                for (var i = 0; i < splats.Count; i++)
+                {
+                    var splat = splats[i];
+                    if (splat.Frames == null || splat.Frames.Length == 0)
+                        continue;
+
+                    var elapsed = Time.time - splat.StartTime;
+                    if (elapsed < 0f || elapsed >= splat.Duration)
+                        continue;
+
+                    var frameIndex = Mathf.Min(
+                        splat.Frames.Length - 1,
+                        Mathf.FloorToInt(elapsed * SplatFrameRate));
+                    var sprite = splat.Frames[frameIndex];
+                    var width = sprite.rect.width * scale *
+                                SplatVisualScaleX;
+                    var height = sprite.rect.height * scale *
+                                 SplatVisualScaleY;
+                    var x = splatComposite.width * 0.5f +
+                            splat.DesignPosition.x * scale -
+                            width * 0.5f;
+                    var y = splatComposite.height * 0.5f -
+                            splat.DesignPosition.y * scale -
+                            height * 0.5f;
+                    var textureRect = sprite.textureRect;
+                    var source = new Rect(
+                        textureRect.x / sprite.texture.width,
+                        textureRect.y / sprite.texture.height,
+                        textureRect.width / sprite.texture.width,
+                        textureRect.height / sprite.texture.height);
+                    Graphics.DrawTexture(
+                        new Rect(x, y, width, height),
+                        sprite.texture, source,
+                        0, 0, 0, 0,
+                        new Color(0.5f, 0.5f, 0.5f, 0.5f));
+                }
+            }
+            finally
+            {
+                GL.PopMatrix();
+                RenderTexture.active = previousTarget;
+            }
+        }
+
+        private void EnsureSplatComposite()
+        {
+            var width = Mathf.Max(1, Screen.width);
+            var height = Mathf.Max(1, Screen.height);
+            if (splatComposite != null &&
+                splatComposite.width == width &&
+                splatComposite.height == height &&
+                splatComposite.IsCreated())
+                return;
+
+            ReleaseSplatComposite();
+            splatComposite = new RenderTexture(
+                width, height, 0, RenderTextureFormat.ARGB32);
+            splatComposite.name = "Gilomx native ink hit splats";
+            splatComposite.hideFlags = HideFlags.HideAndDontSave;
+            splatComposite.filterMode = FilterMode.Bilinear;
+            splatComposite.wrapMode = TextureWrapMode.Clamp;
+            splatComposite.Create();
+        }
+
+        private void ReleaseSplatComposite()
+        {
+            if (splatComposite == null)
+                return;
+
+            if (splatComposite.IsCreated())
+                splatComposite.Release();
+            Destroy(splatComposite);
+            splatComposite = null;
+        }
+
+        private void DrawDropsWithGui()
+        {
+            for (var i = 0; i < drops.Count; i++)
+            {
+                var drop = drops[i];
+                var center = gameplayCamera.WorldToScreenPoint(
+                    new Vector3(drop.Position.x, drop.Position.y, 0f));
+                if (center.z < 0f)
+                    continue;
+
+                var edge = gameplayCamera.WorldToScreenPoint(
+                    new Vector3(drop.Position.x + drop.Radius,
+                        drop.Position.y, 0f));
+                var radiusPixels = Mathf.Max(
+                    7f, Mathf.Abs(edge.x - center.x));
+                var frameIndex = (Mathf.FloorToInt(
+                    drop.Age * DropFrameRate) + drop.FrameOffset) %
+                    inkDropFrames.Length;
+                var sprite = inkDropFrames[frameIndex];
+                var width = radiusPixels * 2f;
+                var height = width / SpriteAspect(sprite);
+                DrawSprite(
+                    new Rect(
+                        center.x - width * 0.5f,
+                        Screen.height - center.y - height * 0.5f,
+                        width, height),
+                    sprite, Color.white);
+            }
+        }
+
+        private void DrawGroundImpactsWithGui()
+        {
+            for (var i = 0; i < groundImpacts.Count; i++)
+            {
+                var impact = groundImpacts[i];
+                if (impact.Frames == null || impact.Frames.Length == 0)
+                    continue;
+
+                var elapsed = Time.time - impact.StartTime;
+                var frameIndex = Mathf.FloorToInt(
+                    elapsed * GroundImpactFrameRate);
+                if (frameIndex < 0 || frameIndex >= impact.Frames.Length)
+                    continue;
+
+                var sprite = impact.Frames[frameIndex];
+                var center = gameplayCamera.WorldToScreenPoint(
+                    new Vector3(impact.Position.x, impact.Position.y, 0f));
+                if (center.z < 0f)
+                    continue;
+
+                var scale = Screen.height / 720f;
+                var width = sprite.rect.width * scale *
+                            GroundImpactVisualScale;
+                var height = sprite.rect.height * scale *
+                             GroundImpactVisualScale;
+                DrawSprite(
+                    new Rect(
+                        center.x - width * 0.5f,
+                        Screen.height - center.y - height,
+                        width, height),
+                    sprite, Color.white);
+            }
         }
 
         private static float SpriteAspect(Sprite sprite)
@@ -982,6 +2062,14 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ResetState()
         {
+            StopSquidAttackAudio();
+            if (preFilmInkRenderer != null)
+            {
+                preFilmInkRenderer.Dispose();
+                preFilmInkRenderer = null;
+            }
+            ReleaseSplatComposite();
+            ReleaseSquidActor();
             drops.Clear();
             groundImpacts.Clear();
             splats.Clear();
@@ -991,6 +2079,19 @@ namespace Gilomx.CupheadBossRoulette
             targetInkAlpha = 0f;
             holdRemaining = 0f;
             nextPlayerScanAt = 0f;
+            loggedFirstGroundImpact = false;
+            nextGroundProbeLogAt = 0f;
+            nextPreFilmRendererRetryAt = 0f;
+            loggedPreFilmRendererFailure = false;
+            squidIntroPending = false;
+            squidIntroActive = false;
+            squidEnterSoundPlayed = false;
+            squidExitSoundPlayed = false;
+            squidAttackPopSoundPlayed = false;
+            squidIntroStartedAt = 0f;
+            inkEffectsEnabledAt = float.PositiveInfinity;
+            gameplayPaused = false;
+            gameplayPauseStartedAt = 0f;
         }
 
         private void OnDestroy()
@@ -998,6 +2099,11 @@ namespace Gilomx.CupheadBossRoulette
             ResetState();
             inkDropFrames = null;
             inkScreenOverlay = null;
+            squidEntranceFrames = null;
+            squidAttackFrames = null;
+            squidAttackLoopFrames = null;
+            squidLeaveFrames = null;
+            squidExitFrames = null;
             groundImpactAnimations.Clear();
             inkScreenAnimations.Clear();
             for (var i = 0; i < ownedInkTextures.Count; i++)
@@ -1006,6 +2112,170 @@ namespace Gilomx.CupheadBossRoulette
                     Destroy(ownedInkTextures[i]);
             }
             ownedInkTextures.Clear();
+        }
+    }
+
+    internal sealed class InkRainPreFilmRenderer : IDisposable
+    {
+        private readonly Camera camera;
+        private readonly CommandBuffer commandBuffer;
+        private readonly Material material;
+        private readonly MaterialPropertyBlock properties;
+        private readonly Mesh quad;
+        private bool disposed;
+
+        private InkRainPreFilmRenderer(
+            Camera targetCamera, Shader transparentShader)
+        {
+            camera = targetCamera;
+            material = new Material(transparentShader);
+            material.name = "Gilomx ink before film grain";
+            material.hideFlags = HideFlags.HideAndDontSave;
+            properties = new MaterialPropertyBlock();
+            quad = CreateQuad();
+
+            commandBuffer = new CommandBuffer();
+            commandBuffer.name = "Gilomx ink before Cuphead film effects";
+            camera.AddCommandBuffer(
+                CameraEvent.BeforeImageEffects, commandBuffer);
+        }
+
+        internal static bool TryCreate(
+            Camera camera, out InkRainPreFilmRenderer renderer,
+            out string error)
+        {
+            renderer = null;
+            error = null;
+            if (camera == null)
+            {
+                error = "la camara de combate no esta disponible.";
+                return false;
+            }
+
+            var shader = Shader.Find("Sprites/Default");
+            if (shader == null || !shader.isSupported)
+                shader = Shader.Find("Unlit/Transparent");
+            if (shader == null || !shader.isSupported)
+            {
+                error = "Cuphead no expuso un shader transparente compatible.";
+                return false;
+            }
+
+            try
+            {
+                renderer = new InkRainPreFilmRenderer(camera, shader);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.GetType().Name + ": " + exception.Message;
+                renderer = null;
+                return false;
+            }
+        }
+
+        internal bool Matches(Camera targetCamera)
+        {
+            return !disposed && camera != null && camera == targetCamera;
+        }
+
+        internal void BeginFrame()
+        {
+            if (disposed)
+                return;
+
+            commandBuffer.Clear();
+            commandBuffer.SetRenderTarget(
+                BuiltinRenderTextureType.CameraTarget);
+            commandBuffer.SetViewProjectionMatrices(
+                Matrix4x4.identity, Matrix4x4.identity);
+        }
+
+        internal void DrawSprite(Rect screenRect, Sprite sprite, Color color)
+        {
+            if (disposed || sprite == null || sprite.texture == null ||
+                Screen.width <= 0 || Screen.height <= 0)
+                return;
+
+            var centerX = (screenRect.x + screenRect.width * 0.5f) /
+                          Screen.width * 2f - 1f;
+            var centerY = 1f -
+                          (screenRect.y + screenRect.height * 0.5f) /
+                          Screen.height * 2f;
+            var scaleX = screenRect.width / Screen.width;
+            var scaleY = screenRect.height / Screen.height;
+            var matrix = Matrix4x4.TRS(
+                new Vector3(centerX, centerY, 0f),
+                Quaternion.identity,
+                new Vector3(scaleX, scaleY, 1f));
+
+            properties.Clear();
+            properties.SetTexture("_MainTex", sprite.texture);
+            properties.SetColor("_Color", color);
+            commandBuffer.DrawMesh(
+                quad, matrix, material, 0, -1, properties);
+        }
+
+        internal void DrawComposite(RenderTexture composite)
+        {
+            if (disposed || composite == null || !composite.IsCreated())
+                return;
+
+            commandBuffer.Blit(
+                composite,
+                BuiltinRenderTextureType.CameraTarget,
+                material, 0);
+            commandBuffer.SetRenderTarget(
+                BuiltinRenderTextureType.CameraTarget);
+            commandBuffer.SetViewProjectionMatrices(
+                Matrix4x4.identity, Matrix4x4.identity);
+        }
+
+        internal void EndFrame()
+        {
+            // Kept as a named boundary so rebuilding the command buffer remains
+            // explicit if the renderer later needs temporary render targets.
+        }
+
+        private static Mesh CreateQuad()
+        {
+            var mesh = new Mesh();
+            mesh.name = "Gilomx full-screen ink quad";
+            mesh.hideFlags = HideFlags.HideAndDontSave;
+            mesh.vertices = new[]
+            {
+                new Vector3(-1f, -1f, 0f),
+                new Vector3(1f, -1f, 0f),
+                new Vector3(1f, 1f, 0f),
+                new Vector3(-1f, 1f, 0f)
+            };
+            mesh.uv = new[]
+            {
+                new Vector2(0f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 1f)
+            };
+            mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+            mesh.UploadMeshData(true);
+            return mesh;
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+                return;
+            disposed = true;
+
+            if (camera != null && commandBuffer != null)
+                camera.RemoveCommandBuffer(
+                    CameraEvent.BeforeImageEffects, commandBuffer);
+            if (commandBuffer != null)
+                commandBuffer.Release();
+            if (material != null)
+                UnityEngine.Object.Destroy(material);
+            if (quad != null)
+                UnityEngine.Object.Destroy(quad);
         }
     }
 }

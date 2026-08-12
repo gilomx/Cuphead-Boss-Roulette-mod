@@ -7,6 +7,13 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
 - Se agrego el primer prototipo jugable de `Lluvia de tinta` para niveles de
   tierra y avion, actualmente habilitado y forzado para continuar sus pruebas.
+- Se redibujo el icono provisional con tres bolitas nativas agrupadas pero en
+  carriles distintos y deliberadamente no alineados. Asi parecen tres gotas
+  simultaneas en vez de tres posiciones de una sola gota; todas conservan una
+  trayectoria claramente inclinada hacia abajo a la izquierda. Los rastros
+  apuntan hacia arriba a la derecha para que ya no parezcan una caida vertical;
+  se actualizaron sus tres frames preparados, aunque la interfaz actualmente
+  usa el primero.
 - Se integraron los 36 frames originales de las gotas, la capa y grupos de
   manchas de pantalla, y las cuatro variantes originales de impacto de siete
   frames. Los assets se exportaron como Sprite para evitar contaminacion del
@@ -18,12 +25,157 @@ versiones corresponden al número mostrado por BepInEx al cargar el mod.
 - Las gotas ahora usan velocidad inicial y gravedad para caer en curvas
   diagonales hacia la izquierda. La velocidad y densidad siguen pendientes de
   ajuste mediante pruebas.
-- Se agrego un primer intento de detectar `Level_Ground` con Physics2D y mostrar
-  la animacion nativa `OnDeath`. Compila, pero la prueba manual confirmo que el
-  choque con el piso todavia no funciona y debe diagnosticarse.
-- Pendiente: definir cantidad y cadencia de gotas, ajustar velocidades, corregir
-  impactos de piso y mostrar una animacion breve del pulpo al iniciar cada
-  combate para identificar el origen del reto.
+- La prueba en Beppi revelo que la deteccion de `Level_Ground` descartaba los
+  colliders configurados como trigger, aunque el proyectil original de Cuphead
+  usa `OnTriggerEnter2D`. Ahora los acepta y muestra la animacion nativa
+  `OnDeath` al impactar. Tambien se agrego diagnostico limitado del linecast
+  (ruta, tipo, capa, tag, trigger y punto) para identificar diferencias entre
+  arenas si alguna sigue sin reconocer el suelo. La correccion se valido
+  manualmente en Beppi y el impacto ahora se muestra al tocar el piso.
+- Se redujo la escala visual del impacto contra el suelo al 60% porque el
+  recorte original se veia demasiado grande respecto a las gotas del reto.
+- La capa oscura y las manchas de pantalla dejaron de componerse al final con
+  `OnGUI`. Ahora un command buffer las dibuja en la camara justo antes de los
+  efectos de imagen, igualando el orden del overlay nativo de Barbasalada. El
+  grano, polvo, rayaduras y filtros configurados por Cuphead se aplican tambien
+  sobre la tinta; si el shader transparente nativo no esta disponible, el mod
+  conserva automaticamente el render anterior como respaldo.
+- Las gotas y los impactos tambien entran ahora por ese mismo compositor. Esto
+  conserva el orden original completo (gotas, impactos, manchas y oscuridad) y
+  evita que los elementos tardios de `OnGUI` aparezcan encima del oscurecimiento
+  o alteren visualmente el tamaño de la animacion que toca al jugador.
+- El dibujo directo de cada mancha dentro del command buffer se descarto porque
+  deformaba los sprites altos y podia repetir el ultimo frame/material. Ahora
+  `Graphics.DrawTexture` compone primero el grupo completo en una RenderTexture
+  transparente del tamaño exacto de la pantalla, usando las dimensiones y UV de
+  la ruta aceptada. El compositor recibe una sola imagen plana, la coloca detras
+  del velo y despues Cuphead aplica la pelicula; se acepta un fotograma de
+  latencia para preservar forma, variedad y escala sin artefactos.
+- La gravedad aleatoria de cada gota aumento siete puntos porcentuales, de
+  `0.15-0.21` a `0.22-0.28` alturas visibles por segundo cuadrado. Los limites
+  simultaneos aumentaron de `2/3/4` a `3/4/13` en Facil/Normal/Experto; los
+  intervalos y probabilidades de oleada doble permanecen sin cambios.
+- Se agrego una introduccion nativa del pulpo antes de `Ready/Wallop`. El reto
+  ya no extiende la espera original de un segundo ni parchea `LevelIntroTime`.
+  La aceleracion `10/3` fue rechazada manualmente. Los dibujos vuelven a sus 24
+  fps nativos y se reproduce la secuencia completa: 18 frames de entrada, 3 de
+  apertura, 22 mostrados del ciclo de 16 y los 29 de salida reconstruidos.
+- La animacion ya no obliga al actor a recorrer casi una pantalla en 0.225
+  segundos. `Ready/Wallop` comienza en el tiempo normal de Cuphead mientras el
+  pulpo continua, y sus propios frames nativos lo sacan de la vista sin cambiar
+  de velocidad ni aplicar movimiento artificial al transform.
+- El pulpo ahora comienza desde `PlayerStatsManager.LevelInit()`, cuando el
+  nivel ya existe pero Cuphead todavia conserva su presentacion de carga. Esto
+  mantiene el inicio independiente del fundido. La prueba inmediata se ajusto
+  con una espera explicita de 1.0 segundo: el primer sprite y el sonido nativo
+  de entrada empiezan juntos despues de esa espera, sin modificar
+  `LevelIntroTime`, `Ready/Wallop`, la duracion ni los 24 fps. La ventana de
+  bolitas tambien se desplaza completa porque sigue siendo relativa al inicio
+  del calamar. El callback de transicion terminada queda solo como respaldo para
+  escenas especiales.
+- Se reforzo la correccion de la animacion duplicada. El ID de `Level.Current`
+  no es estable mientras Cuphead construye la escena, por lo que ya no define
+  una sesion nueva. Dos banderas explicitas registran que el primer `LevelInit`
+  ya configuro la batalla y que el pulpo ya fue programado; llamadas posteriores
+  y el respaldo de transicion no pueden reiniciarlo. Derrota/reintento, salida o
+  una batalla realmente nueva limpian ambas banderas.
+- El primer guard de sesion revelo otro caso: el reintento nativo no llama
+  `ClearInkRainChallengeSession()`, por lo que podia conservar la marca y
+  bloquear tanto el pulpo como la lluvia del siguiente intento. La ruta comun
+  `ResetChallengeVisualsForReload()` ahora limpia tambien Lluvia de tinta detras
+  del fundido oscuro; el siguiente `LevelInit` crea una sola sesion nueva y las
+  llamadas repetidas dentro de esa misma recarga siguen siendo ignoradas.
+- La secuencia usa 59 sprites originales exportados del atlas de Barbasalada
+  (`entrance`, apertura/ciclo de ataque y `leave`) y sus sonidos nativos de
+  entrada, destape, ataque en bucle y salida. No instancia al enemigo real ni
+  sus colliders, vida, reglas del jefe o proyectiles fisicos.
+- Se corrigio la relacion entre la animacion y las primeras bolitas usando los
+  eventos exactos de Barbasalada. La entrada dura 0.75 segundos, pero
+  `OnEnterAnimationComplete` ocurre en el frame 17, a los `16/24 = 0.6667`
+  segundos: ahi comienza el audio de ataque y se crea inmediatamente la primera
+  bolita desde la posicion inicial de `InkOrigin`, `(46, 368)`. El clip que destapa el bote y su
+  pop comienzan a los 0.75 segundos, y el ciclo abierto comienza a los 0.875.
+  El ciclo abierto si anima ese mismo hijo: la curva estaba comprimida en el
+  bloque streamed del clip y por eso no aparecia en `m_PositionCurves`. Se
+  decodifico su ruta CRC `2960652783` (`InkOrigin`) y sus 16 polinomios cubicos
+  originales de X/Y. El mod ahora los evalua, incluida la interpolacion entre
+  frames, para que despues del destape las bolitas sigan exactamente la boquilla
+  que se mueve con el tentaculo. El juego usa un origen animado, no un segundo
+  punto distinto.
+- Las siguientes bolitas del pulpo respetan la cadencia nativa: 0.21 segundos
+  en Facil y 0.12 en Normal o Experto. Los intervalos vencidos se procesan en
+  orden para conservar la cantidad aunque cambie la tasa de frames. El pulpo
+  deja de emitir al entrar a su salida, a los 1.7917 segundos de esta version
+  corta, igual que la corrutina original se detiene al abandonar Attack. Se
+  mantiene el maximo de seguridad de 20 simultaneas y la secuencia visual total
+  de 3 segundos para no prolongar el inicio aprobado. Cuando se va,
+  el limite vuelve inmediatamente a `3/4/13` y no aparece otra oleada hasta que
+  las sobrantes bajan del limite correspondiente; despues regresan las oleadas,
+  probabilidades e intervalos normales desde la zona superior derecha. Esto no
+  cambia la proteccion ya aprobada: solo pueden entintar
+  al jugador un segundo despues de que `Level.PlayAnnouncerBegin()` inicia
+  `Wallop`. La secuencia reproduce el sonido de destape
+  `level_pirate_squid_attack_pop` y usa las velocidades y gravedad nativas de
+  Barbasalada para que las bolitas se vean salir hacia arriba desde el calamar.
+  La lluvia regular conserva su aparicion aprobada una vez terminada la
+  introduccion.
+- Las pruebas manuales de ventanas fijas (`1.5-2.0`, `0.5-1.0`, `0.3-2.6`,
+  `1.0-2.6`, `0.52-2.5`) fueron reemplazadas por los eventos y estados nativos.
+  A partir del corte de Attack, la lluvia restante conserva su movimiento y las
+  futuras oleadas vuelven al origen superior habitual.
+- El actor del pulpo reproduce tambien su balanceo nativo: recorre 20 unidades
+  verticales con `easeInOutSine(PingPong(t, 1))`, un ciclo completo de dos
+  segundos. El movimiento se convierte a la escala visual aprobada del mod y
+  desplaza junto con el dibujo al `InkOrigin`; encima de ese balanceo se aplica
+  la curva animada del hijo, igual que en el prefab original, sin mover por
+  separado las gotas ya creadas.
+- La lluvia de tinta ahora respeta la pausa real de Cuphead. El juego usa
+  `CupheadTime.GlobalSpeed = 0` sin detener necesariamente `Time.deltaTime`, por
+  eso antes las gotas seguian avanzando. Mientras esta pausado no cambian
+  posicion, gravedad, edad, animaciones, impactos, tinta ni temporizadores. Al
+  reanudar se desplazan los relojes absolutos por toda la duracion de la pausa,
+  evitando saltos, salvas acumuladas o que la proteccion venza en el menu.
+- La primera prueba confirmo por registro que la introduccion y sus gotas se
+  ejecutaban, pero el pulpo no era visible: la camara todavia en transicion
+  descartaba el dibujo directo del sprite. La ruta temporal por `OnGUI` lo hizo
+  visible, pero demasiado limpio por quedar encima de la pelicula. Ahora se
+  rasteriza en una textura transparente propia y se compone antes de los efectos
+  de Cuphead, por lo que recibe su grano y color sin modificar las capas de
+  gotas, impactos, manchas y oscurecimiento.
+- La introduccion del pulpo ahora aparece centrada horizontalmente, anclada al
+  piso, y al doble de su escala visual anterior (`0.55` a `1.10`).
+- Se retiro la textura de pantalla intermedia del pulpo despues de observar una
+  apariencia palida y temblor. Esa ruta mezclaba dos veces la transparencia y
+  mostraba el fotograma preparado al final del cuadro anterior. Ahora los 59
+  frames usan su pivote inferior central original en un `SpriteRenderer` real,
+  colocado frente a la escena: recibe una sola vez la pelicula de Cuphead y no
+  introduce latencia. El compositor aprobado de la tinta no fue modificado.
+- Los 59 frames recortados del pulpo se reconstruyeron sobre su lienzo nativo
+  fijo de `620 x 620`, usando el `textureRectOffset` original de cada Sprite.
+  Esto evita que el centro aparente cambie con las distintas dimensiones de
+  cada recorte. El actor tambien queda ligado a la camara durante la secuencia,
+  evitando desplazamientos relativos mientras termina la entrada al nivel.
+- El ancla inferior del pulpo bajo de `0.04` a `-0.04` en coordenadas del
+  viewport para que los extremos recortados de los tentaculos queden ocultos
+  debajo de la pantalla, sin cambiar su centro horizontal ni escala.
+- Las bolitas no pueden oscurecer la pantalla, crear manchas ni reproducir el
+  sonido de impacto hasta un segundo despues de que
+  `Level.PlayAnnouncerBegin()` inicia el anuncio `Wallop`. Durante esa gracia
+  siguen visibles, se mueven y chocan con el suelo, pero atraviesan al jugador.
+  `_OnLevelStart()` proporciona el mismo segundo de respaldo en escenas
+  especiales que no llaman al anunciador, sin ampliar la gracia normal.
+- Pendiente conocido: reproducir y corregir los errores de Lluvia de tinta en
+  toda la cadena del Palacio de Dados. Cada escena interna debe conservar una
+  sola sesion, sin repetir la introduccion, duplicar lluvia/compositores, perder
+  la gracia de daño ni limpiar el reto antes de vencer a Rey Dado.
+- Pendiente de diseño: decidir que debe ocurrir si Lluvia de tinta sale contra
+  el Capitan Barbasalada, cuyo combate ya usa el calamar, sus proyectiles y su
+  overlay nativos. Antes de activar el reto publicamente se elegira entre
+  excluir ese jefe, ocultar solo la introduccion adicional o permitir ambos
+  sistemas deliberadamente; no se desactivara el ataque nativo sin esa decision.
+- Tambien falta validar la introduccion en tierra, avion, reintento y
+  cooperativo; despues ajustar su escala, ubicacion o duracion mediante pruebas
+  si es necesario.
 ## 0.5.129 — 2026-08-08 (desarrollo RGB y 180°)
 
 - Se implementó la primera versión experimental del reto `HP.1` para niveles

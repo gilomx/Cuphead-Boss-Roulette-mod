@@ -186,6 +186,7 @@ namespace Gilomx.CupheadBossRoulette
             ResetRgbShiftChallenge();
             ResetUpsideDownChallenge();
             ResetBlackAndWhiteChallengeForRetry();
+            ResetInkRainChallengeForRetry();
             challengeVisualDefeatUnwindActive = false;
             challengeVisualRetryResetPending = true;
             Logger.LogInfo(
