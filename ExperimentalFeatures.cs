@@ -26,6 +26,10 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool EnableInkRainChallenge = true;
         internal static readonly bool ForceInkRainChallengeForTesting = false;
 
+        // Validated prototype. Keep disabled until its final animated icon exists.
+        internal static readonly bool EnableHalfDamageChallenge = false;
+        internal static readonly bool ForceHalfDamageChallengeForTesting = false;
+
         internal static bool IsChallengeEnabled(ModifierId id)
         {
             if (id == ModifierId.RgbShift)
@@ -36,6 +40,8 @@ namespace Gilomx.CupheadBossRoulette
                 return EnableHpOneChallenge;
             if (id == ModifierId.InkRain)
                 return EnableInkRainChallenge;
+            if (id == ModifierId.HalfDamage)
+                return EnableHalfDamageChallenge;
             return true;
         }
     }

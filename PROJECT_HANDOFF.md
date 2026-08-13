@@ -1,5 +1,27 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Half Damage challenge validated and parked (2026-08-13)
+
+`ModifierId.HalfDamage` is implemented for ground and airplane battles. While the
+challenge is active, player-owned `DamageDealer` hits temporarily multiply the
+native damage multiplier by `0.5`, then restore it immediately after the hit. The
+guard excludes incoming player damage, so enemy attacks and player HP are not
+modified. This single damage path covers regular shots, airplane weapons, EX
+moves and supers without permanently changing weapon data.
+
+The challenge was manually validated through the complete King Dice chain,
+including board transitions, internal `DicePalace*` minibosses and the final
+fight. `ActiveChallengeMatches()` intentionally treats every `DicePalace*` scene
+as part of the `Levels.DicePalaceMain` roulette session, so the modifier and HUD
+persist until the chain is completed or abandoned.
+
+The user-provided static `assets/modifiers/halfdamage.png` is retained only as a
+provisional reference. `EnableHalfDamageChallenge` and
+`ForceHalfDamageChallengeForTesting` are both `false`; therefore Half Damage
+cannot appear or execute in normal roulette play. Reactivate it only after the
+final three-frame animated challenge icon is available and wired into
+`RouletteData.Modifiers`.
+
 ## Native Ink Rain splats and final acceptance (2026-08-13)
 
 Ink Rain is enabled for normal roulette selection. All temporary selectors are

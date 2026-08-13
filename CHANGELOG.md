@@ -1,5 +1,18 @@
 # Historial de cambios
 
+## Desarrollo experimental - reto de dano reducido validado (2026-08-13)
+
+- Se implemento `DANO -50%` para combates terrestres y de avion. Los impactos
+  ofensivos del jugador aplican temporalmente la mitad del multiplicador nativo
+  sin alterar el dano recibido ni los datos permanentes de armas.
+- La ruta cubre disparos normales, armas de avion, ataques EX y supers.
+- Se aprobo manualmente la cadena completa del Rey Dado: tablero, minijefes,
+  transiciones internas y combate final conservaron correctamente el reto.
+- Se guardo `assets/modifiers/halfdamage.png`, aportado por el usuario, como
+  referencia visual provisional.
+- El reto y todos sus selectores de prueba quedaron desactivados. No aparecera
+  en la ruleta hasta contar con su secuencia animada definitiva de tres frames.
+
 ## Desarrollo experimental - salpicaduras nativas y validación final (2026-08-13)
 
 - Las salpicaduras de Lluvia de tinta fuera de Barbasalada usan ahora los 71

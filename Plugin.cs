@@ -34,6 +34,9 @@ namespace Gilomx.CupheadBossRoulette
                 : ExperimentalFeatures.EnableInkRainChallenge &&
                   ExperimentalFeatures.ForceInkRainChallengeForTesting
                 ? ModifierId.InkRain
+                : ExperimentalFeatures.EnableHalfDamageChallenge &&
+                  ExperimentalFeatures.ForceHalfDamageChallengeForTesting
+                ? ModifierId.HalfDamage
                 : ModifierId.None;
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
@@ -208,6 +211,7 @@ namespace Gilomx.CupheadBossRoulette
         private RouletteStatus status = RouletteStatus.Ready;
         private ModifierId activeChallenge = ModifierId.None;
         private int activeChallengeBoss = -1;
+        private bool loggedHalfDamageSample;
         private float blackAndWhiteBlend;
         private float blackAndWhiteTransitionStartedAt = -1f;
         private float blackAndWhiteTransitionFrom;
@@ -670,15 +674,29 @@ namespace Gilomx.CupheadBossRoulette
             var dealDamage = AccessTools.Method(
                 typeof(DamageDealer), "DealDamage",
                 new[] { typeof(GameObject) });
+            var reducePlayerDamagePrefix = AccessTools.Method(
+                typeof(Plugin), "ReducePlayerDamagePrefix");
+            var restorePlayerDamagePostfix = AccessTools.Method(
+                typeof(Plugin), "RestorePlayerDamagePostfix");
             var restartSoloMiniOnInvalidDamagePostfix = AccessTools.Method(
                 typeof(Plugin), "RestartSoloMiniOnInvalidDamagePostfix");
+            if (dealDamage != null && reducePlayerDamagePrefix != null &&
+                restorePlayerDamagePostfix != null)
+                harmony.Patch(dealDamage,
+                    prefix: new HarmonyMethod(reducePlayerDamagePrefix),
+                    postfix: new HarmonyMethod(restorePlayerDamagePostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the half-damage challenge guard.");
+
             if (dealDamage != null &&
                 restartSoloMiniOnInvalidDamagePostfix != null)
                 harmony.Patch(dealDamage,
                     postfix: new HarmonyMethod(
                         restartSoloMiniOnInvalidDamagePostfix));
             else
-                Logger.LogWarning("Could not install the Solo mini airplane damage guard.");
+                Logger.LogWarning(
+                    "Could not install the Solo mini airplane damage guard.");
 
             var planeWeaponStart = AccessTools.Method(
                 typeof(PlanePlayerWeaponManager), "OnLevelStart");
@@ -2578,6 +2596,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             ClearChallengeVisualRetryGate();
             soloMiniRestartPending = false;
+            loggedHalfDamageSample = false;
             if (!ExperimentalFeatures.IsChallengeEnabled(challenge))
                 challenge = ModifierId.None;
             activeChallenge = challenge;
@@ -2702,6 +2721,54 @@ namespace Gilomx.CupheadBossRoulette
                    ShouldShowActiveChallenge();
         }
 
+        private static void ReducePlayerDamagePrefix(
+            GameObject hit,
+            PlayerId ___playerId,
+            ref float ___damageMultiplier,
+            out float __state)
+        {
+            __state = ___damageMultiplier;
+            var plugin = activeInstance;
+            if (plugin == null ||
+                plugin.activeChallenge != ModifierId.HalfDamage ||
+                !plugin.ShouldShowActiveChallenge() ||
+                (int)___playerId == int.MaxValue ||
+                !IsPlayerOffensiveDamageTarget(hit))
+                return;
+
+            ___damageMultiplier *= 0.5f;
+            if (!plugin.loggedHalfDamageSample)
+            {
+                plugin.loggedHalfDamageSample = true;
+                plugin.Logger.LogInfo(
+                    "Half Damage verified: multiplier " + __state +
+                    " -> " + ___damageMultiplier + ".");
+            }
+        }
+
+        private static void RestorePlayerDamagePostfix(
+            ref float ___damageMultiplier,
+            float __state)
+        {
+            ___damageMultiplier = __state;
+        }
+
+        private static bool IsPlayerOffensiveDamageTarget(GameObject hit)
+        {
+            if (hit == null)
+                return false;
+
+            var receiver = hit.GetComponent<DamageReceiver>();
+            if (receiver == null)
+            {
+                var child = hit.GetComponent<DamageReceiverChild>();
+                if (child != null && child.enabled)
+                    receiver = child.Receiver;
+            }
+
+            return receiver != null && receiver.enabled &&
+                   receiver.type != DamageReceiver.Type.Player;
+        }
         private static void RestartSoloMiniOnInvalidDamagePostfix(
             GameObject hit,
             float __result,
