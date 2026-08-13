@@ -21,10 +21,10 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool EnableHpOneChallenge = false;
         internal static readonly bool ForceHpOneChallengeForTesting = false;
 
-        // First playable prototype. Keep it forced while its density,
-        // collisions and progressive blackout are validated in every arena.
-        internal static readonly bool EnableInkRainChallenge = true;
-        internal static readonly bool ForceInkRainChallengeForTesting = true;
+        // Ink Rain remains dormant between acceptance sessions. Its completed
+        // implementation stays available for the remaining special-case tests.
+        internal static readonly bool EnableInkRainChallenge = false;
+        internal static readonly bool ForceInkRainChallengeForTesting = false;
 
         internal static bool IsChallengeEnabled(ModifierId id)
         {

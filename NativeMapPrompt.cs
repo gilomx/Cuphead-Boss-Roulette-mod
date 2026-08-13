@@ -47,6 +47,14 @@ namespace Gilomx.CupheadBossRoulette
 
             if (nativeRoulettePrompt == null)
             {
+                // The prompt belongs to the current map canvas, so Unity
+                // destroys it whenever a fight loads. Clear every reference
+                // and, crucially, the layout token before cloning the prompt
+                // from the new map. Otherwise the unchanged-layout fast path
+                // treats a fresh native Help row as already configured and
+                // leaves only its default B glyph visible, even though the
+                // controller shortcut still requires trigger + Equip.
+                DestroyNativeRoulettePrompt();
                 if (!needsNativeLayer || !TryCreateNativeRoulettePrompt())
                     return;
             }
@@ -90,6 +98,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool TryCreateNativeRoulettePrompt()
         {
+            // This method always creates a new set of UI objects. Never reuse
+            // layout state that was calculated for a previous map scene.
+            nativeRoulettePromptLayoutToken = null;
             var glyphs = Resources.FindObjectsOfTypeAll<CupheadGlyph>();
             CupheadGlyph templateGlyph = null;
             for (var i = 0; i < glyphs.Length; i++)

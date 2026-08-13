@@ -3,6 +3,73 @@
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
+## Desarrollo experimental - Abejita aprobada y cierre de pruebas (2026-08-13)
+
+- Reynita Abejita fue aprobada manualmente con Lluvia de tinta. Su arena valida
+  el comportamiento de las gotas en geometria terrestre con plataformas
+  moviles, complementando el piso sencillo ya aprobado en Goopy.
+- Se desactivaron el jefe, amuleto, reto y selector forzados para entregar el
+  repositorio en un estado seguro. Lluvia de tinta y los demas retos nuevos no
+  aparecen ni ejecutan efectos hasta que otro agente reactive expresamente sus
+  interruptores de desarrollo.
+- Quedan pendientes Rey Dado completo, cooperativo, decidir la convivencia con
+  el calamar nativo de Barbasalada, una regresion breve posterior y el icono
+  animado final.
+
+## Desarrollo experimental - prueba con Cagney antes de Hilda (2026-08-12)
+
+- Se cambio el siguiente objetivo y se forzo temporalmente `Levels.Flower` con
+  Lluvia de tinta para revisar primero a Cagney. Hilda Berg queda pendiente como
+  la siguiente prueba aérea convencional. El jefe forzado debe volver a `false`
+  al terminar cada objetivo.
+- La convivencia con el efecto nativo de Cagney fue aprobada manualmente y no
+  necesita una excepcion. El objetivo forzado avanzo a `Levels.FlyingBlimp`
+  para continuar con Hilda Berg.
+- La prueba de Hilda fuerza especificamente Reliquia Maldita con grado de
+  maldicion `0` en todos los giros; no usa la secuencia alternada con Reliquia
+  Divina. Armas y Super permanecen aleatorios.
+- Hilda y su combinación con Reliquia Maldita fueron aprobadas manualmente. El
+  amuleto forzado se desactivo y el siguiente objetivo avanzo a `Levels.Bee`
+  para revisar la geometria compleja de plataformas de Reynita Abejita.
+
+## Desarrollo experimental - prueba terrestre con Goopy (2026-08-12)
+
+- Se forzo temporalmente `Levels.Slime` con Lluvia de tinta para validar en un
+  piso terrestre sencillo los impactos, orden de capas, pausa, derrota,
+  reintento, knockout y limpieza al regresar al mapa. El jefe forzado debe
+  volver a `false` al terminar la prueba.
+- La prueba completa fue aprobada manualmente. Se desactivo nuevamente el jefe
+  forzado y se conservaron como aceptados el flujo terrestre basico, pausa,
+  derrota/reintento, knockout, resultados y limpieza al volver al mapa.
+
+## Desarrollo experimental - prueba de Perritos Pilotos (2026-08-12)
+
+- Se reactivo temporalmente Lluvia de tinta, se forzo como reto y se forzo
+  `Levels.Airplane` para repetir exclusivamente Los Perritos Pilotos. La prueba
+  revisara direccion, cobertura, densidad, tamaño, colisiones y limpieza de las
+  gotas durante todas las rotaciones. Los tres interruptores deben volver a
+  `false` antes de crear otro paquete publico.
+- La prueba completa fue aprobada manualmente: la lluvia se mantuvo correcta
+  durante todo el encuentro y sus rotaciones. Se desactivo nuevamente el jefe
+  forzado; Lluvia de tinta permanece activada y forzada para continuar la matriz
+  con jefes aleatorios.
+
+## 0.5.130 - 2026-08-12
+
+- Se corrigio la apertura de la ruleta con mando despues de regresar al mapa
+  desde cualquier combate, tanto iniciado por la ruleta como de forma normal.
+  Cuphead destruye el prompt del mapa al cargar un nivel; el mod recreaba la
+  fila al volver, pero conservaba el cache de distribucion anterior. Por eso la
+  fila nueva mostraba solamente el glifo nativo `B`, aunque el atajo real seguia
+  siendo gatillo izquierdo + Equip. Ahora se limpian todas las referencias y el
+  token de distribucion al detectar un prompt destruido, y la combinacion
+  `ZL/LT/L2 + Equip` se reconstruye completamente en cada mapa.
+- El prototipo de `Lluvia de tinta` y su selector forzado quedaron desactivados
+  temporalmente mientras se trabajan correcciones para la version publica. La
+  implementacion y sus assets permanecen disponibles para retomar las pruebas;
+  mientras el interruptor principal siga apagado tampoco se instalan sus
+  parches, se crea su componente ni se ejecuta su ciclo de actualizacion.
+
 ## Desarrollo experimental - Lluvia de tinta (2026-08-11)
 
 - Se agrego el primer prototipo jugable de `Lluvia de tinta` para niveles de

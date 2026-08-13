@@ -25,6 +25,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SafeUpdateInkRainChallenge()
         {
+            if (!ExperimentalFeatures.EnableInkRainChallenge)
+                return;
+
             if (!inkRainUpdateHeartbeatLogged)
             {
                 inkRainUpdateHeartbeatLogged = true;
@@ -58,6 +61,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void InstallInkRainChallengePatches()
         {
+            if (!ExperimentalFeatures.EnableInkRainChallenge)
+                return;
+
             var levelInit = AccessTools.Method(
                 typeof(PlayerStatsManager), "LevelInit");
             var postfix = AccessTools.Method(
@@ -223,6 +229,9 @@ namespace Gilomx.CupheadBossRoulette
         }
         private void InitializeInkRainChallenge()
         {
+            if (!ExperimentalFeatures.EnableInkRainChallenge)
+                return;
+
             inkRainRuntime = gameObject.GetComponent<InkRainChallengeRuntime>();
             if (inkRainRuntime == null)
                 inkRainRuntime = gameObject.AddComponent<InkRainChallengeRuntime>();

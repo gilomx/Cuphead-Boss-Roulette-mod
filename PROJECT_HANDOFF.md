@@ -1,9 +1,121 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Ink Rain acceptance checkpoint after Queen Bee (2026-08-13)
+
+Cagney Carnation passed the requested Ink Rain compatibility check. The user
+specifically confirmed that Cagney's native visual effect and the challenge
+coexisted and behaved as expected; no special suppression or composition rule
+is needed for this pairing.
+
+Hilda Berg passed the ordinary-plane acceptance test with Ink Rain and the
+Cursed Relic at curse grade `0`. The user confirmed the result, so ordinary
+screen-top spawning, density and plane behavior are accepted, and the temporary
+`ForceCursedRelicTest` switch is false again.
+
+Queen Bee (`Levels.Bee`) subsequently passed the complex moving-platform test.
+The user confirmed that Ink Rain behaved correctly in the complete fight, so
+ground detection and drop behavior are now accepted in both a simple arena
+(Goopy) and a moving-platform arena (Bee).
+
+All temporary selectors are false at this handoff: `ForceTestBoss`,
+`ForceCursedRelicTest`, `EnableInkRainChallenge`, and
+`ForceInkRainChallengeForTesting`. `ForcedTestBossSequence` keeps `Levels.Bee`
+only as a dormant target. The other new challenges also remain disabled. The
+next agent must explicitly re-enable only Ink Rain and its force switch for a
+new acceptance session.
+
+Remaining Ink Rain work, in recommended order:
+
+1. King Dice full chain: several minions and `DicePalaceMain`, checking that the
+   squid intro plays once, rain resumes across internal scenes, no compositor or
+   grace period duplicates, and cleanup waits for the real final victory.
+2. Local co-op: independent collision, splats/darkness for both players,
+   revival, pause, retry and cleanup.
+3. Captain Brineybeard policy: choose whether to exclude Ink Rain or, preferably,
+   keep the added rain while suppressing only the mod's duplicate squid intro.
+   Never disable the boss's native squid attack silently.
+4. Short regression over a DLC ground boss plus abandon-to-map/results after the
+   special-case fixes. Goopy, Cagney, Hilda, Queen Bee and Dogfight already
+   passed their intended geometry/lifecycle matrices.
+5. Replace the provisional challenge presentation with the user's final animated
+   icon; the runtime currently references only `inkrain_01.png`.
+
+## Goopy Ink Rain ground/lifecycle acceptance passed (2026-08-12)
+
+The complete Goopy Le Grande Ink Rain test passed manual acceptance. On a simple
+ground arena the user approved the single squid intro per attempt, unchanged
+Ready/Wallop timing, floor impacts and visual layering, pause behavior, player
+splats/darkness, defeat and retry, knockout flow, and cleanup after leaving the
+battle.
+
+At that checkpoint `Plugin.ForceTestBoss` was cleared before the next target.
+The current dormant target and all final switch values are recorded in the
+newest Queen Bee checkpoint above.
+
+## Dogfight Ink Rain acceptance passed (2026-08-12)
+
+The complete `Los Perritos Pilotos` Ink Rain run passed manual acceptance. The
+user confirmed that the challenge looked and behaved perfectly throughout the
+rotating encounter. This validates sky-side spawn direction, lateral coverage,
+density, sprite size through 90/270-degree orientations, survival of active
+drops during rotation, collision alignment and final cleanup as one combined
+gameplay test.
+
+At that checkpoint `Plugin.ForceTestBoss` was cleared while Ink Rain continued
+to the next acceptance target. The current dormant target and final switch
+values are recorded in the newest Queen Bee checkpoint above.
+
+## Controller map-return prompt fix and Ink Rain pause (0.5.130)
+
+The ready-to-paste public installer is
+`dist/Las-Pichi-Ruleta-0.5.130.zip` (10,628,818 bytes, SHA-256
+`1B8F451DF845F09DA8E65B34A24F418C77ACF14D1239A99A88BBB4FC2BABEDBB`).
+It contains 123 files plus two ZIP directory entries: x64 BepInEx/Doorstop, the
+0.5.130 DLL, the 99 established public assets and `README-LEEME.txt`. The packed
+DLL matches the release build at SHA-256
+`AF9C928620EFC10A2962475B536E1C4A08FBF7A956031A96B5B0F3BBF97BB970`.
+The archive was deliberately based on the verified 0.5.127 public asset set, so
+it contains no Ink Rain, RGB, Upside Down or HP.1 presentation assets. It also
+contains no BepInEx config, cache, logs, saves, patchers, temporary files or
+unrelated plugins.
+
+The controller shortcut remains physical left trigger plus Cuphead's native
+`EquipMenu` action: Switch `ZL + X`, Xbox `LT + Y`, and PlayStation
+`L2 + Triangle`. A regression appeared after returning from any fight, whether
+roulette-launched or entered normally: the bottom-right row displayed only the
+native `B` glyph and pressing it could not open the roulette.
+
+The root cause was scene-owned UI plus a plugin-owned layout cache.
+`nativeRoulettePrompt` is parented to Cuphead's map canvas and is destroyed when
+the fight scene loads, while `nativeRoulettePromptLayoutToken` survives on the
+persistent plugin. On the next map, `TryCreateNativeRoulettePrompt()` cloned a
+fresh native Help row, but `ApplyNativeRoulettePrompt()` saw the old token and
+took its unchanged-layout fast path. The new row therefore never had its
+modifier, separator, Equip glyph or positions configured and exposed the
+template's default `B` glyph.
+
+`UpdateNativeRoulettePrompt()` now calls `DestroyNativeRoulettePrompt()` when it
+detects that the scene-owned root is gone. This clears all stale component
+references, the dim overlay and the layout token before cloning from the new
+map. `TryCreateNativeRoulettePrompt()` also invalidates the token defensively
+because every call creates a new object graph. Do not remove either invalidation
+when optimizing prompt updates. Required manual matrix: initial map, normal
+fight/abandon, normal fight/victory, roulette fight/abandon and roulette
+fight/victory, verifying both the displayed trigger-plus-Equip combination and
+actual open/close input after every return.
+
+Ink Rain development is paused at this checkpoint. Both
+`EnableInkRainChallenge` and `ForceInkRainChallengeForTesting` are false; its
+implementation and assets remain intact for later arena testing. While the
+master switch is false, the plugin also skips Ink Rain's Harmony patch install,
+runtime component initialization and update heartbeat entirely.
+
 ## Ink Rain tuning, lifecycle, and rotating Dogfight support (2026-08-12)
 
-The experimental `InkRain` challenge remains enabled and forced from
-`ExperimentalFeatures.cs` while arena-wide acceptance continues. The temporary
+At this checkpoint the experimental `InkRain` challenge remained enabled and
+forced from `ExperimentalFeatures.cs` while arena-wide acceptance continued.
+It is currently paused with both switches false as documented in the newer
+0.5.130 section above. The temporary
 boss selector used for Dogfight validation has been disabled again, so spins
 choose bosses normally. The roulette now keeps a session-only history of the
 last three boss results and excludes them when the compatible pool permits it;
@@ -52,16 +164,12 @@ than the previously visited boss door.
 
 ### Required follow-up after this checkpoint
 
-1. Perform another complete `Los Perritos Pilotos` run and inspect every
-   transition, especially spawn coverage at both lateral edges, density during
-   rotation, world-sky direction, sprite size, collision and cleanup.
-2. Run a broad regression pass across ground bosses, ordinary plane bosses,
-   King Dice sublevels, retry, pause, knockout, results, map return and co-op.
-   Confirm the four-corner bounds and world-edge lifetime introduced for
-   Dogfight do not change ordinary arenas or leak rain into later scenes.
-3. Keep the Ink Rain challenge experimental and forced only for testing until
-   that review passes; then disable `ForceInkRainChallengeForTesting` before a
-   public build.
+1. Complete the King Dice, co-op and Brineybeard work listed in the latest
+   acceptance checkpoint above. Ordinary plane behavior passed in Hilda,
+   moving-platform behavior passed in Queen Bee, Goopy passed the basic ground
+   lifecycle, and Perritos Pilotos passed the rotating-camera case.
+2. Enable and force Ink Rain only during an explicit acceptance session. Both
+   switches are currently false and must remain false in public builds.
 ## Experimental Ink Rain challenge (2026-08-11 handoff)
 
 `ModifierId.InkRain` is a first playable ground-and-plane prototype named
@@ -72,10 +180,10 @@ non-collinear lanes. Each travels down-left with its own trail leaning up-right,
 so the group reads as simultaneous diagonal rain rather than three poses of one
 projectile; only frame 01 is
 currently referenced by the roulette/HUD. The feature
-and its forced test selector are deliberately still enabled in
-`ExperimentalFeatures.cs` so the next session always rolls this challenge.
-Disable `ForceInkRainChallengeForTesting` after the remaining acceptance work,
-and keep the challenge experimental until every arena has been checked.
+and its forced test selector were deliberately enabled during this prototype
+checkpoint. Both switches are currently false for the 0.5.130 public-fix work.
+Re-enable the force only when the remaining acceptance work resumes, and keep
+the challenge experimental until every arena has been checked.
 
 Runtime implementation lives in `InkRainChallenge.cs`. `Plugin` installs its
 Level-init Harmony hook, updates the runtime every frame and clears it through
@@ -341,20 +449,7 @@ screen without a fake impact.
 
 ### Required follow-up tests and tasks
 
-1. Decide the final amount of ink rain by difficulty: maximum simultaneous
-   drops, wave size probabilities and spawn delays. Current values are only a
-   current prototype (`3/4/13` visible on Easy/Normal/Expert). Spawn intervals
-   and double-wave probabilities were intentionally left unchanged when these
-   caps and the gravity were raised.
-2. Tune horizontal speed, initial fall speed and gravity through gameplay so the
-   diagonal arcs are readable and fair in both ground and plane fights.
-3. Validate ground collision beyond Beppi. Confirm the original four-way OnDeath
-   animation appears on real floors/platforms and never on walls, enemies,
-   results, the map or later non-roulette levels.
-4. Validate the new squid introduction in ground, plane, retry and co-op fights.
-   Specifically confirm the first drops cannot ink a locked player, the sequence
-   does not delay Ready/Wallop and the native attack loop always stops.
-5. King Dice is a known pending compatibility case, not a normal single-scene
+1. King Dice is a known pending compatibility case, not a normal single-scene
    boss. Reproduce and document the current Ink Rain errors across several
    `DicePalace*` minions and `DicePalaceMain`, then verify that every internal
    scene keeps the same challenge session without replaying the squid intro,
@@ -362,7 +457,7 @@ screen without a fake impact.
    challenge before the final boss. Camera and HUD replacement during those
    transitions also needs explicit coverage. Do not treat an internal minion
    victory as the end of Ink Rain.
-6. Decide the intended behavior when the roulette selects Ink Rain for Captain
+2. Decide the intended behavior when the roulette selects Ink Rain for Captain
    Brineybeard (`Pirate`). His native fight already owns the same squid, ink
    projectiles and full-screen overlay. The current experimental implementation
    can coexist with those systems, but that may duplicate the introductory
@@ -371,10 +466,11 @@ screen without a fake impact.
    this boss, keep the extra rain but suppress only the mod's squid intro, or
    deliberately allow both complete systems. This is a design decision, not a
    resolved bug; do not silently disable the native boss attack.
-7. After the above, test defeat/retry, victory, abandon-to-map, results screens,
-   ground bosses, plane bosses, DLC bosses, pause and two-player sessions.
-   Finally disable the forced selector and replace the provisional challenge
-   icon with the user's finished animation.
+3. Validate local two-player behavior and run a short DLC/regression pass after
+   the special-case fixes. The general single-player lifecycle and representative
+   ground, platform, plane and rotating-camera arenas are already accepted.
+4. Replace the provisional challenge icon with the user's finished animation.
+   Keep all feature and test selectors disabled until the next explicit session.
 
 ## Completed dormant HP.1 challenge (0.5.129, awaiting final animated icon)
 
@@ -750,8 +846,8 @@ bold, italics, code spans or Markdown separators. Numbered instructions use
 `1)` notation and lists use plain Unicode bullets. It was round-trip verified as
 UTF-8, including Spanish accents.
 
-Last updated: 2026-08-08
-Current local version: 0.5.129
+Last updated: 2026-08-12
+Current local version: 0.5.130
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit

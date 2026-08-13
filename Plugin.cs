@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.129";
+        public const string PluginVersion = "0.5.130";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -37,6 +37,8 @@ namespace Gilomx.CupheadBossRoulette
                 : ModifierId.None;
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
+        // Dormant targeted test: force only Cursed Relic (grade 0).
+        private static readonly bool ForceCursedRelicTest = false;
         // Dormant test selector: exercise both restricted plane weapons.
         private static readonly bool ForcePlaneRelicChallengeTestSequence =
             false;
@@ -56,7 +58,7 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels[] ForcedTestBossSequence =
         {
-            Levels.Airplane
+            Levels.Bee
         };
         // Dormant localization test shortcut. Keep false in normal builds.
         private const bool EnableLanguageTestShortcut = false;
@@ -1584,10 +1586,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private int ForcedRelicTestCharmIndex()
         {
-            if (!ForceRelicTestSequence)
+            if (!ForceCursedRelicTest && !ForceRelicTestSequence)
                 return -1;
 
-            var expectedCurseLevel = forcedRelicTestSpin++ % 2 == 0 ? 0 : 4;
+            var expectedCurseLevel = ForceCursedRelicTest
+                ? 0
+                : forcedRelicTestSpin++ % 2 == 0 ? 0 : 4;
             for (var i = 0; i < availableCharmIndices.Count; i++)
             {
                 var charmIndex = availableCharmIndices[i];
