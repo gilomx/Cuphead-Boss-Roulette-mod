@@ -56,7 +56,7 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly bool ForceTestBoss = false;
         private static readonly Levels[] ForcedTestBossSequence =
         {
-            Levels.Slime
+            Levels.Airplane
         };
         // Dormant localization test shortcut. Keep false in normal builds.
         private const bool EnableLanguageTestShortcut = false;
@@ -145,6 +145,8 @@ namespace Gilomx.CupheadBossRoulette
         private int forcedHpOneHealthCharmTestSpin;
         private int forcedPlaneRelicChallengeTestSpin;
         private int forcedBossTestSpin;
+        private const int RecentBossHistorySize = 3;
+        private readonly List<int> recentBossIndices = new List<int>();
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
         private readonly List<int> availableBossIndices = new List<int>();
         private readonly List<int> availableWeaponIndices = new List<int>();
@@ -1418,7 +1420,8 @@ namespace Gilomx.CupheadBossRoulette
                 ? forcedBoss
                 : forcedModifier >= 0
                     ? RandomBossForModifier(forcedModifier)
-                    : RandomPoolIndex(availableBossIndices);
+                    : RandomBossFromPool(availableBossIndices);
+            RememberBossResult(boss);
             var weapon1 = RandomNonEmptyPoolIndex(
                 availableWeaponIndices, RouletteData.Weapons.Length - 1);
             var emptyWeaponIndex = RouletteData.Weapons.Length - 1;
@@ -1631,8 +1634,51 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             return compatibleBosses.Count > 0
-                ? compatibleBosses[random.Next(compatibleBosses.Count)]
-                : RandomPoolIndex(availableBossIndices);
+                ? RandomBossFromPool(compatibleBosses)
+                : RandomBossFromPool(availableBossIndices);
+        }
+
+        private int RandomBossFromPool(List<int> pool)
+        {
+            if (pool == null || pool.Count == 0)
+                return 0;
+
+            var maximumExclusions = Math.Min(
+                RecentBossHistorySize, recentBossIndices.Count);
+            for (var exclusionCount = maximumExclusions;
+                 exclusionCount >= 0; exclusionCount--)
+            {
+                var candidates = new List<int>();
+                var historyStart = recentBossIndices.Count - exclusionCount;
+                for (var i = 0; i < pool.Count; i++)
+                {
+                    var excluded = false;
+                    for (var historyIndex = historyStart;
+                         historyIndex < recentBossIndices.Count;
+                         historyIndex++)
+                    {
+                        if (pool[i] != recentBossIndices[historyIndex])
+                            continue;
+
+                        excluded = true;
+                        break;
+                    }
+                    if (!excluded)
+                        candidates.Add(pool[i]);
+                }
+
+                if (candidates.Count > 0)
+                    return candidates[random.Next(candidates.Count)];
+            }
+
+            return pool[random.Next(pool.Count)];
+        }
+
+        private void RememberBossResult(int bossIndex)
+        {
+            recentBossIndices.Add(bossIndex);
+            while (recentBossIndices.Count > RecentBossHistorySize)
+                recentBossIndices.RemoveAt(0);
         }
 
         private void EnsureAvailableContent()
@@ -1903,6 +1949,23 @@ namespace Gilomx.CupheadBossRoulette
         private static AbstractMapInteractiveEntity FindRouletteBossEntrance(
             Levels bossLevel)
         {
+            if (bossLevel == Levels.Graveyard)
+            {
+                // Angel and Demon is entered through the DLC graveyard puzzle,
+                // not a MapLevelLoader. Use the handler's native return offsets
+                // so both players reappear at the graveyard instead of at the
+                // previously visited boss door.
+                var graveyardEntrances =
+                    Resources.FindObjectsOfTypeAll<MapGraveyardHandler>();
+                for (var i = 0; i < graveyardEntrances.Length; i++)
+                {
+                    var entrance = graveyardEntrances[i];
+                    if (entrance != null &&
+                        entrance.gameObject.scene.IsValid())
+                        return entrance;
+                }
+            }
+
             var levelField = AccessTools.Field(
                 typeof(MapLevelLoader), "level");
             if (levelField != null)
@@ -2518,9 +2581,10 @@ namespace Gilomx.CupheadBossRoulette
                 ? -1 : bossIndex;
         }
 
-        private void ClearActiveChallenge()
+        private void ClearActiveChallenge(bool preserveInkRainFade = false)
         {
-            ClearInkRainChallengeSession();
+            if (!preserveInkRainFade)
+                ClearInkRainChallengeSession();
             ClearChallengeVisualRetryGate();
             soloMiniRestartPending = false;
             activeChallenge = ModifierId.None;
@@ -2552,7 +2616,17 @@ namespace Gilomx.CupheadBossRoulette
             if (plugin.ShouldClearChallengeOnWin(__instance))
             {
                 plugin.BeginUpsideDownVictoryReturn();
-                plugin.ClearActiveChallenge();
+                var preserveInkRainThroughKnockout =
+                    plugin.activeChallenge == ModifierId.InkRain &&
+                    plugin.inkRainRuntime != null;
+                if (preserveInkRainThroughKnockout)
+                    plugin.inkRainRuntime.BeginKnockoutHold();
+                plugin.ClearActiveChallenge(
+                    preserveInkRainThroughKnockout);
+            }
+            else if (plugin.activeChallenge == ModifierId.InkRain)
+            {
+                plugin.BeginInkRainDicePalaceSublevelWinFade();
             }
         }
 

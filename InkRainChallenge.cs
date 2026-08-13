@@ -18,6 +18,9 @@ namespace Gilomx.CupheadBossRoulette
         private bool inkRainUpdateErrorLogged;
         private bool inkRainBattleSignaled;
         private bool inkRainBattleEnded;
+        private bool inkRainHasConfiguredLevel;
+        private Levels inkRainConfiguredLevel;
+        private bool inkRainDicePalaceIntroShown;
         private float nextInkRainDiagnosticAt;
 
         private void SafeUpdateInkRainChallenge()
@@ -164,43 +167,60 @@ namespace Gilomx.CupheadBossRoulette
         {
             var plugin = activeInstance;
             if (plugin == null ||
-                !ExperimentalFeatures.EnableInkRainChallenge)
-                return;
-
-            if (plugin.activeChallenge != ModifierId.InkRain)
+                !ExperimentalFeatures.EnableInkRainChallenge ||
+                plugin.activeChallenge != ModifierId.InkRain)
                 return;
 
             plugin.inkRainBattleEnded = false;
             plugin.inkRainBattleSignaled = true;
             var levelInstanceId = -1;
+            var currentLevel = default(Levels);
+            var hasCurrentLevel = false;
             try
             {
                 var level = Level.Current;
-                levelInstanceId = level != null
-                    ? level.GetInstanceID()
-                    : -1;
+                if (level != null)
+                {
+                    levelInstanceId = level.GetInstanceID();
+                    currentLevel = level.CurrentLevel;
+                    hasCurrentLevel = true;
+                }
             }
             catch
             {
                 levelInstanceId = -1;
             }
-            var newLevelSession =
-                !plugin.inkRainLevelInitSessionConfigured;
+
+            var newAttempt = !plugin.inkRainLevelInitSessionConfigured ||
+                (hasCurrentLevel &&
+                 (!plugin.inkRainHasConfiguredLevel ||
+                  plugin.inkRainConfiguredLevel != currentLevel));
             plugin.inkRainLevelInstanceId = levelInstanceId;
-            if (newLevelSession)
-            {
-                plugin.inkRainLevelInitSessionConfigured = true;
-                plugin.inkRainSquidIntroStartedThisSession = false;
-            }
+            if (!newAttempt)
+                return;
+
+            plugin.inkRainLevelInitSessionConfigured = true;
+            plugin.inkRainHasConfiguredLevel = hasCurrentLevel;
+            plugin.inkRainConfiguredLevel = currentLevel;
+            var dicePalaceChain = plugin.IsActiveDicePalaceChallenge() &&
+                                  hasCurrentLevel &&
+                                  IsDicePalaceLevel(currentLevel);
+            var showSquidIntro = !dicePalaceChain ||
+                                 !plugin.inkRainDicePalaceIntroShown;
+            if (dicePalaceChain && showSquidIntro)
+                plugin.inkRainDicePalaceIntroShown = true;
+            plugin.inkRainSquidIntroStartedThisSession = !showSquidIntro;
+
             if (plugin.inkRainRuntime == null)
                 plugin.InitializeInkRainChallenge();
-            plugin.inkRainRuntime.Configure(
-                true, plugin.difficulty, newLevelSession);
-            plugin.BeginInkRainSquidIntroOnce();
-            plugin.Logger.LogInfo(
-                "Lluvia de tinta activada por LevelInit.");
+            plugin.inkRainRuntime.StartAttempt(
+                plugin.difficulty, showSquidIntro);
+            if (showSquidIntro)
+                plugin.BeginInkRainSquidIntroOnce();
+            plugin.Logger.LogInfo(showSquidIntro
+                ? "Lluvia de tinta: intento iniciado con pulpo."
+                : "Lluvia de tinta: subnivel de Rey Dado iniciado sin pulpo.");
         }
-
         private void InitializeInkRainChallenge()
         {
             inkRainRuntime = gameObject.GetComponent<InkRainChallengeRuntime>();
@@ -223,6 +243,21 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
+            // A final K.O. clears activeChallenge immediately, but the native
+            // battle transition still needs the current rain and darkness.
+            // Keep them only while that transition is loading; once the next
+            // scene is revealed, remove the compositor outside the player's
+            // view. Dice Palace minion K.O.s keep activeChallenge and do not
+            // enter this branch.
+            if (activeChallenge != ModifierId.InkRain &&
+                inkRainRuntime != null)
+            {
+                if (inkRainRuntime.ShouldEndKnockoutHold())
+                    inkRainRuntime.EndImmediately();
+                else if (!inkRainRuntime.IsHoldingThroughKnockout)
+                    inkRainRuntime.EndImmediately();
+                return;
+            }
             // LevelInit already configured the new Ink Rain session. Preserve
             // it while Cuphead reveals the newly loaded scene so the squid can
             // begin beneath that fade instead of being reset every frame.
@@ -284,6 +319,12 @@ namespace Gilomx.CupheadBossRoulette
             if (inkRainRuntime == null)
                 InitializeInkRainChallenge();
 
+            // A Dice Palace minion has ended, but the roulette session has
+            // not. Let its two-second fade finish without disabling or
+            // restarting the runtime before the next internal LevelInit.
+            if (inkRainBattleEnded && IsActiveDicePalaceChallenge())
+                return;
+
             var newSession = activeFight &&
                              !inkRainLevelInitSessionConfigured;
             if (newSession)
@@ -298,6 +339,18 @@ namespace Gilomx.CupheadBossRoulette
             inkRainLevelInstanceId = activeFight ? levelInstanceId : -1;
         }
 
+        private void BeginInkRainDicePalaceSublevelWinFade()
+        {
+            if (activeChallenge != ModifierId.InkRain ||
+                !IsActiveDicePalaceChallenge())
+                return;
+
+            if (inkRainRuntime != null)
+                inkRainRuntime.BeginKnockoutHold();
+            Logger.LogInfo(
+                "Lluvia de tinta: K.O. interno de Rey Dado; " +
+                "el efecto continua hasta la transición.");
+        }
         private void ClearInkRainChallengeSession()
         {
             inkRainBattleEnded = true;
@@ -305,8 +358,11 @@ namespace Gilomx.CupheadBossRoulette
             inkRainLevelInstanceId = -1;
             inkRainLevelInitSessionConfigured = false;
             inkRainSquidIntroStartedThisSession = false;
+            inkRainHasConfiguredLevel = false;
+            inkRainConfiguredLevel = default(Levels);
+            inkRainDicePalaceIntroShown = false;
             if (inkRainRuntime != null)
-                inkRainRuntime.Configure(false, difficulty, false);
+                inkRainRuntime.EndImmediately();
         }
 
         private void ResetInkRainChallengeForRetry()
@@ -330,6 +386,9 @@ namespace Gilomx.CupheadBossRoulette
             inkRainLevelInstanceId = -1;
             inkRainLevelInitSessionConfigured = false;
             inkRainSquidIntroStartedThisSession = false;
+            inkRainHasConfiguredLevel = false;
+            inkRainConfiguredLevel = default(Levels);
+            inkRainDicePalaceIntroShown = false;
             if (inkRainRuntime == null)
                 return;
 
@@ -346,6 +405,8 @@ namespace Gilomx.CupheadBossRoulette
             internal Vector2 Position;
             internal Vector2 Velocity;
             internal float Gravity;
+            internal bool RemoveBelowWorldEdge;
+            internal float WorldExitY;
             internal float Radius;
             internal float Age;
             internal int FrameOffset;
@@ -382,7 +443,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float InkStep = 0.4f;
         private const float MaximumInk = 1f;
         private const float InkRiseDuration = 0.4f;
-        private const float InkFadeDuration = 5f;
+        private const float InkFadeDuration = 3f;
         private const float MaximumDropLifetime = 7f;
         private const float DropFrameRate = 24f;
         private const float GroundImpactFrameRate = 24f;
@@ -556,6 +617,11 @@ namespace Gilomx.CupheadBossRoulette
         private float inkEffectsEnabledAt = float.PositiveInfinity;
         private bool gameplayPaused;
         private float gameplayPauseStartedAt;
+        private bool holdThroughKnockout;
+        private bool knockoutLoadingSeen;
+        private bool visualEnding;
+        private bool deactivateAfterVisualEnding;
+        private float visualEndingFadeSpeed;
 
         internal void SetLogger(ManualLogSource value)
         {
@@ -567,6 +633,17 @@ namespace Gilomx.CupheadBossRoulette
             assetsDirectory = value;
         }
 
+        internal void StartAttempt(Level.Mode mode, bool showSquidIntro)
+        {
+            difficulty = mode;
+            ResetState();
+            challengeActive = true;
+            squidIntroPending = showSquidIntro;
+            nextSpawnAt = showSquidIntro
+                ? float.PositiveInfinity
+                : Time.time + FirstDropDelay;
+            EnsureInkAssets();
+        }
         internal void Configure(bool active, Level.Mode mode, bool newSession)
         {
             difficulty = mode;
@@ -583,6 +660,12 @@ namespace Gilomx.CupheadBossRoulette
             if (challengeActive == active)
                 return;
 
+            // Victory cleanup asks the runtime to deactivate while its ink
+            // is still fading. Keep only that compositor alive until clear.
+            if (!active && (holdThroughKnockout ||
+                            (visualEnding && deactivateAfterVisualEnding)))
+                return;
+
             challengeActive = active;
             if (challengeActive)
             {
@@ -596,10 +679,88 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal bool IsHoldingThroughKnockout
+        {
+            get { return holdThroughKnockout; }
+        }
+
+        internal bool ShouldEndKnockoutHold()
+        {
+            if (!holdThroughKnockout || !knockoutLoadingSeen)
+                return false;
+
+            if (!SceneLoader.CurrentlyLoading)
+                return true;
+
+            try
+            {
+                var level = Level.Current;
+                if (level == null || level.LevelType != Level.Type.Battle)
+                    return true;
+            }
+            catch
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        internal void BeginKnockoutHold()
+        {
+            if (!challengeActive)
+                return;
+
+            holdThroughKnockout = true;
+            knockoutLoadingSeen = false;
+            nextSpawnAt = float.PositiveInfinity;
+            StopSquidAttackAudio();
+        }
+
+        internal void EndImmediately()
+        {
+            ResetState();
+        }
+        internal void BeginDefeatFade()
+        {
+            // Keep the current hold and native five-second fade untouched.
+            BeginVisualEnding(0f, false);
+        }
+
+        private void BeginVisualEnding(float fadeDuration, bool fadeNow)
+        {
+            if (!challengeActive)
+                return;
+
+            visualEnding = true;
+            deactivateAfterVisualEnding = fadeNow;
+            visualEndingFadeSpeed = fadeNow && fadeDuration > 0f
+                ? Mathf.Max(0.0001f, inkAlpha / fadeDuration)
+                : 0f;
+            nextSpawnAt = float.PositiveInfinity;
+            drops.Clear();
+            groundImpacts.Clear();
+            players = new AbstractPlayerController[0];
+            StopSquidAttackAudio();
+            ReleaseSquidActor();
+            squidIntroPending = false;
+            squidIntroActive = false;
+            if (fadeNow)
+            {
+                holdRemaining = 0f;
+                targetInkAlpha = 0f;
+            }
+        }
         private void Update()
         {
             if (!challengeActive)
                 return;
+
+            if (ShouldEndKnockoutHold())
+            {
+                EndImmediately();
+                return;
+            }
 
             if (CupheadTime.GlobalSpeed <= 0f)
             {
@@ -632,9 +793,17 @@ namespace Gilomx.CupheadBossRoulette
 
             if (SceneLoader.CurrentlyLoading)
             {
-                // During the final scene reveal, update only the visual squid
-                // sequence and its harmless intro drops. Player ink and the
-                // regular rain remain disabled until normal gameplay resumes.
+                if (holdThroughKnockout)
+                {
+                    knockoutLoadingSeen = true;
+                    UpdateDrops(delta);
+                    UpdatePreFilmInkRenderer();
+                    return;
+                }
+
+                // During the initial scene reveal, update only the visual
+                // squid sequence and its harmless intro drops. Player ink and
+                // regular rain remain disabled until gameplay resumes.
                 UpdateDrops(delta);
                 UpdateSquidActor();
                 UpdateSquidIntro();
@@ -651,6 +820,9 @@ namespace Gilomx.CupheadBossRoulette
             UpdateRainSpawning();
 
             UpdatePreFilmInkRenderer();
+            if (visualEnding && deactivateAfterVisualEnding &&
+                inkAlpha <= 0.001f && targetInkAlpha <= 0.001f)
+                ResetState();
         }
 
         internal bool BeginSquidIntro()
@@ -777,6 +949,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateRainSpawning()
         {
+            if (visualEnding)
+                return;
+
             var squidSpawning = SquidCanEmitRain() && squidActor != null &&
                                 squidActorRenderer != null &&
                                 squidActorRenderer.enabled;
@@ -902,8 +1077,9 @@ namespace Gilomx.CupheadBossRoulette
                 var edge = gameplayCamera.WorldToScreenPoint(
                     new Vector3(drop.Position.x + drop.Radius,
                         drop.Position.y, 0f));
-                var radiusPixels = Mathf.Max(
-                    7f, Mathf.Abs(edge.x - center.x));
+                var projectedRadius = new Vector2(
+                    edge.x - center.x, edge.y - center.y).magnitude;
+                var radiusPixels = Mathf.Max(7f, projectedRadius);
                 var frameIndex = (Mathf.FloorToInt(
                     drop.Age * DropFrameRate) + drop.FrameOffset) %
                     inkDropFrames.Length;
@@ -975,7 +1151,9 @@ namespace Gilomx.CupheadBossRoulette
                     targetInkAlpha, 0f, delta / InkFadeDuration);
 
             var riseSpeed = MaximumInk / InkRiseDuration;
-            var fadeSpeed = MaximumInk / InkFadeDuration;
+            var fadeSpeed = visualEndingFadeSpeed > 0f
+                ? visualEndingFadeSpeed
+                : MaximumInk / InkFadeDuration;
             inkAlpha = Mathf.MoveTowards(
                 inkAlpha,
                 targetInkAlpha,
@@ -1046,11 +1224,9 @@ namespace Gilomx.CupheadBossRoulette
                     continue;
                 }
 
-                var viewport = gameplayCamera.WorldToViewportPoint(
-                    new Vector3(drop.Position.x, drop.Position.y, 0f));
                 if (drop.Age >= MaximumDropLifetime ||
-                    viewport.y < -0.15f ||
-                    viewport.x < -0.2f || viewport.x > 1.2f)
+                    (drop.RemoveBelowWorldEdge &&
+                     drop.Position.y < drop.WorldExitY))
                     drops.RemoveAt(i);
             }
         }
@@ -1253,10 +1429,10 @@ namespace Gilomx.CupheadBossRoulette
         private float InkHoldDurationForDifficulty()
         {
             if (difficulty == Level.Mode.Easy)
-                return 2.8f;
+                return 2f;
             if (difficulty == Level.Mode.Hard)
-                return 4f;
-            return 3.3f;
+                return 2.5f;
+            return 2.2f;
         }
 
         private void SpawnWave()
@@ -1266,12 +1442,27 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             var count = 1;
-            if (difficulty == Level.Mode.Normal &&
-                UnityEngine.Random.value < 0.18f)
+            var waveRoll = UnityEngine.Random.value;
+            if (difficulty == Level.Mode.Easy && waveRoll < 0.15f)
+            {
                 count = 2;
-            else if (difficulty == Level.Mode.Hard &&
-                     UnityEngine.Random.value < 0.36f)
-                count = 2;
+            }
+            else if (difficulty == Level.Mode.Normal)
+            {
+                if (waveRoll < 0.06f)
+                    count = 3;
+                else if (waveRoll < 0.40f)
+                    count = 2;
+            }
+            else if (difficulty == Level.Mode.Hard)
+            {
+                if (waveRoll < 0.02f)
+                    count = 4;
+                else if (waveRoll < 0.11f)
+                    count = 3;
+                else if (waveRoll < 0.47f)
+                    count = 2;
+            }
 
             count = Mathf.Min(count, capacity);
             for (var i = 0; i < count; i++)
@@ -1385,32 +1576,71 @@ namespace Gilomx.CupheadBossRoulette
         {
             // Native-style arc: enter from the upper-right, drift left and
             // accelerate downward instead of falling in a vertical line.
-            var x = UnityEngine.Random.Range(0.22f, 1.08f);
+            // Extend the spawn strip equally past both visible sides. The old
+            // 5%-115% range was biased toward one side; that bias rotated with
+            // the Dogfight camera and became especially visible at 90/270°.
+            var x = UnityEngine.Random.Range(-0.05f, 1.05f);
             if (waveCount > 1)
             {
-                var sectionWidth = 0.84f / waveCount;
-                x = 0.20f + sectionWidth *
-                    (waveIndex + UnityEngine.Random.Range(0.2f, 0.8f));
+                var sectionWidth = 1.10f / waveCount;
+                x = -0.05f + sectionWidth *
+                    (waveIndex + UnityEngine.Random.Range(0f, 1f));
             }
 
             var cameraDepth = Mathf.Abs(
                 gameplayCamera.transform.position.z);
-            var start = gameplayCamera.ViewportToWorldPoint(
-                new Vector3(x, 1.12f, cameraDepth));
+            var verticalDelay = 0f;
+            if (difficulty == Level.Mode.Hard && waveCount > 1)
+            {
+                verticalDelay = UnityEngine.Random.Range(0.20f, 0.40f);
+            }
+            else if (difficulty == Level.Mode.Normal)
+            {
+                verticalDelay = UnityEngine.Random.Range(0.20f, 0.40f);
+            }
+            else if (waveCount > 1)
+            {
+                verticalDelay = UnityEngine.Random.Range(0.20f, 0.40f);
+            }
+            var bottomLeft = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(0f, 0f, cameraDepth));
+            var bottomRight = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(1f, 0f, cameraDepth));
+            var topLeft = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(0f, 1f, cameraDepth));
+            var topRight = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(1f, 1f, cameraDepth));
+            var minWorldX = Mathf.Min(
+                bottomLeft.x, bottomRight.x, topLeft.x, topRight.x);
+            var maxWorldX = Mathf.Max(
+                bottomLeft.x, bottomRight.x, topLeft.x, topRight.x);
+            var minWorldY = Mathf.Min(
+                bottomLeft.y, bottomRight.y, topLeft.y, topRight.y);
+            var maxWorldY = Mathf.Max(
+                bottomLeft.y, bottomRight.y, topLeft.y, topRight.y);
+            var visibleWorldWidth = Mathf.Max(1f, maxWorldX - minWorldX);
+            var visibleWorldHeight = Mathf.Max(1f, maxWorldY - minWorldY);
+            var start = new Vector3(
+                Mathf.Lerp(minWorldX, maxWorldX, x),
+                maxWorldY + visibleWorldHeight * (0.12f + verticalDelay),
+                0f);
             var cameraHeight = Mathf.Max(1f,
                 gameplayCamera.orthographicSize * 2f);
             var horizontalSpeed =
                 UnityEngine.Random.Range(-0.20f, -0.14f) * cameraHeight;
             var fallSpeed = UnityEngine.Random.Range(0.15f, 0.22f) *
                             cameraHeight;
-            var gravity = UnityEngine.Random.Range(0.22f, 0.28f) *
+            var gravity = UnityEngine.Random.Range(0.22f, 0.32f) *
                           cameraHeight;
+            var worldExitY = minWorldY - visibleWorldHeight * 0.20f;
 
             drops.Add(new InkDrop
             {
                 Position = new Vector2(start.x, start.y),
                 Velocity = new Vector2(horizontalSpeed, -fallSpeed),
                 Gravity = gravity,
+                RemoveBelowWorldEdge = true,
+                WorldExitY = worldExitY,
                 Radius = cameraHeight * UnityEngine.Random.Range(
                     0.016f, 0.021f),
                 FrameOffset = UnityEngine.Random.Range(
@@ -1427,10 +1657,10 @@ namespace Gilomx.CupheadBossRoulette
         private int MaximumVisibleDrops()
         {
             if (difficulty == Level.Mode.Easy)
-                return 3;
+                return 4;
             if (difficulty == Level.Mode.Hard)
-                return 13;
-            return 4;
+                return 20;
+            return 12;
         }
 
         private void ShiftTimersAfterPause(float pausedDuration)
@@ -1461,10 +1691,10 @@ namespace Gilomx.CupheadBossRoulette
         private float NextSpawnDelay()
         {
             if (difficulty == Level.Mode.Easy)
-                return UnityEngine.Random.Range(1.35f, 1.65f);
+                return UnityEngine.Random.Range(1.00f, 1.25f);
             if (difficulty == Level.Mode.Hard)
-                return UnityEngine.Random.Range(0.65f, 0.95f);
-            return UnityEngine.Random.Range(0.95f, 1.25f);
+                return UnityEngine.Random.Range(0.40f, 0.75f);
+            return UnityEngine.Random.Range(0.65f, 0.90f);
         }
 
         private Camera FindGameplayCamera()
@@ -1676,7 +1906,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OnGUI()
         {
-            if (SceneLoader.CurrentlyLoading)
+            if (SceneLoader.CurrentlyLoading && !holdThroughKnockout)
                 return;
 
             if (!challengeActive || gameplayCamera == null ||
@@ -1985,8 +2215,9 @@ namespace Gilomx.CupheadBossRoulette
                 var edge = gameplayCamera.WorldToScreenPoint(
                     new Vector3(drop.Position.x + drop.Radius,
                         drop.Position.y, 0f));
-                var radiusPixels = Mathf.Max(
-                    7f, Mathf.Abs(edge.x - center.x));
+                var projectedRadius = new Vector2(
+                    edge.x - center.x, edge.y - center.y).magnitude;
+                var radiusPixels = Mathf.Max(7f, projectedRadius);
                 var frameIndex = (Mathf.FloorToInt(
                     drop.Age * DropFrameRate) + drop.FrameOffset) %
                     inkDropFrames.Length;
@@ -2092,6 +2323,11 @@ namespace Gilomx.CupheadBossRoulette
             inkEffectsEnabledAt = float.PositiveInfinity;
             gameplayPaused = false;
             gameplayPauseStartedAt = 0f;
+            holdThroughKnockout = false;
+            knockoutLoadingSeen = false;
+            visualEnding = false;
+            deactivateAfterVisualEnding = false;
+            visualEndingFadeSpeed = 0f;
         }
 
         private void OnDestroy()
@@ -2177,6 +2413,12 @@ namespace Gilomx.CupheadBossRoulette
         internal bool Matches(Camera targetCamera)
         {
             return !disposed && camera != null && camera == targetCamera;
+        }
+
+        internal void ClearFrame()
+        {
+            if (!disposed)
+                commandBuffer.Clear();
         }
 
         internal void BeginFrame()

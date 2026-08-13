@@ -1,5 +1,67 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Ink Rain tuning, lifecycle, and rotating Dogfight support (2026-08-12)
+
+The experimental `InkRain` challenge remains enabled and forced from
+`ExperimentalFeatures.cs` while arena-wide acceptance continues. The temporary
+boss selector used for Dogfight validation has been disabled again, so spins
+choose bosses normally. The roulette now keeps a session-only history of the
+last three boss results and excludes them when the compatible pool permits it;
+small pools progressively relax the oldest exclusions rather than failing.
+
+Accepted tuning at this checkpoint:
+
+- Easy: 4 visible drops, waves every 1.00-1.25 seconds, 85% single and 15%
+  double waves.
+- Normal: 12 visible drops, waves every 0.65-0.90 seconds, 60% single, 34%
+  double and 6% triple waves.
+- Expert: 20 visible drops, waves every 0.40-0.75 seconds, 53% single, 36%
+  double, 9% triple and 2% four-drop waves.
+- Regular drops use random downward gravity of 0.22-0.32 camera-heights per
+  second squared. Ink holds for 2.0 / 2.2 / 2.5 seconds on Easy / Normal /
+  Expert and restores over 3 seconds.
+- Multi-drop vertical delay is 20%-40%; Normal applies the same variation to
+  every wave. The horizontal spawn strip is symmetric from -5% to 105% of the
+  visible world span, including evenly partitioned multi-drop waves.
+
+Victory now holds rain and darkness through Cuphead's knockout/loading fade and
+clears them only once the battle transition has actually left the scene. Defeat
+keeps the natural ink restoration instead of abruptly clearing it. Results and
+map scenes receive no new rain. King Dice sublevels restart regular rain without
+replaying the squid introduction; internal minion knockouts preserve the same
+challenge session until `DicePalaceMain`. The Dice Palace guards must continue
+to test `Levels.DicePalaceMain` specifically.
+
+`Los Perritos Pilotos` needed special handling because its final phase rotates
+the camera counter-clockwise while world gravity and the visual sky rotate
+around the monitor. Spawn bounds are derived from all four camera viewport
+corners, but drops continue to move in world space. Therefore their apparent
+source follows the correct sky side in every orientation: screen top, left,
+bottom, right, then top. Radius projection now uses the full 2D screen-space
+distance, preventing sprites from shrinking at 90/270 degrees. Regular drops
+are removed against the world-space exit edge captured when they spawn, rather
+than viewport X/Y limits; this prevents existing drops from being culled during
+a rotation and preserves the perceived density. A seven-second lifetime remains
+the safety fallback. The final symmetric -5%-105% spawn strip fixes the visible
+left/right bias in the first and third rotations. Manual testing accepted this
+behavior provisionally.
+
+Angel and Demon now resolves its return target through the DLC
+`MapGraveyardHandler`, so victory or abandonment returns to the graveyard rather
+than the previously visited boss door.
+
+### Required follow-up after this checkpoint
+
+1. Perform another complete `Los Perritos Pilotos` run and inspect every
+   transition, especially spawn coverage at both lateral edges, density during
+   rotation, world-sky direction, sprite size, collision and cleanup.
+2. Run a broad regression pass across ground bosses, ordinary plane bosses,
+   King Dice sublevels, retry, pause, knockout, results, map return and co-op.
+   Confirm the four-corner bounds and world-edge lifetime introduced for
+   Dogfight do not change ordinary arenas or leak rain into later scenes.
+3. Keep the Ink Rain challenge experimental and forced only for testing until
+   that review passes; then disable `ForceInkRainChallengeForTesting` before a
+   public build.
 ## Experimental Ink Rain challenge (2026-08-11 handoff)
 
 `ModifierId.InkRain` is a first playable ground-and-plane prototype named

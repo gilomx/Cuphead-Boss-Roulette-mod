@@ -38,6 +38,12 @@ namespace Gilomx.CupheadBossRoulette
                     BeginBlackAndWhiteTransition(
                         0f, 0f, ChallengeDefeatVisualResetDuration);
                     break;
+                case ModifierId.InkRain:
+                    if (inkRainRuntime != null)
+                        inkRainRuntime.BeginDefeatFade();
+                    Logger.LogInfo(
+                        "Ink rain is finishing its native fade after defeat.");
+                    return;
                 default:
                     return;
             }
