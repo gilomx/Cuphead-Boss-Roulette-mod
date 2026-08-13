@@ -55,10 +55,10 @@ namespace Gilomx.CupheadBossRoulette
         // TEMP Djimmi guard test: base boss, Normal, no charm/challenge.
         private static readonly bool ForceDjimmiGuardTest = false;
         // Dormant boss-test selector. Keep false in normal builds.
-        private static readonly bool ForceTestBoss = true;
+        private static readonly bool ForceTestBoss = false;
         private static readonly Levels[] ForcedTestBossSequence =
         {
-            Levels.Pirate
+            Levels.DicePalaceMain
         };
         // Dormant localization test shortcut. Keep false in normal builds.
         private const bool EnableLanguageTestShortcut = false;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Globalization;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
@@ -448,6 +449,10 @@ namespace Gilomx.CupheadBossRoulette
             internal float StartTime;
             internal float Duration;
             internal Sprite[] Frames;
+            internal Vector2[] PivotPixels;
+            internal bool MirrorX;
+            internal GameObject Actor;
+            internal SpriteRenderer Renderer;
         }
 
         private sealed class InkSplatTemplate
@@ -473,8 +478,6 @@ namespace Gilomx.CupheadBossRoulette
         private const float GroundImpactVisualScale = 0.6f;
         private const float SplatFrameRate = 12f;
         private const float SplatDelayStep = 0.025f;
-        private const float SplatVisualScaleX = 0.65f;
-        private const float SplatVisualScaleY = 0.115f;
         private const float SquidFrameRate = 24f;
         private const float SquidVisualScale = 1.10f;
         private const float SquidAnchorViewportY = -0.04f;
@@ -597,6 +600,8 @@ namespace Gilomx.CupheadBossRoulette
             new List<Sprite[]>();
         private readonly List<Sprite[]> inkScreenAnimations =
             new List<Sprite[]>();
+        private readonly List<Vector2[]> inkScreenPivotPixels =
+            new List<Vector2[]>();
         private AbstractPlayerController[] players =
             new AbstractPlayerController[0];
 
@@ -625,7 +630,6 @@ namespace Gilomx.CupheadBossRoulette
         private bool loggedFirstGroundImpact;
         private float nextGroundProbeLogAt;
         private InkRainPreFilmRenderer preFilmInkRenderer;
-        private RenderTexture splatComposite;
         private GameObject squidActor;
         private SpriteRenderer squidActorRenderer;
         private float nextPreFilmRendererRetryAt;
@@ -1158,9 +1162,6 @@ namespace Gilomx.CupheadBossRoulette
 
             if (inkAlpha > 0.001f)
             {
-                if (splatComposite != null && splatComposite.IsCreated())
-                    preFilmInkRenderer.DrawComposite(splatComposite);
-
                 if (inkScreenOverlay != null)
                 {
                     preFilmInkRenderer.DrawSprite(
@@ -1191,16 +1192,84 @@ namespace Gilomx.CupheadBossRoulette
                 (targetInkAlpha > inkAlpha ? riseSpeed : fadeSpeed) * delta);
 
             if (inkAlpha <= 0.001f && targetInkAlpha <= 0.001f)
-                splats.Clear();
+                ReleaseSplatActors();
+            else
+                UpdateSplatActors();
+        }
+
+        private void UpdateSplatActors()
+        {
+            if (gameplayCamera == null)
+                return;
+
+            var cameraDepth = Mathf.Abs(gameplayCamera.transform.position.z);
+            var screenCenter = gameplayCamera.ViewportToWorldPoint(
+                new Vector3(0.5f, 0.5f, cameraDepth));
+            var cameraRight = gameplayCamera.transform.right;
+            var cameraUp = gameplayCamera.transform.up;
 
             for (var i = splats.Count - 1; i >= 0; i--)
             {
                 var splat = splats[i];
-                if (Time.time >= splat.StartTime + splat.Duration)
+                var elapsed = Time.time - splat.StartTime;
+                if (elapsed >= splat.Duration)
+                {
+                    ReleaseSplatActor(splat);
                     splats.RemoveAt(i);
+                    continue;
+                }
+
+                if (elapsed < 0f || splat.Renderer == null ||
+                    splat.Frames == null || splat.Frames.Length == 0 ||
+                    splat.PivotPixels == null ||
+                    splat.PivotPixels.Length != splat.Frames.Length)
+                {
+                    if (splat.Renderer != null)
+                        splat.Renderer.enabled = false;
+                    continue;
+                }
+
+                var frameIndex = Mathf.Min(splat.Frames.Length - 1,
+                    Mathf.FloorToInt(elapsed * SplatFrameRate));
+                var sprite = splat.Frames[frameIndex];
+                var pivot = splat.PivotPixels[frameIndex];
+                var mirrorSign = splat.MirrorX ? -1f : 1f;
+                var localPivotOffset = new Vector2(
+                    (pivot.x - sprite.rect.width * 0.5f) * mirrorSign,
+                    pivot.y - sprite.rect.height * 0.5f);
+                var targetPivot = screenCenter +
+                    cameraRight * splat.DesignPosition.x +
+                    cameraUp * splat.DesignPosition.y;
+
+                splat.Renderer.sprite = sprite;
+                splat.Renderer.enabled = true;
+                splat.Actor.transform.position = targetPivot -
+                    cameraRight * localPivotOffset.x -
+                    cameraUp * localPivotOffset.y;
+                splat.Actor.transform.rotation =
+                    gameplayCamera.transform.rotation;
+                splat.Actor.transform.localScale =
+                    new Vector3(mirrorSign, 1f, 1f);
             }
         }
 
+        private static void ReleaseSplatActor(InkSplat splat)
+        {
+            if (splat != null && splat.Actor != null)
+                Destroy(splat.Actor);
+            if (splat != null)
+            {
+                splat.Actor = null;
+                splat.Renderer = null;
+            }
+        }
+
+        private void ReleaseSplatActors()
+        {
+            for (var i = 0; i < splats.Count; i++)
+                ReleaseSplatActor(splats[i]);
+            splats.Clear();
+        }
         private void UpdatePlayers()
         {
             if (Time.time < nextPlayerScanAt)
@@ -1416,6 +1485,7 @@ namespace Gilomx.CupheadBossRoulette
                     nativePirateInkOverlayRenderer =
                         overlay.GetComponent<SpriteRenderer>();
             }
+
         }
 
         private Color NativePirateDropTint()
@@ -1479,10 +1549,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SpawnNativeSplatGroup()
         {
-            if (inkScreenAnimations.Count < 5)
+            if (inkScreenAnimations.Count < 5 ||
+                inkScreenPivotPixels.Count < 5)
                 return;
 
-            splats.Clear();
+            ReleaseSplatActors();
             var group = SplatGroups[UnityEngine.Random.Range(
                 0, SplatGroups.Length)];
             for (var i = 0; i < group.Length; i++)
@@ -1495,15 +1566,30 @@ namespace Gilomx.CupheadBossRoulette
                 if (frames == null || frames.Length == 0)
                     continue;
 
-                splats.Add(new InkSplat
+                var actor = new GameObject(template.Large
+                    ? "Pirate_Ink_Large"
+                    : "Pirate_Ink_Small");
+                actor.hideFlags = HideFlags.HideAndDontSave;
+                var renderer = actor.AddComponent<SpriteRenderer>();
+                renderer.sortingLayerName = "Effects";
+                renderer.sortingOrder = 0;
+                renderer.color = Color.white;
+
+                var splat = new InkSplat
                 {
                     DesignPosition = template.Position,
                     StartTime = Time.time +
                                 UnityEngine.Random.Range(0, 10) *
                                 SplatDelayStep,
                     Duration = NativeSplatDuration(animationIndex),
-                    Frames = frames
-                });
+                    Frames = frames,
+                    PivotPixels = inkScreenPivotPixels[animationIndex],
+                    MirrorX = UnityEngine.Random.value >= 0.5f,
+                    Actor = actor,
+                    Renderer = renderer
+                };
+                renderer.enabled = false;
+                splats.Add(splat);
             }
         }
 
@@ -1871,15 +1957,10 @@ namespace Gilomx.CupheadBossRoulette
                     : null;
 
                 inkScreenAnimations.Clear();
-                var groups = new[] { "a", "b", "c", "d", "e" };
-                for (var i = 0; i < groups.Length; i++)
-                {
-                    var frames = LoadSpriteSequence(
-                        screenDirectory,
-                        "pirate_squid_ink_screen_" + groups[i] + "_*.png");
-                    if (frames.Length > 0)
-                        inkScreenAnimations.Add(frames);
-                }
+                inkScreenPivotPixels.Clear();
+                var nativeScreenDirectory = Path.Combine(
+                    inkRoot, "screen-native");
+                LoadNativeSplatSequences(nativeScreenDirectory);
 
                 if (inkDropFrames.Length == 0)
                 {
@@ -1921,6 +2002,77 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private void LoadNativeSplatSequences(string directory)
+        {
+            var pivotFile = Path.Combine(directory, "pivots.tsv");
+            if (!Directory.Exists(directory) || !File.Exists(pivotFile))
+                return;
+
+            var pivots = new Dictionary<string, Vector2>(
+                StringComparer.OrdinalIgnoreCase);
+            var lines = File.ReadAllLines(pivotFile);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var parts = lines[i].Split('\t');
+                float pivotX;
+                float pivotY;
+                if (parts.Length != 3 ||
+                    !float.TryParse(parts[1], NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out pivotX) ||
+                    !float.TryParse(parts[2], NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out pivotY))
+                    continue;
+                pivots[parts[0]] = new Vector2(pivotX, pivotY);
+            }
+
+            var groups = new[] { "a", "b", "c", "d", "e" };
+            for (var groupIndex = 0; groupIndex < groups.Length;
+                 groupIndex++)
+            {
+                var files = Directory.GetFiles(directory,
+                    "pirate_squid_ink_screen_" + groups[groupIndex] +
+                    "_*.png");
+                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+                var frames = new List<Sprite>();
+                var framePivots = new List<Vector2>();
+                for (var frameIndex = 0; frameIndex < files.Length;
+                     frameIndex++)
+                {
+                    var fileName = Path.GetFileName(files[frameIndex]);
+                    Vector2 normalizedPivot;
+                    if (!pivots.TryGetValue(fileName, out normalizedPivot))
+                        continue;
+
+                    var bytes = File.ReadAllBytes(files[frameIndex]);
+                    var texture = new Texture2D(
+                        2, 2, TextureFormat.ARGB32, false);
+                    texture.name = Path.GetFileNameWithoutExtension(fileName);
+                    texture.filterMode = FilterMode.Bilinear;
+                    texture.wrapMode = TextureWrapMode.Clamp;
+                    if (!texture.LoadImage(bytes))
+                    {
+                        Destroy(texture);
+                        continue;
+                    }
+
+                    ownedInkTextures.Add(texture);
+                    var sprite = Sprite.Create(texture,
+                        new Rect(0f, 0f, texture.width, texture.height),
+                        new Vector2(0.5f, 0.5f), 1f);
+                    sprite.name = texture.name;
+                    frames.Add(sprite);
+                    framePivots.Add(new Vector2(
+                        normalizedPivot.x * texture.width,
+                        normalizedPivot.y * texture.height));
+                }
+
+                if (frames.Count > 0)
+                {
+                    inkScreenAnimations.Add(frames.ToArray());
+                    inkScreenPivotPixels.Add(framePivots.ToArray());
+                }
+            }
+        }
         private Sprite[] LoadSpriteSequence(
             string directory, string searchPattern)
         {
@@ -2013,64 +2165,22 @@ namespace Gilomx.CupheadBossRoulette
             GUI.depth = 40;
             GUI.matrix = Matrix4x4.identity;
 
-            if (preFilmInkRenderer != null)
-                RenderSplatsToComposite();
-
             if (preFilmInkRenderer == null)
             {
                 DrawDropsWithGui();
                 DrawGroundImpactsWithGui();
             }
 
-            // The normal path already draws hit splats before the veil. This
-            // exact GUI block remains only for the all-GUI fallback.
-            if (preFilmInkRenderer == null && inkAlpha > 0.001f)
+            // Fallback only: native hit splats are real SpriteRenderers. Keep
+            // only the full-screen veil here if composition is unavailable.
+            if (preFilmInkRenderer == null && inkAlpha > 0.001f &&
+                inkScreenOverlay != null)
             {
-                var scale = Mathf.Min(
-                    Screen.width / 1280f, Screen.height / 720f);
-                for (var i = 0; i < splats.Count; i++)
-                {
-                    var splat = splats[i];
-                    if (splat.Frames == null || splat.Frames.Length == 0)
-                        continue;
-
-                    var elapsed = Time.time - splat.StartTime;
-                    if (elapsed < 0f || elapsed >= splat.Duration)
-                        continue;
-
-                    var frameIndex = Mathf.Min(
-                        splat.Frames.Length - 1,
-                        Mathf.FloorToInt(elapsed * SplatFrameRate));
-                    var sprite = splat.Frames[frameIndex];
-                    var width = sprite.rect.width * scale * SplatVisualScaleX;
-                    var height = sprite.rect.height * scale * SplatVisualScaleY;
-                    var x = Screen.width * 0.5f +
-                            splat.DesignPosition.x * scale -
-                            width * 0.5f;
-                    var y = Screen.height * 0.5f -
-                            splat.DesignPosition.y * scale -
-                            height * 0.5f;
-                    DrawSprite(
-                        new Rect(x, y, width, height),
-                        sprite,
-                        Color.white);
-                }
-
-                // Only the fallback draws the veil here. In the normal path it
-                // was already composed before Cuphead's film effects, while
-                // these short hit splats intentionally retain their exact old
-                // GUI rendering, scale and screen coordinates.
-                if (preFilmInkRenderer == null && inkScreenOverlay != null)
-                {
-                    DrawSprite(
-                        new Rect(0f, 0f, Screen.width, Screen.height),
-                        inkScreenOverlay,
-                        new Color(1f, 1f, 1f,
-                            Mathf.Clamp01(inkAlpha)));
-                }
+                DrawSprite(
+                    new Rect(0f, 0f, Screen.width, Screen.height),
+                    inkScreenOverlay,
+                    new Color(1f, 1f, 1f, Mathf.Clamp01(inkAlpha)));
             }
-
-
 
             GUI.matrix = previousMatrix;
             GUI.color = previousColor;
@@ -2121,6 +2231,22 @@ namespace Gilomx.CupheadBossRoulette
             return null;
         }
 
+        private static SpriteRenderer FindNativePirateDockBackRenderer()
+        {
+            var renderers = Resources.FindObjectsOfTypeAll<SpriteRenderer>();
+            for (var i = 0; i < renderers.Length; i++)
+            {
+                var renderer = renderers[i];
+                if (renderer == null || renderer.sprite == null ||
+                    !renderer.gameObject.scene.IsValid())
+                    continue;
+
+                if (renderer.sprite.name == "pirateDockA" ||
+                    GetTransformPath(renderer.transform) == "Level/Dock/Back")
+                    return renderer;
+            }
+            return null;
+        }
         private void UpdateSquidActor()
         {
             var sprite = CurrentSquidIntroSprite();
@@ -2181,23 +2307,29 @@ namespace Gilomx.CupheadBossRoulette
             var bobPhase = Mathf.PingPong(elapsed, 1f);
             var easedBob = 0.5f -
                            Mathf.Cos(bobPhase * Mathf.PI) * 0.5f;
-            if (!anchoredToNativePirate)
+
+            if (useNativePirateInkOverlay)
+            {
+                // The native prefab uses a 620x620 sprite at PPU 1 and scale 1.
+                // Our exported PNG uses PPU 100, so scale 100 reproduces the
+                // same 620 world-unit bounds without changing other levels.
+                spriteScale = sprite.pixelsPerUnit;
+                anchor.x = -73f;
+                anchor.y = -220f - SquidNativeBobDistance * easedBob;
+                anchor.z = 0f;
+
+                var dockBackRenderer = FindNativePirateDockBackRenderer();
+                squidActorRenderer.sortingLayerID = dockBackRenderer != null
+                    ? dockBackRenderer.sortingLayerID
+                    : SortingLayer.NameToID("Background");
+                squidActorRenderer.sortingOrder = -10;
+            }
+            else if (!anchoredToNativePirate)
             {
                 var bobPixels = SquidNativeBobDistance * easedBob;
                 anchor -= gameplayCamera.transform.up *
                           (bobPixels * Screen.height / 720f *
                            SquidVisualScale * worldUnitsPerPixel);
-            }
-
-            if (useNativePirateInkOverlay)
-            {
-                squidActorRenderer.sortingLayerID = 0;
-                squidActorRenderer.sortingOrder = 0;
-                // Match the native PirateLevelSquid gameplay plane so the
-                // foreground sea and wooden dock correctly occlude the intro.
-                anchor.z = anchoredToNativePirate
-                    ? nativePirateSquid.transform.position.z
-                    : 0f;
             }
 
             squidActorRenderer.sprite = sprite;
@@ -2215,103 +2347,6 @@ namespace Gilomx.CupheadBossRoulette
                 Destroy(squidActor);
             squidActor = null;
             squidActorRenderer = null;
-        }
-
-        private void RenderSplatsToComposite()
-        {
-            EnsureSplatComposite();
-            if (splatComposite == null)
-                return;
-
-            var previousTarget = RenderTexture.active;
-            try
-            {
-                RenderTexture.active = splatComposite;
-                GL.PushMatrix();
-                GL.LoadPixelMatrix(
-                    0f, splatComposite.width,
-                    splatComposite.height, 0f);
-                GL.Clear(true, true, Color.clear);
-
-                if (inkAlpha <= 0.001f)
-                    return;
-
-                var scale = Mathf.Min(
-                    splatComposite.width / 1280f,
-                    splatComposite.height / 720f);
-                for (var i = 0; i < splats.Count; i++)
-                {
-                    var splat = splats[i];
-                    if (splat.Frames == null || splat.Frames.Length == 0)
-                        continue;
-
-                    var elapsed = Time.time - splat.StartTime;
-                    if (elapsed < 0f || elapsed >= splat.Duration)
-                        continue;
-
-                    var frameIndex = Mathf.Min(
-                        splat.Frames.Length - 1,
-                        Mathf.FloorToInt(elapsed * SplatFrameRate));
-                    var sprite = splat.Frames[frameIndex];
-                    var width = sprite.rect.width * scale *
-                                SplatVisualScaleX;
-                    var height = sprite.rect.height * scale *
-                                 SplatVisualScaleY;
-                    var x = splatComposite.width * 0.5f +
-                            splat.DesignPosition.x * scale -
-                            width * 0.5f;
-                    var y = splatComposite.height * 0.5f -
-                            splat.DesignPosition.y * scale -
-                            height * 0.5f;
-                    var textureRect = sprite.textureRect;
-                    var source = new Rect(
-                        textureRect.x / sprite.texture.width,
-                        textureRect.y / sprite.texture.height,
-                        textureRect.width / sprite.texture.width,
-                        textureRect.height / sprite.texture.height);
-                    Graphics.DrawTexture(
-                        new Rect(x, y, width, height),
-                        sprite.texture, source,
-                        0, 0, 0, 0,
-                        new Color(0.5f, 0.5f, 0.5f, 0.5f));
-                }
-            }
-            finally
-            {
-                GL.PopMatrix();
-                RenderTexture.active = previousTarget;
-            }
-        }
-
-        private void EnsureSplatComposite()
-        {
-            var width = Mathf.Max(1, Screen.width);
-            var height = Mathf.Max(1, Screen.height);
-            if (splatComposite != null &&
-                splatComposite.width == width &&
-                splatComposite.height == height &&
-                splatComposite.IsCreated())
-                return;
-
-            ReleaseSplatComposite();
-            splatComposite = new RenderTexture(
-                width, height, 0, RenderTextureFormat.ARGB32);
-            splatComposite.name = "Gilomx native ink hit splats";
-            splatComposite.hideFlags = HideFlags.HideAndDontSave;
-            splatComposite.filterMode = FilterMode.Bilinear;
-            splatComposite.wrapMode = TextureWrapMode.Clamp;
-            splatComposite.Create();
-        }
-
-        private void ReleaseSplatComposite()
-        {
-            if (splatComposite == null)
-                return;
-
-            if (splatComposite.IsCreated())
-                splatComposite.Release();
-            Destroy(splatComposite);
-            splatComposite = null;
         }
 
         private void DrawDropsWithGui()
@@ -2411,11 +2446,10 @@ namespace Gilomx.CupheadBossRoulette
                 preFilmInkRenderer.Dispose();
                 preFilmInkRenderer = null;
             }
-            ReleaseSplatComposite();
             ReleaseSquidActor();
             drops.Clear();
             groundImpacts.Clear();
-            splats.Clear();
+            ReleaseSplatActors();
             players = new AbstractPlayerController[0];
             gameplayCamera = null;
             inkAlpha = 0f;
@@ -2457,6 +2491,7 @@ namespace Gilomx.CupheadBossRoulette
             squidExitFrames = null;
             groundImpactAnimations.Clear();
             inkScreenAnimations.Clear();
+            inkScreenPivotPixels.Clear();
             for (var i = 0; i < ownedInkTextures.Count; i++)
             {
                 if (ownedInkTextures[i] != null)

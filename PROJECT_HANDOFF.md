@@ -1,5 +1,46 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Native Ink Rain splats and final acceptance (2026-08-13)
+
+Ink Rain is enabled for normal roulette selection. All temporary selectors are
+now disabled: `ForceInkRainChallengeForTesting` and `ForceTestBoss` are `false`.
+The dormant target remains `Levels.DicePalaceMain`, but it has no effect unless
+the boss-test switch is explicitly enabled.
+
+Outside Captain Brineybeard, challenge hits now reproduce Cuphead's native ink
+presentation from the original five `Pirate_Ink_Large/Small` animation families.
+The mod loads 71 tightly cropped original frames from
+`assets/inkrain/screen-native`, reads each frame's original normalized pivot from
+`pivots.tsv`, preserves the native 12 fps timing and animation-event lifetimes,
+randomizes the same large/small family and horizontal mirror, and renders each
+short-lived hit through a real `SpriteRenderer` on Cuphead's `Effects` layer.
+This replaces the former manually stretched GUI/render-texture copy. Because the
+splats are camera-relative sprites, they follow rotating arenas and receive the
+same camera/film treatment as the game. Actors are destroyed as soon as their
+native clip finishes or the challenge state is cleared.
+
+Captain Brineybeard continues to call his live
+`PirateLevelSquidInkOverlay.Current.Hit()` so that encounter uses the game's
+actual native overlay directly. The challenge's introductory squid position,
+scale and occlusion behind the dock/foreground sea were manually accepted. The
+rain, darkness progression, hold/restoration timing and all accepted difficulty
+values were intentionally left unchanged by the splat replacement.
+
+Manual regression passed in these paths:
+
+- Goopy: single and repeated hits, darkness/restoration, pause/resume, retry,
+  abandon to map, victory, results cleanup and entering a later non-roulette fight.
+- Captain Brineybeard: direct comparison and coexistence with the native squid.
+- Dogfight: normal, 90, 180 and 270-degree camera orientations.
+- Hilda Berg local co-op: both players, shared darkness, retry/exit and heavy
+  projectile load.
+- King Dice: board/miniboss transitions, native-size splats, cleanup, retry and
+  complete victory chain.
+
+No further full boss regression is required for this isolated presentation
+change. The remaining non-code deliverable is the final animated Ink Rain icon if
+the provisional single-frame icon is later replaced.
+
 ## Captain Brineybeard native Ink Rain integration (2026-08-13)
 
 The selected `Levels.Pirate` policy deliberately keeps the challenge's added rain

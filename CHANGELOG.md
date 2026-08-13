@@ -1,5 +1,22 @@
 # Historial de cambios
 
+## Desarrollo experimental - salpicaduras nativas y validación final (2026-08-13)
+
+- Las salpicaduras de Lluvia de tinta fuera de Barbasalada usan ahora los 71
+  fotogramas recortados originales, el pivote individual de cada frame, las cinco
+  familias grande/pequeña, espejo aleatorio, 12 fps y las duraciones reales del
+  juego. Se eliminó la copia anterior estirada mediante GUI/render texture.
+- Las manchas se renderizan como `SpriteRenderer` temporales en la capa nativa
+  `Effects`, siguen correctamente la cámara y se destruyen al terminar el clip o
+  limpiar el reto. La lluvia, oscuridad y sus tiempos no fueron modificados.
+- Barbasalada conserva su overlay real mediante `PirateLevelSquidInkOverlay.Hit()`
+  y se aprobó la posición final del calamar adicional detrás del puente y el mar.
+- Pasaron las pruebas de Goopy (pausa, reintento, abandono y victoria),
+  Barbasalada, Perritos Pilotos en todas sus rotaciones, Hilda Berg cooperativo y
+  la cadena completa del Rey Dado.
+- Lluvia de tinta queda habilitada como resultado normal de la ruleta. Se
+  desactivaron el reto y jefe forzados de las pruebas.
+
 ## Desarrollo experimental - integración nativa con Barbasalada (2026-08-13)
 
 - Lluvia de tinta conserva su lluvia adicional y su calamar de entrada contra
