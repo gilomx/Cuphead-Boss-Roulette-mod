@@ -1,5 +1,30 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## King Dice Ink Rain acceptance passed (2026-08-13)
+
+The complete King Dice chain passed manual Ink Rain acceptance. The squid intro
+plays once when entering the chain, regular rain resumes through internal
+`DicePalace*` minions without duplicating the runtime/compositor, the challenge
+and HUD persist into `DicePalaceMain`, and final victory performs the expected
+cleanup. Pause, transitions, darkness and the complete run behaved correctly.
+
+A retry-specific defect was found and fixed: both defeat-menu `Retry` and
+pause-menu `Restart` reset the current sublevel but retained
+`inkRainDicePalaceIntroShown`, so the new attempt skipped the squid intro.
+`ResetInkRainChallengeForRetry()` now clears that flag. This method is called
+only for an actual retry/restart; normal progress to another King Dice minion
+does not call it and therefore still suppresses repeated squid intros. Manual
+testing passed both retry paths and another complete King Dice run.
+
+All temporary test selectors were disabled again after acceptance:
+`ForceTestBoss`, `EnableInkRainChallenge`, and
+`ForceInkRainChallengeForTesting` are false. The dormant boss target remains
+`Levels.Bee`; the functional Dice Palace guards remain
+`Levels.DicePalaceMain` and must not be changed when switching test bosses.
+
+Remaining Ink Rain acceptance work is local co-op, the Captain Brineybeard
+native-squid coexistence policy, a short DLC/exit regression after those special
+cases, and the final animated challenge icon.
 ## Ink Rain acceptance checkpoint after Queen Bee (2026-08-13)
 
 Cagney Carnation passed the requested Ink Rain compatibility check. The user

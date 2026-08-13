@@ -384,6 +384,10 @@ namespace Gilomx.CupheadBossRoulette
             inkRainLevelInstanceId = -1;
             inkRainLevelInitSessionConfigured = false;
             inkRainSquidIntroStartedThisSession = false;
+            // Retry/Restart starts a fresh attempt of the current Dice Palace
+            // sublevel, so replay the squid. Normal transitions between
+            // minions never call this reset and still suppress repeat intros.
+            inkRainDicePalaceIntroShown = false;
             if (inkRainRuntime != null)
                 inkRainRuntime.Configure(false, difficulty, false);
             Logger.LogInfo(
