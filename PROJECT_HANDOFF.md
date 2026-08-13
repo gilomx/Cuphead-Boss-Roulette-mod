@@ -1,5 +1,37 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Captain Brineybeard native Ink Rain integration (2026-08-13)
+
+The selected `Levels.Pirate` policy deliberately keeps the challenge's added rain
+and its introductory squid while sharing Captain Brineybeard's native ink
+presentation. `StartAttempt()` detects Pirate early from either `Level.Current`
+or the roulette's active boss because the native level singleton may not exist yet.
+For this encounter, every challenge-drop hit calls
+`PirateLevelSquidInkOverlay.Current.Hit()` directly. This means the screen splat,
+darkness increments, hold/fade timing, scale and randomized native splat family are
+Cuphead's own implementation rather than a resized mod copy. If the native overlay
+is unavailable, the general Ink Rain overlay remains the safe fallback.
+
+Challenge drops and ground impacts are tinted from the current native overlay
+alpha so they remain behind the darkness instead of glowing over it. The ordinary
+non-Pirate compositor and all accepted difficulty/density values are unchanged.
+
+The additional squid intro uses native sorting layer/order zero in Pirate. The
+first manual pass placed it behind the front sea layer but still in front of the
+wooden dock because its camera-relative fallback was too close to the camera. The
+latest build now preserves the approved screen-space X/Y and moves only its world
+Z to the native `PirateLevelSquid` gameplay plane (`z = 0`, or the live native
+squid's exact Z when available). That DLL is installed and awaits one visual check:
+confirm that the intro is behind both the front sea and wooden dock. Do not change
+its coordinates, scale, rain tuning or difficulty values while checking this.
+
+Temporary diagnostics used to inspect nearby renderers and native splat metrics
+were removed before this handoff. They are unnecessary because Pirate hit splats
+now execute the native `Hit()` method directly. Ink Rain and Pirate remain forced
+in `ExperimentalFeatures.cs` and `Plugin.cs` intentionally for the next visual
+test. Set `EnableInkRainChallenge`, `ForceInkRainChallengeForTesting` and
+`ForceTestBoss` back to `false` before any public build.
+
 ## King Dice Ink Rain acceptance passed (2026-08-13)
 
 The complete King Dice chain passed manual Ink Rain acceptance. The squid intro

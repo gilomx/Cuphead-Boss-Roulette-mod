@@ -23,8 +23,8 @@ namespace Gilomx.CupheadBossRoulette
 
         // Ink Rain remains dormant between acceptance sessions. Its completed
         // implementation stays available for the remaining special-case tests.
-        internal static readonly bool EnableInkRainChallenge = false;
-        internal static readonly bool ForceInkRainChallengeForTesting = false;
+        internal static readonly bool EnableInkRainChallenge = true;
+        internal static readonly bool ForceInkRainChallengeForTesting = true;
 
         internal static bool IsChallengeEnabled(ModifierId id)
         {

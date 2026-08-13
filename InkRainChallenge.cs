@@ -219,8 +219,18 @@ namespace Gilomx.CupheadBossRoulette
 
             if (plugin.inkRainRuntime == null)
                 plugin.InitializeInkRainChallenge();
+            var pirateChallenge =
+                hasCurrentLevel && currentLevel == Levels.Pirate;
+            if (!pirateChallenge &&
+                plugin.activeChallengeBoss >= 0 &&
+                plugin.activeChallengeBoss < RouletteData.Bosses.Length)
+            {
+                pirateChallenge =
+                    RouletteData.Bosses[plugin.activeChallengeBoss].Level ==
+                    Levels.Pirate;
+            }
             plugin.inkRainRuntime.StartAttempt(
-                plugin.difficulty, showSquidIntro);
+                plugin.difficulty, showSquidIntro, pirateChallenge);
             if (showSquidIntro)
                 plugin.BeginInkRainSquidIntroOnce();
             plugin.Logger.LogInfo(showSquidIntro
@@ -635,6 +645,9 @@ namespace Gilomx.CupheadBossRoulette
         private bool visualEnding;
         private bool deactivateAfterVisualEnding;
         private float visualEndingFadeSpeed;
+        private bool useNativePirateInkOverlay;
+        private PirateLevelSquid nativePirateSquid;
+        private SpriteRenderer nativePirateInkOverlayRenderer;
 
         internal void SetLogger(ManualLogSource value)
         {
@@ -646,11 +659,15 @@ namespace Gilomx.CupheadBossRoulette
             assetsDirectory = value;
         }
 
-        internal void StartAttempt(Level.Mode mode, bool showSquidIntro)
+        internal void StartAttempt(
+            Level.Mode mode, bool showSquidIntro,
+            bool nativePirateInkOverlay)
         {
             difficulty = mode;
             ResetState();
             challengeActive = true;
+            useNativePirateInkOverlay = nativePirateInkOverlay;
+            RefreshNativePirateReferences();
             squidIntroPending = showSquidIntro;
             nextSpawnAt = showSquidIntro
                 ? float.PositiveInfinity
@@ -1079,6 +1096,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             preFilmInkRenderer.BeginFrame();
+            var nativePirateTint = NativePirateDropTint();
             for (var i = 0; i < drops.Count; i++)
             {
                 var drop = drops[i];
@@ -1104,7 +1122,7 @@ namespace Gilomx.CupheadBossRoulette
                         center.x - width * 0.5f,
                         Screen.height - center.y - height * 0.5f,
                         width, height),
-                    sprite, Color.white);
+                    sprite, nativePirateTint);
             }
 
             for (var i = 0; i < groundImpacts.Count; i++)
@@ -1135,7 +1153,7 @@ namespace Gilomx.CupheadBossRoulette
                         center.x - width * 0.5f,
                         Screen.height - center.y - height,
                         width, height),
-                    sprite, Color.white);
+                    sprite, nativePirateTint);
             }
 
             if (inkAlpha > 0.001f)
@@ -1372,8 +1390,70 @@ namespace Gilomx.CupheadBossRoulette
             });
         }
 
+        private void RefreshNativePirateReferences()
+        {
+            if (!useNativePirateInkOverlay)
+                return;
+
+            if (nativePirateSquid == null)
+            {
+                var squids = Resources.FindObjectsOfTypeAll<PirateLevelSquid>();
+                for (var i = 0; i < squids.Length; i++)
+                {
+                    var squid = squids[i];
+                    if (squid != null && squid.gameObject.scene.IsValid())
+                    {
+                        nativePirateSquid = squid;
+                        break;
+                    }
+                }
+            }
+
+            if (nativePirateInkOverlayRenderer == null)
+            {
+                var overlay = PirateLevelSquidInkOverlay.Current;
+                if (overlay != null)
+                    nativePirateInkOverlayRenderer =
+                        overlay.GetComponent<SpriteRenderer>();
+            }
+        }
+
+        private Color NativePirateDropTint()
+        {
+            if (!useNativePirateInkOverlay)
+                return Color.white;
+
+            RefreshNativePirateReferences();
+            if (nativePirateInkOverlayRenderer == null ||
+                !nativePirateInkOverlayRenderer.enabled)
+                return Color.white;
+
+            var visibleLight = 1f - Mathf.Clamp01(
+                nativePirateInkOverlayRenderer.color.a);
+            return new Color(visibleLight, visibleLight, visibleLight, 1f);
+        }
         private void RegisterInkHit(Vector2 worldPosition)
         {
+            if (useNativePirateInkOverlay)
+            {
+                try
+                {
+                    var nativeOverlay = PirateLevelSquidInkOverlay.Current;
+                    if (nativeOverlay != null)
+                    {
+                        nativeOverlay.Hit();
+                        return;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    if (log != null)
+                        log.LogWarning(
+                            "No se pudo usar el overlay nativo de tinta: " +
+                            exception.Message);
+                }
+            }
+
             targetInkAlpha = Mathf.Min(
                 MaximumInk, Mathf.Max(targetInkAlpha, inkAlpha) + InkStep);
             holdRemaining = InkHoldDurationForDifficulty();
@@ -2080,8 +2160,13 @@ namespace Gilomx.CupheadBossRoulette
 
             var depth = Mathf.Max(
                 1f, gameplayCamera.nearClipPlane + 0.5f);
-            var anchor = gameplayCamera.ViewportToWorldPoint(
-                new Vector3(0.5f, SquidAnchorViewportY, depth));
+            RefreshNativePirateReferences();
+            var anchoredToNativePirate = useNativePirateInkOverlay &&
+                                         nativePirateSquid != null;
+            var anchor = anchoredToNativePirate
+                ? nativePirateSquid.transform.position
+                : gameplayCamera.ViewportToWorldPoint(
+                    new Vector3(0.5f, SquidAnchorViewportY, depth));
             var viewportBottom = gameplayCamera.ViewportToWorldPoint(
                 new Vector3(0.5f, 0f, depth));
             var viewportTop = gameplayCamera.ViewportToWorldPoint(
@@ -2096,10 +2181,24 @@ namespace Gilomx.CupheadBossRoulette
             var bobPhase = Mathf.PingPong(elapsed, 1f);
             var easedBob = 0.5f -
                            Mathf.Cos(bobPhase * Mathf.PI) * 0.5f;
-            var bobPixels = SquidNativeBobDistance * easedBob;
-            anchor -= gameplayCamera.transform.up *
-                      (bobPixels * Screen.height / 720f *
-                       SquidVisualScale * worldUnitsPerPixel);
+            if (!anchoredToNativePirate)
+            {
+                var bobPixels = SquidNativeBobDistance * easedBob;
+                anchor -= gameplayCamera.transform.up *
+                          (bobPixels * Screen.height / 720f *
+                           SquidVisualScale * worldUnitsPerPixel);
+            }
+
+            if (useNativePirateInkOverlay)
+            {
+                squidActorRenderer.sortingLayerID = 0;
+                squidActorRenderer.sortingOrder = 0;
+                // Match the native PirateLevelSquid gameplay plane so the
+                // foreground sea and wooden dock correctly occlude the intro.
+                anchor.z = anchoredToNativePirate
+                    ? nativePirateSquid.transform.position.z
+                    : 0f;
+            }
 
             squidActorRenderer.sprite = sprite;
             squidActorRenderer.enabled = true;
@@ -2341,6 +2440,9 @@ namespace Gilomx.CupheadBossRoulette
             visualEnding = false;
             deactivateAfterVisualEnding = false;
             visualEndingFadeSpeed = 0f;
+            useNativePirateInkOverlay = false;
+            nativePirateSquid = null;
+            nativePirateInkOverlayRenderer = null;
         }
 
         private void OnDestroy()

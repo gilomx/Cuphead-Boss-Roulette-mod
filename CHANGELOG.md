@@ -1,5 +1,19 @@
 # Historial de cambios
 
+## Desarrollo experimental - integración nativa con Barbasalada (2026-08-13)
+
+- Lluvia de tinta conserva su lluvia adicional y su calamar de entrada contra
+  Barbasalada, pero los impactos usan directamente el overlay nativo del juego.
+  Las manchas, escala, oscurecimiento y tiempos son por ello los originales.
+- Las gotas y los impactos del reto respetan el alfa del oscurecimiento nativo y
+  dejan de verse por delante de la tinta.
+- La animación inicial conserva su posición y escala aprobadas, usa el orden de
+  render nativo y ahora se coloca en el plano de juego `z = 0` para quedar detrás
+  del mar frontal y del puente. Esta última profundidad queda pendiente de una
+  confirmación visual en la siguiente sesión.
+- Barbasalada y el reto permanecen forzados únicamente para esa prueba. Los tres
+  interruptores temporales deben desactivarse antes de una compilación pública.
+
 Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
