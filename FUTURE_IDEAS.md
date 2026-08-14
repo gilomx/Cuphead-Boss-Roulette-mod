@@ -402,6 +402,10 @@ snapshot inmutable que ya controlan el HUD de combate.
   recibir estado durante aproximadamente dos segundos.
 - La vista previa debe usar datos simulados y desactivarse automáticamente al
   comenzar una pelea real para no sustituir un resultado válido.
+- Pendiente especial del Palacio de Dados: conservar una sola sesión y el mismo
+  estado ya revelado durante tablero, minijefes y jefe final. Actualmente cada
+  cambio de minijefe reinicia la animación del overlay; debe animarse sólo al
+  inicio real y salir únicamente al ganar o abandonar toda la cadena.
 
 ### Integración propuesta en los menús de Cuphead
 
@@ -433,15 +437,16 @@ Opciones iniciales:
 
 - `CREATOR TOOLS`: activado/desactivado. Inicia o detiene el servicio local y conserva la
   preferencia.
-- `TAMAÑO`: 1x/2x. Generar internamente una versión de mayor resolución evita
+- `VISTA PREVIA`: activada/desactivada, para acomodar la fuente mientras se
+  observa OBS. Es temporal y vuelve automáticamente a desactivado al salir de
+  esta pantalla.
+- `TAMAÑO`: 1x/1.5x/2x. Generar internamente una versión de mayor resolución evita
   depender únicamente del escalado de OBS y mejora la lectura de iconos
   pequeños.
 - `ORDEN`: iconos arriba/texto arriba. Cambia la composición vertical en vivo,
   sin alterar el orden temporal de la animación.
 - `ALINEACIÓN`: izquierda/centro/derecha dentro del lienzo transparente.
-- `OPACIDAD`: 25-100 %.
-- `VISTA PREVIA`: activada/desactivada, para acomodar la fuente mientras se
-  observa OBS.
+- `OPACIDAD`: 25-100 %, en pasos de 5 puntos porcentuales.
 - `COPIAR URL DEL OVERLAY`: copia la URL vigente al portapapeles, reproduce la
   confirmación nativa y muestra temporalmente `URL COPIADA`. No debe abrir un
   navegador ni sacar al jugador del menú.

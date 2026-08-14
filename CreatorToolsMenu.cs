@@ -558,6 +558,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             var pause = creatorToolsPauseOwner;
             var options = creatorToolsNativeOptions;
+            if (creatorToolsPreviewSetting != null &&
+                creatorToolsPreviewSetting.Value)
+                SetCreatorToolsPreview(false);
             RestoreCreatorToolsNativeOptions();
 
             creatorToolsMenuOpen = false;
@@ -899,27 +902,36 @@ namespace Gilomx.CupheadBossRoulette
                         creatorToolsEnabledSetting.Value ? 1 : 0);
                     break;
                 case 1:
-                    creatorToolsScaleSetting.Value = selection + 1;
-                    creatorToolsLabelKey = null;
+                    SetCreatorToolsPreview(selection == 1);
+                    SetCreatorToolsNativeButtonSelection(
+                        snapshot,
+                        creatorToolsPreviewSetting.Value ? 1 : 0);
+                    if (creatorToolsNativeMenuRows.Count > 0)
+                        SetCreatorToolsNativeButtonSelection(
+                            creatorToolsNativeMenuRows[0],
+                            creatorToolsEnabledSetting.Value ? 1 : 0);
                     break;
                 case 2:
+                    creatorToolsScaleSetting.Value =
+                        1f + selection * 0.5f;
+                    creatorToolsLabelKey = null;
+                    break;
+                case 3:
                     creatorToolsOrderSetting.Value =
                         (CreatorToolsOrder)selection;
                     break;
-                case 3:
+                case 4:
                     creatorToolsAlignmentSetting.Value =
                         (CreatorToolsAlignment)selection;
                     break;
-                case 4:
-                    creatorToolsOpacitySetting.Value =
-                        (selection + 1) * 25;
-                    break;
                 case 5:
-                    creatorToolsPreviewSetting.Value = selection == 1;
+                    creatorToolsOpacitySetting.Value =
+                        25 + selection * 5;
                     break;
             }
 
-            PublishCreatorToolsState(true);
+            if (index != 1)
+                PublishCreatorToolsState(true);
             if (OptionsMenuSelectSoundMethod != null)
                 OptionsMenuSelectSoundMethod.Invoke(
                     creatorToolsNativeOptions, null);
@@ -972,22 +984,25 @@ namespace Gilomx.CupheadBossRoulette
             switch (index)
             {
                 case 0:
-                case 5:
+                case 1:
                     return CreatorToolsSpanish
                         ? new[] { "DESACTIVADO", "ACTIVADO" }
                         : new[] { "DISABLED", "ENABLED" };
-                case 1:
-                    return new[] { "1X", "2X" };
                 case 2:
+                    return new[] { "1X", "1.5X", "2X" };
+                case 3:
                     return CreatorToolsSpanish
                         ? new[] { "ICONOS ARRIBA", "TEXTO ARRIBA" }
                         : new[] { "ICONS ABOVE", "TEXT ABOVE" };
-                case 3:
+                case 4:
                     return CreatorToolsSpanish
                         ? new[] { "IZQUIERDA", "CENTRO", "DERECHA" }
                         : new[] { "LEFT", "CENTER", "RIGHT" };
-                case 4:
-                    return new[] { "25%", "50%", "75%", "100%" };
+                case 5:
+                    var opacityValues = new string[16];
+                    for (var i = 0; i < opacityValues.Length; i++)
+                        opacityValues[i] = (25 + i * 5) + "%";
+                    return opacityValues;
                 default:
                     return new string[0];
             }
@@ -1000,16 +1015,19 @@ namespace Gilomx.CupheadBossRoulette
                 case 0:
                     return creatorToolsEnabledSetting.Value ? 1 : 0;
                 case 1:
-                    return creatorToolsScaleSetting.Value == 2 ? 1 : 0;
-                case 2:
-                    return (int)creatorToolsOrderSetting.Value;
-                case 3:
-                    return (int)creatorToolsAlignmentSetting.Value;
-                case 4:
-                    return Mathf.Clamp(
-                        creatorToolsOpacitySetting.Value / 25 - 1, 0, 3);
-                case 5:
                     return creatorToolsPreviewSetting.Value ? 1 : 0;
+                case 2:
+                    return Mathf.Clamp(Mathf.RoundToInt(
+                        (creatorToolsScaleSetting.Value - 1f) / 0.5f),
+                        0, 2);
+                case 3:
+                    return (int)creatorToolsOrderSetting.Value;
+                case 4:
+                    return (int)creatorToolsAlignmentSetting.Value;
+                case 5:
+                    return Mathf.Clamp(
+                        (creatorToolsOpacitySetting.Value - 25) / 5,
+                        0, 15);
                 default:
                     return 0;
             }
@@ -1191,34 +1209,39 @@ namespace Gilomx.CupheadBossRoulette
                         !creatorToolsEnabledSetting.Value);
                     break;
                 case 1:
-                    creatorToolsScaleSetting.Value =
-                        creatorToolsScaleSetting.Value == 1 ? 2 : 1;
-                    creatorToolsLabelKey = null;
+                    SetCreatorToolsPreview(
+                        !creatorToolsPreviewSetting.Value);
                     break;
                 case 2:
+                    var scaleIndex = Mathf.Clamp(Mathf.RoundToInt(
+                        (creatorToolsScaleSetting.Value - 1f) / 0.5f),
+                        0, 2);
+                    scaleIndex = Wrap(scaleIndex + direction, 3);
+                    creatorToolsScaleSetting.Value =
+                        1f + scaleIndex * 0.5f;
+                    creatorToolsLabelKey = null;
+                    break;
+                case 3:
                     creatorToolsOrderSetting.Value =
                         creatorToolsOrderSetting.Value ==
                         CreatorToolsOrder.IconsAbove
                             ? CreatorToolsOrder.TextAbove
                             : CreatorToolsOrder.IconsAbove;
                     break;
-                case 3:
+                case 4:
                     var alignment = (int)
                         creatorToolsAlignmentSetting.Value;
                     creatorToolsAlignmentSetting.Value =
                         (CreatorToolsAlignment)Wrap(
                             alignment + direction, 3);
                     break;
-                case 4:
-                    var opacityIndex =
-                        creatorToolsOpacitySetting.Value / 25 - 1;
-                    opacityIndex = Wrap(opacityIndex + direction, 4);
-                    creatorToolsOpacitySetting.Value =
-                        (opacityIndex + 1) * 25;
-                    break;
                 case 5:
-                    creatorToolsPreviewSetting.Value =
-                        !creatorToolsPreviewSetting.Value;
+                    var opacityIndex =
+                        (creatorToolsOpacitySetting.Value - 25) / 5;
+                    opacityIndex = Wrap(
+                        opacityIndex + direction, 16);
+                    creatorToolsOpacitySetting.Value =
+                        25 + opacityIndex * 5;
                     break;
             }
             PublishCreatorToolsState(true);
@@ -1312,22 +1335,22 @@ namespace Gilomx.CupheadBossRoulette
                 switch (index)
                 {
                     case 0: return "CREATOR TOOLS";
-                    case 1: return "SIZE";
-                    case 2: return "ORDER";
-                    case 3: return "ALIGNMENT";
-                    case 4: return "OPACITY";
-                    case 5: return "PREVIEW";
+                    case 1: return "PREVIEW";
+                    case 2: return "SIZE";
+                    case 3: return "ORDER";
+                    case 4: return "ALIGNMENT";
+                    case 5: return "OPACITY";
                     default: return "COPY OVERLAY URL";
                 }
             }
             switch (index)
             {
                 case 0: return "CREATOR TOOLS";
-                case 1: return "TAMAÑO";
-                case 2: return "ORDEN";
-                case 3: return "ALINEACIÓN";
-                case 4: return "OPACIDAD";
-                case 5: return "VISTA PREVIA";
+                case 1: return "VISTA PREVIA";
+                case 2: return "TAMAÑO";
+                case 3: return "ORDEN";
+                case 4: return "ALINEACIÓN";
+                case 5: return "OPACIDAD";
                 default: return "COPIAR URL DEL OVERLAY";
             }
         }
@@ -1340,8 +1363,13 @@ namespace Gilomx.CupheadBossRoulette
                     return CreatorToolsOnOff(
                         creatorToolsEnabledSetting.Value);
                 case 1:
-                    return creatorToolsScaleSetting.Value + "X";
+                    return CreatorToolsOnOff(
+                        creatorToolsPreviewSetting.Value);
                 case 2:
+                    return creatorToolsScaleSetting.Value.ToString(
+                        "0.0#", System.Globalization.CultureInfo.InvariantCulture) +
+                        "X";
+                case 3:
                     if (creatorToolsOrderSetting.Value ==
                         CreatorToolsOrder.TextAbove)
                         return CreatorToolsSpanish
@@ -1350,7 +1378,7 @@ namespace Gilomx.CupheadBossRoulette
                     return CreatorToolsSpanish
                         ? "ICONOS ARRIBA"
                         : "ICONS ABOVE";
-                case 3:
+                case 4:
                     if (creatorToolsAlignmentSetting.Value ==
                         CreatorToolsAlignment.Left)
                         return CreatorToolsSpanish
@@ -1362,11 +1390,8 @@ namespace Gilomx.CupheadBossRoulette
                             ? "DERECHA"
                             : "RIGHT";
                     return CreatorToolsSpanish ? "CENTRO" : "CENTER";
-                case 4:
-                    return creatorToolsOpacitySetting.Value + "%";
                 case 5:
-                    return CreatorToolsOnOff(
-                        creatorToolsPreviewSetting.Value);
+                    return creatorToolsOpacitySetting.Value + "%";
                 default:
                     return ">";
             }

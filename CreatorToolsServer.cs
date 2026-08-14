@@ -420,20 +420,22 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/" || path == "/index.html")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
-                    "creator-tools\\overlay.html"), "text/html; charset=utf-8");
+                    "creator-tools\\overlay.html"),
+                    "text/html; charset=utf-8", false);
                 return;
             }
             if (path == "/overlay.css")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
-                    "creator-tools\\overlay.css"), "text/css; charset=utf-8");
+                    "creator-tools\\overlay.css"),
+                    "text/css; charset=utf-8", false);
                 return;
             }
             if (path == "/overlay.js")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\overlay.js"),
-                    "application/javascript; charset=utf-8");
+                    "application/javascript; charset=utf-8", false);
                 return;
             }
             if (path == "/generated/challenge.png")
@@ -499,11 +501,12 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
-            ServeFile(stream, fullPath, MimeType(fullPath));
+            ServeFile(stream, fullPath, MimeType(fullPath), true);
         }
 
         private static void ServeFile(
-            NetworkStream stream, string path, string contentType)
+            NetworkStream stream, string path, string contentType,
+            bool cache)
         {
             if (!File.Exists(path))
             {
@@ -521,7 +524,7 @@ namespace Gilomx.CupheadBossRoulette
                         "Unable to read file."), false);
                 return;
             }
-            WriteResponse(stream, 200, "OK", contentType, body, true);
+            WriteResponse(stream, 200, "OK", contentType, body, cache);
         }
 
         private static void WriteResponse(

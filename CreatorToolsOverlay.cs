@@ -28,7 +28,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private ConfigEntry<bool> creatorToolsEnabledSetting;
         private ConfigEntry<int> creatorToolsResolvedPortSetting;
-        private ConfigEntry<int> creatorToolsScaleSetting;
+        private ConfigEntry<float> creatorToolsScaleSetting;
         private ConfigEntry<CreatorToolsOrder> creatorToolsOrderSetting;
         private ConfigEntry<CreatorToolsAlignment>
             creatorToolsAlignmentSetting;
@@ -58,8 +58,8 @@ namespace Gilomx.CupheadBossRoulette
                 CreatorToolsDefaultPort,
                 "Puerto local resuelto automaticamente. No necesita editarse.");
             creatorToolsScaleSetting = Config.Bind(
-                "Creator Tools", "Tamano", 1,
-                "Escala del overlay: 1 o 2.");
+                "Creator Tools", "Tamano", 1f,
+                "Escala del overlay: 1, 1.5 o 2.");
             creatorToolsOrderSetting = Config.Bind(
                 "Creator Tools", "Orden", CreatorToolsOrder.IconsAbove,
                 "Distribucion vertical del overlay.");
@@ -75,17 +75,24 @@ namespace Gilomx.CupheadBossRoulette
                 "Muestra un resultado simulado mientras no hay combate.");
 
             NormalizeCreatorToolsSettings();
+            // Preview is a temporary positioning aid, never a persisted
+            // overlay state. Recover safely if the game closed while the
+            // settings screen was still open.
+            if (creatorToolsPreviewSetting.Value)
+                creatorToolsPreviewSetting.Value = false;
             if (creatorToolsEnabledSetting.Value)
                 StartCreatorToolsServer();
         }
 
         private void NormalizeCreatorToolsSettings()
         {
-            creatorToolsScaleSetting.Value =
-                creatorToolsScaleSetting.Value == 2 ? 2 : 1;
+            var scale = creatorToolsScaleSetting.Value;
+            creatorToolsScaleSetting.Value = scale < 1.25f
+                ? 1f
+                : scale < 1.75f ? 1.5f : 2f;
             var opacity = creatorToolsOpacitySetting.Value;
             opacity = Mathf.Clamp(opacity, 25, 100);
-            opacity = Mathf.RoundToInt(opacity / 25f) * 25;
+            opacity = Mathf.RoundToInt(opacity / 5f) * 5;
             creatorToolsOpacitySetting.Value = opacity;
             var port = creatorToolsResolvedPortSetting.Value;
             if (port < 1024 || port > 65535)
@@ -146,6 +153,26 @@ namespace Gilomx.CupheadBossRoulette
             }
             else
                 StopCreatorToolsServer();
+        }
+
+        private bool SetCreatorToolsPreview(bool enabled)
+        {
+            // Preview needs the local HTTP/WebSocket server. Turning it on
+            // from the menu should never leave the row enabled while doing
+            // nothing, so start Creator Tools automatically when necessary.
+            if (enabled && (creatorToolsServer == null ||
+                            !creatorToolsServer.IsRunning))
+            {
+                SetCreatorToolsEnabled(true);
+                if (!creatorToolsEnabledSetting.Value ||
+                    creatorToolsServer == null ||
+                    !creatorToolsServer.IsRunning)
+                    enabled = false;
+            }
+
+            creatorToolsPreviewSetting.Value = enabled;
+            PublishCreatorToolsState(true);
+            return creatorToolsPreviewSetting.Value;
         }
 
         private void UpdateCreatorTools()
@@ -274,6 +301,9 @@ namespace Gilomx.CupheadBossRoulette
             var session = preview
                 ? -1
                 : creatorToolsBattleSessionId;
+            var labelRevision = preview
+                ? 0
+                : creatorToolsLabelRevision;
 
             var builder = new StringBuilder(512);
             builder.Append("{\"type\":\"state\",\"active\":true");
@@ -288,7 +318,7 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append(",\"challengeText\":\"")
                 .Append(EscapeJson(challengeText)).Append("\"");
             builder.Append(",\"labelRevision\":")
-                .Append(creatorToolsLabelRevision);
+                .Append(labelRevision);
             builder.Append(",\"icons\":[");
             for (var i = 0; i < icons.Count; i++)
             {
@@ -299,7 +329,8 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append(']');
             builder.Append(",\"settings\":{");
             builder.Append("\"scale\":")
-                .Append(creatorToolsScaleSetting.Value);
+                .Append(creatorToolsScaleSetting.Value.ToString(
+                    "0.0#", CultureInfo.InvariantCulture));
             builder.Append(",\"textFirst\":").Append(
                 creatorToolsOrderSetting.Value ==
                 CreatorToolsOrder.TextAbove ? "true" : "false");

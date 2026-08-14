@@ -19,6 +19,94 @@ This removes the overflowing `COPIAR URL DEL OVERLAY` label/value pair and uses
 the common large options card shared by Visual and Audio more faithfully. Build
 verification remains 0 errors and 0 warnings.
 
+The accepted menu order is now Enabled, Preview, Size, Order, Alignment,
+Opacity, then Copy URL. Opacity retains the safe 25-100% range but advances in
+5-point increments. Preview is deliberately session-only: enabling it starts
+Creator Tools automatically if necessary, then the browser reveals its five
+simulated icons and challenge label in the normal entry order. Closing the
+Creator Tools screen immediately publishes the hidden state and reproduces the
+complete exit before resetting Preview, so it cannot remain visible in OBS.
+
+`dist/Las-Pichi-Ruleta-Creator-Tools-Iconos-1X-2X.zip` contains the exact 34
+unique PNG paths currently sent by the overlay: 10 weapon/empty, 3 super, 9
+charm and 12 challenge images. Current equipment art is 72x72 and challenge art
+is 80x80, while CSS displays icons at 92x92 in 1X and 184x184 in 2X and pulses
+them to 107.5% (about 198 px at 2X). Replacement artwork should therefore use a
+single consistent 256x256 transparent RGBA canvas; that downscales cleanly at
+both modes and retains headroom during the reveal pulse. Keep artwork centered
+with consistent internal margins across every category.
+
+Direct inspection of Cuphead's `atlas_equip_icons` and
+`atlas_equip_icons_dlc` bundles confirmed that the original weapon, super and
+charm sprite rectangles are 80x80; the native empty sprite is 73x73. There is no
+higher-resolution official equipment source in the shipped game. The mod's
+72x72 PNG copies are slightly smaller exports, but recovering the native 80x80
+only adds eight pixels and still requires upscale at the overlay's 184px 2X
+size. The 256x256 replacement recommendation therefore remains correct.
+
+The browser overlay now exits instead of hiding in one frame. It follows the
+same sequence and timing as entry: visible icons leave from first to last with
+the same 280 ms stagger and the challenge label scales/fades last. Each icon
+uses the same 380 ms pulse shape as entry. A renewed visible state cancels the
+exit cleanly for transient scene/HUD changes, while socket errors still hide
+immediately. Overlay icon spacing is now 8 px at 1X and 16 px at 2X instead of
+using a negative gap.
+
+`assets/creator-tools/empty.png` is a static 73x73 extraction of Cuphead's
+native `equip_icon_empty_0001` sprite. Its original alpha silhouette is kept
+and its visible pixels are white, exactly matching the transformation used by
+the in-game battle HUD. Every overlay slot whose data path is
+`weapons/vacio.png` is redirected to this PNG; no runtime-generated HTTP image
+is required. `tools/extract_native_empty_icon.py` documents and reproduces the
+extraction from `atlas_equip_icons` when UnityPy and Pillow are available.
+
+The nine non-empty ground weapon icons now have overlay-only 82x82 test assets
+under `assets/creator-tools/weapons`. The browser redirects `weapons/*.png` to
+that directory while `weapons/vacio.png` keeps using the native white empty
+sprite. Roulette cards and the in-game result HUD continue reading the original
+`assets/weapons` files. CSS display dimensions remain 92x92 at 1X and 184x184
+at 2X, so the larger artwork is tested without changing overlay layout.
+
+Creator Tools size now offers three native menu values: 1X, 1.5X and 2X. The
+saved setting migrated from `ConfigEntry<int>` to `ConfigEntry<float>`; existing
+`1` and `2` config values remain valid and normalization snaps arbitrary values
+to the nearest supported size. JSON writes the float with invariant culture so
+Spanish Windows locales cannot produce invalid `1,5` JSON. The 1.5X CSS metrics
+are proportional: 138 px icons, 12 px icon gap, 21 px section gap, 51 px text
+fallback and 114 px native-label height limit.
+
+Horizontal alignment now applies to the overlay content's children as well as
+the outer stage. Left, center and right set `#content` to `flex-start`, `center`
+or `flex-end`, so the icon row and both native-image/fallback challenge labels
+share the same corresponding edge instead of leaving the text centered.
+
+### Creator Tools pending work
+
+The Dice Palace is the known special case still pending. The in-game result HUD
+already treats its board, miniboss scenes and King Dice as one roulette level,
+but Creator Tools currently observes each miniboss scene as a new overlay
+session. Consequently the browser clears and replays its entrance whenever the
+player changes miniboss. The fix must preserve one Creator Tools session ID and
+one completed reveal state across every `DicePalace*` scene belonging to the
+same `Levels.DicePalaceMain` run. It must animate only at the real beginning,
+remain stable through board/miniboss transitions and exit only after final
+victory or abandonment. Defeat/retry inside the chain must retain the same
+result without replaying the entrance unless the whole roulette attempt truly
+starts over.
+
+Manual verification still pending for the next session:
+
+- Complete a full Dice Palace route and confirm no overlay entrance repeats.
+- Recheck 1X, 1.5X and 2X with left/center/right alignment and both vertical
+  orders, including a challenge label wider and narrower than the icon row.
+- Spin a ground result containing `Nada` and confirm the native white PNG is
+  visible; also inspect the nine overlay-only 82x82 weapon replacements.
+- Verify Preview entry/exit, real battle exit timing, one airplane battle and a
+  local cooperative session in OBS/browser-source conditions.
+
+Overlay HTML/CSS/JS are now served with `Cache-Control: no-store` so OBS reloads
+presentation updates; static PNG icon assets retain their one-hour cache.
+
 The first Creator Tools implementation is installed but is not yet a public
 release. `CreatorToolsServer.cs` owns a loopback-only `TcpListener` that serves
 the browser source and upgrades `/ws` with a small in-process RFC 6455 server.
@@ -49,8 +137,8 @@ original action. Selecting it now enters Cuphead's real `OptionsGUI` Visual
 screen and temporarily loans its rows to Creator Tools. The mod therefore uses
 the exact native card/noise background, fonts, selected colors, arrows, repeat
 timing, motion, sounds, keyboard/controller navigation and pause transition
-instead of drawing a lookalike IMGUI card. Seven rows expose enabled, size,
-vertical order, alignment, opacity, preview and URL copy. On Cancel every
+instead of drawing a lookalike IMGUI card. Seven rows expose enabled, preview,
+size, vertical order, alignment, opacity and URL copy. On Cancel every
 original Visual button, localization helper, value, active state, title and
 `currentItems` entry is restored before the native options screen closes, so
 resolution, fullscreen, V-Sync and the other game settings remain untouched.

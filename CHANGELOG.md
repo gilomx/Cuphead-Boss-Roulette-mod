@@ -10,6 +10,39 @@
 - El nuevo acomodo usa seis filas nativas para los ajustes y la acción inferior
   centrada para `COPIAR URL`. Esto elimina el texto largo que desbordaba la
   tarjeta y aprovecha mejor el diseño compartido por Visual y Sonido.
+- `VISTA PREVIA` aparece inmediatamente después de `CREATOR TOOLS` y se apaga
+  automáticamente al salir de la pantalla. Si el servidor estaba apagado, la
+  vista previa activa Creator Tools para que no quede encendida sin hacer nada;
+  el navegador reproduce tanto su entrada completa como su salida. `OPACIDAD`
+  conserva el rango 25-100%, ahora en pasos de 5 puntos porcentuales.
+- Se generó un ZIP con las 34 imágenes únicas que el overlay utiliza. Para
+  reemplazarlas se recomienda un lienzo PNG RGBA uniforme de 256x256: cubre los
+  tamaños visibles 92x92/184x184 y el pulso máximo aproximado de 198 px.
+- Se verificaron los atlas originales de Cuphead: armas, supers y amuletos sólo
+  existen a 80x80 (el vacío a 73x73). Las copias de 72x72 del mod pueden ganar
+  ocho píxeles recuperando el original, pero no hay una fuente oficial grande
+  suficiente para 2X.
+- Al terminar el combate, el overlay sale en el mismo orden y con el mismo
+  ritmo de entrada: iconos del primero al último cada 280 ms y texto al final,
+  conservando el pulso de entrada. La secuencia se cancela sin saltos si el HUD
+  reaparece durante una transición. La separación pasó de -4/-8 px a 8/16 px
+  para 1X/2X.
+- `Nada` ahora usa un PNG estático de 73x73 extraído del sprite nativo
+  `equip_icon_empty_0001`, conservando su transparencia y volviendo blanca la
+  silueta como hace el HUD. HTML, CSS y JS se sirven sin caché para que OBS
+  reciba cambios de presentación al recargar; los PNG conservan su caché.
+- Se añadieron nueve iconos de armas de 82x82 exclusivamente para Creator Tools
+  en `assets/creator-tools/weapons`. El overlay los usa sin cambiar sus medidas
+  visibles de 92x92/184x184; ruleta y HUD conservan los archivos originales.
+- `TAMAÑO` ahora ofrece `1X`, `1.5X` y `2X`; el punto medio usa medidas
+  proporcionales de 138 px para iconos, 12 px de separación y 51 px para el
+  texto de respaldo. El valor decimal se serializa con cultura invariable.
+- `ALINEACIÓN` ya no mueve únicamente el bloque exterior: iconos y texto del
+  reto comparten el borde izquierdo, el centro o el borde derecho seleccionado.
+- Queda documentado como pendiente el Palacio de Dados: Creator Tools todavía
+  inicia una sesión y repite la entrada del overlay en cada cambio de minijefe.
+  Debe conservar una única sesión durante toda la cadena y salir sólo al
+  completarla o abandonarla.
 
 - Se agrego la primera implementacion de `Creator Tools`: un servidor local
   integrado que entrega una fuente transparente para OBS y empuja su estado por

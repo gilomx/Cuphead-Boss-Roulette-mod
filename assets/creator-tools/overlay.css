@@ -2,7 +2,7 @@
   color-scheme: only light;
   --overlay-opacity: 1;
   --icon-size: 92px;
-  --icon-gap: -4px;
+  --icon-gap: 8px;
   --section-gap: 14px;
 }
 
@@ -58,13 +58,31 @@ body {
   min-width: max-content;
 }
 
+#stage.align-left #content {
+  align-items: flex-start;
+}
+
+#stage.align-center #content {
+  align-items: center;
+}
+
+#stage.align-right #content {
+  align-items: flex-end;
+}
+
 #stage.text-first #content {
   flex-direction: column-reverse;
 }
 
+#stage.scale-15 {
+  --icon-size: 138px;
+  --icon-gap: 12px;
+  --section-gap: 21px;
+}
+
 #stage.scale-2 {
   --icon-size: 184px;
-  --icon-gap: -8px;
+  --icon-gap: 16px;
   --section-gap: 28px;
 }
 
@@ -85,12 +103,20 @@ body {
   transform: scale(1);
 }
 
+.result-icon.empty-icon {
+  /* Static native Cuphead silhouette extracted and whitened for the overlay. */
+}
+
 .result-icon.settled {
   opacity: 0.7;
 }
 
 .result-icon.reveal {
   animation: icon-reveal 380ms ease-out both;
+}
+
+.result-icon.exit {
+  animation: icon-exit 380ms ease-in both;
 }
 
 .challenge {
@@ -106,6 +132,10 @@ body {
   min-height: 68px;
 }
 
+#stage.scale-15 .challenge {
+  min-height: 51px;
+}
+
 .challenge.settled {
   opacity: 0.7;
   transform: scale(1);
@@ -113,6 +143,10 @@ body {
 
 .challenge.reveal {
   animation: challenge-reveal 280ms ease-out both;
+}
+
+.challenge.exit {
+  animation: challenge-exit 280ms ease-in both;
 }
 
 #challenge-image {
@@ -127,6 +161,11 @@ body {
   max-height: 152px;
 }
 
+#stage.scale-15 #challenge-image {
+  max-width: 1140px;
+  max-height: 114px;
+}
+
 #challenge-fallback {
   color: white;
   font-family: sans-serif;
@@ -138,6 +177,10 @@ body {
 
 #stage.scale-2 #challenge-fallback {
   font-size: 68px;
+}
+
+#stage.scale-15 #challenge-fallback {
+  font-size: 51px;
 }
 
 @keyframes icon-reveal {
@@ -163,5 +206,31 @@ body {
   to {
     opacity: 0.7;
     transform: scale(1);
+  }
+}
+
+@keyframes icon-exit {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.075);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes challenge-exit {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.12);
   }
 }
