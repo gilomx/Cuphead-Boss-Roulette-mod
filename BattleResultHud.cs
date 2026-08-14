@@ -61,6 +61,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!ShouldShowBattleResultHud())
             {
+                SetCreatorToolsBattleVisibility(false);
                 if (battleHudRoot != null && battleHudRoot.activeSelf)
                     battleHudRoot.SetActive(false);
                 // Dice Palace loads a separate battle scene for every space.
@@ -81,6 +82,7 @@ namespace Gilomx.CupheadBossRoulette
 
             if (!UpdateBattleResultHudLayer())
             {
+                SetCreatorToolsBattleVisibility(false);
                 battleHudRoot.SetActive(false);
                 // LevelHUD is temporarily disabled by some phase/iris
                 // transitions. Preserve the reveal state so returning to the
@@ -90,6 +92,7 @@ namespace Gilomx.CupheadBossRoulette
 
             if (!battleHudRoot.activeSelf)
                 battleHudRoot.SetActive(true);
+            SetCreatorToolsBattleVisibility(true);
             if (!battleHudWasVisible)
             {
                 battleHudWasVisible = true;
@@ -145,6 +148,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudWasVisible = false;
             battleHudRevealStartedAt = -1f;
             battleHudImpactPlayedCount = 0;
+            BeginCreatorToolsBattleSession();
         }
 
         private void KeepBattleResultHudThroughVictory(
@@ -182,6 +186,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudOnNativeCanvas = false;
             if (battleHudRoot != null && battleHudRoot.activeSelf)
                 battleHudRoot.SetActive(false);
+            EndCreatorToolsBattleSession();
         }
 
         private bool PrepareBattleResultHud()
@@ -845,6 +850,10 @@ namespace Gilomx.CupheadBossRoulette
             var textScale = Mathf.Lerp(1.12f, 1f, smoothProgress);
             textRect.localScale = new Vector3(
                 textScale, textScale, 1f);
+            UpdateCreatorToolsBattleReveal(
+                revealedIconCount,
+                textProgress > 0f &&
+                battleHudChallengeSnapshot != ModifierId.None);
         }
 
         private void ApplyBattleHudEquipmentIcon(RawImage image,

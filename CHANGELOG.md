@@ -1,5 +1,38 @@
 # Historial de cambios
 
+## Desarrollo experimental - Creator Tools overlay (2026-08-13)
+
+- La prueba aislada confirmó que insertar la fila del mod en el índice 4 dejaba
+  visible `ELIMINAR JUGADOR 2`: `LevelPauseGUI.OnPause()` usa ese índice fijo para
+  ocultar la entrada nativa. Durante ese método el mod restaura temporalmente el
+  arreglo original y después recupera su fila, conservando la lógica multijugador
+  de Cuphead. Creator Tools quedó activado nuevamente para validar el arreglo.
+- El nuevo acomodo usa seis filas nativas para los ajustes y la acción inferior
+  centrada para `COPIAR URL`. Esto elimina el texto largo que desbordaba la
+  tarjeta y aprovecha mejor el diseño compartido por Visual y Sonido.
+
+- Se agrego la primera implementacion de `Creator Tools`: un servidor local
+  integrado que entrega una fuente transparente para OBS y empuja su estado por
+  WebSocket, sin sondeo periodico ni aplicacion auxiliar.
+- HTTP y WebSocket comparten `127.0.0.1:18081`. Si el puerto esta ocupado, el
+  mod avanza secuencialmente hasta encontrar uno libre entre 100 candidatos y
+  conserva el resultado para la siguiente sesion.
+- La pagina recibe el snapshot inmutable del HUD, los mismos iconos terrestres o
+  de avion, el progreso de revelado, el texto localizado y los ajustes en vivo.
+  El texto del reto se renderiza desde Unity con la misma fuente/material nativos
+  que usa la fila del HUD y se sirve como PNG transparente de alta resolucion.
+- Se agrego `LA PICHI RULETA` inmediatamente debajo de `OPCIONES` en el menu de
+  pausa del mapa. Abre directamente la pantalla Visual real de Cuphead y presta
+  temporalmente sus filas a activacion, tamano, orden vertical, alineacion,
+  opacidad, vista previa y copia de URL. Por ello conserva exactamente el fondo,
+  ruido, tipografia, flechas, colores, movimiento, sonidos y controles nativos,
+  sin dibujar una tarjeta propia. Al cancelar se restauran todas las opciones
+  visuales originales antes de volver a la pausa. No modifica el menu de pausa
+  de los combates.
+- La prueba tecnica aprobo compilacion sin errores, entrega HTTP, handshake
+  WebSocket, envio de estado y fallback de `18081` a `18082`. Falta validar
+  visualmente la nueva fila, la tarjeta, el texto nativo y un combate completo.
+
 ## Desarrollo experimental - reto de dano reducido validado (2026-08-13)
 
 - Se implemento `DANO -50%` para combates terrestres y de avion. Los impactos

@@ -1,5 +1,69 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Creator Tools first development build (2026-08-13)
+
+The disabled isolation build confirmed that Creator Tools exposed the native
+`ELIMINAR JUGADOR 2` row. Root cause is Cuphead's hard-coded
+`LevelPauseGUI.OnPause()` access to `menuItems[4]`: inserting the mod row at 4
+shifted Player 2 Leave to 5, so Cuphead toggled the mod row and left its original
+Player 2 row active. The compatibility prefix now gives `OnPause()` the original
+eight-item array; its postfix restores the extended array and refreshes colors.
+This preserves Cuphead's multiplayer visibility logic instead of duplicating it.
+Creator Tools is enabled again and the corrected DLL is installed for manual
+single-player plus local-co-op verification.
+
+The menu layout was also revised. Six adjustable settings keep native Visual row
+positions, while URL copy uses Cuphead's separate centered bottom action row
+(the slot normally used by Back) and displays only `COPIAR URL`/`URL COPIADA`.
+This removes the overflowing `COPIAR URL DEL OVERLAY` label/value pair and uses
+the common large options card shared by Visual and Audio more faithfully. Build
+verification remains 0 errors and 0 warnings.
+
+The first Creator Tools implementation is installed but is not yet a public
+release. `CreatorToolsServer.cs` owns a loopback-only `TcpListener` that serves
+the browser source and upgrades `/ws` with a small in-process RFC 6455 server.
+It supports text frames, ping/pong, close, multiple clients and clean shutdown;
+the network threads never inspect Unity objects. The Unity thread replaces one
+immutable JSON snapshot and the broadcaster pushes only revisions. An isolated
+test passed the HTML request, `101 Switching Protocols`, a state frame, and the
+automatic port fallback from occupied `18081` to `18082`.
+
+`CreatorToolsOverlay.cs` publishes the existing `battleHudResultSnapshot` rather
+than creating a second gameplay state. Ground sessions expose five icon paths;
+airplane sessions expose charm and challenge. Reveal messages are emitted from
+`UpdateBattleResultHudReveal()` at the same icon/text boundaries as the in-game
+HUD. New sessions, temporary battle-layer hiding, retry continuity and final
+cleanup all follow `Begin/EndBattleResultHudSession()`. Preview is overridden
+and disabled by a real battle. The localized challenge label is rendered on the
+Unity thread from `battleHudChallengeText` into a cached transparent PNG, so the
+browser uses the same native font and material instead of bundling a web font.
+
+The browser files live in `assets/creator-tools`. They reconnect with backoff,
+hide stale state immediately, cache static icon files and accept live scale,
+icons-above/text-above order, alignment and opacity changes over WebSocket.
+
+`CreatorToolsMenu.cs` inserts `LA PICHI RULETA` at index 4 of `MapPauseUI`,
+directly after native `OPCIONES`. Later native selections are temporarily mapped
+back by one only while `LevelPauseGUI.Select()` executes, preserving every
+original action. Selecting it now enters Cuphead's real `OptionsGUI` Visual
+screen and temporarily loans its rows to Creator Tools. The mod therefore uses
+the exact native card/noise background, fonts, selected colors, arrows, repeat
+timing, motion, sounds, keyboard/controller navigation and pause transition
+instead of drawing a lookalike IMGUI card. Seven rows expose enabled, size,
+vertical order, alignment, opacity, preview and URL copy. On Cancel every
+original Visual button, localization helper, value, active state, title and
+`currentItems` entry is restored before the native options screen closes, so
+resolution, fullscreen, V-Sync and the other game settings remain untouched.
+Combat pause menus are not modified. Creator Tools defaults to disabled.
+
+The development DLL and browser assets are installed. Cuphead loaded plugin
+version `0.5.130` without exceptions and the project builds with 0 errors and 0
+warnings. Manual acceptance still needs: open the new native Visual-based screen
+and inspect its seven labels/rows; close and reopen ordinary `OPCIONES -> VISUAL`
+to confirm its original values are restored; test keyboard/controller changes
+and URL copy; add the URL to OBS or a browser; then spin one ground and one
+airplane battle to inspect timing, native challenge text and cleanup.
+
 ## Half Damage challenge validated and parked (2026-08-13)
 
 `ModifierId.HalfDamage` is implemented for ground and airplane battles. While the

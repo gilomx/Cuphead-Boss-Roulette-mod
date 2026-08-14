@@ -305,15 +305,17 @@ reto. Después conviene ejecutar una regresión corta de giro, HUD, reintento y
 cooperativo, habilitar `EnableHpOneChallenge` y mantener todos los selectores
 `Force...ForTesting` desactivados.
 
-## Overlay local para streamers
+## Creator Tools: overlay local
 
 ### Objetivo
 
-Ofrecer una fuente transparente para OBS, Streamlabs u otro programa compatible
-con fuentes de navegador. Al comenzar un combate elegido por la ruleta, el
-overlay debe mostrar los mismos resultados que el HUD del mod, pero con un
-diseño pensado para poder verse más grande en una transmisión: los iconos en
-una fila superior y el texto del reto debajo.
+La primera versión de `Creator Tools` se limita a ofrecer una fuente transparente
+para OBS, Streamlabs u otro programa compatible con fuentes de navegador. Al
+comenzar un combate elegido por la ruleta, el overlay debe mostrar los mismos
+resultados que el HUD del mod, pero con un diseño pensado para poder verse más
+grande en una transmisión o grabación: los iconos en una fila superior y el
+texto del reto debajo. Otras herramientas para creadores quedan fuera de esta
+primera etapa hasta que el overlay esté terminado y aceptado.
 
 Debe funcionar completamente en la computadora del jugador, sin internet, una
 cuenta, un servicio remoto ni una aplicación auxiliar. El overlay no debe
@@ -322,13 +324,37 @@ snapshot inmutable que ya controlan el HUD de combate.
 
 ### Arquitectura propuesta
 
-- Integrar en el plugin un servidor HTTP mínimo basado en `TcpListener`,
-  enlazado exclusivamente a `127.0.0.1`. Evitar `HttpListener` por sus posibles
-  requisitos de URL ACL y evitar WebSockets por la complejidad adicional en el
-  runtime antiguo de Unity/Mono usado por Cuphead.
-- Servir una página HTML con fondo transparente en una URL estable, por ejemplo
-  `http://127.0.0.1:18080/`, además de los recursos locales y un endpoint de
-  estado JSON de solo lectura.
+- Integrar en el plugin un servidor local mínimo basado en `TcpListener`,
+  enlazado exclusivamente a `127.0.0.1`. El mismo puerto sirve la página HTML,
+  sus recursos locales y actualiza la conexión a WebSocket en una ruta dedicada.
+  Se evita `HttpListener` por sus posibles requisitos de URL ACL.
+- Cuphead usa .NET 3.5 y no incluye `System.Net.WebSockets`. Para no agregar una
+  DLL externa al instalable, implementar dentro del mod solamente la parte
+  necesaria del protocolo WebSocket: handshake RFC 6455, mensajes de texto,
+  ping/pong, cierre y desconexión limpia.
+- Servir la fuente transparente en una URL estable, por ejemplo
+  `http://127.0.0.1:18081/`. El navegador abre después una conexión local como
+  `ws://127.0.0.1:18081/ws`; no consulta periódicamente un endpoint de estado.
+- El puerto se administra automáticamente y lo comparten la página HTTP y el
+  WebSocket para no crear dos posibles conflictos. Cambiar solamente la ruta
+  `/ws` no permite compartir un puerto ya ocupado por otro servidor. La
+  dirección permanece limitada a `127.0.0.1`; no se expone el mod a la red
+  local ni a internet.
+- Al cambiar el puerto, `COPIAR URL DEL OVERLAY` debe entregar automáticamente
+  la nueva dirección. El puerto preferido predeterminado es `18081`. Si está
+  ocupado, el servidor prueba secuencialmente `18082`, `18083` y los siguientes,
+  hasta un máximo de 100 candidatos. No elige un valor aleatorio. El primer
+  puerto libre se guarda como el nuevo preferido para que la dirección permanezca
+  estable en lanzamientos posteriores.
+  Si el puerto efectivo cambia respecto al que OBS podía tener guardado, el menú
+  debe mostrar un aviso claro para volver a copiar la URL. Si no se encuentra un
+  puerto disponible dentro del rango de búsqueda, se desactiva solamente
+  `Creator Tools`, sin modificar Cuphead ni afectar la ruleta.
+- Enviar un snapshot completo inmediatamente al conectar o reconectar. Después,
+  el mod solamente empuja otro mensaje cuando cambia la sesión, la cantidad de
+  elementos revelados, la visibilidad, el idioma o un ajuste visual. El formato
+  del mensaje puede seguir siendo JSON compacto; WebSocket elimina el sondeo,
+  mientras JSON mantiene el protocolo sencillo de inspeccionar y ampliar.
 - Enlazar la publicación con `BeginBattleResultHudSession()` y usar
   `battleHudResultSnapshot` como fuente de verdad. Limpiar el estado junto con
   `EndBattleResultHudSession()` al regresar al mapa.
@@ -338,19 +364,36 @@ snapshot inmutable que ya controlan el HUD de combate.
 - Publicar una revisión o identificador de sesión y el número de elementos ya
   revelados. Esto permite que el navegador muestre cada icono y después el
   texto al mismo tiempo que el HUD, sin intentar calcular por separado el
-  momento de la animación.
+  momento de la animación. Una conexión que llega a mitad del combate recibe el
+  estado actual y no vuelve a reproducir una animación antigua.
 - El hilo de red nunca debe acceder a objetos de Unity. El hilo principal debe
   preparar un DTO o JSON inmutable y sustituirlo de forma segura; el servidor
   únicamente devuelve ese estado ya construido.
-- Detener el listener limpiamente al cerrar el plugin o el juego. Si el puerto
-  está ocupado, registrar el problema y desactivar solo el overlay, sin afectar
-  la ruleta ni Cuphead.
+- Detener el listener limpiamente al cerrar el plugin o el juego. Si se agotan
+  los 100 puertos candidatos, registrar el problema y desactivar solo el
+  overlay, sin afectar la ruleta ni Cuphead.
 
 ### Diseño del overlay
 
 - Fondo completamente transparente.
-- Iconos del resultado en una fila superior y el texto localizado del reto
-  debajo de ellos.
+- La distribución predeterminada coloca los iconos del resultado en una fila
+  superior y el texto localizado del reto debajo. Una opción permite invertir
+  solamente la composición para colocar el texto arriba y los iconos abajo.
+  En ambas distribuciones la secuencia de entrada permanece igual: primero se
+  revelan los iconos y después aparece la etiqueta del reto.
+- La etiqueta del reto debe verse con exactamente la misma tipografía que la
+  fila del HUD del mod. Ese HUD clona el texto auxiliar nativo de Cuphead
+  (`PauseGUI/Text (1)`) con su fuente y material, y usa
+  `CupheadMemphis-Medium` solamente como respaldo.
+- No depender de una fuente instalada en Windows ni incluir una aproximación
+  web. El hilo principal de Unity renderiza la etiqueta localizada a una imagen
+  transparente de alta resolución usando el mismo componente nativo, la guarda
+  en caché y publica su revisión al overlay. El navegador anima esa imagen como
+  una sola etiqueta. Esto conserva glifos, material y espaciado en todos los
+  idiomas sin entregar el archivo de fuente del juego.
+- Regenerar la etiqueta solamente cuando cambie el reto, el idioma o la escala
+  del overlay. La captura y codificación ocurren siempre en el hilo principal;
+  el servidor WebSocket sólo transmite la referencia inmutable ya preparada.
 - Reutilizar los primeros frames estáticos aceptados para el HUD de combate y
   los recursos incluidos en el mod; el navegador debe cargarlos una vez y
   conservarlos en caché.
@@ -362,49 +405,70 @@ snapshot inmutable que ya controlan el HUD de combate.
 
 ### Integración propuesta en los menús de Cuphead
 
-Agregar una entrada `LA PICHI RULETA` tanto en el menú principal como en el
-menú disponible desde el mapa. Dentro de ella, reservar
-`HERRAMIENTAS DE STREAMING` para esta función y posibles herramientas futuras,
-con un submenú `OVERLAY PARA STREAMING`.
+Agregar una entrada `LA PICHI RULETA` al menú nativo que se abre con pausa
+desde el mapa. La primera versión no modifica el menú de pausa de los combates
+ni agrega una entrada al menú principal. La nueva fila debe integrarse en
+`MapPauseUI`, usar la misma tipografía, selección, sonidos y controles nativos,
+y funcionar igual con teclado o mando. Su posición aceptada es inmediatamente
+debajo de la fila nativa `OPCIONES`.
+
+Seleccionar `LA PICHI RULETA` abre directamente la pantalla nativa que Cuphead
+usa para `OPCIONES -> VISUAL`, pero sus filas se sustituyen temporalmente por la
+configuración del mod. De esta forma se conservan exactamente su fondo, ruido,
+tipografía, flechas, colores, movimiento, sonidos, transiciones y navegación.
+No existe todavía un submenú intermedio para `CREATOR TOOLS`, porque es la única
+familia de opciones disponible. El título pasa a `LA PICHI RULETA`; al cancelar,
+los botones y valores Visual originales se restauran antes de volver a la pausa.
+Si en el futuro aparecen otras familias, esta pantalla podrá convertirse en un
+índice de categorías sin cambiar la entrada del menú del mapa.
+
+Mientras la pantalla esté abierta, el mapa permanece pausado y el menú nativo no
+recibe selecciones por debajo. `Cancelar` regresa al menú de pausa; no cierra la
+pausa ni mueve al personaje. Cerrar después el menú nativo reanuda el mapa
+normalmente. La entrada permanece
+disponible aunque el overlay esté desactivado, porque es también el lugar para
+volver a activarlo, copiar la URL vigente o consultar un error del servidor.
 
 Opciones iniciales:
 
-- `ACTIVADO`: sí/no. Inicia o detiene el servicio local y conserva la
+- `CREATOR TOOLS`: activado/desactivado. Inicia o detiene el servicio local y conserva la
   preferencia.
 - `TAMAÑO`: 1x/2x. Generar internamente una versión de mayor resolución evita
   depender únicamente del escalado de OBS y mejora la lectura de iconos
   pequeños.
+- `ORDEN`: iconos arriba/texto arriba. Cambia la composición vertical en vivo,
+  sin alterar el orden temporal de la animación.
 - `ALINEACIÓN`: izquierda/centro/derecha dentro del lienzo transparente.
 - `OPACIDAD`: 25-100 %.
 - `VISTA PREVIA`: activada/desactivada, para acomodar la fuente mientras se
   observa OBS.
-- `COPIAR URL DEL OVERLAY`: copia la URL estable al portapapeles, reproduce la
+- `COPIAR URL DEL OVERLAY`: copia la URL vigente al portapapeles, reproduce la
   confirmación nativa y muestra temporalmente `URL COPIADA`. No debe abrir un
   navegador ni sacar al jugador del menú.
 
 Los cambios de tamaño, alineación y opacidad deben reflejarse automáticamente
 en una fuente de OBS que ya esté abierta, sin recargarla ni volver a copiar la
-URL. El puerto puede permanecer fuera del menú normal y exponerse únicamente
-en la configuración avanzada de BepInEx para resolver conflictos excepcionales.
+URL. El puerto resuelto se conserva internamente para mantener estable la
+dirección entre sesiones, pero no aparece como una opción editable en el menú.
 
-### Actualización y rendimiento
+### Conexión y rendimiento
 
-- La página puede consultar el pequeño estado JSON cada 250 ms cuando el
-  resultado esté visible y cada 1 segundo cuando no haya una pelea activa.
-- Todo el tráfico permanece dentro de `127.0.0.1`; el JSON esperado mide solo
-  unos pocos kilobytes y los iconos no se transfieren en cada consulta.
-- El mod debe devolver un JSON previamente preparado, sin buscar componentes
-  de Unity por solicitud. Con estas reglas, el coste de CPU, memoria y red debe
-  ser imperceptible incluso en equipos modestos.
-- Usar `Cache-Control: no-store` para el estado y caché normal para imágenes,
-  fuentes y estilos.
-- Limitar la primera versión a solicitudes GET de solo lectura, sin endpoints
-  que permitan controlar el juego desde el navegador.
+- Todo el tráfico permanece dentro de `127.0.0.1`. Los mensajes de estado miden
+  solo unos pocos kilobytes y los iconos no se transfieren con cada cambio.
+- El hilo principal prepara un mensaje inmutable al cambiar el estado; el hilo
+  de red se limita a enviarlo a las conexiones activas. Con estas reglas, no hay
+  consultas constantes ni búsquedas de componentes de Unity desde la red.
+- Enviar un ping espaciado solamente para detectar conexiones muertas. Si se
+  cierra Cuphead o se pierde la conexión, la página oculta el resultado y trata
+  de reconectar con espera progresiva, sin conservar información obsoleta.
+- Usar caché normal para imágenes, fuentes y estilos. Limitar la primera versión
+  a estado enviado desde el juego hacia el navegador: ningún mensaje o endpoint
+  puede girar la ruleta, cargar niveles o controlar Cuphead.
 
 ### Implementación por etapas
 
-1. Servidor local, página transparente, estado sincronizado e invalidación de
-   resultados antiguos.
+1. Servidor local HTTP/WebSocket, página transparente, estado sincronizado,
+   reconexión e invalidación de resultados antiguos.
 2. Menús, persistencia, copia de URL y vista previa.
 3. Ajustes visuales, localización completa y sincronización fina de la aparición
    de iconos y texto.

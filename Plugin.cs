@@ -324,6 +324,7 @@ namespace Gilomx.CupheadBossRoulette
             // cached native layout so its measured width is rebuilt too.
             nativeRoulettePromptLayoutToken = null;
             equipSlotLabelsFitReady = false;
+            CreatorToolsLanguageChanged();
         }
 
         private void UpdateLanguageTestShortcut()
@@ -418,6 +419,8 @@ namespace Gilomx.CupheadBossRoulette
                        ForcePlaneRelicChallengeTestSequence ||
                        challengeSetting.Value;
             theme = new GameTheme();
+            if (ExperimentalFeatures.EnableCreatorTools)
+                InitializeCreatorTools();
             LoadBlackAndWhiteTransitionShader();
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
@@ -438,6 +441,8 @@ namespace Gilomx.CupheadBossRoulette
             SceneLoader.OnFadeInEndEvent +=
                 CompleteChallengeVisualRestartOnFadeInEnd;
             harmony = new Harmony(PluginGuid);
+            if (ExperimentalFeatures.EnableCreatorTools)
+                InstallCreatorToolsMenuPatches();
             var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
             var mapPausePostfix = AccessTools.Method(typeof(Plugin), "BlockMapPausePostfix");
             if (mapPauseCanPause != null && mapPausePostfix != null)
@@ -1167,6 +1172,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Update()
         {
+            UpdateCreatorTools();
             SafeUpdateInkRainChallenge();
             UpdateLanguageTestShortcut();
             UpdateLoanedLoadoutLifecycle();
@@ -3230,6 +3236,7 @@ namespace Gilomx.CupheadBossRoulette
         private void OnApplicationQuit()
         {
             RestoreOriginalTestLanguage();
+            StopCreatorToolsServer();
         }
 
         private void OnDestroy()
@@ -3245,6 +3252,8 @@ namespace Gilomx.CupheadBossRoulette
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
             DestroyBattleResultHud();
+            CloseCreatorToolsMenu(false);
+            DisposeCreatorTools();
             ClearChallengeVisualRetryGate();
             ResetRgbShiftChallenge();
             ResetUpsideDownChallenge();
