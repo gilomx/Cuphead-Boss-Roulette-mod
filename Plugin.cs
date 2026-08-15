@@ -38,9 +38,9 @@ namespace Gilomx.CupheadBossRoulette
                   ExperimentalFeatures.ForceHalfDamageChallengeForTesting
                 ? ModifierId.HalfDamage
                 : ModifierId.None;
-        // TEMPORARY ACCEPTANCE SEQUENCE. Each spin advances through the five
-        // completed new challenges while keeping the boss compatible/random.
-        private static readonly bool ForceNewChallengeSequenceForTesting = true;
+        // DORMANT ACCEPTANCE SEQUENCE. When enabled, each spin advances through
+        // the five completed challenges while keeping the boss compatible/random.
+        private static readonly bool ForceNewChallengeSequenceForTesting = false;
         private static readonly ModifierId[] ForcedNewChallengeTestSequence =
         {
             ModifierId.RgbShift,

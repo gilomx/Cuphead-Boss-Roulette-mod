@@ -1,19 +1,30 @@
 # Cuphead Boss Roulette - Project Handoff
+## Localization documentation split (2026-08-15)
+
+The 12 active files under `translations/` now separate the established
+29-ID approved catalog from 26 new IDs awaiting review: five challenge names
+and 21 visible Creator Tools strings. `translations/LOCALIZATION_STATUS.md`
+is the source of truth for this temporary stage. Historical deliveries under
+`translations/review_by_language/` remain unchanged.
+
+After all 12 new deliveries are approved, move the 26 rows into each approved
+table, archive the reviewed deliveries, update runtime dictionaries, perform
+font/width regression, and remove the temporary approved/pending split.
+
 
 ## Forced five-challenge acceptance sequence (2026-08-15)
 
-All five completed new challenges are now enabled: RGB Shift, Upside Down,
-Ink Rain, Half Damage and HP.1. A separate temporary selector,
-`ForceNewChallengeSequenceForTesting`, is true and advances once whenever a
-roulette spin is created. Its repeating order is RGB Shift -> Upside Down ->
-Ink Rain -> Half Damage -> HP.1. The boss remains random but is selected from
-the challenge-compatible pool.
+All five completed new challenges are enabled: RGB Shift, Upside Down, Ink
+Rain, Half Damage and HP.1. The temporary selector
+`ForceNewChallengeSequenceForTesting` is now false after acceptance. When
+enabled, it cycles through those five challenges while the boss remains random
+within the compatible pool.
 
-The older per-challenge `Force...ForTesting` switches remain false; enabling all
-of them would not form a sequence because `ForcedTestChallenge` resolves them by
-priority. Before a public build, set `ForceNewChallengeSequenceForTesting` back
-to false. Keep the five `Enable...Challenge` switches true if acceptance passes
-and the project intends to publish all five.
+The older per-challenge `Force...ForTesting` switches remain false; enabling
+all of them would not form a sequence because `ForcedTestChallenge` resolves
+them by priority. Normal builds keep the sequence off and select randomly from
+all compatible enabled challenges. Keep the five `Enable...Challenge` switches
+true while the project intends to publish all five.
 
 ## Complete Creator Tools icon set (2026-08-15)
 

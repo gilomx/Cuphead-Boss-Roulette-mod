@@ -1,5 +1,19 @@
 # Historial de cambios
 
+## Preparación de la nueva localización (2026-08-15)
+
+- Los doce documentos activos separan ahora los 29 IDs ya aprobados de los
+  26 pendientes: cinco retos nuevos y 21 cadenas visibles de Creator Tools.
+- Se añadió `translations/LOCALIZATION_STATUS.md` como índice temporal.
+- Las entregas históricas permanecen intactas; al aprobar los doce idiomas se
+  volverán a fusionar las tablas y se retirará esta separación.
+
+## Cierre de la secuencia de aceptacion (2026-08-15)
+
+- Se desactivo `ForceNewChallengeSequenceForTesting` despues de completar la
+  revision de arte; ninguna secuencia de retos queda forzada en giros normales.
+- Los cinco retos nuevos permanecen habilitados dentro del catalogo aleatorio.
+
 ## Prueba de aceptación - secuencia de retos nuevos (2026-08-15)
 
 - RGB, 180°, Lluvia de tinta, Daño -50% y HP.1 quedaron habilitados en el

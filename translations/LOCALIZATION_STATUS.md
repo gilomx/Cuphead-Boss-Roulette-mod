@@ -1,0 +1,46 @@
+# Estado de localización
+
+Este índice separa temporalmente el contenido aprobado del contenido nuevo
+pendiente. Cuando las doce revisiones nuevas estén terminadas, las tablas se
+fusionarán de nuevo y esta separación se retirará.
+
+## Catálogo aprobado actual
+
+- 29 IDs visibles de la ruleta, prompts del mapa y HUD.
+- 12 idiomas aprobados y activos.
+- Las entregas originales permanecen archivadas sin cambios en
+  `translations/review_by_language/`.
+- `SpanishAmerica` conserva el override `SIN PEASHOOTER`; `SpanishSpain` usa
+  `SIN DISPARO NORMAL`.
+
+## Pendiente de localización
+
+### Cinco retos nuevos
+
+- `challenge.rgb_shift`
+- `challenge.upside_down`
+- `challenge.hp_one`
+- `challenge.ink_rain`
+- `challenge.half_damage`
+
+### Creator Tools
+
+Hay 21 IDs visibles pendientes: etiquetas del menú, valores, alineación, orden,
+confirmaciones, ayuda inferior y estados del servidor local. Cada documento
+activo contiene la tabla completa con su columna de aprobación vacía.
+
+## Fuera de alcance
+
+Continúan excluidos los textos de la interfaz antigua, logs, configuración de
+BepInEx, símbolos de botones, escalas, porcentajes, URL local y nombres de
+jefes/equipo que ya proceden de la localización oficial de Cuphead.
+
+## Cierre de esta etapa
+
+Cuando estén aprobadas las doce entregas:
+
+1. Incorporar los nuevos valores a `ModLocalization.cs` y Creator Tools.
+2. Probar anchos, fuentes y saltos de línea en los doce idiomas.
+3. Mover los 26 IDs nuevos al catálogo aprobado de cada archivo.
+4. Actualizar `review_by_language/` con las nuevas entregas finales.
+5. Eliminar la separación temporal entre aprobado y pendiente.
