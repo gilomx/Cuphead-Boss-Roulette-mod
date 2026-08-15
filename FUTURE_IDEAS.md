@@ -61,8 +61,8 @@ Estado: funcionalidad terminada y aceptada en 0.5.129. Queda desactivada por
 decisión del proyecto: `EnableRgbShiftChallenge` y
 `ForceRgbShiftChallengeForTesting` están en `false`, por lo que no aparece en
 la ruleta. Para publicarla después se activa sólo el primer interruptor. El arte
-final de tres frames y el nombre localizado siguen pendientes como presentación,
-no como desarrollo funcional.
+final de tres frames ya está integrado; el nombre localizado continúa siendo
+una decisión de presentación y no un pendiente funcional.
 
 ### Idea
 
@@ -101,8 +101,8 @@ mismos 1.5 segundos de apertura normal que `Blanco y negro` y entra durante
 trayectoria sinusoidal 2D: velocidad vertical 10 y horizontal 7.3, con 70% de
 amplitud horizontal. Rojo usa 120% de fuerza, verde 60% y azul 90%. También
 controla `BlurGamma` sin corutinas: conserva el ciclo nativo de 2.2 segundos a
-70% de fuerza. El placeholder es un único PNG transparente de 80 × 80 con el
-texto `RGB`; el arte final animado sigue pendiente.
+70% de fuerza. El arte final usa `rgb_01.png` a `rgb_03.png`, tres PNG
+transparentes de 80 × 80 que la ruleta anima a 12.5 fps.
 
 ## Reto de fijado permanente
 
@@ -186,8 +186,8 @@ Dados, supers, HUD y restauración del equipamiento al volver al mapa.
 
 Estado: implementación y pruebas manuales terrestres terminadas en 0.5.129.
 `EnableUpsideDownChallenge` y `ForceUpsideDownChallengeForTesting` están en
-`false`, por lo que queda compilado pero dormido hasta recibir el nuevo icono
-animado y completar su matriz final de pruebas.
+`false`, por lo que queda compilado pero dormido hasta completar su matriz final
+de pruebas y decidir su activación pública. Su icono animado ya está integrado.
 
 ### Diseño final
 
@@ -213,7 +213,8 @@ controles.
 - La prueba terrestre confirmó derrota, reintento, ambas salidas al mapa,
   reinicio desde pausa, sonido y limpieza. Antes de publicarlo faltan avión,
   cooperativo, parrys repetidos y la cadena completa del Palacio de Dados.
-- El icono actual es temporal; el nuevo arte animado sigue pendiente.
+- El arte final usa `upside_down_01.png` a `upside_down_03.png` y ya está
+  conectado a la animación normal de la ruleta.
 
 ## Reto aleatorio por intervalos
 
@@ -258,15 +259,14 @@ confirmar únicamente si el siguiente reto puede repetir el anterior.
 - Probar P1, cooperativo, terrestre, avión, reintentos, pausa, knockout,
   Palacio de Dados y cambios de escena.
 
-## Reto HP.1 (implementación terminada, en espera de arte)
+## Reto HP.1 (implementación y arte terminados)
 
 ### Estado actual
 
-La implementación funcional está terminada y superó su matriz manual. Permanece
-desactivada mediante `ExperimentalFeatures.EnableHpOneChallenge = false` y
-`ForceHpOneChallengeForTesting = false` únicamente porque falta sustituir el
-icono temporal por el icono animado definitivo de ruleta/HUD. Hasta entonces no
-puede aparecer en giros normales.
+La implementación funcional está terminada, superó su matriz manual y ya usa su
+icono animado definitivo. Permanece desactivada mediante
+`ExperimentalFeatures.EnableHpOneChallenge = false` y
+`ForceHpOneChallengeForTesting = false` hasta decidir su activación pública.
 
 El reto funciona en niveles terrestres y de avión y fija la vida actual y
 máxima de cada jugador en exactamente 1 HP durante toda la sesión de batalla.
@@ -296,14 +296,14 @@ volver al mapa restaura el comportamiento normal sin modificar el perfil.
 - En cooperativo, P1 y P2 comienzan con 1 HP; un fantasma revive con 1 HP; un
   P2 incorporado durante la pelea entra con 1 HP; volver a intentar conserva
   una vida para ambos; salir de la ruleta restaura la vida normal.
-- El icono actual de candado `HP.1` es temporal y de un solo frame.
+- El arte final usa `hp1_01.png` a `hp1_03.png`, tres frames transparentes de
+  80 × 80 conectados a la ruleta.
 
 ### Pendiente antes de reactivarlo
 
-Crear e integrar el icono animado definitivo para todas las apariciones del
-reto. Después conviene ejecutar una regresión corta de giro, HUD, reintento y
-cooperativo, habilitar `EnableHpOneChallenge` y mantener todos los selectores
-`Force...ForTesting` desactivados.
+Ejecutar una regresión corta de giro, HUD, reintento y cooperativo. Después se
+puede habilitar `EnableHpOneChallenge` cuando se decida publicarlo, manteniendo
+todos los selectores `Force...ForTesting` desactivados.
 
 ## Creator Tools: overlay local
 

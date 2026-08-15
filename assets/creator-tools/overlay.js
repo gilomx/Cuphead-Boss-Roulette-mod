@@ -128,7 +128,12 @@
       if (normalizedPath.endsWith("weapons/vacio.png")) {
         image.classList.add("empty-icon");
         image.src = "/assets/creator-tools/empty.png";
-      } else if (normalizedPath.startsWith("weapons/")) {
+      } else if (
+        normalizedPath.startsWith("weapons/") ||
+        normalizedPath.startsWith("supers/") ||
+        normalizedPath.startsWith("charms/") ||
+        normalizedPath.startsWith("modifiers/")
+      ) {
         image.src = `/assets/creator-tools/${encodeURI(normalizedPath)}`;
       } else {
         image.src = `/assets/${encodeURI(path)}`;

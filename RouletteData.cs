@@ -177,15 +177,15 @@ namespace Gilomx.CupheadBossRoulette
             new ModifierEntry(ModifierId.NoEx, ModifierKind.Both, "modifiers/noex_01.png"),
             new ModifierEntry(ModifierId.BlackAndWhite, ModifierKind.Both, "modifiers/blacknwhite_01.png"),
             new ModifierEntry(ModifierId.RgbShift, ModifierKind.Both,
-                "modifiers/rgb.png", 1),
+                "modifiers/rgb_01.png"),
             new ModifierEntry(ModifierId.UpsideDown, ModifierKind.Both,
-                "modifiers/upside_down.png", 1),
+                "modifiers/upside_down_01.png"),
             new ModifierEntry(ModifierId.HpOne, ModifierKind.Both,
-                "modifiers/hp1.png", 1),
+                "modifiers/hp1_01.png"),
             new ModifierEntry(ModifierId.InkRain, ModifierKind.Both,
                 "modifiers/inkrain_01.png"),
             new ModifierEntry(ModifierId.HalfDamage, ModifierKind.Both,
-                "modifiers/halfdamage.png", 1),
+                "modifiers/halfdamage_01.png"),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
 

@@ -1,5 +1,39 @@
 # Historial de cambios
 
+## Prueba de aceptación - secuencia de retos nuevos (2026-08-15)
+
+- RGB, 180°, Lluvia de tinta, Daño -50% y HP.1 quedaron habilitados en el
+  catálogo normal después de completar funcionalidad y arte.
+- Una secuencia temporal de aceptación fuerza exactamente un reto por giro y
+  se repite en este orden: RGB, 180°, Lluvia de tinta, Daño -50% y HP.1. Cada
+  resultado conserva un jefe compatible elegido al azar.
+- Los cinco selectores individuales `Force...ForTesting` permanecen apagados;
+  la secuencia dedicada evita que la prioridad histórica deje siempre el mismo
+  reto. Debe desactivarse antes de preparar una build pública.
+
+## Desarrollo experimental - conjunto completo del overlay (2026-08-15)
+
+- Creator Tools ya tiene recursos estáticos exclusivos para las 34 imágenes
+  únicas del resultado: `Nada`, nueve armas, tres supers, nueve amuletos y doce
+  retos. La ruleta y el HUD dentro del juego conservan sus archivos originales.
+- Se añadieron al overlay los cinco retos nuevos entregados como `trippy`,
+  `flip`, `hp1`, `ink` y `halfdamage`; sus rutas internas normalizadas son
+  `rgb_01`, `upside_down_01`, `hp1_01`, `inkrain_01` y `halfdamage_01`.
+- El navegador redirige ahora armas, supers, amuletos y retos a
+  `assets/creator-tools`, además del tratamiento especial ya existente para
+  `Nada`. Todos los iconos entregados conservan su tamaño y transparencia.
+
+## Desarrollo experimental - arte animado de retos nuevos (2026-08-14)
+
+- Se integraron las secuencias finales de tres fotogramas para `DESFASE RGB`,
+  `180°`, `HP.1`, `LLUVIA DE TINTA` y `DAÑO -50%`, todas en PNG RGBA de 80 × 80.
+- Los archivos aportados como `trippy`, `flip`, `hp1`, `ink` y `halfdamage`
+  quedaron normalizados como `rgb_01..03`, `upside_down_01..03`,
+  `hp1_01..03`, `inkrain_01..03` y `halfdamage_01..03`.
+- `RouletteData` conecta ahora los cinco retos con su animación normal de tres
+  frames a 12.5 fps. Los interruptores experimentales no cambiaron: Lluvia de
+  tinta permanece habilitada y RGB, 180°, HP.1 y Daño -50% siguen dormidos.
+
 ## Desarrollo experimental - Creator Tools overlay (2026-08-13)
 
 - La prueba aislada confirmó que insertar la fila del mod en el índice 4 dejaba

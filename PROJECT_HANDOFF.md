@@ -1,5 +1,59 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Forced five-challenge acceptance sequence (2026-08-15)
+
+All five completed new challenges are now enabled: RGB Shift, Upside Down,
+Ink Rain, Half Damage and HP.1. A separate temporary selector,
+`ForceNewChallengeSequenceForTesting`, is true and advances once whenever a
+roulette spin is created. Its repeating order is RGB Shift -> Upside Down ->
+Ink Rain -> Half Damage -> HP.1. The boss remains random but is selected from
+the challenge-compatible pool.
+
+The older per-challenge `Force...ForTesting` switches remain false; enabling all
+of them would not form a sequence because `ForcedTestChallenge` resolves them by
+priority. Before a public build, set `ForceNewChallengeSequenceForTesting` back
+to false. Keep the five `Enable...Challenge` switches true if acceptance passes
+and the project intends to publish all five.
+
+## Complete Creator Tools icon set (2026-08-15)
+
+Creator Tools now owns a complete static overlay-only set for all 34 unique
+result images: one native white Empty icon, nine weapons, three supers, nine
+charms and twelve challenges. The five final missing challenge deliveries were
+normalized from `trippy.png`, `flip.png`, `hp1.png`, `ink.png` and
+`halfdamage.png` to `assets/creator-tools/modifiers/rgb_01.png`,
+`upside_down_01.png`, `hp1_01.png`, `inkrain_01.png` and
+`halfdamage_01.png`.
+
+`overlay.js` redirects every non-empty `weapons/`, `supers/`, `charms/` and
+`modifiers/` runtime path to the matching file below `assets/creator-tools`.
+Empty continues using `assets/creator-tools/empty.png`. This routing is confined
+to the browser overlay: the equip-card roulette and in-game battle HUD continue
+using their normal animated/original assets. Keep the overlay filenames aligned
+with `RouletteData` first-frame paths when future equipment or challenges are
+added.
+
+## Final animated art for the new challenges (2026-08-14)
+
+The five implemented new challenges now have their final three-frame 80 x 80
+RGBA icon sequences under `assets/modifiers`: `rgb_01..03`,
+`upside_down_01..03`, `hp1_01..03`, `inkrain_01..03` and
+`halfdamage_01..03`. The source deliveries named Trippy, Flip, HP1, Ink and
+Half Damage were normalized to the runtime identifiers; the corrected Trippy
+files are the RGB sequence and contain no stray edge pixel.
+
+`RouletteData.Modifiers` points each of these challenges at frame 01 and uses
+the normal three-frame convention. The equip-card roulette therefore animates
+them at 12.5 fps (80 ms per frame), while the battle HUD and Creator Tools keep
+using frame 01 as their static representation, matching established challenge
+behavior.
+
+No feature switches changed with the art integration. Ink Rain remains enabled
+for ordinary selection. RGB Shift, Upside Down, HP.1 and Half Damage remain
+dormant (`Enable...Challenge = false`) until their deliberate release and any
+remaining short regression passes; every `Force...ForTesting` switch remains
+false.
+
 ## Creator Tools first development build (2026-08-13)
 
 The disabled isolation build confirmed that Creator Tools exposed the native
@@ -167,12 +221,13 @@ fight. `ActiveChallengeMatches()` intentionally treats every `DicePalace*` scene
 as part of the `Levels.DicePalaceMain` roulette session, so the modifier and HUD
 persist until the chain is completed or abandoned.
 
-The user-provided static `assets/modifiers/halfdamage.png` is retained only as a
-provisional reference. `EnableHalfDamageChallenge` and
+The user-provided static `assets/modifiers/halfdamage.png` is retained only as
+the earlier reference; the final runtime art is the three-frame
+`halfdamage_01..03.png` sequence. `EnableHalfDamageChallenge` and
 `ForceHalfDamageChallengeForTesting` are both `false`; therefore Half Damage
-cannot appear or execute in normal roulette play. Reactivate it only after the
-final three-frame animated challenge icon is available and wired into
-`RouletteData.Modifiers`.
+cannot appear or execute in normal roulette play. Its art is no longer a release
+blocker; reactivate it only after the planned short regression and deliberate
+public-release decision.
 
 ## Native Ink Rain splats and final acceptance (2026-08-13)
 
@@ -212,8 +267,8 @@ Manual regression passed in these paths:
   complete victory chain.
 
 No further full boss regression is required for this isolated presentation
-change. The remaining non-code deliverable is the final animated Ink Rain icon if
-the provisional single-frame icon is later replaced.
+change. The final animated Ink Rain icon was subsequently delivered and wired
+as `inkrain_01..03.png`.
 
 ## Captain Brineybeard native Ink Rain integration (2026-08-13)
 
@@ -744,12 +799,11 @@ screen without a fake impact.
 4. Replace the provisional challenge icon with the user's finished animation.
    Keep all feature and test selectors disabled until the next explicit session.
 
-## Completed dormant HP.1 challenge (0.5.129, awaiting final animated icon)
+## Completed dormant HP.1 challenge (0.5.129)
 
-`ModifierId.HpOne` implements the ground-and-plane `HP.1` challenge. The
-roulette and battle HUD use `assets/modifiers/hp1.png`, an 80 x 80 temporary
-single-frame icon with a padlock and the joined `HP.1` label. All localization
-dictionaries currently use `HP.1` as the challenge name.
+`ModifierId.HpOne` implements the ground-and-plane `HP.1` challenge. Its final
+80 x 80 art is the three-frame `assets/modifiers/hp1_01..03.png` sequence. All
+localization dictionaries currently use `HP.1` as the challenge name.
 
 The runtime rule is a real health lock, not a cosmetic HUD override.
 `HpOneChallenge.cs` patches the `PlayerStatsManager.Health` and `HealthMax`
@@ -840,9 +894,9 @@ Expert (`Level.Mode` value 2), so Normal is the meaningful regression case.
 - `ExperimentalFeatures.ForceHpOneChallengeForTesting = false`.
 - Every HP.1 loadout/boss test selector and the generic boss selector are
   `false`; normal builds do not select HP.1.
-- The only release gate is replacing the temporary single-frame `hp1.png` with
-  the final animated challenge icon. Re-enable the challenge only after that
-  asset is integrated; never re-enable a force selector for a public build.
+- Final animated art is integrated. The remaining release gate is a short
+  roulette/HUD/retry/co-op regression and an explicit public activation
+  decision; never enable a force selector for a public build.
 
 Manual validation completed for ground and plane, Cuphead/Mugman and Ms.
 Chalice-specific behavior, Heart, Twin Heart, Heart Ring, Cursed/Divine Relic,
@@ -931,13 +985,14 @@ layers remain upright. A retry of the same level instance sequence starts from
 different `Levels` value preserves the completed 180-degree state and attaches
 it to the new camera without replaying the entry.
 
-The temporary display name is `180°` in all 12 language dictionaries. The
-single-frame `assets/modifiers/upside_down.png` is now an 80 × 80 transparent
-text-free icon: a cream arrow with black vintage ink, tilted as an elliptical
-ring in perspective so its wide front arc and narrow rear arc imply a flat
-180-degree turn. The merely vertically reversed second draft was rejected.
-The current third draft narrows into the upper/rear arc, then grows into a large
-foreshortened arrowhead that emerges from the back toward the viewer. Runtime
+The temporary display name is `180°` in all 12 language dictionaries. The final
+three-frame `assets/modifiers/upside_down_01..03.png` sequence uses 80 × 80
+transparent text-free art: a cream arrow with black vintage ink, tilted as an
+elliptical ring in perspective so its wide front arc and narrow rear arc imply
+a flat 180-degree turn. The merely vertically reversed second draft was
+rejected. The accepted design narrows into the upper/rear arc, then grows into
+a large foreshortened arrowhead that emerges from the back toward the viewer.
+Runtime
 feedback found the first export too horizontal, so the active asset rotates the
 same high-resolution transparent art clockwise by 28 degrees before its final
 80 Ã— 80 Lanczos downscale. It was

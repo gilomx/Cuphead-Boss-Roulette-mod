@@ -38,6 +38,17 @@ namespace Gilomx.CupheadBossRoulette
                   ExperimentalFeatures.ForceHalfDamageChallengeForTesting
                 ? ModifierId.HalfDamage
                 : ModifierId.None;
+        // TEMPORARY ACCEPTANCE SEQUENCE. Each spin advances through the five
+        // completed new challenges while keeping the boss compatible/random.
+        private static readonly bool ForceNewChallengeSequenceForTesting = true;
+        private static readonly ModifierId[] ForcedNewChallengeTestSequence =
+        {
+            ModifierId.RgbShift,
+            ModifierId.UpsideDown,
+            ModifierId.InkRain,
+            ModifierId.HalfDamage,
+            ModifierId.HpOne
+        };
         // Dormant test selector: alternate cursed/divine relic each spin.
         private static readonly bool ForceRelicTestSequence = false;
         // Dormant targeted test: force only Cursed Relic (grade 0).
@@ -150,6 +161,7 @@ namespace Gilomx.CupheadBossRoulette
         private int forcedHpOneHealthCharmTestSpin;
         private int forcedPlaneRelicChallengeTestSpin;
         private int forcedBossTestSpin;
+        private int forcedNewChallengeTestSpin;
         private const int RecentBossHistorySize = 3;
         private readonly List<int> recentBossIndices = new List<int>();
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
@@ -1435,8 +1447,9 @@ namespace Gilomx.CupheadBossRoulette
         private RouletteResult CreateRandomResult()
         {
             EnsureAvailableContent();
-            var forcedModifier =
-                ForcedPlaneRelicChallengeModifierIndex();
+            var forcedModifier = ForcedNewChallengeModifierIndex();
+            if (forcedModifier < 0)
+                forcedModifier = ForcedPlaneRelicChallengeModifierIndex();
             if (forcedModifier < 0)
                 forcedModifier = ForcedTestModifierIndex();
             if (ForceDjimmiGuardTest)
@@ -1562,6 +1575,38 @@ namespace Gilomx.CupheadBossRoulette
             return -1;
         }
 
+        private int ForcedNewChallengeModifierIndex()
+        {
+            if (!ForceNewChallengeSequenceForTesting ||
+                ForcedNewChallengeTestSequence.Length == 0)
+                return -1;
+
+            var expectedId = ForcedNewChallengeTestSequence[
+                forcedNewChallengeTestSpin];
+            forcedNewChallengeTestSpin = (forcedNewChallengeTestSpin + 1) %
+                                         ForcedNewChallengeTestSequence.Length;
+            if (!ExperimentalFeatures.IsChallengeEnabled(expectedId))
+            {
+                Logger.LogWarning(
+                    "Forced new challenge is disabled: " + expectedId + ".");
+                return -1;
+            }
+
+            for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+            {
+                if (RouletteData.Modifiers[i].Id != expectedId)
+                    continue;
+                Logger.LogInfo(
+                    "Forced new challenge sequence: " + expectedId + ".");
+                return i;
+            }
+
+            Logger.LogWarning(
+                "Forced new challenge is missing from RouletteData: " +
+                expectedId + ".");
+            return -1;
+        }
+
         private int ForcedTestBossIndex()
         {
             if (!ForceTestBoss || ForcedTestBossSequence.Length == 0)
@@ -1634,12 +1679,13 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool HasForcedTestChallenge()
         {
-            return ForcedTestChallenge != ModifierId.None;
+            return ForceNewChallengeSequenceForTesting ||
+                   ForcedTestChallenge != ModifierId.None;
         }
 
         private static int ForcedTestModifierIndex()
         {
-            if (!HasForcedTestChallenge())
+            if (ForcedTestChallenge == ModifierId.None)
                 return -1;
 
             for (var i = 0; i < RouletteData.Modifiers.Length; i++)
