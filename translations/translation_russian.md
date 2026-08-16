@@ -63,6 +63,9 @@ porcentajes y la URL local no se traducen.
 
 | ID | Referencia en español / inglés | Traducción aprobada |
 | --- | --- | --- |
+| `creator.menu.roulette_overlay` | OVERLAY DE RULETA / ROULETTE OVERLAY | |
+| `creator.menu.status` | ESTADO / STATUS | |
+| `creator.menu.retry` | AL REINTENTAR / ON RETRY | |
 | `creator.menu.preview` | VISTA PREVIA / PREVIEW | |
 | `creator.menu.size` | TAMAÑO / SIZE | |
 | `creator.menu.order` | ORDEN / ORDER | |
@@ -70,8 +73,11 @@ porcentajes y la URL local no se traducen.
 | `creator.menu.opacity` | OPACIDAD / OPACITY | |
 | `creator.action.copy_overlay_url` | COPIAR URL DEL OVERLAY / COPY OVERLAY URL | |
 | `creator.action.copy_url` | COPIAR URL / COPY URL | |
+| `creator.action.back` | VOLVER / BACK | |
 | `creator.value.enabled` | ACTIVADO / ENABLED | |
 | `creator.value.disabled` | DESACTIVADO / DISABLED | |
+| `creator.retry.keep` | MANTENER / KEEP | |
+| `creator.retry.reappear` | REAPARECER / REAPPEAR | |
 | `creator.order.icons_above` | ICONOS ARRIBA / ICONS ABOVE | |
 | `creator.order.text_above` | TEXTO ARRIBA / TEXT ABOVE | |
 | `creator.alignment.left` | IZQUIERDA / LEFT | |

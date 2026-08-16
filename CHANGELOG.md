@@ -1,9 +1,21 @@
 # Historial de cambios
 
+## Creator Tools: nombre y reintentos (2026-08-15)
+
+- La entrada del menú y la tarjeta principal ahora se llaman `CREATOR TOOLS`;
+  la función concreta se identifica como `OVERLAY DE RULETA` y abre su propia
+  página nativa, dejando preparado el contenedor para futuras herramientas.
+- Se agregó `AL REINTENTAR` con `REAPARECER` como comportamiento predeterminado
+  para grabaciones y `MANTENER` para directos. Mantener evita que el overlay
+  salga, pierda iconos o repita la entrada entre derrota y reintento; todavía
+  sale normalmente al ganar, abandonar o sustituir la sesión de ruleta.
+- La plantilla de traducción añade seis IDs por la nueva navegación y opción;
+  Creator Tools pasa de 21 a 27 cadenas pendientes.
+
 ## Preparación de la nueva localización (2026-08-15)
 
 - Los doce documentos activos separan ahora los 29 IDs ya aprobados de los
-  26 pendientes: cinco retos nuevos y 21 cadenas visibles de Creator Tools.
+  32 pendientes: cinco retos nuevos y 27 cadenas visibles de Creator Tools.
 - Se añadió `translations/LOCALIZATION_STATUS.md` como índice temporal.
 - Las entregas históricas permanecen intactas; al aprobar los doce idiomas se
   volverán a fusionar las tablas y se retirará esta separación.

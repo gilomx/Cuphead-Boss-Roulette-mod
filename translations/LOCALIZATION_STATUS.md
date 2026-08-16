@@ -25,7 +25,7 @@ fusionarán de nuevo y esta separación se retirará.
 
 ### Creator Tools
 
-Hay 21 IDs visibles pendientes: etiquetas del menú, valores, alineación, orden,
+Hay 27 IDs visibles pendientes: etiquetas del menú, valores, alineación, orden,
 confirmaciones, ayuda inferior y estados del servidor local. Cada documento
 activo contiene la tabla completa con su columna de aprobación vacía.
 
@@ -41,6 +41,6 @@ Cuando estén aprobadas las doce entregas:
 
 1. Incorporar los nuevos valores a `ModLocalization.cs` y Creator Tools.
 2. Probar anchos, fuentes y saltos de línea en los doce idiomas.
-3. Mover los 26 IDs nuevos al catálogo aprobado de cada archivo.
+3. Mover los 32 IDs nuevos al catálogo aprobado de cada archivo.
 4. Actualizar `review_by_language/` con las nuevas entregas finales.
 5. Eliminar la separación temporal entre aprobado y pendiente.

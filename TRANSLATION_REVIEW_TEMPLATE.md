@@ -3,11 +3,11 @@
 Idioma objetivo: **ESCRIBE AQUÍ EL IDIOMA DE LA TABLA SIGUIENTE**
 
 Esta plantilla separa los **29 textos aprobados** del catálogo anterior y los
-**26 textos nuevos pendientes**. El inventario cubre la Equip Card, los prompts
+**32 textos nuevos pendientes**. El inventario cubre la Equip Card, los prompts
 del mapa, el HUD de combate y el menú de Creator Tools.
 
 Estado del catálogo anterior: **los doce idiomas están aprobados y activos**.
-Las cinco cadenas de retos y las 21 de Creator Tools deben revisarse ahora sin
+Las cinco cadenas de retos y las 27 de Creator Tools deben revisarse ahora sin
 alterar las traducciones que ya habían sido aceptadas.
 
 ## Idiomas disponibles y orden histórico de Ctrl+F8
@@ -106,6 +106,9 @@ traducción. Traduce las siguientes etiquetas y mensajes:
 
 | ID | Español de referencia | Dónde aparece | Traducción aprobada |
 | --- | --- | --- | --- |
+| `creator.menu.roulette_overlay` | OVERLAY DE RULETA | Entrada y título de la herramienta | |
+| `creator.menu.status` | ESTADO | Menú Overlay de ruleta | |
+| `creator.menu.retry` | AL REINTENTAR | Menú Overlay de ruleta | |
 | `creator.menu.preview` | VISTA PREVIA | Menú Creator Tools | |
 | `creator.menu.size` | TAMAÑO | Menú Creator Tools | |
 | `creator.menu.order` | ORDEN | Menú Creator Tools | |
@@ -113,8 +116,11 @@ traducción. Traduce las siguientes etiquetas y mensajes:
 | `creator.menu.opacity` | OPACIDAD | Menú Creator Tools | |
 | `creator.action.copy_overlay_url` | COPIAR URL DEL OVERLAY | Menú alternativo | |
 | `creator.action.copy_url` | COPIAR URL | Menú nativo | |
+| `creator.action.back` | VOLVER | Acción inferior de la herramienta | |
 | `creator.value.enabled` | ACTIVADO | Valor de opción | |
 | `creator.value.disabled` | DESACTIVADO | Valor de opción | |
+| `creator.retry.keep` | MANTENER | Comportamiento al reintentar | |
+| `creator.retry.reappear` | REAPARECER | Comportamiento al reintentar | |
 | `creator.order.icons_above` | ICONOS ARRIBA | Valor de orden | |
 | `creator.order.text_above` | TEXTO ARRIBA | Valor de orden | |
 | `creator.alignment.left` | IZQUIERDA | Valor de alineación | |

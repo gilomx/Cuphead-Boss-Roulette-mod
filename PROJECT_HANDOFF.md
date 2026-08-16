@@ -1,13 +1,45 @@
 # Cuphead Boss Roulette - Project Handoff
+## Creator Tools naming and retry behavior (2026-08-15)
+
+The map pause entry and main native card are now named `CREATOR TOOLS`; the
+roulette broadcast feature is identified separately as `OVERLAY DE RULETA`
+(`ROULETTE OVERLAY` outside Spanish). The main card acts as a small tool hub:
+it opens the overlay-specific native settings page, keeps temporary Preview
+immediately below it, and retains the centered Copy URL action. This leaves a
+clear container for future creator features without crowding Cuphead's fixed
+six-setting Visual card.
+
+The overlay settings page contains Status, On Retry, Size, Order, Alignment and
+Opacity, with the native bottom action returning to the Creator Tools hub.
+Cancel also returns to the hub first; cancelling again restores Cuphead's
+original Visual menu objects and closes back to the pause menu. Preview still
+turns itself off only when the complete Creator Tools menu is closed.
+
+`AlReintentar` is persisted under the existing `Creator Tools` BepInEx config
+section. Its default is `REAPARECER`, preserving the accepted recording
+behavior: defeat plays the overlay exit and retry replays its entrance in sync
+with the battle HUD. `MANTENER` is the streaming behavior: temporary HUD/battle
+visibility gaps cannot hide the overlay or reduce its reveal state, so it stays
+stable across any number of retries. The definitive
+`EndCreatorToolsBattleSession()` still performs the normal exit on victory,
+abandonment/return to map or replacement by a new roulette session.
+
+Six new pending localization IDs describe this hierarchy and behavior:
+`creator.menu.roulette_overlay`, `creator.menu.status`, `creator.menu.retry`,
+`creator.retry.keep`, `creator.retry.reappear` and `creator.action.back`.
+Creator Tools therefore has 27 pending strings; with the five new challenge
+names, the current pending catalog contains 32 IDs. Runtime still uses the
+established Spanish/English fallback until all 12 language reviews are approved.
+
 ## Localization documentation split (2026-08-15)
 
 The 12 active files under `translations/` now separate the established
-29-ID approved catalog from 26 new IDs awaiting review: five challenge names
-and 21 visible Creator Tools strings. `translations/LOCALIZATION_STATUS.md`
+29-ID approved catalog from 32 new IDs awaiting review: five challenge names
+and 27 visible Creator Tools strings. `translations/LOCALIZATION_STATUS.md`
 is the source of truth for this temporary stage. Historical deliveries under
 `translations/review_by_language/` remain unchanged.
 
-After all 12 new deliveries are approved, move the 26 rows into each approved
+After all 12 new deliveries are approved, move the 32 rows into each approved
 table, archive the reviewed deliveries, update runtime dictionaries, perform
 font/width regression, and remove the temporary approved/pending split.
 
@@ -84,13 +116,14 @@ This removes the overflowing `COPIAR URL DEL OVERLAY` label/value pair and uses
 the common large options card shared by Visual and Audio more faithfully. Build
 verification remains 0 errors and 0 warnings.
 
-The accepted menu order is now Enabled, Preview, Size, Order, Alignment,
-Opacity, then Copy URL. Opacity retains the safe 25-100% range but advances in
-5-point increments. Preview is deliberately session-only: enabling it starts
-Creator Tools automatically if necessary, then the browser reveals its five
-simulated icons and challenge label in the normal entry order. Closing the
-Creator Tools screen immediately publishes the hidden state and reproduces the
-complete exit before resetting Preview, so it cannot remain visible in OBS.
+That original single-page order was superseded by the Creator Tools hub and
+Overlay de ruleta page documented at the top of this handoff. Opacity retains
+the safe 25-100% range but advances in 5-point increments. Preview is
+deliberately session-only: enabling it starts Creator Tools automatically if
+necessary, then the browser reveals its five simulated icons and challenge
+label in the normal entry order. Closing the complete Creator Tools screen
+publishes the hidden state and reproduces the complete exit before resetting
+Preview, so it cannot remain visible in OBS.
 
 `dist/Las-Pichi-Ruleta-Creator-Tools-Iconos-1X-2X.zip` contains the exact 34
 unique PNG paths currently sent by the overlay: 10 weapon/empty, 3 super, 9
@@ -195,15 +228,16 @@ The browser files live in `assets/creator-tools`. They reconnect with backoff,
 hide stale state immediately, cache static icon files and accept live scale,
 icons-above/text-above order, alignment and opacity changes over WebSocket.
 
-`CreatorToolsMenu.cs` inserts `LA PICHI RULETA` at index 4 of `MapPauseUI`,
+`CreatorToolsMenu.cs` inserts `CREATOR TOOLS` at index 4 of `MapPauseUI`,
 directly after native `OPCIONES`. Later native selections are temporarily mapped
 back by one only while `LevelPauseGUI.Select()` executes, preserving every
 original action. Selecting it now enters Cuphead's real `OptionsGUI` Visual
-screen and temporarily loans its rows to Creator Tools. The mod therefore uses
+screen and temporarily loans its rows to the Creator Tools hub and its
+`OVERLAY DE RULETA` settings page. The mod therefore uses
 the exact native card/noise background, fonts, selected colors, arrows, repeat
 timing, motion, sounds, keyboard/controller navigation and pause transition
-instead of drawing a lookalike IMGUI card. Seven rows expose enabled, preview,
-size, vertical order, alignment, opacity and URL copy. On Cancel every
+instead of drawing a lookalike IMGUI card. The hierarchy and current row sets
+are documented in the newest section at the top of this file. On final Cancel every
 original Visual button, localization helper, value, active state, title and
 `currentItems` entry is restored before the native options screen closes, so
 resolution, fullscreen, V-Sync and the other game settings remain untouched.

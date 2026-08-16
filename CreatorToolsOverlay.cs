@@ -21,6 +21,12 @@ namespace Gilomx.CupheadBossRoulette
         TextAbove
     }
 
+    internal enum CreatorToolsRetryBehavior
+    {
+        Keep,
+        Reappear
+    }
+
     public sealed partial class Plugin
     {
         private const int CreatorToolsDefaultPort = 18081;
@@ -34,6 +40,8 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsAlignmentSetting;
         private ConfigEntry<int> creatorToolsOpacitySetting;
         private ConfigEntry<bool> creatorToolsPreviewSetting;
+        private ConfigEntry<CreatorToolsRetryBehavior>
+            creatorToolsRetryBehaviorSetting;
 
         private CreatorToolsServer creatorToolsServer;
         private bool creatorToolsBattleSessionActive;
@@ -73,6 +81,10 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsPreviewSetting = Config.Bind(
                 "Creator Tools", "VistaPrevia", false,
                 "Muestra un resultado simulado mientras no hay combate.");
+            creatorToolsRetryBehaviorSetting = Config.Bind(
+                "Creator Tools", "AlReintentar",
+                CreatorToolsRetryBehavior.Reappear,
+                "Al reintentar, mantiene el overlay o repite su animacion.");
 
             NormalizeCreatorToolsSettings();
             // Preview is a temporary positioning aid, never a persisted
@@ -231,6 +243,13 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SetCreatorToolsBattleVisibility(bool visible)
         {
+            // In streaming mode the overlay is a persistent broadcast panel:
+            // temporary battle/HUD gaps (defeat, retry and scene hand-offs)
+            // must not play its exit animation. The definitive session end
+            // still hides it on victory or when returning to the map.
+            if (!visible && creatorToolsBattleSessionActive &&
+                CreatorToolsKeepOverlayAcrossRetries)
+                return;
             if (!creatorToolsBattleSessionActive ||
                 creatorToolsBattleVisible == visible)
                 return;
@@ -243,12 +262,31 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!creatorToolsBattleSessionActive)
                 return;
+            if (CreatorToolsKeepOverlayAcrossRetries)
+            {
+                // BattleResultHud resets its reveal counter while retrying.
+                // Never let those transient resets retract an overlay that
+                // has already entered; fresh sessions still begin at zero.
+                revealedIcons = Math.Max(
+                    creatorToolsRevealedIcons, revealedIcons);
+                textVisible = creatorToolsTextVisible || textVisible;
+            }
             if (creatorToolsRevealedIcons == revealedIcons &&
                 creatorToolsTextVisible == textVisible)
                 return;
             creatorToolsRevealedIcons = revealedIcons;
             creatorToolsTextVisible = textVisible;
             PublishCreatorToolsState(false);
+        }
+
+        private bool CreatorToolsKeepOverlayAcrossRetries
+        {
+            get
+            {
+                return creatorToolsRetryBehaviorSetting != null &&
+                       creatorToolsRetryBehaviorSetting.Value ==
+                       CreatorToolsRetryBehavior.Keep;
+            }
         }
 
         private void EndCreatorToolsBattleSession()
