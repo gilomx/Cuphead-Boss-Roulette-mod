@@ -144,6 +144,7 @@ namespace Gilomx.CupheadBossRoulette
                     creatorToolsServer.Port;
             }
             PublishCreatorToolsState(true);
+            PublishCreatorToolsForceConfig(true);
             return true;
         }
 
@@ -203,6 +204,7 @@ namespace Gilomx.CupheadBossRoulette
                 StopCreatorToolsServer();
 
             UpdateCreatorToolsChallengeLabel();
+            UpdateCreatorToolsForceConfig();
         }
 
         private void DisposeCreatorTools()
@@ -297,12 +299,14 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsTextVisible = false;
             creatorToolsLabelKey = null;
             PublishCreatorToolsState(true);
+            PublishCreatorToolsForceConfig(true);
         }
 
         private void CreatorToolsLanguageChanged()
         {
             creatorToolsLabelKey = null;
             PublishCreatorToolsState(true);
+            PublishCreatorToolsForceConfig(true);
         }
 
         private void PublishCreatorToolsState(bool force)

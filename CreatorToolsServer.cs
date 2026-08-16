@@ -20,6 +20,9 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
         private readonly object stateLock = new object();
+        private readonly object configLock = new object();
+        private readonly Queue<string> configCommands =
+            new Queue<string>();
         private readonly object clientsLock = new object();
         private readonly List<WebSocketClient> clients =
             new List<WebSocketClient>();
@@ -34,6 +37,8 @@ namespace Gilomx.CupheadBossRoulette
         private long latestRevision;
         private byte[] challengeLabelPng;
         private int challengeLabelRevision;
+        private string latestConfigState =
+            "{\"enabled\":false,\"ready\":false}";
 
         internal int Port { get; private set; }
 
@@ -138,6 +143,27 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal void SetConfigState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (configLock)
+                latestConfigState = json;
+        }
+
+        internal bool TryTakeConfigCommand(out string command)
+        {
+            lock (configLock)
+            {
+                if (configCommands.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = configCommands.Dequeue();
+                return true;
+            }
+        }
         internal void Stop()
         {
             if (!running && listener == null)
@@ -249,7 +275,7 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
 
-                ServeHttp(stream, request.Path);
+                ServeHttp(stream, request);
             }
             catch (Exception exception)
             {
@@ -369,7 +395,12 @@ namespace Gilomx.CupheadBossRoulette
             request.Path = requestParts[1];
             var queryIndex = request.Path.IndexOf('?');
             if (queryIndex >= 0)
+            {
+                request.Query = request.Path.Substring(queryIndex + 1);
                 request.Path = request.Path.Substring(0, queryIndex);
+            }
+            else
+                request.Query = string.Empty;
             request.Headers = new Dictionary<string, string>(
                 StringComparer.OrdinalIgnoreCase);
 
@@ -415,8 +446,9 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
-        private void ServeHttp(NetworkStream stream, string path)
+        private void ServeHttp(NetworkStream stream, HttpRequest request)
         {
+            var path = request.Path;
             if (path == "/" || path == "/index.html")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
@@ -438,7 +470,46 @@ namespace Gilomx.CupheadBossRoulette
                     "application/javascript; charset=utf-8", false);
                 return;
             }
-            if (path == "/generated/challenge.png")
+            if (path == "/config" || path == "/config.html")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\config.html"),
+                    "text/html; charset=utf-8", false);
+                return;
+            }
+            if (path == "/config.css")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\config.css"),
+                    "text/css; charset=utf-8", false);
+                return;
+            }
+            if (path == "/config.js")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\config.js"),
+                    "application/javascript; charset=utf-8", false);
+                return;
+            }
+            if (path == "/api/config")
+            {
+                string json;
+                lock (configLock)
+                    json = latestConfigState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/config/set")
+            {
+                lock (configLock)
+                    configCommands.Enqueue(request.Query ?? string.Empty);
+                WriteResponse(stream, 202, "Accepted",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                return;
+            }            if (path == "/generated/challenge.png")
             {
                 byte[] png;
                 int revision;
@@ -650,6 +721,7 @@ namespace Gilomx.CupheadBossRoulette
         private sealed class HttpRequest
         {
             internal string Path;
+            internal string Query;
             internal Dictionary<string, string> Headers;
             internal bool IsWebSocket;
         }

@@ -21,8 +21,11 @@ namespace Gilomx.CupheadBossRoulette
         private const float DesignHeight = 720f;
         // TEMPORARY TEST SELECTOR. Keep non-None while developing a challenge.
         // Compatible bosses are still chosen randomly.
+        private const bool ForceLongestOverlayChallengeForTesting = true;
         private static readonly ModifierId ForcedTestChallenge =
-            ExperimentalFeatures.EnableHpOneChallenge &&
+            ForceLongestOverlayChallengeForTesting
+                ? ModifierId.MiniPlaneOnly
+                : ExperimentalFeatures.EnableHpOneChallenge &&
             ExperimentalFeatures.ForceHpOneChallengeForTesting
                 ? ModifierId.HpOne
                 : ExperimentalFeatures.EnableUpsideDownChallenge &&
@@ -1424,7 +1427,8 @@ namespace Gilomx.CupheadBossRoulette
                 SetVisible(true);
 
             resultReady = false;
-            result = CreateRandomResult();
+            result = CreateCreatorToolsForcedResult() ??
+                CreateRandomResult();
             revealed = 0;
             ticker = 0;
             spinStartedAt = Time.realtimeSinceStartup;

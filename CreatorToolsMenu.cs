@@ -11,8 +11,8 @@ namespace Gilomx.CupheadBossRoulette
     public sealed partial class Plugin
     {
         private const int CreatorToolsPauseMenuIndex = 4;
-        private const int CreatorToolsOverlayMenuItemCount = 7;
-        private const int CreatorToolsHubMenuItemCount = 3;
+        private const int CreatorToolsOverlayMenuItemCount = 9;
+        private const int CreatorToolsHubMenuItemCount = 2;
         private const string CreatorToolsPauseRowName =
             "Gilomx Las Pichi Ruleta Pause Row";
 
@@ -32,6 +32,10 @@ namespace Gilomx.CupheadBossRoulette
             AccessTools.Field(typeof(LevelPauseGUI), "options");
         private static readonly MethodInfo LevelPauseOpenOptionsMethod =
             AccessTools.Method(typeof(LevelPauseGUI), "Options");
+        private static readonly FieldInfo OptionsMainObjectField =
+            AccessTools.Field(typeof(OptionsGUI), "mainObject");
+        private static readonly FieldInfo OptionsMainButtonsField =
+            AccessTools.Field(typeof(OptionsGUI), "mainObjectButtons");
         private static readonly FieldInfo OptionsVisualObjectField =
             AccessTools.Field(typeof(OptionsGUI), "visualObject");
         private static readonly FieldInfo OptionsVisualButtonsField =
@@ -42,6 +46,8 @@ namespace Gilomx.CupheadBossRoulette
             AccessTools.Field(typeof(OptionsGUI), "_verticalSelection");
         private static readonly MethodInfo OptionsToVisualMethod =
             AccessTools.Method(typeof(OptionsGUI), "ToVisual");
+        private static readonly MethodInfo OptionsToMainOptionsMethod =
+            AccessTools.Method(typeof(OptionsGUI), "ToMainOptions");
         private static readonly MethodInfo OptionsToPauseMenuMethod =
             AccessTools.Method(typeof(OptionsGUI), "ToPauseMenu");
         private static readonly MethodInfo OptionsCenterVisualMethod =
@@ -86,6 +92,12 @@ namespace Gilomx.CupheadBossRoulette
         private LocalizationHelper creatorToolsNativeTitleLocalization;
         private bool creatorToolsNativeTitleLocalizationEnabled;
         private bool creatorToolsNativeConfigured;
+        private bool creatorToolsNativeTransitioning;
+
+        private GameObject creatorToolsNativeCopyDisplayObject;
+        private Text creatorToolsNativeCopyDisplayText;
+        private Color creatorToolsNativeSelectedColor = Color.white;
+        private Color creatorToolsNativeUnselectedColor = Color.white;
         private int creatorToolsMenuSelection;
         private CreatorToolsMenuPage creatorToolsMenuPage;
         private string creatorToolsMenuNotice;
@@ -156,6 +168,14 @@ namespace Gilomx.CupheadBossRoulette
                 typeof(OptionsGUI), "ShowMainOptionMenu");
             var showOptionsPostfix = AccessTools.Method(
                 typeof(Plugin), "CreatorToolsOptionsShowPostfix");
+            var hideOptions = AccessTools.Method(
+                typeof(OptionsGUI), "HideMainOptionMenu");
+            var hideOptionsPrefix = AccessTools.Method(
+                typeof(Plugin), "CreatorToolsOptionsHidePrefix");
+            var optionSelect = AccessTools.Method(
+                typeof(OptionsGUI), "OptionSelect");
+            var optionSelectPrefix = AccessTools.Method(
+                typeof(Plugin), "CreatorToolsOptionsMainSelectPrefix");
             var toMainOptions = AccessTools.Method(
                 typeof(OptionsGUI), "ToMainOptions");
             var toMainOptionsPrefix = AccessTools.Method(
@@ -208,6 +228,12 @@ namespace Gilomx.CupheadBossRoulette
             if (showOptions != null && showOptionsPostfix != null)
                 harmony.Patch(showOptions,
                     postfix: new HarmonyMethod(showOptionsPostfix));
+            if (hideOptions != null && hideOptionsPrefix != null)
+                harmony.Patch(hideOptions,
+                    prefix: new HarmonyMethod(hideOptionsPrefix));
+            if (optionSelect != null && optionSelectPrefix != null)
+                harmony.Patch(optionSelect,
+                    prefix: new HarmonyMethod(optionSelectPrefix));
             if (toMainOptions != null && toMainOptionsPrefix != null)
                 harmony.Patch(toMainOptions,
                     prefix: new HarmonyMethod(toMainOptionsPrefix));
@@ -264,7 +290,7 @@ namespace Gilomx.CupheadBossRoulette
                 Destroy(rowObject);
                 return;
             }
-            row.text = "CREATOR TOOLS";
+            row.text = "LA PICHI RULETA";
 
             var nativeLayout = rowParent == null
                 ? null
@@ -372,11 +398,34 @@ namespace Gilomx.CupheadBossRoulette
             plugin.ConfigureCreatorToolsNativeOptions();
         }
 
-        private static bool CreatorToolsOptionsToMainPrefix(
+        private static void CreatorToolsOptionsHidePrefix(
             OptionsGUI __instance)
         {
             var plugin = activeInstance;
             if (plugin == null || !plugin.creatorToolsMenuOpen ||
+                plugin.creatorToolsNativeOptions != __instance)
+                return;
+            plugin.CloseCreatorToolsMenu(false);
+        }
+
+        private static bool CreatorToolsOptionsMainSelectPrefix(
+            OptionsGUI __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.creatorToolsMenuOpen ||
+                plugin.creatorToolsNativeOptions != __instance ||
+                plugin.creatorToolsMenuPage != CreatorToolsMenuPage.Hub)
+                return true;
+            plugin.ActivateCreatorToolsNativeSelection();
+            return false;
+        }
+
+        private static bool CreatorToolsOptionsToMainPrefix(
+            OptionsGUI __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || plugin.creatorToolsNativeTransitioning ||
+                !plugin.creatorToolsMenuOpen ||
                 plugin.creatorToolsNativeOptions != __instance)
                 return true;
             if (plugin.creatorToolsMenuPage ==
@@ -526,7 +575,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             var items = LevelPauseMenuItemsField.GetValue(pause) as Text[];
             var row = items[CreatorToolsPauseMenuIndex];
-            row.text = "CREATOR TOOLS";
+            row.text = "LA PICHI RULETA";
             if (!row.gameObject.activeSelf)
                 row.gameObject.SetActive(true);
         }
@@ -621,10 +670,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (creatorToolsMenuPage ==
                     CreatorToolsMenuPage.RouletteOverlay)
-                    return CreatorToolsSpanish
-                        ? "OVERLAY DE RULETA"
-                        : "ROULETTE OVERLAY";
-                return "CREATOR TOOLS";
+                    return "STREAM OVERLAY";
+                return "LA PICHI RULETA";
             }
         }
 
@@ -633,6 +680,10 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!creatorToolsMenuOpen || creatorToolsMenuPage == page)
                 return;
+            if (creatorToolsMenuPage == CreatorToolsMenuPage.RouletteOverlay &&
+                creatorToolsPreviewSetting != null &&
+                creatorToolsPreviewSetting.Value)
+                SetCreatorToolsPreview(false);
             RestoreCreatorToolsNativeOptions();
             creatorToolsMenuPage = page;
             creatorToolsMenuSelection = 0;
@@ -647,26 +698,62 @@ namespace Gilomx.CupheadBossRoulette
 
             try
             {
-                if (OptionsToVisualMethod == null ||
-                    OptionsVisualObjectField == null ||
-                    OptionsVisualButtonsField == null ||
-                    OptionsCurrentItemsField == null)
+                if (OptionsCurrentItemsField == null)
                     throw new InvalidOperationException(
-                        "The native Visual menu is unavailable.");
+                        "Cuphead's native option list is unavailable.");
 
                 var options = creatorToolsNativeOptions;
-                OptionsToVisualMethod.Invoke(options, null);
-                var visualObject = OptionsVisualObjectField.GetValue(options)
-                    as GameObject;
-                var buttons = OptionsVisualButtonsField.GetValue(options)
-                    as Array;
+                var useHub = creatorToolsMenuPage ==
+                             CreatorToolsMenuPage.Hub;
+                GameObject menuObject;
+                Array buttons;
+                if (useHub)
+                {
+                    if (OptionsMainObjectField == null ||
+                        OptionsMainButtonsField == null)
+                        throw new InvalidOperationException(
+                            "Cuphead's native main options menu is unavailable.");
+                    menuObject = OptionsMainObjectField.GetValue(options)
+                        as GameObject;
+                    if (menuObject != null && !menuObject.activeSelf &&
+                        OptionsToMainOptionsMethod != null)
+                    {
+                        creatorToolsNativeTransitioning = true;
+                        try
+                        {
+                            OptionsToMainOptionsMethod.Invoke(options, null);
+                        }
+                        finally
+                        {
+                            creatorToolsNativeTransitioning = false;
+                        }
+                    }
+                    menuObject = OptionsMainObjectField.GetValue(options)
+                        as GameObject;
+                    buttons = OptionsMainButtonsField.GetValue(options)
+                        as Array;
+                }
+                else
+                {
+                    if (OptionsToVisualMethod == null ||
+                        OptionsVisualObjectField == null ||
+                        OptionsVisualButtonsField == null)
+                        throw new InvalidOperationException(
+                            "Cuphead's native Visual menu is unavailable.");
+                    OptionsToVisualMethod.Invoke(options, null);
+                    menuObject = OptionsVisualObjectField.GetValue(options)
+                        as GameObject;
+                    buttons = OptionsVisualButtonsField.GetValue(options)
+                        as Array;
+                }
+
                 var currentItems = OptionsCurrentItemsField.GetValue(options)
                     as IList;
-                if (visualObject == null || buttons == null ||
+                if (menuObject == null || buttons == null ||
                     buttons.Length < CreatorToolsMenuItemCount ||
                     currentItems == null)
                     throw new InvalidOperationException(
-                        "Cuphead's Visual menu does not expose enough rows.");
+                        "Cuphead's native menu does not expose enough rows.");
 
                 creatorToolsNativeOriginalItems =
                     new object[currentItems.Count];
@@ -689,8 +776,10 @@ namespace Gilomx.CupheadBossRoulette
                         as Text;
                     if (value == null)
                         continue;
-                    var label = FindCreatorToolsNativeLabel(
-                        visualObject, value, valueTexts, usedLabels);
+                    var label = useHub
+                        ? null
+                        : FindCreatorToolsNativeLabel(
+                            menuObject, value, valueTexts, usedLabels);
                     if (label != null)
                         usedLabels.Add(label);
                     var localization =
@@ -699,8 +788,10 @@ namespace Gilomx.CupheadBossRoulette
                     var labelLocalization = label == null
                         ? null
                         : label.GetComponent<LocalizationHelper>();
-                    var row = FindCreatorToolsNativeRow(
-                        visualObject, value, label);
+                    var row = useHub
+                        ? value.gameObject
+                        : FindCreatorToolsNativeRow(
+                            menuObject, value, label);
                     creatorToolsNativeButtonSnapshots.Add(
                         new CreatorToolsNativeButtonSnapshot
                         {
@@ -751,8 +842,15 @@ namespace Gilomx.CupheadBossRoulette
                         creatorToolsNativeButtonSnapshots[i].Row = null;
                 }
 
+                var nativeBackSnapshot = useHub
+                    ? null
+                    : PrepareCreatorToolsNativeActionRows();
+                if (!useHub && nativeBackSnapshot == null)
+                    throw new InvalidOperationException(
+                        "Cuphead's native back row could not be prepared.");
+
                 creatorToolsNativeTitle = FindCreatorToolsNativeTitle(
-                    visualObject, valueTexts, usedLabels);
+                    menuObject, valueTexts, usedLabels);
                 if (creatorToolsNativeTitle != null)
                 {
                     creatorToolsNativeTitleText =
@@ -776,14 +874,26 @@ namespace Gilomx.CupheadBossRoulette
 
                 for (var i = 0; i < CreatorToolsMenuItemCount; i++)
                 {
-                    // Keep settings in Cuphead's normal Visual slots and
-                    // reuse its dedicated bottom action for either URL copy
-                    // or returning to the Creator Tools hub.
-                    var sourceIndex = i == CreatorToolsMenuItemCount - 1
-                        ? creatorToolsNativeButtonSnapshots.Count - 1
-                        : i;
-                    var snapshot = creatorToolsNativeButtonSnapshots[
-                        sourceIndex];
+                    // Reuse the first normal row plus Cuphead's bottom action
+                    // in the compact hub. The overlay settings keep the large
+                    // Visual card and its dedicated bottom URL action.
+                    CreatorToolsNativeButtonSnapshot snapshot;
+                    if (!useHub &&
+                        i == CreatorToolsMenuItemCount - 1)
+                        snapshot = nativeBackSnapshot;
+                    else if (!useHub &&
+                             i == CreatorToolsMenuItemCount - 2)
+                        snapshot = creatorToolsNativeButtonSnapshots[
+                            CreatorToolsOverlayMenuItemCount - 2];
+                    else
+                    {
+                        var sourceIndex =
+                            i == CreatorToolsMenuItemCount - 1
+                                ? creatorToolsNativeButtonSnapshots.Count - 1
+                                : i;
+                        snapshot = creatorToolsNativeButtonSnapshots[
+                            sourceIndex];
+                    }
                     creatorToolsNativeMenuRows.Add(snapshot);
                     SetCreatorToolsNativeRowActive(snapshot, true);
 
@@ -793,10 +903,17 @@ namespace Gilomx.CupheadBossRoulette
                         snapshot.Button, null);
                     if (snapshot.LabelLocalizationHelper != null)
                         snapshot.LabelLocalizationHelper.enabled = false;
-                    if (snapshot.LabelText != null &&
-                        i < CreatorToolsMenuItemCount - 1)
-                        snapshot.LabelText.text =
-                            CreatorToolsMenuLabel(i);
+                    var isOverlayAction = !useHub &&
+                        i >= CreatorToolsMenuItemCount - 2;
+                    if (snapshot.LabelText != null)
+                    {
+                        snapshot.LabelText.gameObject.SetActive(
+                            !isOverlayAction);
+                        if (!isOverlayAction &&
+                            i < CreatorToolsMenuItemCount - 1)
+                            snapshot.LabelText.text =
+                                CreatorToolsMenuLabel(i);
+                    }
 
                     var values = CreatorToolsNativeValues(i);
                     OptionsButtonValuesField.SetValue(
@@ -813,8 +930,19 @@ namespace Gilomx.CupheadBossRoulette
                         OptionsButtonSelectionField.SetValue(
                             snapshot.Button, 0);
                         snapshot.ValueText.text =
-                            CreatorToolsBottomActionLabel;
+                            isOverlayAction
+                                ? i == CreatorToolsMenuItemCount - 1
+                                    ? CreatorToolsBottomActionLabel
+                                    : CreatorToolsMenuLabel(i)
+                                : i == CreatorToolsMenuItemCount - 1
+                                    ? CreatorToolsBottomActionLabel
+                                    : snapshot.LabelText == null
+                                        ? CreatorToolsMenuLabel(i)
+                                        : string.Empty;
                     }
+                    if (!useHub &&
+                        i == CreatorToolsMenuItemCount - 2)
+                        snapshot.ValueText.text = string.Empty;
                     currentItems.Add(snapshot.Button);
                 }
 
@@ -822,9 +950,22 @@ namespace Gilomx.CupheadBossRoulette
                     OptionsVerticalSelectionField.SetValue(options, 0);
                 if (OptionsUpdateVerticalMethod != null)
                     OptionsUpdateVerticalMethod.Invoke(options, null);
+                if (!useHub && creatorToolsNativeMenuRows.Count > 1)
+                {
+                    creatorToolsNativeSelectedColor =
+                        creatorToolsNativeMenuRows[0].ValueText.color;
+                    creatorToolsNativeUnselectedColor =
+                        creatorToolsNativeMenuRows[1].ValueText.color;
+                }
+                MaintainCreatorToolsNativeCopyCentering();
+                Canvas.willRenderCanvases -=
+                    MaintainCreatorToolsNativeCopyCentering;
+                Canvas.willRenderCanvases +=
+                    MaintainCreatorToolsNativeCopyCentering;
                 creatorToolsNativeConfigured = true;
                 Logger.LogInfo(
-                    "Creator Tools is using Cuphead's native Visual menu (" +
+                    "Creator Tools is using Cuphead's native " +
+                    (useHub ? "main" : "Visual") + " menu (" +
                     creatorToolsNativeButtonSnapshots.Count +
                     " rows detected, " + usedLabels.Count +
                     " labels matched)." );
@@ -838,8 +979,119 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private CreatorToolsNativeButtonSnapshot
+            PrepareCreatorToolsNativeActionRows()
+        {
+            if (creatorToolsNativeButtonSnapshots.Count <
+                CreatorToolsOverlayMenuItemCount)
+                return null;
+
+            var bottom = creatorToolsNativeButtonSnapshots[
+                creatorToolsNativeButtonSnapshots.Count - 1];
+            var copy = creatorToolsNativeButtonSnapshots[
+                CreatorToolsOverlayMenuItemCount - 2];
+            if (bottom.ValueText == null || copy.ValueText == null)
+                return null;
+
+            // Use a native button only for navigation. The visible URL action
+            // is a clone of Cuphead's centered bottom text, so the two-column
+            // Visual layout cannot push it toward the right edge.
+            creatorToolsNativeCopyDisplayObject = new GameObject(
+                "Gilomx Stream Overlay Copy URL",
+                typeof(RectTransform), typeof(CanvasRenderer),
+                typeof(Text));
+            creatorToolsNativeCopyDisplayObject.transform.SetParent(
+                bottom.ValueText.transform.parent, false);
+            creatorToolsNativeCopyDisplayObject.transform.SetAsLastSibling();
+            creatorToolsNativeCopyDisplayText =
+                creatorToolsNativeCopyDisplayObject.GetComponent<Text>();
+            var sourceText = bottom.ValueText;
+            creatorToolsNativeCopyDisplayText.font = sourceText.font;
+            creatorToolsNativeCopyDisplayText.material = sourceText.material;
+            creatorToolsNativeCopyDisplayText.fontStyle =
+                sourceText.fontStyle;
+            creatorToolsNativeCopyDisplayText.fontSize = sourceText.fontSize;
+            creatorToolsNativeCopyDisplayText.lineSpacing =
+                sourceText.lineSpacing;
+            creatorToolsNativeCopyDisplayText.supportRichText =
+                sourceText.supportRichText;
+            creatorToolsNativeCopyDisplayText.alignment =
+                TextAnchor.MiddleCenter;
+            creatorToolsNativeCopyDisplayText.alignByGeometry =
+                sourceText.alignByGeometry;
+            creatorToolsNativeCopyDisplayText.resizeTextForBestFit =
+                sourceText.resizeTextForBestFit;
+            creatorToolsNativeCopyDisplayText.resizeTextMinSize =
+                sourceText.resizeTextMinSize;
+            creatorToolsNativeCopyDisplayText.resizeTextMaxSize =
+                sourceText.resizeTextMaxSize;
+            creatorToolsNativeCopyDisplayText.horizontalOverflow =
+                sourceText.horizontalOverflow;
+            creatorToolsNativeCopyDisplayText.verticalOverflow =
+                sourceText.verticalOverflow;
+            creatorToolsNativeCopyDisplayText.raycastTarget = false;
+            creatorToolsNativeCopyDisplayText.color = sourceText.color;
+            creatorToolsNativeCopyDisplayText.text = CreatorToolsSpanish
+                ? "COPIAR URL"
+                : "COPY URL";
+            var sourceRect = sourceText.rectTransform;
+            var displayRect =
+                creatorToolsNativeCopyDisplayText.rectTransform;
+            displayRect.anchorMin = sourceRect.anchorMin;
+            displayRect.anchorMax = sourceRect.anchorMax;
+            displayRect.pivot = sourceRect.pivot;
+            displayRect.anchoredPosition = sourceRect.anchoredPosition;
+            displayRect.sizeDelta = sourceRect.sizeDelta;
+            displayRect.localScale = sourceRect.localScale;
+            displayRect.localRotation = sourceRect.localRotation;
+            creatorToolsNativeCopyDisplayObject.SetActive(true);            MaintainCreatorToolsNativeCopyCentering();
+            return bottom;
+        }
+        private void MaintainCreatorToolsNativeCopyCentering()
+        {
+            if (!creatorToolsMenuOpen ||
+                creatorToolsMenuPage !=
+                    CreatorToolsMenuPage.RouletteOverlay ||
+                creatorToolsNativeCopyDisplayText == null ||
+                creatorToolsNativeButtonSnapshots.Count <
+                    CreatorToolsOverlayMenuItemCount)
+                return;
+
+            var copy = creatorToolsNativeButtonSnapshots[
+                CreatorToolsOverlayMenuItemCount - 2];
+            var bottom = creatorToolsNativeButtonSnapshots[
+                creatorToolsNativeButtonSnapshots.Count - 1];
+            if (copy == null || copy.ValueText == null ||
+                bottom == null || bottom.ValueText == null)
+                return;
+
+            if (Time.realtimeSinceStartup >=
+                creatorToolsMenuNoticeUntil)
+                creatorToolsNativeCopyDisplayText.text =
+                    CreatorToolsSpanish
+                        ? "COPIAR URL"
+                        : "COPY URL";
+
+            var displayRect =
+                creatorToolsNativeCopyDisplayText.rectTransform;
+            var worldPosition = displayRect.position;
+            worldPosition.x = bottom.ValueText.rectTransform.position.x;
+            worldPosition.y = copy.ValueText.rectTransform.position.y;
+            displayRect.position = worldPosition;
+            var selection = OptionsVerticalSelectionField == null
+                ? -1
+                : (int)OptionsVerticalSelectionField.GetValue(
+                    creatorToolsNativeOptions);
+            creatorToolsNativeCopyDisplayText.color =
+                selection == CreatorToolsOverlayMenuItemCount - 2
+                    ? creatorToolsNativeSelectedColor
+                    : creatorToolsNativeUnselectedColor;
+            creatorToolsNativeCopyDisplayObject.SetActive(true);
+        }
         private void RestoreCreatorToolsNativeOptions()
         {
+            Canvas.willRenderCanvases -=
+                MaintainCreatorToolsNativeCopyCentering;
             var options = creatorToolsNativeOptions;
             for (var i = 0;
                  i < creatorToolsNativeButtonSnapshots.Count; i++)
@@ -919,6 +1171,10 @@ namespace Gilomx.CupheadBossRoulette
                         creatorToolsNativeTitleLocalizationEnabled;
             }
 
+            if (creatorToolsNativeCopyDisplayObject != null)
+                DestroyImmediate(creatorToolsNativeCopyDisplayObject);
+            creatorToolsNativeCopyDisplayObject = null;
+            creatorToolsNativeCopyDisplayText = null;
             creatorToolsNativeButtonSnapshots.Clear();
             creatorToolsNativeMenuRows.Clear();
             creatorToolsNativeOriginalItems = null;
@@ -944,49 +1200,45 @@ namespace Gilomx.CupheadBossRoulette
                 snapshot.Button);
 
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
+                return;
+
+            switch (index)
             {
-                if (index != 1)
-                    return;
-                SetCreatorToolsPreview(selection == 1);
-                SetCreatorToolsNativeButtonSelection(
-                    snapshot,
-                    creatorToolsPreviewSetting.Value ? 1 : 0);
-                PublishCreatorToolsState(true);
+                case 0:
+                    SetCreatorToolsEnabled(selection == 1);
+                    SetCreatorToolsNativeButtonSelection(
+                        snapshot,
+                        creatorToolsEnabledSetting.Value ? 1 : 0);
+                    break;
+                case 1:
+                    SetCreatorToolsPreview(selection == 1);
+                    SetCreatorToolsNativeButtonSelection(
+                        snapshot,
+                        creatorToolsPreviewSetting.Value ? 1 : 0);
+                    break;
+                case 2:
+                    creatorToolsRetryBehaviorSetting.Value =
+                        (CreatorToolsRetryBehavior)selection;
+                    break;
+                case 3:
+                    creatorToolsScaleSetting.Value =
+                        1f + selection * 0.5f;
+                    creatorToolsLabelKey = null;
+                    break;
+                case 4:
+                    creatorToolsOrderSetting.Value =
+                        (CreatorToolsOrder)selection;
+                    break;
+                case 5:
+                    creatorToolsAlignmentSetting.Value =
+                        (CreatorToolsAlignment)selection;
+                    break;
+                case 6:
+                    creatorToolsOpacitySetting.Value =
+                        25 + selection * 5;
+                    break;
             }
-            else
-            {
-                switch (index)
-                {
-                    case 0:
-                        SetCreatorToolsEnabled(selection == 1);
-                        SetCreatorToolsNativeButtonSelection(
-                            snapshot,
-                            creatorToolsEnabledSetting.Value ? 1 : 0);
-                        break;
-                    case 1:
-                        creatorToolsRetryBehaviorSetting.Value =
-                            (CreatorToolsRetryBehavior)selection;
-                        break;
-                    case 2:
-                        creatorToolsScaleSetting.Value =
-                            1f + selection * 0.5f;
-                        creatorToolsLabelKey = null;
-                        break;
-                    case 3:
-                        creatorToolsOrderSetting.Value =
-                            (CreatorToolsOrder)selection;
-                        break;
-                    case 4:
-                        creatorToolsAlignmentSetting.Value =
-                            (CreatorToolsAlignment)selection;
-                        break;
-                    case 5:
-                        creatorToolsOpacitySetting.Value =
-                            25 + selection * 5;
-                        break;
-                }
-                PublishCreatorToolsState(true);
-            }
+            PublishCreatorToolsState(true);
 
             if (OptionsMenuSelectSoundMethod != null)
                 OptionsMenuSelectSoundMethod.Invoke(
@@ -1017,24 +1269,30 @@ namespace Gilomx.CupheadBossRoulette
                         CreatorToolsMenuPage.RouletteOverlay);
                     return;
                 }
-                if (index == CreatorToolsMenuItemCount - 1)
-                {
-                    CopyCreatorToolsUrl();
-                    snapshot.ValueText.text = CreatorToolsSpanish
-                        ? "COPIADA"
-                        : "COPIED";
-                    if (OptionsMenuSelectSoundMethod != null)
-                        OptionsMenuSelectSoundMethod.Invoke(
-                            creatorToolsNativeOptions, null);
-                    return;
-                }
+                CloseCreatorToolsMenu(true);
+                return;
             }
-            else if (index == CreatorToolsMenuItemCount - 1)
+
+            if (index == CreatorToolsMenuItemCount - 1)
             {
                 if (OptionsMenuSelectSoundMethod != null)
                     OptionsMenuSelectSoundMethod.Invoke(
                         creatorToolsNativeOptions, null);
                 SwitchCreatorToolsMenuPage(CreatorToolsMenuPage.Hub);
+                return;
+            }
+            if (index == CreatorToolsMenuItemCount - 2)
+            {
+                CopyCreatorToolsUrl();
+                snapshot.ValueText.text = string.Empty;
+                if (creatorToolsNativeCopyDisplayText != null)
+                    creatorToolsNativeCopyDisplayText.text =
+                        CreatorToolsSpanish
+                            ? "URL COPIADA"
+                            : "URL COPIED";
+                if (OptionsMenuSelectSoundMethod != null)
+                    OptionsMenuSelectSoundMethod.Invoke(
+                        creatorToolsNativeOptions, null);
                 return;
             }
 
@@ -1059,33 +1317,28 @@ namespace Gilomx.CupheadBossRoulette
         private string[] CreatorToolsNativeValues(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-            {
-                if (index == 0)
-                    return new[] { ">" };
-                if (index == 1)
-                    return CreatorToolsEnabledValues;
                 return new string[0];
-            }
 
             switch (index)
             {
                 case 0:
-                    return CreatorToolsEnabledValues;
                 case 1:
+                    return CreatorToolsEnabledValues;
+                case 2:
                     return CreatorToolsSpanish
                         ? new[] { "MANTENER", "REAPARECER" }
                         : new[] { "KEEP", "REAPPEAR" };
-                case 2:
-                    return new[] { "1X", "1.5X", "2X" };
                 case 3:
+                    return new[] { "1X", "1.5X", "2X" };
+                case 4:
                     return CreatorToolsSpanish
                         ? new[] { "ICONOS ARRIBA", "TEXTO ARRIBA" }
                         : new[] { "ICONS ABOVE", "TEXT ABOVE" };
-                case 4:
+                case 5:
                     return CreatorToolsSpanish
                         ? new[] { "IZQUIERDA", "CENTRO", "DERECHA" }
                         : new[] { "LEFT", "CENTER", "RIGHT" };
-                case 5:
+                case 6:
                     var opacityValues = new string[16];
                     for (var i = 0; i < opacityValues.Length; i++)
                         opacityValues[i] = (25 + i * 5) + "%";
@@ -1108,27 +1361,25 @@ namespace Gilomx.CupheadBossRoulette
         private int CreatorToolsNativeSelection(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-            {
-                return index == 1 && creatorToolsPreviewSetting.Value
-                    ? 1
-                    : 0;
-            }
+                return 0;
 
             switch (index)
             {
                 case 0:
                     return creatorToolsEnabledSetting.Value ? 1 : 0;
                 case 1:
-                    return (int)creatorToolsRetryBehaviorSetting.Value;
+                    return creatorToolsPreviewSetting.Value ? 1 : 0;
                 case 2:
+                    return (int)creatorToolsRetryBehaviorSetting.Value;
+                case 3:
                     return Mathf.Clamp(Mathf.RoundToInt(
                         (creatorToolsScaleSetting.Value - 1f) / 0.5f),
                         0, 2);
-                case 3:
-                    return (int)creatorToolsOrderSetting.Value;
                 case 4:
-                    return (int)creatorToolsAlignmentSetting.Value;
+                    return (int)creatorToolsOrderSetting.Value;
                 case 5:
+                    return (int)creatorToolsAlignmentSetting.Value;
+                case 6:
                     return Mathf.Clamp(
                         (creatorToolsOpacitySetting.Value - 25) / 5,
                         0, 15);
@@ -1286,8 +1537,8 @@ namespace Gilomx.CupheadBossRoulette
             else if (Input.GetKeyDown(KeyCode.RightArrow) ||
                      IsControllerMenuButtonDown(CupheadButton.MenuRight))
                 direction = 1;
-            if (direction != 0 && creatorToolsMenuSelection !=
-                CreatorToolsMenuItemCount - 1)
+            if (direction != 0 && creatorToolsMenuSelection <
+                CreatorToolsMenuItemCount - 2)
             {
                 ChangeCreatorToolsMenuSetting(
                     creatorToolsMenuSelection, direction);
@@ -1308,11 +1559,16 @@ namespace Gilomx.CupheadBossRoulette
                      CreatorToolsMenuItemCount - 1)
             {
                 if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-                    CopyCreatorToolsUrl();
+                    CloseCreatorToolsMenu(true);
                 else
                     SwitchCreatorToolsMenuPage(
                         CreatorToolsMenuPage.Hub);
             }
+            else if (creatorToolsMenuPage ==
+                         CreatorToolsMenuPage.RouletteOverlay &&
+                     creatorToolsMenuSelection ==
+                         CreatorToolsMenuItemCount - 2)
+                CopyCreatorToolsUrl();
             else
                 ChangeCreatorToolsMenuSetting(
                     creatorToolsMenuSelection, 1);
@@ -1324,12 +1580,7 @@ namespace Gilomx.CupheadBossRoulette
             int setting, int direction)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-            {
-                if (setting == 1)
-                    SetCreatorToolsPreview(
-                        !creatorToolsPreviewSetting.Value);
                 return;
-            }
 
             switch (setting)
             {
@@ -1338,13 +1589,17 @@ namespace Gilomx.CupheadBossRoulette
                         !creatorToolsEnabledSetting.Value);
                     break;
                 case 1:
+                    SetCreatorToolsPreview(
+                        !creatorToolsPreviewSetting.Value);
+                    break;
+                case 2:
                     creatorToolsRetryBehaviorSetting.Value =
                         creatorToolsRetryBehaviorSetting.Value ==
                         CreatorToolsRetryBehavior.Keep
                             ? CreatorToolsRetryBehavior.Reappear
                             : CreatorToolsRetryBehavior.Keep;
                     break;
-                case 2:
+                case 3:
                     var scaleIndex = Mathf.Clamp(Mathf.RoundToInt(
                         (creatorToolsScaleSetting.Value - 1f) / 0.5f),
                         0, 2);
@@ -1353,21 +1608,21 @@ namespace Gilomx.CupheadBossRoulette
                         1f + scaleIndex * 0.5f;
                     creatorToolsLabelKey = null;
                     break;
-                case 3:
+                case 4:
                     creatorToolsOrderSetting.Value =
                         creatorToolsOrderSetting.Value ==
                         CreatorToolsOrder.IconsAbove
                             ? CreatorToolsOrder.TextAbove
                             : CreatorToolsOrder.IconsAbove;
                     break;
-                case 4:
+                case 5:
                     var alignment = (int)
                         creatorToolsAlignmentSetting.Value;
                     creatorToolsAlignmentSetting.Value =
                         (CreatorToolsAlignment)Wrap(
                             alignment + direction, 3);
                     break;
-                case 5:
+                case 6:
                     var opacityIndex =
                         (creatorToolsOpacitySetting.Value - 25) / 5;
                     opacityIndex = Wrap(
@@ -1445,11 +1700,15 @@ namespace Gilomx.CupheadBossRoulette
                     {
                         if (creatorToolsMenuPage ==
                             CreatorToolsMenuPage.Hub)
-                            CopyCreatorToolsUrl();
+                            CloseCreatorToolsMenu(true);
                         else
                             SwitchCreatorToolsMenuPage(
                                 CreatorToolsMenuPage.Hub);
                     }
+                    else if (creatorToolsMenuPage ==
+                                 CreatorToolsMenuPage.RouletteOverlay &&
+                             i == CreatorToolsMenuItemCount - 2)
+                        CopyCreatorToolsUrl();
                     else
                         ChangeCreatorToolsMenuSetting(i, 1);
                     PlayNativeMenuSound(
@@ -1474,39 +1733,33 @@ namespace Gilomx.CupheadBossRoulette
         private string CreatorToolsMenuLabel(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-            {
-                if (index == 0)
-                    return CreatorToolsSpanish
-                        ? "OVERLAY DE RULETA"
-                        : "ROULETTE OVERLAY";
-                if (index == 1)
-                    return CreatorToolsSpanish
-                        ? "VISTA PREVIA"
-                        : "PREVIEW";
-                return string.Empty;
-            }
+                return index == 0 ? "STREAM OVERLAY" : string.Empty;
 
             if (!CreatorToolsSpanish)
             {
                 switch (index)
                 {
                     case 0: return "STATUS";
-                    case 1: return "ON RETRY";
-                    case 2: return "SIZE";
-                    case 3: return "ORDER";
-                    case 4: return "ALIGNMENT";
-                    case 5: return "OPACITY";
+                    case 1: return "PREVIEW";
+                    case 2: return "ON RETRY";
+                    case 3: return "SIZE";
+                    case 4: return "ORDER";
+                    case 5: return "ALIGNMENT";
+                    case 6: return "OPACITY";
+                    case 7: return "COPY URL";
                     default: return string.Empty;
                 }
             }
             switch (index)
             {
                 case 0: return "ESTADO";
-                case 1: return "AL REINTENTAR";
-                case 2: return "TAMAÑO";
-                case 3: return "ORDEN";
-                case 4: return "ALINEACIÓN";
-                case 5: return "OPACIDAD";
+                case 1: return "VISTA PREVIA";
+                case 2: return "AL REINTENTAR";
+                case 3: return "TAMAÑO";
+                case 4: return "ORDEN";
+                case 5: return "ALINEACIÓN";
+                case 6: return "OPACIDAD";
+                case 7: return "COPIAR URL";
                 default: return string.Empty;
             }
         }
@@ -1514,16 +1767,9 @@ namespace Gilomx.CupheadBossRoulette
         private string CreatorToolsMenuValue(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-            {
-                if (index == 0)
-                    return ">";
-                if (index == 1)
-                    return CreatorToolsOnOff(
-                        creatorToolsPreviewSetting.Value);
-                return CreatorToolsSpanish
-                    ? "COPIAR URL"
-                    : "COPY URL";
-            }
+                return index == 0
+                    ? string.Empty
+                    : (CreatorToolsSpanish ? "VOLVER" : "BACK");
 
             switch (index)
             {
@@ -1531,6 +1777,9 @@ namespace Gilomx.CupheadBossRoulette
                     return CreatorToolsOnOff(
                         creatorToolsEnabledSetting.Value);
                 case 1:
+                    return CreatorToolsOnOff(
+                        creatorToolsPreviewSetting.Value);
+                case 2:
                     if (creatorToolsRetryBehaviorSetting.Value ==
                         CreatorToolsRetryBehavior.Keep)
                         return CreatorToolsSpanish
@@ -1539,11 +1788,11 @@ namespace Gilomx.CupheadBossRoulette
                     return CreatorToolsSpanish
                         ? "REAPARECER"
                         : "REAPPEAR";
-                case 2:
+                case 3:
                     return creatorToolsScaleSetting.Value.ToString(
                         "0.0#", System.Globalization.CultureInfo.InvariantCulture) +
                         "X";
-                case 3:
+                case 4:
                     if (creatorToolsOrderSetting.Value ==
                         CreatorToolsOrder.TextAbove)
                         return CreatorToolsSpanish
@@ -1552,7 +1801,7 @@ namespace Gilomx.CupheadBossRoulette
                     return CreatorToolsSpanish
                         ? "ICONOS ARRIBA"
                         : "ICONS ABOVE";
-                case 4:
+                case 5:
                     if (creatorToolsAlignmentSetting.Value ==
                         CreatorToolsAlignment.Left)
                         return CreatorToolsSpanish
@@ -1564,8 +1813,10 @@ namespace Gilomx.CupheadBossRoulette
                             ? "DERECHA"
                             : "RIGHT";
                     return CreatorToolsSpanish ? "CENTRO" : "CENTER";
-                case 5:
+                case 6:
                     return creatorToolsOpacitySetting.Value + "%";
+                case 7:
+                    return string.Empty;
                 default:
                     return CreatorToolsSpanish ? "VOLVER" : "BACK";
             }
@@ -1575,10 +1826,6 @@ namespace Gilomx.CupheadBossRoulette
         {
             get
             {
-                if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-                    return CreatorToolsSpanish
-                        ? "COPIAR URL"
-                        : "COPY URL";
                 return CreatorToolsSpanish ? "VOLVER" : "BACK";
             }
         }

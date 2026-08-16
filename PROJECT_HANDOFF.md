@@ -1,4 +1,47 @@
 # Cuphead Boss Roulette - Project Handoff
+
+## Creator Tools external force panel (2026-08-16)
+
+Creator Tools now serves a recording-oriented configuration page at
+`http://127.0.0.1:18081/config` from the same local listener as the browser
+overlay. `CreatorToolsServer.cs` owns `/config`, `/config.css`, `/config.js`,
+`/api/config` and `/api/config/set`; `CreatorToolsForceConfig.cs` publishes the
+localized runtime catalog, drains queued browser commands on Unity's main
+thread and creates an exact `RouletteResult` before normal random selection.
+
+The page exposes Boss, Shot 1, Shot 2, Super, Charm and Challenge plus the
+session-only `FORZADO ACTIVO` checkbox. Its catalog honors the installed DLC
+and experimental challenge switches. Shot 1 rejects Empty, Shot 2 rejects a
+duplicate of Shot 1 but may be Empty, and Challenge only shows `both` plus the
+selected boss's `ground` or `plane` entries. Enabling the checkbox makes every
+new spin use the selected values; disabling it immediately returns spins to
+the normal random path. The state is deliberately not persisted and starts
+disabled on every Cuphead process.
+
+Cuphead suspends its normal Unity `Update` while another window has focus, but
+the HTTP listener continues running on its background thread. Browser changes
+therefore remain queued and the page reports `PENDIENTE: VUELVE A CUPHEAD`
+until focus returns and `UpdateCreatorToolsForceConfig()` applies them. Future
+work must preserve that main-thread boundary; do not mutate roulette or Unity
+state directly from the server thread.
+
+The native navigation shipped in the same batch renames the map pause entry
+and compact hub to `LA PICHI RULETA`. The hub borrows Cuphead's main Options
+card and contains the normal `STREAM OVERLAY` row plus Back. The overlay page
+continues borrowing the larger Visual card and now orders Status, Preview, On
+Retry, Size, Order, Alignment and Opacity before the centered Copy URL action
+and Back. Preview turns off when leaving the overlay page. Copy URL uses a
+dedicated clone of Cuphead's centered bottom action text so the two-column
+Visual layout cannot displace it. Long challenge fallback text in `overlay.js`
+shrinks down to 60 percent and then wraps inside the safe width instead of
+leaving the browser canvas.
+
+Validation completed on 2026-08-16: `/config` and `/api/config` returned HTTP
+200, the rendered page was visually checked at 1440x1000, JavaScript passed
+`node --check`, and a temporary plane-boss selection (Hilda Berg, fixed
+equipment and `NO DISPARO BOMBAS`) was accepted by the running game. The final
+server state was confirmed with `enabled:false`.
+
 ## Creator Tools naming and retry behavior (2026-08-15)
 
 The map pause entry and main native card are now named `CREATOR TOOLS`; the
@@ -1827,7 +1870,7 @@ coroutines named `Clouds` and `DragonShoot`. Its cloud coroutine replaces
 normal movement with Player Two input, and its dragon coroutine replaces the
 normal attack pattern with Player Two button input. This exactly explains the
 stationary clouds and idle dragon. A second copy existed under
-`BepInEx\plugins\CupheadModdingTemplate\`.
+`BepInEx\plugins\CupheadModdingTemplate`.
 
 Version 0.5.36 removes all temporary diagnostic flags/results, restores random
 selection, persisted difficulty, loadout application, challenge activation,

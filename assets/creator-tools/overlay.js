@@ -117,6 +117,37 @@
 
     const opacity = Math.max(0.25, Math.min(1, Number(settings.opacity) || 1));
     stage.style.setProperty("--overlay-opacity", String(opacity));
+    window.requestAnimationFrame(fitChallengeFallback);
+  }
+
+  function fitChallengeFallback() {
+    challengeFallback.style.fontSize = "";
+    challengeFallback.style.whiteSpace = "nowrap";
+    challengeFallback.style.width = "auto";
+
+    if (!challengeFallback.textContent ||
+        challengeFallback.style.display === "none") {
+      return;
+    }
+
+    const available = Math.max(160, window.innerWidth * 0.9);
+    const naturalWidth = challengeFallback.scrollWidth;
+    if (naturalWidth <= available) {
+      return;
+    }
+
+    const baseSize = Number.parseFloat(
+      window.getComputedStyle(challengeFallback).fontSize) || 34;
+    const fittedSize = baseSize * available / naturalWidth;
+    const minimumSize = baseSize * 0.6;
+    if (fittedSize >= minimumSize) {
+      challengeFallback.style.fontSize = `${fittedSize}px`;
+      return;
+    }
+
+    challengeFallback.style.fontSize = `${minimumSize}px`;
+    challengeFallback.style.width = `${available}px`;
+    challengeFallback.style.whiteSpace = "normal";
   }
 
   function rebuildIcons(iconPaths) {
@@ -160,6 +191,7 @@
       challengeImage.style.display = "none";
       challengeFallback.style.display = text ? "block" : "none";
     }
+    window.requestAnimationFrame(fitChallengeFallback);
   }
 
   function revealIcons(nextCount, initial) {
@@ -315,5 +347,6 @@
     stage.classList.add("hidden");
   }
 
+  window.addEventListener("resize", fitChallengeFallback);
   connect();
 })();

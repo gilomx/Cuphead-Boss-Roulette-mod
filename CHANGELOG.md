@@ -1,5 +1,27 @@
 # Historial de cambios
 
+## Creator Tools: panel externo de forzado (2026-08-16)
+
+- El servidor local de Creator Tools ahora publica `http://127.0.0.1:18081/config`
+  junto al overlay. La nueva página permite elegir jefe, disparos, súper,
+  amuleto y reto, y activar `FORZADO ACTIVO` para que cada giro nuevo produzca
+  exactamente ese resultado.
+- El catálogo se genera desde el contenido realmente disponible en la
+  instalación: respeta la presencia del DLC, evita `Nada` en Disparo 1,
+  impide repetir el mismo disparo en ambas posiciones y filtra los retos
+  terrestres o aéreos según el jefe seleccionado.
+- Los cambios del navegador se encolan en el servidor y se aplican en el hilo
+  principal de Unity. Si Cuphead está sin foco, la página muestra que el cambio
+  queda pendiente hasta volver al juego. El forzado es temporal, comienza
+  desactivado y no se guarda al cerrar Cuphead.
+- La entrada nativa del mapa se llama ahora `LA PICHI RULETA`. Su hub compacto
+  usa la tarjeta principal de Opciones y abre `STREAM OVERLAY`; la configuración
+  del overlay conserva la tarjeta grande, coloca `VISTA PREVIA` antes de
+  `AL REINTENTAR`, añade `VOLVER` y mantiene `COPIAR URL` centrado como acción
+  independiente. La vista previa se apaga al salir de esa pantalla.
+- Los nombres de reto demasiado largos en el overlay reducen primero su tamaño
+  y, si todavía no caben, se ajustan en varias líneas dentro del ancho seguro.
+
 ## Creator Tools: nombre y reintentos (2026-08-15)
 
 - La entrada del menú y la tarjeta principal ahora se llaman `CREATOR TOOLS`;

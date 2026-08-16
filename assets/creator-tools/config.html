@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>La Pichi Ruleta — Forzado</title>
+  <link rel="stylesheet" href="/config.css">
+</head>
+<body>
+  <main class="card">
+    <header>
+      <p class="eyebrow">HERRAMIENTAS DE GRABACIÓN</p>
+      <h1>La Pichi Ruleta</h1>
+      <p class="intro">El resultado elegido se aplicará a cada giro nuevo mientras el forzado esté activo.</p>
+    </header>
+
+    <label class="force-toggle">
+      <input id="enabled" type="checkbox">
+      <span class="check"></span>
+      <span>FORZADO ACTIVO</span>
+    </label>
+
+    <section class="form-grid" aria-label="Resultado forzado">
+      <label>JEFE<select id="boss"></select></label>
+      <label>DISPARO 1<select id="weapon1"></select></label>
+      <label>DISPARO 2<select id="weapon2"></select></label>
+      <label>SÚPER<select id="super"></select></label>
+      <label>AMULETO<select id="charm"></select></label>
+      <label>RETO<select id="modifier"></select></label>
+    </section>
+
+    <footer>
+      <span id="status">CONECTANDO CON CUPHEAD…</span>
+      <a href="/" target="_blank" rel="noopener">ABRIR OVERLAY</a>
+    </footer>
+  </main>
+  <script src="/config.js"></script>
+</body>
+</html>
