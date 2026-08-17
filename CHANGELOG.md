@@ -1,5 +1,30 @@
 # Historial de cambios
 
+## 0.5.131 - Personaje de la ruleta en la pantalla de calificación (2026-08-16)
+
+- Antes de devolver el equipo prestado, el mod ahora conserva qué personaje
+  terminó realmente la batalla. La pantalla de calificación recibe de nuevo ese
+  dato y, en una partida individual, verifica que Cuphead, Mugman o Ms. Chalice
+  haya quedado activo.
+- La disponibilidad del DLC confirmada ahora también se conserva para las
+  consultas internas de Cuphead, no sólo para el catálogo de Creator Tools.
+  Una respuesta falsa transitoria impedía cargar el arte de Ms. Chalice en la
+  calificación y su animación de regreso al mapa, aunque su objeto estuviera
+  correctamente activo. Las instalaciones sin DLC no se modifican.
+
+## Creator Tools: amuletos DLC al recuperar el foco (2026-08-16)
+
+- Una detección positiva del DLC ahora permanece válida durante toda la sesión
+  de Cuphead. `DLCManager` podía devolver temporalmente falso después de cambios
+  de foco o escena; al reconstruir el catálogo, el mod eliminaba los amuletos
+  DLC y sustituía el seleccionado por `Nada` antes del giro forzado.
+- La misma detección positiva protege las llamadas nativas a
+  `DLCManager.DLCEnabled()`, necesarias para cargar los recursos visuales del
+  DLC en resultados y en el mapa.
+- Las instalaciones sin DLC continúan usando únicamente el contenido base. El
+  cambio sólo evita que una propiedad ya confirmada desaparezca a mitad del
+  proceso.
+
 ## Creator Tools: panel externo de forzado (2026-08-16)
 
 - El servidor local de Creator Tools ahora publica `http://127.0.0.1:18081/config`

@@ -15,7 +15,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
         public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.130";
+        public const string PluginVersion = "0.5.131";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -248,6 +248,9 @@ namespace Gilomx.CupheadBossRoulette
         private LoadoutSnapshot originalPlayerTwoLoadout;
         private bool loanedLoadoutsActive;
         private bool loanedBattleSeen;
+        private bool rouletteWinCharacterPending;
+        private bool rouletteWinPlayerOneIsChalice;
+        private bool rouletteWinPlayerTwoIsChalice;
         private bool returnToMapAfterRouletteFinalBossWin;
         private bool rouletteReturnDestinationPending;
         private Levels rouletteReturnLevel;
@@ -534,12 +537,42 @@ namespace Gilomx.CupheadBossRoulette
                 Logger.LogWarning(
                     "Could not install the black-and-white filter bridge.");
 
+            var dlcEnabled = AccessTools.Method(
+                typeof(DLCManager), "DLCEnabled", Type.EmptyTypes);
+            var preserveConfirmedDlcPostfix = AccessTools.Method(
+                typeof(Plugin), "PreserveConfirmedDlcPostfix");
+            if (dlcEnabled != null && preserveConfirmedDlcPostfix != null)
+                harmony.Patch(dlcEnabled,
+                    postfix: new HarmonyMethod(
+                        preserveConfirmedDlcPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the confirmed-DLC availability guard.");
+
             var levelPreWin = AccessTools.Method(typeof(Level), "_OnPreWin");
             var levelPreWinPrefix = AccessTools.Method(typeof(Plugin), "ClearChallengeOnWinPrefix");
             if (levelPreWin != null && levelPreWinPrefix != null)
                 harmony.Patch(levelPreWin, prefix: new HarmonyMethod(levelPreWinPrefix));
             else
                 Logger.LogWarning("Could not install the challenge win guard.");
+
+            var winScreenAwake = AccessTools.Method(
+                typeof(WinScreen), "Awake");
+            var preserveRouletteWinCharacterPrefix = AccessTools.Method(
+                typeof(Plugin), "PreserveRouletteWinCharacterPrefix");
+            var preserveRouletteWinCharacterPostfix = AccessTools.Method(
+                typeof(Plugin), "PreserveRouletteWinCharacterPostfix");
+            if (winScreenAwake != null &&
+                preserveRouletteWinCharacterPrefix != null &&
+                preserveRouletteWinCharacterPostfix != null)
+                harmony.Patch(winScreenAwake,
+                    prefix: new HarmonyMethod(
+                        preserveRouletteWinCharacterPrefix),
+                    postfix: new HarmonyMethod(
+                        preserveRouletteWinCharacterPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the roulette results-character guard.");
 
             var baseGameEndingLoad = AccessTools.Method(
                 typeof(Cutscene), "Load", new[]
@@ -1770,11 +1803,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private void RefreshAvailableContent()
         {
-            var dlcEnabled = false;
+            var detectedDlcEnabled = false;
             try
             {
                 DLCManager.RefreshDLC();
-                dlcEnabled = DLCManager.DLCEnabled();
+                detectedDlcEnabled = DLCManager.DLCEnabled();
             }
             catch (Exception exception)
             {
@@ -1783,6 +1816,16 @@ namespace Gilomx.CupheadBossRoulette
                         "No se pudo consultar el DLC; se usara solo contenido base: " +
                         exception.Message);
             }
+
+            // DLCManager can report false transiently after focus/scene
+            // changes even though ownership was already confirmed. DLC
+            // ownership cannot disappear during one Cuphead process, so keep
+            // a positive detection sticky for the rest of the session. This
+            // prevents forced DLC equipment (especially charms) from being
+            // sanitized to Empty immediately before a roulette spin.
+            var dlcEnabled = detectedDlcEnabled ||
+                             (dlcAvailabilityKnown &&
+                              dlcEnabledForRoulette);
 
             availableBossIndices.Clear();
             for (var i = 0; i < RouletteData.Bosses.Length; i++)
@@ -2139,6 +2182,8 @@ namespace Gilomx.CupheadBossRoulette
                 throw new InvalidOperationException(
                     "Could not restore the previous roulette loadout before a new fight.");
 
+            rouletteWinCharacterPending = false;
+
             originalPlayerOneLoadout =
                 LoadoutSnapshot.Capture(PlayerId.PlayerOne);
             originalPlayerTwoLoadout =
@@ -2184,6 +2229,126 @@ namespace Gilomx.CupheadBossRoulette
                     exception);
                 return false;
             }
+        }
+
+        private void CaptureRouletteWinCharacters(Level level)
+        {
+            rouletteWinCharacterPending = false;
+            if (level == null)
+                return;
+
+            try
+            {
+                var playerOne = PlayerManager.GetPlayer(PlayerId.PlayerOne);
+                rouletteWinPlayerOneIsChalice = playerOne != null &&
+                    playerOne.stats != null &&
+                    playerOne.stats.isChalice;
+
+                var playerTwo = PlayerManager.GetPlayer(PlayerId.PlayerTwo);
+                rouletteWinPlayerTwoIsChalice =
+                    PlayerManager.Multiplayer &&
+                    playerTwo != null &&
+                    playerTwo.stats != null &&
+                    playerTwo.stats.isChalice;
+                rouletteWinCharacterPending = true;
+                Logger.LogInfo(
+                    "Roulette results character captured: P1 Chalice=" +
+                    rouletteWinPlayerOneIsChalice +
+                    ", P2 Chalice=" +
+                    rouletteWinPlayerTwoIsChalice + ".");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning(
+                    "Could not capture the roulette results character: " +
+                    exception.Message);
+            }
+        }
+
+        private static void PreserveRouletteWinCharacterPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.rouletteWinCharacterPending)
+                return;
+
+            try
+            {
+                var scoring = Level.ScoringData;
+                if (scoring == null)
+                    return;
+
+                // WinScreen chooses its character from Level.ScoringData.
+                // Restore the winner captured before the temporary roulette
+                // charm was removed so final-boss transitions cannot lose it.
+                scoring.player1IsChalice =
+                    plugin.rouletteWinPlayerOneIsChalice;
+                scoring.player2IsChalice =
+                    plugin.rouletteWinPlayerTwoIsChalice;
+            }
+            catch (Exception exception)
+            {
+                plugin.Logger.LogWarning(
+                    "Could not restore the roulette results character: " +
+                    exception.Message);
+            }
+        }
+
+        private static void PreserveRouletteWinCharacterPostfix(
+            WinScreen __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.rouletteWinCharacterPending)
+                return;
+
+            try
+            {
+                // Vanilla normally activates this object from the scoring
+                // flags restored by the prefix. Reinforce the one-player
+                // selection because an invalid Chalice/loadout transition can
+                // otherwise leave every character root inactive.
+                if (!PlayerManager.Multiplayer && __instance != null)
+                {
+                    var fieldName = plugin.rouletteWinPlayerOneIsChalice
+                        ? "OnePlayerChalice"
+                        : PlayerManager.player1IsMugman
+                            ? "OnePlayerMugman"
+                            : "OnePlayerCuphead";
+                    var field = AccessTools.Field(
+                        typeof(WinScreen), fieldName);
+                    var character = field == null
+                        ? null
+                        : field.GetValue(__instance) as GameObject;
+                    if (character != null && !character.activeSelf)
+                    {
+                        character.SetActive(true);
+                        plugin.Logger.LogInfo(
+                            "Reactivated " + fieldName +
+                            " on the roulette results screen.");
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                plugin.Logger.LogWarning(
+                    "Could not verify the roulette results character: " +
+                    exception.Message);
+            }
+            finally
+            {
+                plugin.rouletteWinCharacterPending = false;
+            }
+        }
+
+        private static void PreserveConfirmedDlcPostfix(ref bool __result)
+        {
+            if (__result)
+                return;
+
+            var plugin = activeInstance;
+            if (plugin != null &&
+                plugin.dlcAvailabilityKnown &&
+                plugin.dlcEnabledForRoulette)
+                __result = true;
         }
 
         private void UpdateLoanedLoadoutLifecycle()
@@ -2688,6 +2853,7 @@ namespace Gilomx.CupheadBossRoulette
 
             if (plugin.ShouldRestoreLoanedLoadoutOnWin(__instance))
             {
+                plugin.CaptureRouletteWinCharacters(__instance);
                 plugin.KeepBattleResultHudThroughVictory(
                     currentLevel == Levels.Saltbaker);
                 plugin.RestoreOriginalLoadouts(false);

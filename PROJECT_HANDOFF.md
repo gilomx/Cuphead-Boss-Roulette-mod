@@ -1,5 +1,66 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Creator Tools scope after 0.5.131 (2026-08-16)
+
+Creator Tools intentionally stops here for the current release: the native map
+menu, WebSocket overlay, overlay presentation settings, retry behavior, preview,
+clipboard URL, and external `/config` force panel are the supported scope.
+
+Future work may add live-stream interaction providers to the same Creator Tools
+area so audience events can influence roulette configuration or results. Keep
+that work provider-agnostic at the configuration boundary; do not couple the
+existing local overlay/config server to one streaming platform. Any provider
+integration must remain optional and must not change normal roulette behavior
+when disabled or unavailable.
+
+## Roulette winner on the grade screen (2026-08-16)
+
+Immediately before normal victory restoration,
+`CaptureRouletteWinCharacters()` records the live
+`PlayerStatsManager.isChalice` state for both players. This is deliberately the
+actual battle character rather than an inference from the selected charm.
+Non-Chalice victories still restore both temporary-loadout snapshots from the
+`Level._OnPreWin` prefix, before Cuphead saves the victory.
+
+`WinScreen.Awake` has a prefix/postfix guard. The prefix reapplies the captured
+character flags to `Level.ScoringData`, the same source vanilla uses to choose
+its artwork. The postfix reinforces the chosen one-player root if necessary and
+then clears the pending snapshot. Loadout restoration remains in `_OnPreWin`,
+so loaned equipment is never intentionally left for Cuphead's native victory
+save.
+
+Runtime evidence showed the Chalice GameObject already active but invisible on
+the grade screen, followed by a missing Chalice return animation and a delayed
+base character on the map. Deferring Astral Cookie restoration through
+`WinScreen.Awake` did not change either symptom. The actual cause was the same
+transient false `DLCManager.DLCEnabled()` result that had already removed DLC
+charms from Creator Tools. `PreserveConfirmedDlcPostfix` now returns true to
+native Cuphead callers after this process has positively confirmed ownership,
+so `AssetLoader` can load Chalice result/map visuals. Base-game-only sessions
+remain false because their ownership cache is never set.
+
+## Sticky DLC ownership for Creator Tools charms (2026-08-16)
+
+`RefreshAvailableContent()` now treats a successful `DLCManager.DLCEnabled()`
+result as valid for the lifetime of the Cuphead process. Runtime evidence showed
+the game reporting DLC available at startup and then transiently returning false
+after focus/scene changes. The next roulette spin rebuilt every content pool as
+base-game-only; `SanitizeCreatorToolsForceSelection()` consequently replaced a
+selected DLC charm with Empty even though the browser had sent the correct
+`charm` index.
+
+The cache remains conservative for base-game-only installations: they stay
+base-only unless a later refresh positively confirms DLC ownership. Once true,
+ownership cannot fall back to false until Cuphead is restarted. This rule must
+remain shared by normal random selection and `/config` forcing so their visible
+catalogs cannot disagree.
+
+The same sticky value now guards Cuphead's own public
+`DLCManager.DLCEnabled()` through a Harmony postfix. This is required because
+native `AssetLoader<T>` consults that method before loading DLC assets. Do not
+limit the cache back to `RefreshAvailableContent()`: Creator Tools would keep
+showing DLC entries while the game silently refused to load their visuals.
+
 ## Creator Tools external force panel (2026-08-16)
 
 Creator Tools now serves a recording-oriented configuration page at
