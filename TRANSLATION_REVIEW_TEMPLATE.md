@@ -3,13 +3,13 @@
 Idioma objetivo: **ESCRIBE AQUÍ EL IDIOMA DE LA TABLA SIGUIENTE**
 
 Esta plantilla separa los **29 textos aprobados** del catálogo anterior y los
-**52 textos nuevos pendientes**. El inventario cubre la Equip Card, los prompts
-del mapa, el HUD de combate, el menú de Creator Tools y su página externa de
-configuración.
+textos nuevos pendientes. El alcance se divide en **33 IDs del juego para los
+doce idiomas** y **19 IDs de `/config` únicamente para inglés y español**.
 
 Estado del catálogo anterior: **los doce idiomas están aprobados y activos**.
-Las cinco cadenas de retos y las 47 de Creator Tools deben revisarse ahora sin
-alterar las traducciones que ya habían sido aceptadas.
+Las cinco cadenas de retos y las 28 de Creator Tools que aparecen dentro del
+juego deben revisarse en los doce idiomas. Los 19 textos exclusivos de
+`/config` sólo requieren una versión inglesa y una española.
 
 ## Idiomas disponibles y orden histórico de Ctrl+F8
 
@@ -86,9 +86,9 @@ traducciones.
 
 ## Pendiente de localización
 
-Completa únicamente la columna `Traducción aprobada`. Estos IDs todavía no
-deben mezclarse con el catálogo anterior hasta que las doce revisiones estén
-validadas.
+Completa únicamente la columna `Traducción aprobada`. Los IDs del juego todavía
+no deben mezclarse con el catálogo anterior hasta que las doce revisiones estén
+validadas. El bloque de `/config` se aprobará por separado en inglés y español.
 
 ### Retos nuevos
 
@@ -100,7 +100,7 @@ validadas.
 | `challenge.ink_rain` | Lluvia de tinta | Nombre del reto en ruleta, HUD y overlay | |
 | `challenge.half_damage` | Daño -50% | Nombre del reto en ruleta, HUD y overlay | |
 
-### Creator Tools
+### Creator Tools dentro del juego
 
 `LA PICHI RULETA`, `CREATOR TOOLS`, las escalas, los porcentajes, `Cuphead` y la
 URL local se conservan sin traducción. Traduce las siguientes etiquetas y
@@ -137,7 +137,11 @@ mensajes:
 | `creator.status.clients` | CLIENTES | Contador plural | |
 | `creator.status.port_updated` | PUERTO ACTUALIZADO | Aviso junto al puerto elegido automáticamente | |
 
-### Página externa de forzado
+### Página externa de forzado — sólo inglés y español
+
+`/config` mostrará español cuando Cuphead use `SpanishSpain` o
+`SpanishAmerica`; para cualquiera de los otros diez idiomas mostrará inglés.
+No solicites ni agregues variantes adicionales para esta página.
 
 La página local `/config` comparte los nombres oficiales de jefes y equipo que
 proporciona Cuphead. También reutiliza los IDs aprobados `ui.slot.super`,
@@ -162,7 +166,7 @@ proporciona Cuphead. También reutiliza los IDs aprobados `ui.slot.super`,
 | `creator.force.applying` | APLICANDO EN CUPHEAD… | Aplicación en curso | |
 | `creator.force.apply_failed` | NO SE PUDO APLICAR | Error al aplicar | |
 
-### Valores especiales visibles en `/config`
+### Valores especiales visibles en `/config` — sólo inglés y español
 
 Estos nombres antes estaban excluidos porque la Equip Card sólo dibuja sus
 iconos. La página de forzado sí los presenta dentro de sus selectores, así que

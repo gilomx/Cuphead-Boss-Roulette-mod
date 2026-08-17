@@ -4,9 +4,12 @@ Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `Spanish
 
 ## Auditoría de Creator Tools (0.5.131)
 
-La nueva interfaz amplía el catálogo pendiente de 32 a **52 IDs**: cinco
-nombres de retos y 47 textos de Creator Tools. Además de las 27 cadenas que ya
-estaban inventariadas, la revisión encontró:
+La nueva interfaz amplía el inventario pendiente a **52 IDs**, pero no todos
+comparten el mismo alcance. Los **33 IDs visibles dentro del juego** —cinco
+nombres de retos y 28 textos de Creator Tools— requieren los 12 idiomas de
+Cuphead. Los otros **19 IDs pertenecen únicamente a `/config`** y sólo tendrán
+inglés y español. Además de las 27 cadenas que ya estaban inventariadas, la
+revisión encontró:
 
 - `creator.status.port_updated`, visible cuando el servidor elige otro puerto;
 - 16 textos de la página externa `/config`, incluyendo sus estados y el nombre
@@ -16,8 +19,10 @@ estaban inventariadas, la revisión encontró:
 
 Los nombres reales de jefes, armas, supers y amuletos continúan usando la
 localización oficial de Cuphead. `LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`,
-las escalas, los porcentajes y la URL local permanecen sin traducir. La fuente
-de verdad del inventario pendiente es `TRANSLATION_REVIEW_TEMPLATE.md`.
+las escalas, los porcentajes y la URL local permanecen sin traducir. `/config`
+usará español para `SpanishSpain` y `SpanishAmerica`, e inglés para los otros
+diez idiomas. La fuente de verdad del inventario pendiente es
+`TRANSLATION_REVIEW_TEMPLATE.md`.
 
 ## Placeholder del reto RGB (0.5.129)
 

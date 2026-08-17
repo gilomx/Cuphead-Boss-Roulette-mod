@@ -25,12 +25,16 @@ fusionarán de nuevo y esta separación se retirará.
 
 ### Creator Tools
 
-Hay 47 IDs visibles pendientes:
+El alcance se divide por superficie:
 
-- 28 etiquetas, valores, confirmaciones y estados del menú integrado;
-- 16 textos de la página externa `/config`;
-- 3 valores especiales de equipo que ahora aparecen escritos en esa página:
-  `Nada`, `Reliquia Maldita` y `Reliquia Divina`.
+- 28 etiquetas, valores, confirmaciones y estados del menú integrado deben
+  traducirse a los 12 idiomas de Cuphead;
+- 16 textos de la página externa `/config` sólo tendrán inglés y español;
+- 3 valores especiales de equipo visibles en `/config` (`Nada`, `Reliquia
+  Maldita` y `Reliquia Divina`) también serán únicamente bilingües.
+
+En total quedan **33 IDs del juego para los 12 idiomas** (cinco retos más 28 de
+Creator Tools) y **19 IDs exclusivos de `/config` para inglés y español**.
 
 `TRANSLATION_REVIEW_TEMPLATE.md` contiene el inventario completo. Los
 documentos activos de cada idioma deben actualizarse con estas filas cuando se
@@ -46,10 +50,13 @@ pendiente.
 
 ## Cierre de esta etapa
 
-Cuando estén aprobadas las doce entregas:
+Cuando estén aprobadas las doce entregas del juego y las dos variantes de
+`/config`:
 
 1. Incorporar los nuevos valores a `ModLocalization.cs` y Creator Tools.
-2. Probar anchos, fuentes y saltos de línea en los doce idiomas.
-3. Mover los 52 IDs nuevos al catálogo aprobado de cada archivo.
+2. Probar el contenido del juego en los doce idiomas y `/config` en inglés y
+   español.
+3. Mover los 33 IDs del juego al catálogo aprobado de cada idioma e incorporar
+   los 19 IDs bilingües a la implementación de `/config`.
 4. Actualizar `review_by_language/` con las nuevas entregas finales.
 5. Eliminar la separación temporal entre aprobado y pendiente.
