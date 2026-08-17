@@ -13,6 +13,24 @@ existing local overlay/config server to one streaming platform. Any provider
 integration must remain optional and must not change normal roulette behavior
 when disabled or unavailable.
 
+## Creator Tools localization audit (2026-08-16)
+
+The current UI adds 20 translation candidates that were missing from the
+previous 32-ID pending inventory. The pending catalog now contains **52 IDs**:
+five challenge names and 47 Creator Tools strings. The 20 additions are
+`creator.status.port_updated`, 16 labels/messages from the external `/config`
+page, and the three special catalog values `common.none`,
+`charm.cursed_relic` and `charm.divine_relic` that `/config` now displays as
+text. Normal boss, weapon, super and charm names still come from Cuphead.
+
+`TRANSLATION_REVIEW_TEMPLATE.md` is the authoritative row-by-row inventory and
+`translations/LOCALIZATION_STATUS.md` records the approval stage. The external
+page currently contains static Spanish markup/JavaScript and the native menu
+still uses a Spanish/English branch; implementation must move both onto the 12
+language catalogs only after the user approves the new wording. Preserve
+`LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`, numeric scales, percentages and
+the local URL without translation.
+
 ## Roulette winner on the grade screen (2026-08-16)
 
 Immediately before normal victory restoration,

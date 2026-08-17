@@ -11,6 +11,10 @@
   Una respuesta falsa transitoria impedía cargar el arte de Ms. Chalice en la
   calificación y su animación de regreso al mapa, aunque su objeto estuviera
   correctamente activo. Las instalaciones sin DLC no se modifican.
+- La auditoría posterior de Creator Tools amplía la plantilla pendiente de 32
+  a 52 IDs: incluye la página externa de forzado, el aviso de puerto actualizado
+  y los valores especiales `Nada`, `Reliquia Maldita` y `Reliquia Divina` que
+  ahora sí aparecen escritos en `/config`.
 
 ## Creator Tools: amuletos DLC al recuperar el foco (2026-08-16)
 

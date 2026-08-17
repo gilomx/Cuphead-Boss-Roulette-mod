@@ -3,11 +3,12 @@
 Idioma objetivo: **ESCRIBE AQUÍ EL IDIOMA DE LA TABLA SIGUIENTE**
 
 Esta plantilla separa los **29 textos aprobados** del catálogo anterior y los
-**32 textos nuevos pendientes**. El inventario cubre la Equip Card, los prompts
-del mapa, el HUD de combate y el menú de Creator Tools.
+**52 textos nuevos pendientes**. El inventario cubre la Equip Card, los prompts
+del mapa, el HUD de combate, el menú de Creator Tools y su página externa de
+configuración.
 
 Estado del catálogo anterior: **los doce idiomas están aprobados y activos**.
-Las cinco cadenas de retos y las 27 de Creator Tools deben revisarse ahora sin
+Las cinco cadenas de retos y las 47 de Creator Tools deben revisarse ahora sin
 alterar las traducciones que ya habían sido aceptadas.
 
 ## Idiomas disponibles y orden histórico de Ctrl+F8
@@ -101,12 +102,13 @@ validadas.
 
 ### Creator Tools
 
-`CREATOR TOOLS`, las escalas, los porcentajes y la URL local se conservan sin
-traducción. Traduce las siguientes etiquetas y mensajes:
+`LA PICHI RULETA`, `CREATOR TOOLS`, las escalas, los porcentajes, `Cuphead` y la
+URL local se conservan sin traducción. Traduce las siguientes etiquetas y
+mensajes:
 
 | ID | Español de referencia | Dónde aparece | Traducción aprobada |
 | --- | --- | --- | --- |
-| `creator.menu.roulette_overlay` | OVERLAY DE RULETA | Entrada y título de la herramienta | |
+| `creator.menu.roulette_overlay` | STREAM OVERLAY | Entrada y título de la herramienta | |
 | `creator.menu.status` | ESTADO | Menú Overlay de ruleta | |
 | `creator.menu.retry` | AL REINTENTAR | Menú Overlay de ruleta | |
 | `creator.menu.preview` | VISTA PREVIA | Menú Creator Tools | |
@@ -133,6 +135,44 @@ traducción. Traduce las siguientes etiquetas y mensajes:
 | `creator.status.no_port` | NO HAY UN PUERTO DISPONIBLE | Error local | |
 | `creator.status.client` | CLIENTE | Contador singular | |
 | `creator.status.clients` | CLIENTES | Contador plural | |
+| `creator.status.port_updated` | PUERTO ACTUALIZADO | Aviso junto al puerto elegido automáticamente | |
+
+### Página externa de forzado
+
+La página local `/config` comparte los nombres oficiales de jefes y equipo que
+proporciona Cuphead. También reutiliza los IDs aprobados `ui.slot.super`,
+`ui.slot.charm` y `ui.slot.challenge`; no es necesario traducirlos dos veces.
+
+| ID | Español de referencia | Dónde aparece | Traducción aprobada |
+| --- | --- | --- | --- |
+| `creator.force.page_title` | FORZADO | Título de la pestaña, después de la marca | |
+| `creator.force.eyebrow` | HERRAMIENTAS DE GRABACIÓN | Encabezado superior | |
+| `creator.force.intro` | El resultado elegido se aplicará a cada giro nuevo mientras el forzado esté activo. | Explicación de la herramienta | |
+| `creator.force.toggle` | FORZADO ACTIVO | Interruptor principal | |
+| `creator.force.result_aria` | Resultado forzado | Nombre accesible del formulario | |
+| `creator.force.boss` | JEFE | Selector de jefe | |
+| `creator.force.shot_1` | DISPARO 1 | Selector del primer disparo | |
+| `creator.force.shot_2` | DISPARO 2 | Selector del segundo disparo | |
+| `creator.force.connecting` | CONECTANDO CON CUPHEAD… | Estado inicial | |
+| `creator.force.open_overlay` | ABRIR OVERLAY | Enlace inferior | |
+| `creator.force.pending_return` | PENDIENTE: VUELVE A CUPHEAD | Cambio pendiente por aplicar | |
+| `creator.force.enabled_status` | FORZADO ACTIVO EN CUPHEAD | Confirmación de estado activo | |
+| `creator.force.disabled_status` | FORZADO DESACTIVADO | Confirmación de estado inactivo | |
+| `creator.force.disconnected` | SIN CONEXIÓN CON EL MOD | Error de conexión | |
+| `creator.force.applying` | APLICANDO EN CUPHEAD… | Aplicación en curso | |
+| `creator.force.apply_failed` | NO SE PUDO APLICAR | Error al aplicar | |
+
+### Valores especiales visibles en `/config`
+
+Estos nombres antes estaban excluidos porque la Equip Card sólo dibuja sus
+iconos. La página de forzado sí los presenta dentro de sus selectores, así que
+ahora forman parte del catálogo pendiente.
+
+| ID | Español de referencia | Dónde aparece | Traducción aprobada |
+| --- | --- | --- | --- |
+| `common.none` | Nada | Selectores sin segundo disparo, súper o amuleto | |
+| `charm.cursed_relic` | Reliquia Maldita | Selector de amuleto | |
+| `charm.divine_relic` | Reliquia Divina | Selector de amuleto | |
 
 ## Textos excluidos después de la revisión
 
@@ -143,7 +183,6 @@ No hace falta traducir lo siguiente para la primera versión:
 | `status.*` | Sólo lo dibuja `DrawRouletteLegacy()`, la interfaz antigua que ya no se ejecuta. Esto incluye `status.scene_loading`. |
 | `ui.brand`, `ui.tagline`, `ui.action.close`, `ui.value.selected`, `ui.value.rolling` y `ui.controls` | Pertenecen únicamente a la interfaz antigua. |
 | `ui.action.select_save` | La Equip Card sólo puede dibujarse cuando ya hay una partida cargada; el estado defensivo no llega a mostrarse. |
-| `common.none`, `charm.cursed_relic` y `charm.divine_relic` | La tarjeta actual muestra iconos de equipo, no sus nombres escritos. |
 | `challenge.none` | Cuando no hay reto se muestra el círculo vacío, sin el texto “Nada”. |
 | Aviso de `Ctrl+F8` | Es una herramienta temporal de desarrollo y se desactivará antes del lanzamiento. |
 | Configuración de BepInEx y logs | No aparecen dentro de la interfaz del juego. |

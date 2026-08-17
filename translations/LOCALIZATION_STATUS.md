@@ -25,15 +25,24 @@ fusionarán de nuevo y esta separación se retirará.
 
 ### Creator Tools
 
-Hay 27 IDs visibles pendientes: etiquetas del menú, valores, alineación, orden,
-confirmaciones, ayuda inferior y estados del servidor local. Cada documento
-activo contiene la tabla completa con su columna de aprobación vacía.
+Hay 47 IDs visibles pendientes:
+
+- 28 etiquetas, valores, confirmaciones y estados del menú integrado;
+- 16 textos de la página externa `/config`;
+- 3 valores especiales de equipo que ahora aparecen escritos en esa página:
+  `Nada`, `Reliquia Maldita` y `Reliquia Divina`.
+
+`TRANSLATION_REVIEW_TEMPLATE.md` contiene el inventario completo. Los
+documentos activos de cada idioma deben actualizarse con estas filas cuando se
+incorporen las nuevas revisiones.
 
 ## Fuera de alcance
 
 Continúan excluidos los textos de la interfaz antigua, logs, configuración de
 BepInEx, símbolos de botones, escalas, porcentajes, URL local y nombres de
-jefes/equipo que ya proceden de la localización oficial de Cuphead.
+jefes/equipo que ya proceden de la localización oficial de Cuphead. Los tres
+valores especiales sin equivalente nativo sí están dentro del alcance
+pendiente.
 
 ## Cierre de esta etapa
 
@@ -41,6 +50,6 @@ Cuando estén aprobadas las doce entregas:
 
 1. Incorporar los nuevos valores a `ModLocalization.cs` y Creator Tools.
 2. Probar anchos, fuentes y saltos de línea en los doce idiomas.
-3. Mover los 32 IDs nuevos al catálogo aprobado de cada archivo.
+3. Mover los 52 IDs nuevos al catálogo aprobado de cada archivo.
 4. Actualizar `review_by_language/` con las nuevas entregas finales.
 5. Eliminar la separación temporal entre aprobado y pendiente.

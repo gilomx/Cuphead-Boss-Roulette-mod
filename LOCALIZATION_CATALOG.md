@@ -2,6 +2,23 @@
 
 Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `SpanishSpain` usa la tabla española base; `SpanishAmerica` hereda esa tabla y cambia sólo `challenge.no_peashooter` a `SIN PEASHOOTER`. `LOCALIZATION_TRANSLATIONS.md` queda como registro histórico.
 
+## Auditoría de Creator Tools (0.5.131)
+
+La nueva interfaz amplía el catálogo pendiente de 32 a **52 IDs**: cinco
+nombres de retos y 47 textos de Creator Tools. Además de las 27 cadenas que ya
+estaban inventariadas, la revisión encontró:
+
+- `creator.status.port_updated`, visible cuando el servidor elige otro puerto;
+- 16 textos de la página externa `/config`, incluyendo sus estados y el nombre
+  accesible del formulario;
+- `common.none`, `charm.cursed_relic` y `charm.divine_relic`, que ahora sí se
+  muestran escritos en los selectores de la página de forzado.
+
+Los nombres reales de jefes, armas, supers y amuletos continúan usando la
+localización oficial de Cuphead. `LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`,
+las escalas, los porcentajes y la URL local permanecen sin traducir. La fuente
+de verdad del inventario pendiente es `TRANSLATION_REVIEW_TEMPLATE.md`.
+
 ## Placeholder del reto RGB (0.5.129)
 
 El reto experimental usa temporalmente `RGB` como nombre visible en las 12
@@ -125,9 +142,9 @@ Conviene reutilizar estas traducciones oficiales en lugar de mantener copias:
 | Nombre de súper | `WeaponProperties.GetDisplayName(Super)` | `EquipmentEntry.Name` |
 | Nombre de amuleto | `WeaponProperties.GetDisplayName(Charm)` | `EquipmentEntry.Name` |
 
-`Nada` no corresponde a un equipo real, pero no se escribe en la Equip Card
-actual. Sólo necesitará traducción si una interfaz futura vuelve a mostrar
-nombres de equipo.
+`Nada` no corresponde a un equipo real y no se escribe en la Equip Card, pero
+desde 0.5.131 sí aparece en los selectores de la página `/config`; por eso ya
+forma parte de la traducción pendiente.
 
 ## Inventario técnico de textos de tarjeta
 
