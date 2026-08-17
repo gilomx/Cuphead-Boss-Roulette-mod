@@ -3,13 +3,11 @@
 Idioma objetivo: **ESCRIBE AQUÍ EL IDIOMA DE LA TABLA SIGUIENTE**
 
 Esta plantilla separa los **29 textos aprobados** del catálogo anterior y los
-textos nuevos pendientes. El alcance se divide en **33 IDs del juego para los
-doce idiomas** y **19 IDs de `/config` únicamente para inglés y español**.
+**33 IDs nuevos del juego pendientes para los doce idiomas**.
 
 Estado del catálogo anterior: **los doce idiomas están aprobados y activos**.
 Las cinco cadenas de retos y las 28 de Creator Tools que aparecen dentro del
-juego deben revisarse en los doce idiomas. Los 19 textos exclusivos de
-`/config` sólo requieren una versión inglesa y una española.
+juego deben revisarse en los doce idiomas.
 
 ## Idiomas disponibles y orden histórico de Ctrl+F8
 
@@ -86,9 +84,9 @@ traducciones.
 
 ## Pendiente de localización
 
-Completa únicamente la columna `Traducción aprobada`. Los IDs del juego todavía
-no deben mezclarse con el catálogo anterior hasta que las doce revisiones estén
-validadas. El bloque de `/config` se aprobará por separado en inglés y español.
+Completa únicamente la columna `Traducción aprobada`. Estos IDs todavía no deben
+mezclarse con el catálogo anterior hasta que las doce revisiones estén
+validadas.
 
 ### Retos nuevos
 
@@ -136,47 +134,6 @@ mensajes:
 | `creator.status.client` | CLIENTE | Contador singular | |
 | `creator.status.clients` | CLIENTES | Contador plural | |
 | `creator.status.port_updated` | PUERTO ACTUALIZADO | Aviso junto al puerto elegido automáticamente | |
-
-### Página externa de forzado — sólo inglés y español
-
-`/config` mostrará español cuando Cuphead use `SpanishSpain` o
-`SpanishAmerica`; para cualquiera de los otros diez idiomas mostrará inglés.
-No solicites ni agregues variantes adicionales para esta página.
-
-La página local `/config` comparte los nombres oficiales de jefes y equipo que
-proporciona Cuphead. También reutiliza los IDs aprobados `ui.slot.super`,
-`ui.slot.charm` y `ui.slot.challenge`; no es necesario traducirlos dos veces.
-
-| ID | Español de referencia | Dónde aparece | Traducción aprobada |
-| --- | --- | --- | --- |
-| `creator.force.page_title` | FORZADO | Título de la pestaña, después de la marca | |
-| `creator.force.eyebrow` | HERRAMIENTAS DE GRABACIÓN | Encabezado superior | |
-| `creator.force.intro` | El resultado elegido se aplicará a cada giro nuevo mientras el forzado esté activo. | Explicación de la herramienta | |
-| `creator.force.toggle` | FORZADO ACTIVO | Interruptor principal | |
-| `creator.force.result_aria` | Resultado forzado | Nombre accesible del formulario | |
-| `creator.force.boss` | JEFE | Selector de jefe | |
-| `creator.force.shot_1` | DISPARO 1 | Selector del primer disparo | |
-| `creator.force.shot_2` | DISPARO 2 | Selector del segundo disparo | |
-| `creator.force.connecting` | CONECTANDO CON CUPHEAD… | Estado inicial | |
-| `creator.force.open_overlay` | ABRIR OVERLAY | Enlace inferior | |
-| `creator.force.pending_return` | PENDIENTE: VUELVE A CUPHEAD | Cambio pendiente por aplicar | |
-| `creator.force.enabled_status` | FORZADO ACTIVO EN CUPHEAD | Confirmación de estado activo | |
-| `creator.force.disabled_status` | FORZADO DESACTIVADO | Confirmación de estado inactivo | |
-| `creator.force.disconnected` | SIN CONEXIÓN CON EL MOD | Error de conexión | |
-| `creator.force.applying` | APLICANDO EN CUPHEAD… | Aplicación en curso | |
-| `creator.force.apply_failed` | NO SE PUDO APLICAR | Error al aplicar | |
-
-### Valores especiales visibles en `/config` — sólo inglés y español
-
-Estos nombres antes estaban excluidos porque la Equip Card sólo dibuja sus
-iconos. La página de forzado sí los presenta dentro de sus selectores, así que
-ahora forman parte del catálogo pendiente.
-
-| ID | Español de referencia | Dónde aparece | Traducción aprobada |
-| --- | --- | --- | --- |
-| `common.none` | Nada | Selectores sin segundo disparo, súper o amuleto | |
-| `charm.cursed_relic` | Reliquia Maldita | Selector de amuleto | |
-| `charm.divine_relic` | Reliquia Divina | Selector de amuleto | |
 
 ## Textos excluidos después de la revisión
 

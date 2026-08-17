@@ -41,18 +41,8 @@ súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.
 
 Desde el menú de pausa del mapa, `LA PICHI RULETA` abre un pequeño hub con la
 configuración de `STREAM OVERLAY`. Cuando su estado está activado, el mismo
-servidor local ofrece:
-
-- Overlay para OBS: `http://127.0.0.1:18081/`
-- Panel temporal de forzado: `http://127.0.0.1:18081/config`
-
-El panel de forzado sirve para grabaciones y pruebas. Permite fijar jefe,
-disparos, súper, amuleto y reto; mientras `FORZADO ACTIVO` esté marcado, cada
-giro nuevo usa exactamente esa selección. Disparo 1 nunca puede ser `Nada`,
-Disparo 2 no puede repetir el primero y los retos se filtran según el tipo de
-nivel. Si el navegador indica que el cambio está pendiente, basta con volver a
-la ventana de Cuphead para que el juego lo procese. Esta configuración no se
-guarda y vuelve a estar desactivada al reiniciar Cuphead.
+servidor local ofrece el overlay para OBS en
+`http://127.0.0.1:18081/`.
 
 ## Instalación
 

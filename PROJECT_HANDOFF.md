@@ -4,31 +4,27 @@
 
 Creator Tools intentionally stops here for the current release: the native map
 menu, WebSocket overlay, overlay presentation settings, retry behavior, preview,
-clipboard URL, and external `/config` force panel are the supported scope.
+and clipboard URL are the supported public scope.
 
 Future work may add live-stream interaction providers to the same Creator Tools
 area so audience events can influence roulette configuration or results. Keep
 that work provider-agnostic at the configuration boundary; do not couple the
-existing local overlay/config server to one streaming platform. Any provider
+existing local overlay server to one streaming platform. Any provider
 integration must remain optional and must not change normal roulette behavior
 when disabled or unavailable.
 
 ## Creator Tools localization audit (2026-08-16)
 
-The current UI has **33 pending in-game IDs** that require all 12 Cuphead
-languages: five challenge names and 28 Creator Tools strings. The external
-`/config` page has a separate **19-ID bilingual scope**: 16 labels/messages and
-the three special catalog values `common.none`, `charm.cursed_relic` and
-`charm.divine_relic` that it displays as text. `/config` must use Spanish for
-`SpanishSpain`/`SpanishAmerica` and English for every other game language; do
-not add ten more page variants. Normal boss, weapon, super and charm names
-still come from Cuphead.
+The current public UI has **33 pending in-game IDs** that require all 12 Cuphead
+languages: five challenge names and 28 Creator Tools strings. Normal boss,
+weapon, super and charm names still come from Cuphead.
 
 `TRANSLATION_REVIEW_TEMPLATE.md` is the authoritative row-by-row inventory and
-`translations/LOCALIZATION_STATUS.md` records the approval stage. The external
-page currently contains static Spanish markup/JavaScript and the native menu
-still uses a Spanish/English branch. Move the native menu onto the 12-language
-catalog after approval, but keep the page on its separate bilingual catalog.
+`translations/LOCALIZATION_STATUS.md` records the approval stage. The native
+menu still uses a Spanish/English branch and must move onto the 12-language
+catalog after approval. The compiled `/config` prototype is deliberately
+excluded: it will remain internal and unannounced in the next public update, so
+do not add its labels or special equipment values to this localization round.
 Preserve
 `LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`, numeric scales, percentages and
 the local URL without translation.
@@ -81,7 +77,11 @@ native `AssetLoader<T>` consults that method before loading DLC assets. Do not
 limit the cache back to `RefreshAvailableContent()`: Creator Tools would keep
 showing DLC entries while the game silently refused to load their visuals.
 
-## Creator Tools external force panel (2026-08-16)
+## Creator Tools internal force-panel prototype (2026-08-16)
+
+This prototype may remain compiled, but it is not part of the next public
+update: do not link it from the game, README, release notes or translation
+templates. Preserve the implementation notes below only for future development.
 
 Creator Tools now serves a recording-oriented configuration page at
 `http://127.0.0.1:18081/config` from the same local listener as the browser

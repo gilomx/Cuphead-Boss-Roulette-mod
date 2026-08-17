@@ -4,25 +4,15 @@ Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `Spanish
 
 ## Auditoría de Creator Tools (0.5.131)
 
-La nueva interfaz amplía el inventario pendiente a **52 IDs**, pero no todos
-comparten el mismo alcance. Los **33 IDs visibles dentro del juego** —cinco
-nombres de retos y 28 textos de Creator Tools— requieren los 12 idiomas de
-Cuphead. Los otros **19 IDs pertenecen únicamente a `/config`** y sólo tendrán
-inglés y español. Además de las 27 cadenas que ya estaban inventariadas, la
-revisión encontró:
-
-- `creator.status.port_updated`, visible cuando el servidor elige otro puerto;
-- 16 textos de la página externa `/config`, incluyendo sus estados y el nombre
-  accesible del formulario;
-- `common.none`, `charm.cursed_relic` y `charm.divine_relic`, que ahora sí se
-  muestran escritos en los selectores de la página de forzado.
+El inventario público pendiente contiene **33 IDs visibles dentro del juego**:
+cinco nombres de retos y 28 textos de Creator Tools para los 12 idiomas de
+Cuphead. La revisión añadió `creator.status.port_updated`, visible cuando el
+servidor elige automáticamente otro puerto, a las 27 cadenas ya inventariadas.
 
 Los nombres reales de jefes, armas, supers y amuletos continúan usando la
 localización oficial de Cuphead. `LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`,
-las escalas, los porcentajes y la URL local permanecen sin traducir. `/config`
-usará español para `SpanishSpain` y `SpanishAmerica`, e inglés para los otros
-diez idiomas. La fuente de verdad del inventario pendiente es
-`TRANSLATION_REVIEW_TEMPLATE.md`.
+las escalas, los porcentajes y la URL local permanecen sin traducir. La fuente
+de verdad del inventario pendiente es `TRANSLATION_REVIEW_TEMPLATE.md`.
 
 ## Placeholder del reto RGB (0.5.129)
 
@@ -147,9 +137,8 @@ Conviene reutilizar estas traducciones oficiales en lugar de mantener copias:
 | Nombre de súper | `WeaponProperties.GetDisplayName(Super)` | `EquipmentEntry.Name` |
 | Nombre de amuleto | `WeaponProperties.GetDisplayName(Charm)` | `EquipmentEntry.Name` |
 
-`Nada` no corresponde a un equipo real y no se escribe en la Equip Card, pero
-desde 0.5.131 sí aparece en los selectores de la página `/config`; por eso ya
-forma parte de la traducción pendiente.
+`Nada` no corresponde a un equipo real y no se escribe en la Equip Card, por lo
+que no forma parte del catálogo público pendiente.
 
 ## Inventario técnico de textos de tarjeta
 

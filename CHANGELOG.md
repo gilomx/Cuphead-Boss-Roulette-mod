@@ -11,17 +11,14 @@
   Una respuesta falsa transitoria impedía cargar el arte de Ms. Chalice en la
   calificación y su animación de regreso al mapa, aunque su objeto estuviera
   correctamente activo. Las instalaciones sin DLC no se modifican.
-- La auditoría posterior de Creator Tools separa 33 IDs del juego que requieren
-  los doce idiomas y 19 IDs exclusivos de `/config`, que sólo tendrá inglés y
-  español. Este último grupo incluye sus textos de estado y los valores `Nada`,
-  `Reliquia Maldita` y `Reliquia Divina` que ahora aparecen escritos allí.
+- La auditoría posterior de Creator Tools deja 33 IDs públicos pendientes para
+  los doce idiomas: cinco retos nuevos y 28 cadenas visibles dentro del juego.
 
-## Creator Tools: amuletos DLC al recuperar el foco (2026-08-16)
+## DLC al recuperar el foco (2026-08-16)
 
 - Una detección positiva del DLC ahora permanece válida durante toda la sesión
   de Cuphead. `DLCManager` podía devolver temporalmente falso después de cambios
-  de foco o escena; al reconstruir el catálogo, el mod eliminaba los amuletos
-  DLC y sustituía el seleccionado por `Nada` antes del giro forzado.
+  de foco o escena y hacer desaparecer contenido ya confirmado.
 - La misma detección positiva protege las llamadas nativas a
   `DLCManager.DLCEnabled()`, necesarias para cargar los recursos visuales del
   DLC en resultados y en el mapa.
@@ -29,20 +26,8 @@
   cambio sólo evita que una propiedad ya confirmada desaparezca a mitad del
   proceso.
 
-## Creator Tools: panel externo de forzado (2026-08-16)
+## Creator Tools: menú integrado y overlay (2026-08-16)
 
-- El servidor local de Creator Tools ahora publica `http://127.0.0.1:18081/config`
-  junto al overlay. La nueva página permite elegir jefe, disparos, súper,
-  amuleto y reto, y activar `FORZADO ACTIVO` para que cada giro nuevo produzca
-  exactamente ese resultado.
-- El catálogo se genera desde el contenido realmente disponible en la
-  instalación: respeta la presencia del DLC, evita `Nada` en Disparo 1,
-  impide repetir el mismo disparo en ambas posiciones y filtra los retos
-  terrestres o aéreos según el jefe seleccionado.
-- Los cambios del navegador se encolan en el servidor y se aplican en el hilo
-  principal de Unity. Si Cuphead está sin foco, la página muestra que el cambio
-  queda pendiente hasta volver al juego. El forzado es temporal, comienza
-  desactivado y no se guarda al cerrar Cuphead.
 - La entrada nativa del mapa se llama ahora `LA PICHI RULETA`. Su hub compacto
   usa la tarjeta principal de Opciones y abre `STREAM OVERLAY`; la configuración
   del overlay conserva la tarjeta grande, coloca `VISTA PREVIA` antes de
