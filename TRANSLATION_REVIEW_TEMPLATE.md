@@ -3,10 +3,10 @@
 Idioma objetivo: **ESCRIBE AQUÍ EL IDIOMA DE LA TABLA SIGUIENTE**
 
 Esta plantilla separa los **29 textos aprobados** del catálogo anterior y los
-**33 IDs nuevos del juego pendientes para los doce idiomas**.
+**25 IDs nuevos del juego pendientes para los doce idiomas**.
 
 Estado del catálogo anterior: **los doce idiomas están aprobados y activos**.
-Las cinco cadenas de retos y las 28 de Creator Tools que aparecen dentro del
+Las cinco cadenas de retos y las 20 de Creator Tools que aparecen dentro del
 juego deben revisarse en los doce idiomas.
 
 ## Idiomas disponibles y orden histórico de Ctrl+F8
@@ -114,7 +114,6 @@ mensajes:
 | `creator.menu.order` | ORDEN | Menú Creator Tools | |
 | `creator.menu.alignment` | ALINEACIÓN | Menú Creator Tools | |
 | `creator.menu.opacity` | OPACIDAD | Menú Creator Tools | |
-| `creator.action.copy_overlay_url` | COPIAR URL DEL OVERLAY | Menú alternativo | |
 | `creator.action.copy_url` | COPIAR URL | Menú nativo | |
 | `creator.action.back` | VOLVER | Acción inferior de la herramienta | |
 | `creator.value.enabled` | ACTIVADO | Valor de opción | |
@@ -126,14 +125,7 @@ mensajes:
 | `creator.alignment.left` | IZQUIERDA | Valor de alineación | |
 | `creator.alignment.center` | CENTRO | Valor de alineación | |
 | `creator.alignment.right` | DERECHA | Valor de alineación | |
-| `creator.feedback.copied` | COPIADA | Confirmación corta | |
 | `creator.feedback.url_copied` | URL COPIADA | Aviso temporal | |
-| `creator.controls.change_back` | ACEPTAR: CAMBIAR · CANCELAR: VOLVER | Ayuda inferior | |
-| `creator.status.server_disabled` | SERVIDOR DESACTIVADO | Estado local | |
-| `creator.status.no_port` | NO HAY UN PUERTO DISPONIBLE | Error local | |
-| `creator.status.client` | CLIENTE | Contador singular | |
-| `creator.status.clients` | CLIENTES | Contador plural | |
-| `creator.status.port_updated` | PUERTO ACTUALIZADO | Aviso junto al puerto elegido automáticamente | |
 
 ## Textos excluidos después de la revisión
 

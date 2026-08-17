@@ -4,10 +4,12 @@ Estado: **los 12 idiomas de Cuphead tienen tablas activas en 0.5.120**. `Spanish
 
 ## Auditoría de Creator Tools (0.5.131)
 
-El inventario público pendiente contiene **33 IDs visibles dentro del juego**:
-cinco nombres de retos y 28 textos de Creator Tools para los 12 idiomas de
-Cuphead. La revisión añadió `creator.status.port_updated`, visible cuando el
-servidor elige automáticamente otro puerto, a las 27 cadenas ya inventariadas.
+El inventario público pendiente contiene **25 IDs visibles dentro del juego**:
+cinco nombres de retos y 20 textos de Creator Tools para los 12 idiomas de
+Cuphead. La revisión de llamadas confirmó que ocho IDs heredados pertenecían al
+menú IMGUI anterior y ya no podían dibujarse. Entre ellos estaba
+`creator.action.copy_overlay_url`; el menú nativo actual sólo muestra
+`creator.action.copy_url`.
 
 Los nombres reales de jefes, armas, supers y amuletos continúan usando la
 localización oficial de Cuphead. `LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`,

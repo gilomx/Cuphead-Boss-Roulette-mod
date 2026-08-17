@@ -11,8 +11,9 @@
   Una respuesta falsa transitoria impedía cargar el arte de Ms. Chalice en la
   calificación y su animación de regreso al mapa, aunque su objeto estuviera
   correctamente activo. Las instalaciones sin DLC no se modifican.
-- La auditoría posterior de Creator Tools deja 33 IDs públicos pendientes para
-  los doce idiomas: cinco retos nuevos y 28 cadenas visibles dentro del juego.
+- La auditoría de llamadas de Creator Tools deja 25 IDs públicos pendientes
+  para los doce idiomas: cinco retos nuevos y 20 cadenas visibles dentro del
+  juego. Se retiraron ocho textos heredados del menú manual que ya no se llama.
 
 ## DLC al recuperar el foco (2026-08-16)
 

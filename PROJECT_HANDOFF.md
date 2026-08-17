@@ -15,9 +15,18 @@ when disabled or unavailable.
 
 ## Creator Tools localization audit (2026-08-16)
 
-The current public UI has **33 pending in-game IDs** that require all 12 Cuphead
-languages: five challenge names and 28 Creator Tools strings. Normal boss,
+The current public UI has **25 pending in-game IDs** that require all 12 Cuphead
+languages: five challenge names and 20 Creator Tools strings. Normal boss,
 weapon, super and charm names still come from Cuphead.
+
+The runtime call audit removed eight stale IDs from the public translation
+scope: `creator.action.copy_overlay_url`, `creator.feedback.copied`,
+`creator.controls.change_back`, `creator.status.server_disabled`,
+`creator.status.no_port`, `creator.status.client`, `creator.status.clients` and
+`creator.status.port_updated`. They are reachable only from the abandoned
+IMGUI menu helpers (`DrawCreatorToolsMenu`, `CreatorToolsMenuValue` and
+`CreatorToolsServerStatus`), which have no callers. The native Cuphead menu uses
+`creator.action.copy_url` and `creator.feedback.url_copied` instead.
 
 `TRANSLATION_REVIEW_TEMPLATE.md` is the authoritative row-by-row inventory and
 `translations/LOCALIZATION_STATUS.md` records the approval stage. The native

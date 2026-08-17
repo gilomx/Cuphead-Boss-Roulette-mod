@@ -62,7 +62,7 @@ porcentajes y la URL local no se traducen.
 
 | ID | Referencia en español / inglés | Traducción aprobada |
 | --- | --- | --- |
-| `creator.menu.roulette_overlay` | OVERLAY DE RULETA / ROULETTE OVERLAY | |
+| `creator.menu.roulette_overlay` | STREAM OVERLAY | |
 | `creator.menu.status` | ESTADO / STATUS | |
 | `creator.menu.retry` | AL REINTENTAR / ON RETRY | |
 | `creator.menu.preview` | VISTA PREVIA / PREVIEW | |
@@ -70,7 +70,6 @@ porcentajes y la URL local no se traducen.
 | `creator.menu.order` | ORDEN / ORDER | |
 | `creator.menu.alignment` | ALINEACIÓN / ALIGNMENT | |
 | `creator.menu.opacity` | OPACIDAD / OPACITY | |
-| `creator.action.copy_overlay_url` | COPIAR URL DEL OVERLAY / COPY OVERLAY URL | |
 | `creator.action.copy_url` | COPIAR URL / COPY URL | |
 | `creator.action.back` | VOLVER / BACK | |
 | `creator.value.enabled` | ACTIVADO / ENABLED | |
@@ -82,10 +81,4 @@ porcentajes y la URL local no se traducen.
 | `creator.alignment.left` | IZQUIERDA / LEFT | |
 | `creator.alignment.center` | CENTRO / CENTER | |
 | `creator.alignment.right` | DERECHA / RIGHT | |
-| `creator.feedback.copied` | COPIADA / COPIED | |
 | `creator.feedback.url_copied` | URL COPIADA / URL COPIED | |
-| `creator.controls.change_back` | ACEPTAR: CAMBIAR · CANCELAR: VOLVER / ACCEPT: CHANGE · CANCEL: BACK | |
-| `creator.status.server_disabled` | SERVIDOR DESACTIVADO / SERVER DISABLED | |
-| `creator.status.no_port` | NO HAY UN PUERTO DISPONIBLE / NO LOCAL PORT AVAILABLE | |
-| `creator.status.client` | CLIENTE / CLIENT | |
-| `creator.status.clients` | CLIENTES / CLIENTS | |
