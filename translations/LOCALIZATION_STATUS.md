@@ -1,6 +1,6 @@
 # Estado de localización
 
-Estado: **etapa cerrada, implementada y verificada el 2026-08-17**.
+Estado: **catálogo anterior cerrado; nueva ronda 1/1 recibida el 2026-08-18**.
 
 ## Catálogo activo
 
@@ -10,8 +10,9 @@ Estado: **etapa cerrada, implementada y verificada el 2026-08-17**.
 - Un texto adicional, `creator.menu.logo`, integrado después para la nueva
   opción del overlay.
 - Total aprobado de esta auditoría: **55 IDs visibles en 12 idiomas**.
-- `challenge.stiff_mode` está implementado con valores provisionales, pero aún
-  no forma parte del total aprobado.
+- `challenge.stiff_mode` sigue activo con valores provisionales. Su entrega
+  definitiva de 12/12 idiomas ya está registrada, pero aún no se implementa ni
+  forma parte del total aprobado.
 - Los nombres de jefes, armas, supers y amuletos siguen procediendo de la
   localización oficial de Cuphead.
 
@@ -32,11 +33,12 @@ Tools convierte el texto visible a mayúsculas para conservar el diseño nativo.
 
 ## Próxima ronda
 
-La próxima ronda comienza con un ID definido:
+La nueva ronda contiene un ID y su entrega está completa:
 
-- `challenge.stiff_mode`: nombre visible del nuevo reto Modo Tieso. Español
-  usa provisionalmente `MODO TIESO`; los otros once idiomas usan `STIFF MODE`
-  hasta recibir y aprobar sus traducciones.
+- `challenge.stiff_mode`: **12/12 idiomas recibidos literalmente; pendiente de
+  implementación**. El valor final inglés será `Locked`; mientras tanto,
+  Español usa provisionalmente `MODO TIESO` y los otros once idiomas usan
+  `STIFF MODE` en el catálogo activo.
 
 Cuando se amplíe esta ronda:
 

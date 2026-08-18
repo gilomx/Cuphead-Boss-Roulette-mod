@@ -1,6 +1,6 @@
 # Histórico de localización por etiqueta
 
-Estado: **25/25 etiquetas aprobadas, implementadas y verificadas**.
+Estado: **25/25 etiquetas históricas implementadas; nueva ronda 1/1 recibida**.
 
 Este documento conserva literalmente cada entrega del usuario y las decisiones
 compactas posteriores. Las 25 etiquetas se incorporaron al catálogo activo
@@ -10,9 +10,10 @@ archivo se conserva para mantener continuidad con el flujo anterior.
 ## Estado de la recopilación
 
 - Progreso: **25/25 aprobadas e implementadas**.
+- Nueva ronda: **1/1 recibida literalmente; pendiente de implementación**.
 - Retos nuevos: **5/5 activos**.
 - Creator Tools: **20/20 activos**.
-- Siguiente etiqueta: **ninguna; etapa cerrada**.
+- Siguiente etiqueta: **ninguna; todos los IDs definidos están entregados**.
 - Regla histórica conservada: las entregas literales permanecen en este
   archivo aunque sus valores aprobados ya estén en el catálogo activo.
 
@@ -29,6 +30,25 @@ Ninguna.
   overlay.
 - La etiqueta posterior `creator.menu.logo` no forma parte de estas 25
   entregas literales y se documenta por separado.
+
+## Nueva ronda: `challenge.stiff_mode`
+
+Estado: **recibida literalmente — 12/12 idiomas; pendiente de implementación**.
+
+| Idioma interno | Traducción recibida |
+| --- | --- |
+| `English` | Locked |
+| `French` | Verrouillé |
+| `Italian` | Bloccato |
+| `German` | Festgesetzt |
+| `SpanishSpain` | Modo tieso |
+| `SpanishAmerica` | Modo tieso |
+| `Korean` | 고정 |
+| `Russian` | Зафиксирован |
+| `Polish` | Zablokowany |
+| `PortugueseBrazil` | Travado |
+| `Japanese` | 固定 |
+| `SimplifiedChinese` | 锁定 |
 
 ## `challenge.rgb_shift`
 
