@@ -23,7 +23,7 @@ namespace Gilomx.CupheadBossRoulette
         // Compatible bosses are still chosen randomly.
         private const bool ForceLongestOverlayChallengeForTesting = false;
         private static readonly bool ForceQueenBeeInkRainLoadoutForTesting =
-            true;
+            false;
         private static readonly ModifierId ForcedTestChallenge =
             ForceLongestOverlayChallengeForTesting
                 ? ModifierId.MiniPlaneOnly
@@ -80,7 +80,7 @@ namespace Gilomx.CupheadBossRoulette
             Levels.DicePalaceMain
         };
         // TEMP localization verification shortcut. Disable after review.
-        private const bool EnableLanguageTestShortcut = true;
+        private const bool EnableLanguageTestShortcut = false;
         private static readonly KeyboardShortcut LanguageTestLeftShortcut =
             new KeyboardShortcut(KeyCode.F8, KeyCode.LeftControl);
         private static readonly KeyboardShortcut LanguageTestRightShortcut =
@@ -696,6 +696,16 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(handleDash, prefix: new HarmonyMethod(handleDashPrefix));
             else
                 Logger.LogWarning("Could not install the No Dash guard.");
+
+            var handleLocked = AccessTools.Method(
+                typeof(LevelPlayerMotor), "HandleLocked");
+            var forceLockedPostfix = AccessTools.Method(
+                typeof(Plugin), "ForceLockedPostfix");
+            if (handleLocked != null && forceLockedPostfix != null)
+                harmony.Patch(handleLocked,
+                    postfix: new HarmonyMethod(forceLockedPostfix));
+            else
+                Logger.LogWarning("Could not install the Stiff Mode guard.");
 
             var canUseEx = AccessTools.PropertyGetter(
                 typeof(PlayerStatsManager), "CanUseEx");
@@ -2972,7 +2982,27 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockDash()
         {
-            return activeChallenge == ModifierId.NoDash &&
+            return (activeChallenge == ModifierId.NoDash ||
+                    activeChallenge == ModifierId.StiffMode) &&
+                   ShouldShowActiveChallenge();
+        }
+
+        private static void ForceLockedPostfix(LevelPlayerMotor __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.ShouldForceLocked())
+                return;
+
+            // Match holding Cuphead's native Lock button: HandleLocked only
+            // locks on the ground and releases in the air, so jumping remains
+            // steerable. Only replace the physical button result while grounded.
+            Traverse.Create(__instance).Property("Locked")
+                .SetValue(__instance.Grounded);
+        }
+
+        private bool ShouldForceLocked()
+        {
+            return activeChallenge == ModifierId.StiffMode &&
                    ShouldShowActiveChallenge();
         }
 

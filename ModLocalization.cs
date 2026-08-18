@@ -88,6 +88,7 @@ namespace Gilomx.CupheadBossRoulette
         ChallengeHpOne,
         ChallengeInkRain,
         ChallengeHalfDamage,
+        ChallengeStiffMode,
         ChallengeNone
     }
 
@@ -235,6 +236,8 @@ namespace Gilomx.CupheadBossRoulette
                     return Text(ModText.ChallengeInkRain);
                 case ModifierId.HalfDamage:
                     return Text(ModText.ChallengeHalfDamage);
+                case ModifierId.StiffMode:
+                    return Text(ModText.ChallengeStiffMode);
                 default:
                     return Text(ModText.ChallengeNone);
             }
@@ -331,6 +334,7 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.ChallengeHpOne] = "HP.1";
             spanish[ModText.ChallengeInkRain] = "LLUVIA DE TINTA";
             spanish[ModText.ChallengeHalfDamage] = "DAÑO -50%";
+            spanish[ModText.ChallengeStiffMode] = "MODO TIESO";
             spanish[ModText.ChallengeNone] = "Nada";
         }
 
@@ -377,6 +381,7 @@ namespace Gilomx.CupheadBossRoulette
             english[ModText.ChallengeHpOne] = "HP.1";
             english[ModText.ChallengeInkRain] = "INK RAIN";
             english[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            english[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddFrenchTexts()
@@ -415,6 +420,7 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.ChallengeHpOne] = "HP.1";
             french[ModText.ChallengeInkRain] = "INK RAIN";
             french[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            french[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddItalianTexts()
@@ -453,6 +459,7 @@ namespace Gilomx.CupheadBossRoulette
             italian[ModText.ChallengeHpOne] = "HP.1";
             italian[ModText.ChallengeInkRain] = "INK RAIN";
             italian[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            italian[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddGermanTexts()
@@ -491,6 +498,7 @@ namespace Gilomx.CupheadBossRoulette
             german[ModText.ChallengeHpOne] = "HP.1";
             german[ModText.ChallengeInkRain] = "INK RAIN";
             german[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            german[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddKoreanTexts()
@@ -529,6 +537,7 @@ namespace Gilomx.CupheadBossRoulette
             korean[ModText.ChallengeHpOne] = "HP.1";
             korean[ModText.ChallengeInkRain] = "INK RAIN";
             korean[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            korean[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddRussianTexts()
@@ -567,6 +576,7 @@ namespace Gilomx.CupheadBossRoulette
             russian[ModText.ChallengeHpOne] = "HP.1";
             russian[ModText.ChallengeInkRain] = "INK RAIN";
             russian[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            russian[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddPolishTexts()
@@ -605,6 +615,7 @@ namespace Gilomx.CupheadBossRoulette
             polish[ModText.ChallengeHpOne] = "HP.1";
             polish[ModText.ChallengeInkRain] = "INK RAIN";
             polish[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            polish[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddPortugueseBrazilTexts()
@@ -643,6 +654,7 @@ namespace Gilomx.CupheadBossRoulette
             portugueseBrazil[ModText.ChallengeHpOne] = "HP.1";
             portugueseBrazil[ModText.ChallengeInkRain] = "INK RAIN";
             portugueseBrazil[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            portugueseBrazil[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddJapaneseTexts()
@@ -681,6 +693,7 @@ namespace Gilomx.CupheadBossRoulette
             japanese[ModText.ChallengeHpOne] = "HP.1";
             japanese[ModText.ChallengeInkRain] = "INK RAIN";
             japanese[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            japanese[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
 
         private void AddSimplifiedChineseTexts()
@@ -719,6 +732,7 @@ namespace Gilomx.CupheadBossRoulette
             simplifiedChinese[ModText.ChallengeHpOne] = "HP.1";
             simplifiedChinese[ModText.ChallengeInkRain] = "INK RAIN";
             simplifiedChinese[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
+            simplifiedChinese[ModText.ChallengeStiffMode] = "STIFF MODE";
         }
     }
 }
