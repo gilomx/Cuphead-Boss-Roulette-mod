@@ -15,10 +15,13 @@ de `DicePalaceFlyingHorse` y `DicePalaceFlyingMemory`. El HUD y el resultado
 siguen mostrando Modo Tieso; no cambian de reto al entrar en esas salas. La
 prueba manual quedó aceptada el 2026-08-18.
 
-Pendiente antes de cerrar el reto: sustituir `modifiers/nodash_01.png` por su
-animación definitiva de tres fotogramas y revisar `challenge.stiff_mode` en los
-doce idiomas. Español usa provisionalmente `MODO TIESO`; los demás idiomas usan
-`STIFF MODE` como fallback temporal.
+El arte definitivo ya está integrado: `assets/modifiers/locked_01..03.png`
+anima la ruleta a través de la convención normal de tres frames, el HUD usa
+`locked_01.png` y Creator Tools resuelve su copia estática de 82 x 82 desde
+`assets/creator-tools/modifiers/locked_01.png`. Sólo queda pendiente revisar
+`challenge.stiff_mode` en los doce idiomas. Español usa
+provisionalmente `MODO TIESO`; los demás idiomas usan `STIFF MODE` como
+fallback temporal.
 
 ## Estado verificado para el siguiente agente (2026-08-17)
 

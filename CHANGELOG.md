@@ -8,10 +8,10 @@
 - En los subniveles aéreos `DicePalaceFlyingHorse` y
   `DicePalaceFlyingMemory`, el HUD conserva `MODO TIESO` y la restricción cambia
   únicamente a bloquear la transformación en miniavión.
-- La prueba manual del recorrido quedó aceptada. Todavía faltan su animación
-  definitiva de tres fotogramas y la revisión de `challenge.stiff_mode` en los
-  doce idiomas; hasta entonces reutiliza el arte de `No Dash` y usa textos
-  provisionales.
+- La prueba manual del recorrido quedó aceptada. La animación definitiva usa
+  `locked_01..03.png` en la ruleta; el HUD conserva el primer frame y Creator
+  Tools usa su icono estático de 82 x 82. Sólo queda pendiente la revisión de
+  `challenge.stiff_mode` en los doce idiomas.
 
 ## Creator Tools localizado, centrado y con logo (2026-08-17)
 

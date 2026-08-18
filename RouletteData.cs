@@ -187,10 +187,8 @@ namespace Gilomx.CupheadBossRoulette
                 "modifiers/inkrain_01.png"),
             new ModifierEntry(ModifierId.HalfDamage, ModifierKind.Both,
                 "modifiers/halfdamage_01.png"),
-            // Temporary testing art: reuse No Dash until Modo Tieso receives
-            // its final three-frame roulette animation.
             new ModifierEntry(ModifierId.StiffMode, ModifierKind.Ground,
-                "modifiers/nodash_01.png"),
+                "modifiers/locked_01.png"),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
 
