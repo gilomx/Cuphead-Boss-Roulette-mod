@@ -2,17 +2,18 @@
 
 Idioma objetivo: **ESCRIBE AQUÍ EL IDIOMA DE LA TABLA SIGUIENTE**
 
-Esta plantilla separa los **29 textos aprobados** del catálogo anterior y los
-**25 IDs nuevos del juego pendientes para los doce idiomas**.
+Esta plantilla conserva el inventario histórico de los **29 textos aprobados**
+del catálogo anterior y los **25 IDs que se revisaron para los doce idiomas**.
 
-Estado del catálogo anterior: **los doce idiomas están aprobados y activos**.
-Las cinco cadenas de retos y las 20 de Creator Tools que aparecen dentro del
-juego deben revisarse en los doce idiomas.
+Estado actual: **las cinco cadenas de retos y las 20 de Creator Tools también
+están aprobadas, implementadas y verificadas dentro del juego**. Para una ronda
+nueva, crear primero otro inventario de IDs; no reutilizar las filas cerradas de
+esta plantilla como si siguieran pendientes.
 
 ## Idiomas disponibles y orden histórico de Ctrl+F8
 
-El atajo permanece desactivado. Si se habilita temporalmente para revisión,
-la primera pulsación selecciona inglés y después avanza en este orden:
+El atajo está habilitado temporalmente para verificación. `Ctrl+F8` selecciona
+inglés en la primera pulsación y después avanza en este orden:
 
 | Número | Idioma | Nombre interno de Cuphead | Archivo recomendado |
 | ---: | --- | --- | --- |

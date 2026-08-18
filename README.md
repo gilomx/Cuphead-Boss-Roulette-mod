@@ -44,6 +44,12 @@ configuración de `STREAM OVERLAY`. Cuando su estado está activado, el mismo
 servidor local ofrece el overlay para OBS en
 `http://127.0.0.1:18081/`.
 
+El menú está localizado en los doce idiomas de Cuphead y conserva el formato
+nativo `ETIQUETA: VALOR`. Además de vista previa, reintento, tamaño, orden,
+alineación y opacidad, la opción `LOGO` muestra la identidad del mod mientras
+el HUD del resultado no está activo. Al alternar entre HUD y logo, uno termina
+su salida antes de que el otro aparezca.
+
 ## Instalación
 
 El ZIP `Gilomx-Boss-Roulette-<versión>-BepInEx-x64.zip` ya incluye BepInEx y el

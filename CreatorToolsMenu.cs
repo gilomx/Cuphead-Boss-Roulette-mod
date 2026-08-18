@@ -11,7 +11,7 @@ namespace Gilomx.CupheadBossRoulette
     public sealed partial class Plugin
     {
         private const int CreatorToolsPauseMenuIndex = 4;
-        private const int CreatorToolsOverlayMenuItemCount = 9;
+        private const int CreatorToolsOverlayMenuItemCount = 10;
         private const int CreatorToolsHubMenuItemCount = 2;
         private const string CreatorToolsPauseRowName =
             "Gilomx Las Pichi Ruleta Pause Row";
@@ -74,6 +74,9 @@ namespace Gilomx.CupheadBossRoulette
             AccessTools.Method(OptionsButtonType, "updateSelection");
         private static readonly MethodInfo OptionsButtonIncrementMethod =
             AccessTools.Method(OptionsButtonType, "incrementSelection");
+        private static readonly MethodInfo MemberwiseCloneMethod =
+            typeof(object).GetMethod("MemberwiseClone",
+                BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo LocalizationTextField =
             AccessTools.Field(typeof(LocalizationHelper), "textComponent");
 
@@ -96,6 +99,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private GameObject creatorToolsNativeCopyDisplayObject;
         private Text creatorToolsNativeCopyDisplayText;
+        private CreatorToolsNativeButtonSnapshot
+            creatorToolsNativeCopyActionSnapshot;
         private Color creatorToolsNativeSelectedColor = Color.white;
         private Color creatorToolsNativeUnselectedColor = Color.white;
         private int creatorToolsMenuSelection;
@@ -670,7 +675,9 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (creatorToolsMenuPage ==
                     CreatorToolsMenuPage.RouletteOverlay)
-                    return "STREAM OVERLAY";
+                    return CreatorToolsText(
+                        ModText.CreatorMenuRouletteOverlay,
+                        "STREAM OVERLAY");
                 return "LA PICHI RULETA";
             }
         }
@@ -749,11 +756,16 @@ namespace Gilomx.CupheadBossRoulette
 
                 var currentItems = OptionsCurrentItemsField.GetValue(options)
                     as IList;
+                var requiredButtonCount = useHub
+                    ? CreatorToolsHubMenuItemCount
+                    : CreatorToolsOverlayMenuItemCount - 1;
                 if (menuObject == null || buttons == null ||
-                    buttons.Length < CreatorToolsMenuItemCount ||
+                    buttons.Length < requiredButtonCount ||
                     currentItems == null)
                     throw new InvalidOperationException(
                         "Cuphead's native menu does not expose enough rows.");
+
+                RefreshCreatorToolsNativeLocalization(menuObject);
 
                 creatorToolsNativeOriginalItems =
                     new object[currentItems.Count];
@@ -883,8 +895,7 @@ namespace Gilomx.CupheadBossRoulette
                         snapshot = nativeBackSnapshot;
                     else if (!useHub &&
                              i == CreatorToolsMenuItemCount - 2)
-                        snapshot = creatorToolsNativeButtonSnapshots[
-                            CreatorToolsOverlayMenuItemCount - 2];
+                        snapshot = creatorToolsNativeCopyActionSnapshot;
                     else
                     {
                         var sourceIndex =
@@ -940,9 +951,6 @@ namespace Gilomx.CupheadBossRoulette
                                         ? CreatorToolsMenuLabel(i)
                                         : string.Empty;
                     }
-                    if (!useHub &&
-                        i == CreatorToolsMenuItemCount - 2)
-                        snapshot.ValueText.text = string.Empty;
                     currentItems.Add(snapshot.Button);
                 }
 
@@ -957,6 +965,7 @@ namespace Gilomx.CupheadBossRoulette
                     creatorToolsNativeUnselectedColor =
                         creatorToolsNativeMenuRows[1].ValueText.color;
                 }
+                PrepareCreatorToolsNativeLocalizedRows();
                 MaintainCreatorToolsNativeCopyCentering();
                 Canvas.willRenderCanvases -=
                     MaintainCreatorToolsNativeCopyCentering;
@@ -983,14 +992,16 @@ namespace Gilomx.CupheadBossRoulette
             PrepareCreatorToolsNativeActionRows()
         {
             if (creatorToolsNativeButtonSnapshots.Count <
-                CreatorToolsOverlayMenuItemCount)
+                CreatorToolsOverlayMenuItemCount - 1 ||
+                MemberwiseCloneMethod == null)
                 return null;
 
             var bottom = creatorToolsNativeButtonSnapshots[
                 creatorToolsNativeButtonSnapshots.Count - 1];
-            var copy = creatorToolsNativeButtonSnapshots[
-                CreatorToolsOverlayMenuItemCount - 2];
-            if (bottom.ValueText == null || copy.ValueText == null)
+            var logo = creatorToolsNativeButtonSnapshots[
+                CreatorToolsOverlayMenuItemCount - 3];
+            if (bottom.ValueText == null || logo.ValueText == null ||
+                logo.Button == null)
                 return null;
 
             // Use a native button only for navigation. The visible URL action
@@ -1031,9 +1042,8 @@ namespace Gilomx.CupheadBossRoulette
                 sourceText.verticalOverflow;
             creatorToolsNativeCopyDisplayText.raycastTarget = false;
             creatorToolsNativeCopyDisplayText.color = sourceText.color;
-            creatorToolsNativeCopyDisplayText.text = CreatorToolsSpanish
-                ? "COPIAR URL"
-                : "COPY URL";
+            creatorToolsNativeCopyDisplayText.text = CreatorToolsText(
+                ModText.CreatorActionCopyUrl, "COPY URL");
             var sourceRect = sourceText.rectTransform;
             var displayRect =
                 creatorToolsNativeCopyDisplayText.rectTransform;
@@ -1044,39 +1054,69 @@ namespace Gilomx.CupheadBossRoulette
             displayRect.sizeDelta = sourceRect.sizeDelta;
             displayRect.localScale = sourceRect.localScale;
             displayRect.localRotation = sourceRect.localRotation;
-            creatorToolsNativeCopyDisplayObject.SetActive(true);            MaintainCreatorToolsNativeCopyCentering();
+            var copyButton = MemberwiseCloneMethod.Invoke(
+                logo.Button, null);
+            OptionsButtonTextField.SetValue(
+                copyButton, creatorToolsNativeCopyDisplayText);
+            OptionsButtonLocalizationField.SetValue(copyButton, null);
+            OptionsButtonValuesField.SetValue(
+                copyButton, new string[0]);
+            OptionsButtonSelectionField.SetValue(copyButton, 0);
+            OptionsButtonWrapField.SetValue(copyButton, true);
+            creatorToolsNativeCopyActionSnapshot =
+                new CreatorToolsNativeButtonSnapshot
+                {
+                    Button = copyButton,
+                    ValueText = creatorToolsNativeCopyDisplayText,
+                    Value = creatorToolsNativeCopyDisplayText.text,
+                    ValueActive = true,
+                    Options = new string[0],
+                    Selection = 0,
+                    Wrap = true,
+                    Row = creatorToolsNativeCopyDisplayObject,
+                    RowActive = true
+                };
+            creatorToolsNativeCopyDisplayObject.SetActive(true);
+            MaintainCreatorToolsNativeCopyCentering();
             return bottom;
         }
         private void MaintainCreatorToolsNativeCopyCentering()
         {
+            MaintainCreatorToolsNativeLocalizedRows();
             if (!creatorToolsMenuOpen ||
                 creatorToolsMenuPage !=
                     CreatorToolsMenuPage.RouletteOverlay ||
                 creatorToolsNativeCopyDisplayText == null ||
                 creatorToolsNativeButtonSnapshots.Count <
-                    CreatorToolsOverlayMenuItemCount)
+                    CreatorToolsOverlayMenuItemCount - 1)
                 return;
 
-            var copy = creatorToolsNativeButtonSnapshots[
-                CreatorToolsOverlayMenuItemCount - 2];
+            var logo = creatorToolsNativeButtonSnapshots[
+                CreatorToolsOverlayMenuItemCount - 3];
             var bottom = creatorToolsNativeButtonSnapshots[
                 creatorToolsNativeButtonSnapshots.Count - 1];
-            if (copy == null || copy.ValueText == null ||
+            if (logo == null || logo.ValueText == null ||
                 bottom == null || bottom.ValueText == null)
                 return;
 
             if (Time.realtimeSinceStartup >=
                 creatorToolsMenuNoticeUntil)
-                creatorToolsNativeCopyDisplayText.text =
-                    CreatorToolsSpanish
-                        ? "COPIAR URL"
-                        : "COPY URL";
+                creatorToolsNativeCopyDisplayText.text = CreatorToolsText(
+                    ModText.CreatorActionCopyUrl, "COPY URL");
 
             var displayRect =
                 creatorToolsNativeCopyDisplayText.rectTransform;
             var worldPosition = displayRect.position;
-            worldPosition.x = bottom.ValueText.rectTransform.position.x;
-            worldPosition.y = copy.ValueText.rectTransform.position.y;
+            worldPosition.x = creatorToolsNativeLocalizedRowCenterX;
+            worldPosition.y =
+                (CreatorToolsNativeLocalizedRowPositionY(
+                     CreatorToolsOverlayMenuItemCount - 3,
+                     logo.ValueText.rectTransform.position.y) +
+                 bottom.ValueText.rectTransform.position.y) * 0.5f;
+            var bottomRect = bottom.ValueText.rectTransform;
+            var bottomPosition = bottomRect.position;
+            bottomPosition.x = creatorToolsNativeLocalizedRowCenterX;
+            bottomRect.position = bottomPosition;
             displayRect.position = worldPosition;
             var selection = OptionsVerticalSelectionField == null
                 ? -1
@@ -1092,6 +1132,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             Canvas.willRenderCanvases -=
                 MaintainCreatorToolsNativeCopyCentering;
+            DestroyCreatorToolsNativeLocalizedRows();
             var options = creatorToolsNativeOptions;
             for (var i = 0;
                  i < creatorToolsNativeButtonSnapshots.Count; i++)
@@ -1175,6 +1216,7 @@ namespace Gilomx.CupheadBossRoulette
                 DestroyImmediate(creatorToolsNativeCopyDisplayObject);
             creatorToolsNativeCopyDisplayObject = null;
             creatorToolsNativeCopyDisplayText = null;
+            creatorToolsNativeCopyActionSnapshot = null;
             creatorToolsNativeButtonSnapshots.Clear();
             creatorToolsNativeMenuRows.Clear();
             creatorToolsNativeOriginalItems = null;
@@ -1237,8 +1279,12 @@ namespace Gilomx.CupheadBossRoulette
                     creatorToolsOpacitySetting.Value =
                         25 + selection * 5;
                     break;
+                case 7:
+                    creatorToolsLogoSetting.Value = selection == 1;
+                    break;
             }
             PublishCreatorToolsState(true);
+            MaintainCreatorToolsNativeLocalizedRows();
 
             if (OptionsMenuSelectSoundMethod != null)
                 OptionsMenuSelectSoundMethod.Invoke(
@@ -1287,9 +1333,9 @@ namespace Gilomx.CupheadBossRoulette
                 snapshot.ValueText.text = string.Empty;
                 if (creatorToolsNativeCopyDisplayText != null)
                     creatorToolsNativeCopyDisplayText.text =
-                        CreatorToolsSpanish
-                            ? "URL COPIADA"
-                            : "URL COPIED";
+                        CreatorToolsText(
+                            ModText.CreatorFeedbackUrlCopied,
+                            "URL COPIED");
                 if (OptionsMenuSelectSoundMethod != null)
                     OptionsMenuSelectSoundMethod.Invoke(
                         creatorToolsNativeOptions, null);
@@ -1323,21 +1369,38 @@ namespace Gilomx.CupheadBossRoulette
             {
                 case 0:
                 case 1:
+                case 7:
                     return CreatorToolsEnabledValues;
                 case 2:
-                    return CreatorToolsSpanish
-                        ? new[] { "MANTENER", "REAPARECER" }
-                        : new[] { "KEEP", "REAPPEAR" };
+                    return new[]
+                    {
+                        CreatorToolsText(
+                            ModText.CreatorRetryKeep, "KEEP"),
+                        CreatorToolsText(
+                            ModText.CreatorRetryReappear, "REAPPEAR")
+                    };
                 case 3:
                     return new[] { "1X", "1.5X", "2X" };
                 case 4:
-                    return CreatorToolsSpanish
-                        ? new[] { "ICONOS ARRIBA", "TEXTO ARRIBA" }
-                        : new[] { "ICONS ABOVE", "TEXT ABOVE" };
+                    return new[]
+                    {
+                        CreatorToolsText(
+                            ModText.CreatorOrderIconsAbove,
+                            "ICONS ABOVE"),
+                        CreatorToolsText(
+                            ModText.CreatorOrderTextAbove,
+                            "TEXT ABOVE")
+                    };
                 case 5:
-                    return CreatorToolsSpanish
-                        ? new[] { "IZQUIERDA", "CENTRO", "DERECHA" }
-                        : new[] { "LEFT", "CENTER", "RIGHT" };
+                    return new[]
+                    {
+                        CreatorToolsText(
+                            ModText.CreatorAlignmentLeft, "LEFT"),
+                        CreatorToolsText(
+                            ModText.CreatorAlignmentCenter, "CENTER"),
+                        CreatorToolsText(
+                            ModText.CreatorAlignmentRight, "RIGHT")
+                    };
                 case 6:
                     var opacityValues = new string[16];
                     for (var i = 0; i < opacityValues.Length; i++)
@@ -1352,9 +1415,13 @@ namespace Gilomx.CupheadBossRoulette
         {
             get
             {
-                return CreatorToolsSpanish
-                    ? new[] { "DESACTIVADO", "ACTIVADO" }
-                    : new[] { "DISABLED", "ENABLED" };
+                return new[]
+                {
+                    CreatorToolsText(
+                        ModText.CreatorValueDisabled, "DISABLED"),
+                    CreatorToolsText(
+                        ModText.CreatorValueEnabled, "ENABLED")
+                };
             }
         }
 
@@ -1383,6 +1450,8 @@ namespace Gilomx.CupheadBossRoulette
                     return Mathf.Clamp(
                         (creatorToolsOpacitySetting.Value - 25) / 5,
                         0, 15);
+                case 7:
+                    return creatorToolsLogoSetting.Value ? 1 : 0;
                 default:
                     return 0;
             }
@@ -1637,9 +1706,8 @@ namespace Gilomx.CupheadBossRoulette
         private void CopyCreatorToolsUrl()
         {
             GUIUtility.systemCopyBuffer = CreatorToolsUrl;
-            creatorToolsMenuNotice = CreatorToolsSpanish
-                ? "URL COPIADA"
-                : "URL COPIED";
+            creatorToolsMenuNotice = CreatorToolsText(
+                ModText.CreatorFeedbackUrlCopied, "URL COPIED");
             creatorToolsMenuNoticeUntil =
                 Time.realtimeSinceStartup + 2.5f;
         }
@@ -1733,34 +1801,43 @@ namespace Gilomx.CupheadBossRoulette
         private string CreatorToolsMenuLabel(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-                return index == 0 ? "STREAM OVERLAY" : string.Empty;
+                return index == 0
+                    ? CreatorToolsText(
+                        ModText.CreatorMenuRouletteOverlay,
+                        "STREAM OVERLAY")
+                    : string.Empty;
 
-            if (!CreatorToolsSpanish)
-            {
-                switch (index)
-                {
-                    case 0: return "STATUS";
-                    case 1: return "PREVIEW";
-                    case 2: return "ON RETRY";
-                    case 3: return "SIZE";
-                    case 4: return "ORDER";
-                    case 5: return "ALIGNMENT";
-                    case 6: return "OPACITY";
-                    case 7: return "COPY URL";
-                    default: return string.Empty;
-                }
-            }
             switch (index)
             {
-                case 0: return "ESTADO";
-                case 1: return "VISTA PREVIA";
-                case 2: return "AL REINTENTAR";
-                case 3: return "TAMAÑO";
-                case 4: return "ORDEN";
-                case 5: return "ALINEACIÓN";
-                case 6: return "OPACIDAD";
-                case 7: return "COPIAR URL";
-                default: return string.Empty;
+                case 0:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuStatus, "STATUS");
+                case 1:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuPreview, "PREVIEW");
+                case 2:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuRetry, "ON RETRY");
+                case 3:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuSize, "SIZE");
+                case 4:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuOrder, "ORDER");
+                case 5:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuAlignment, "ALIGNMENT");
+                case 6:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuOpacity, "OPACITY");
+                case 7:
+                    return CreatorToolsText(
+                        ModText.CreatorMenuLogo, "LOGO");
+                case 8:
+                    return CreatorToolsText(
+                        ModText.CreatorActionCopyUrl, "COPY URL");
+                default:
+                    return string.Empty;
             }
         }
 
@@ -1769,7 +1846,8 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
                 return index == 0
                     ? string.Empty
-                    : (CreatorToolsSpanish ? "VOLVER" : "BACK");
+                    : CreatorToolsText(
+                        ModText.CreatorActionBack, "BACK");
 
             switch (index)
             {
@@ -1782,12 +1860,10 @@ namespace Gilomx.CupheadBossRoulette
                 case 2:
                     if (creatorToolsRetryBehaviorSetting.Value ==
                         CreatorToolsRetryBehavior.Keep)
-                        return CreatorToolsSpanish
-                            ? "MANTENER"
-                            : "KEEP";
-                    return CreatorToolsSpanish
-                        ? "REAPARECER"
-                        : "REAPPEAR";
+                        return CreatorToolsText(
+                            ModText.CreatorRetryKeep, "KEEP");
+                    return CreatorToolsText(
+                        ModText.CreatorRetryReappear, "REAPPEAR");
                 case 3:
                     return creatorToolsScaleSetting.Value.ToString(
                         "0.0#", System.Globalization.CultureInfo.InvariantCulture) +
@@ -1795,30 +1871,33 @@ namespace Gilomx.CupheadBossRoulette
                 case 4:
                     if (creatorToolsOrderSetting.Value ==
                         CreatorToolsOrder.TextAbove)
-                        return CreatorToolsSpanish
-                            ? "TEXTO ARRIBA"
-                            : "TEXT ABOVE";
-                    return CreatorToolsSpanish
-                        ? "ICONOS ARRIBA"
-                        : "ICONS ABOVE";
+                        return CreatorToolsText(
+                            ModText.CreatorOrderTextAbove,
+                            "TEXT ABOVE");
+                    return CreatorToolsText(
+                        ModText.CreatorOrderIconsAbove,
+                        "ICONS ABOVE");
                 case 5:
                     if (creatorToolsAlignmentSetting.Value ==
                         CreatorToolsAlignment.Left)
-                        return CreatorToolsSpanish
-                            ? "IZQUIERDA"
-                            : "LEFT";
+                        return CreatorToolsText(
+                            ModText.CreatorAlignmentLeft, "LEFT");
                     if (creatorToolsAlignmentSetting.Value ==
                         CreatorToolsAlignment.Right)
-                        return CreatorToolsSpanish
-                            ? "DERECHA"
-                            : "RIGHT";
-                    return CreatorToolsSpanish ? "CENTRO" : "CENTER";
+                        return CreatorToolsText(
+                            ModText.CreatorAlignmentRight, "RIGHT");
+                    return CreatorToolsText(
+                        ModText.CreatorAlignmentCenter, "CENTER");
                 case 6:
                     return creatorToolsOpacitySetting.Value + "%";
                 case 7:
+                    return CreatorToolsOnOff(
+                        creatorToolsLogoSetting.Value);
+                case 8:
                     return string.Empty;
                 default:
-                    return CreatorToolsSpanish ? "VOLVER" : "BACK";
+                    return CreatorToolsText(
+                        ModText.CreatorActionBack, "BACK");
             }
         }
 
@@ -1826,15 +1905,62 @@ namespace Gilomx.CupheadBossRoulette
         {
             get
             {
-                return CreatorToolsSpanish ? "VOLVER" : "BACK";
+                return CreatorToolsText(
+                    ModText.CreatorActionBack, "BACK");
             }
         }
 
         private string CreatorToolsOnOff(bool value)
         {
-            if (CreatorToolsSpanish)
-                return value ? "ACTIVADO" : "DESACTIVADO";
-            return value ? "ENABLED" : "DISABLED";
+            return value
+                ? CreatorToolsText(
+                    ModText.CreatorValueEnabled, "ENABLED")
+                : CreatorToolsText(
+                    ModText.CreatorValueDisabled, "DISABLED");
+        }
+
+        private string CreatorToolsText(ModText id, string fallback)
+        {
+            var value = modLocalization == null
+                ? fallback
+                : modLocalization.Text(id);
+            return value.ToUpperInvariant();
+        }
+
+        private static void RefreshCreatorToolsNativeLocalization(
+            GameObject menuObject)
+        {
+            if (menuObject == null)
+                return;
+
+            var helpers = menuObject.GetComponentsInChildren<
+                LocalizationHelper>(true);
+            for (var i = 0; i < helpers.Length; i++)
+            {
+                if (helpers[i] != null)
+                    helpers[i].ApplyTranslation();
+            }
+        }
+
+        private void RefreshCreatorToolsMenuLocalization()
+        {
+            if (!creatorToolsMenuOpen ||
+                creatorToolsNativeOptions == null ||
+                !creatorToolsNativeConfigured)
+                return;
+
+            var selection = OptionsVerticalSelectionField == null
+                ? creatorToolsMenuSelection
+                : (int)OptionsVerticalSelectionField.GetValue(
+                    creatorToolsNativeOptions);
+            RestoreCreatorToolsNativeOptions();
+            ConfigureCreatorToolsNativeOptions();
+            selection = Mathf.Clamp(
+                selection, 0, CreatorToolsMenuItemCount - 1);
+            creatorToolsMenuSelection = selection;
+            if (OptionsVerticalSelectionField != null)
+                OptionsVerticalSelectionField.SetValue(
+                    creatorToolsNativeOptions, selection);
         }
 
         private string CreatorToolsServerStatus()

@@ -1,5 +1,50 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Estado verificado para el siguiente agente (2026-08-17)
+
+La ronda de localización descrita anteriormente como pendiente está cerrada:
+las cinco etiquetas de retos nuevos y las 20 de Creator Tools se implementaron
+para los doce idiomas en `ModLocalization.LabelReview.cs`. La etiqueta nueva
+`creator.menu.logo` se mantiene aparte en
+`ModLocalization.CreatorToolsBrand.cs`. Creator Tools convierte las cadenas
+visibles a mayúsculas en runtime para reproducir el estilo de Cuphead.
+
+El menú nativo ya no mezcla los objetos de texto independientes de etiqueta y
+valor. `CreatorToolsMenu.LocalizedRows.cs` genera una sola fila centrada con el
+formato `ETIQUETA: VALOR`, conserva en rojo únicamente el valor seleccionado,
+ajusta el tamaño al ancho seguro y calcula el centro óptico usando los glifos
+visibles. Esta solución fue comprobada al cambiar de idioma desde el menú y al
+iniciar Cuphead directamente en otro idioma; también elimina el destello del
+valor nativo anterior durante los cambios de opción.
+
+La página de Stream Overlay contiene diez filas: Status, Preview, Retry, Size,
+Order, Alignment, Opacity, Logo, Copy URL y Back. `LOGO` persiste mediante la
+clave histórica `Creator Tools/MostrarNombre`. Cuando el HUD del resultado no
+está visible y el overlay sigue activo, `overlay.js` muestra el nombre del mod
+y la etiqueta `MOD`. HUD y logo comparten la misma celda, pero una máquina de
+estados termina la animación de salida antes de iniciar la entrada del otro,
+por lo que nunca se superponen. El nombre y la etiqueta tienen flotaciones
+leves con duraciones/fases distintas; la etiqueta mide 1.4 veces el recurso
+original. El cache-buster actual es `logo-sequence-4`.
+
+### Interruptores temporales activos
+
+- `EnableLanguageTestShortcut = true`: `Ctrl+F8` recorre los doce idiomas y
+  restaura el idioma original al cerrar el proceso.
+- `ForceQueenBeeInkRainLoadoutForTesting = true`: tiene prioridad sobre el
+  forzado manual de Creator Tools y produce siempre Reina Abeja,
+  Lanzaguisantes, segundo disparo vacío, Súper I, Afiladora y Lluvia de tinta.
+- `ForceLongestOverlayChallengeForTesting = false`: el antiguo forzado de
+  `MiniPlaneOnly` está apagado.
+
+Desactivar los dos primeros interruptores antes de preparar una build pública.
+La compilación de cierre terminó con cero errores y cero advertencias; el DLL y
+los assets de overlay instalados se verificaron por SHA-256. Las pruebas
+manuales confirmaron el menú multilingüe, los retos y el comportamiento del
+overlay. No hay una nueva ronda de localización definida todavía; crear un
+inventario nuevo cuando se acuerden sus IDs, sin reabrir las 25 etiquetas ya
+cerradas.
+
 ## Creator Tools scope after 0.5.131 (2026-08-16)
 
 Creator Tools intentionally stops here for the current release: the native map
@@ -13,9 +58,9 @@ existing local overlay server to one streaming platform. Any provider
 integration must remain optional and must not change normal roulette behavior
 when disabled or unavailable.
 
-## Creator Tools localization audit (2026-08-16)
+## Creator Tools localization audit (2026-08-16, closed 2026-08-17)
 
-The current public UI has **25 pending in-game IDs** that require all 12 Cuphead
+The 25 audited in-game IDs now have approved runtime values in all 12 Cuphead
 languages: five challenge names and 20 Creator Tools strings. Normal boss,
 weapon, super and charm names still come from Cuphead.
 
@@ -28,12 +73,11 @@ IMGUI menu helpers (`DrawCreatorToolsMenu`, `CreatorToolsMenuValue` and
 `CreatorToolsServerStatus`), which have no callers. The native Cuphead menu uses
 `creator.action.copy_url` and `creator.feedback.url_copied` instead.
 
-`TRANSLATION_REVIEW_TEMPLATE.md` is the authoritative row-by-row inventory and
-`translations/LOCALIZATION_STATUS.md` records the approval stage. The native
-menu still uses a Spanish/English branch and must move onto the 12-language
-catalog after approval. The compiled `/config` prototype is deliberately
-excluded: it will remain internal and unannounced in the next public update, so
-do not add its labels or special equipment values to this localization round.
+`translations/PENDING_LABEL_LOCALIZATION_REVIEW.md` preserves the literal
+deliveries and `translations/LOCALIZATION_STATUS.md` records the completed
+stage. The native menu now uses the 12-language catalog. The compiled `/config`
+prototype remains deliberately excluded and unannounced, so do not add its
+labels or special equipment values retroactively to this completed round.
 Preserve
 `LA PICHI RULETA`, `CREATOR TOOLS`, `Cuphead`, numeric scales, percentages and
 the local URL without translation.

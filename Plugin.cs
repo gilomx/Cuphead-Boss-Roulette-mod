@@ -21,7 +21,9 @@ namespace Gilomx.CupheadBossRoulette
         private const float DesignHeight = 720f;
         // TEMPORARY TEST SELECTOR. Keep non-None while developing a challenge.
         // Compatible bosses are still chosen randomly.
-        private const bool ForceLongestOverlayChallengeForTesting = true;
+        private const bool ForceLongestOverlayChallengeForTesting = false;
+        private static readonly bool ForceQueenBeeInkRainLoadoutForTesting =
+            true;
         private static readonly ModifierId ForcedTestChallenge =
             ForceLongestOverlayChallengeForTesting
                 ? ModifierId.MiniPlaneOnly
@@ -77,8 +79,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             Levels.DicePalaceMain
         };
-        // Dormant localization test shortcut. Keep false in normal builds.
-        private const bool EnableLanguageTestShortcut = false;
+        // TEMP localization verification shortcut. Disable after review.
+        private const bool EnableLanguageTestShortcut = true;
         private static readonly KeyboardShortcut LanguageTestLeftShortcut =
             new KeyboardShortcut(KeyCode.F8, KeyCode.LeftControl);
         private static readonly KeyboardShortcut LanguageTestRightShortcut =
@@ -1452,6 +1454,8 @@ namespace Gilomx.CupheadBossRoulette
             if (!CanUseRouletteOnMap() || running || pendingLoad)
                 return;
             RefreshAvailableContent();
+            if (ForceQueenBeeInkRainLoadoutForTesting)
+                uglyMode = true;
             if (HasForcedTestChallenge())
                 uglyMode = true;
             if (ForcePlaneRelicChallengeTestSequence)
@@ -1460,7 +1464,8 @@ namespace Gilomx.CupheadBossRoulette
                 SetVisible(true);
 
             resultReady = false;
-            result = CreateCreatorToolsForcedResult() ??
+            result = CreateQueenBeeInkRainLoadoutTestResult() ??
+                CreateCreatorToolsForcedResult() ??
                 CreateRandomResult();
             revealed = 0;
             ticker = 0;
@@ -1479,6 +1484,46 @@ namespace Gilomx.CupheadBossRoulette
             }
             else
                 Logger.LogWarning("El audio de giro no esta disponible.");
+        }
+
+        private RouletteResult CreateQueenBeeInkRainLoadoutTestResult()
+        {
+            if (!ForceQueenBeeInkRainLoadoutForTesting)
+                return null;
+
+            var boss = Array.FindIndex(RouletteData.Bosses,
+                entry => entry.Level == Levels.Bee);
+            var weapon1 = Array.FindIndex(RouletteData.Weapons,
+                entry => entry.Value.Equals(Weapon.level_weapon_peashot));
+            var weapon2 = Array.FindIndex(RouletteData.Weapons,
+                entry => entry.Value.Equals(Weapon.None));
+            var super = Array.FindIndex(RouletteData.Supers,
+                entry => entry.Value.Equals(Super.level_super_beam));
+            var charm = Array.FindIndex(RouletteData.Charms,
+                entry => entry.Value.Equals(Charm.charm_parry_attack));
+            var modifier = Array.FindIndex(RouletteData.Modifiers,
+                entry => entry.Id == ModifierId.InkRain);
+            if (boss < 0 || weapon1 < 0 || weapon2 < 0 || super < 0 ||
+                charm < 0 || modifier < 0)
+            {
+                Logger.LogError(
+                    "TEMP Queen Bee Ink Rain test loadout is incomplete.");
+                return null;
+            }
+
+            RememberBossResult(boss);
+            Logger.LogWarning(
+                "TEMP test: forcing Queen Bee, Peashooter, empty Shot 2, " +
+                "Super I, Whetstone and Ink Rain.");
+            return new RouletteResult
+            {
+                Boss = boss,
+                Weapon1 = weapon1,
+                Weapon2 = weapon2,
+                Super = super,
+                Charm = charm,
+                Modifier = modifier
+            };
         }
 
         private RouletteResult CreateRandomResult()

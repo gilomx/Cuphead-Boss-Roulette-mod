@@ -40,6 +40,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsAlignmentSetting;
         private ConfigEntry<int> creatorToolsOpacitySetting;
         private ConfigEntry<bool> creatorToolsPreviewSetting;
+        private ConfigEntry<bool> creatorToolsLogoSetting;
         private ConfigEntry<CreatorToolsRetryBehavior>
             creatorToolsRetryBehaviorSetting;
 
@@ -81,6 +82,9 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsPreviewSetting = Config.Bind(
                 "Creator Tools", "VistaPrevia", false,
                 "Muestra un resultado simulado mientras no hay combate.");
+            creatorToolsLogoSetting = Config.Bind(
+                "Creator Tools", "MostrarNombre", false,
+                "Muestra el logo del mod cuando el HUD no esta activo.");
             creatorToolsRetryBehaviorSetting = Config.Bind(
                 "Creator Tools", "AlReintentar",
                 CreatorToolsRetryBehavior.Reappear,
@@ -307,6 +311,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsLabelKey = null;
             PublishCreatorToolsState(true);
             PublishCreatorToolsForceConfig(true);
+            RefreshCreatorToolsMenuLocalization();
         }
 
         private void PublishCreatorToolsState(bool force)
@@ -381,6 +386,8 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append(",\"opacity\":")
                 .Append((creatorToolsOpacitySetting.Value / 100f)
                     .ToString("0.00", CultureInfo.InvariantCulture));
+            builder.Append(",\"logo\":").Append(
+                creatorToolsLogoSetting.Value ? "true" : "false");
             builder.Append("}}");
             return builder.ToString();
         }

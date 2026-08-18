@@ -4,18 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Las Pichi Ruleta Overlay</title>
-  <link rel="stylesheet" href="/overlay.css">
+  <link rel="stylesheet" href="/overlay.css?v=logo-sequence-4">
 </head>
 <body>
   <main id="stage" class="hidden align-center scale-1 icons-first" aria-live="polite">
     <div id="content">
-      <div id="icons"></div>
-      <div id="challenge" class="challenge">
-        <img id="challenge-image" alt="">
-        <span id="challenge-fallback"></span>
+      <div id="result" hidden>
+        <div id="icons"></div>
+        <div id="challenge" class="challenge">
+          <img id="challenge-image" alt="">
+          <span id="challenge-fallback"></span>
+        </div>
+      </div>
+      <div id="brand" class="brand" hidden aria-hidden="true">
+        <div class="brand-part mod-name-motion">
+          <img id="mod-name"
+               src="/assets/creator-tools/branding/modname.png" alt="">
+        </div>
+        <div class="brand-part mod-label-motion">
+          <img id="mod-label"
+               src="/assets/creator-tools/branding/modlabel.png" alt="">
+        </div>
       </div>
     </div>
   </main>
-  <script src="/overlay.js"></script>
+  <script src="/overlay.js?v=logo-sequence-4"></script>
 </body>
 </html>

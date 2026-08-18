@@ -1,5 +1,24 @@
 # Historial de cambios
 
+## Creator Tools localizado, centrado y con logo (2026-08-17)
+
+- Las cinco etiquetas de retos nuevos y las 20 etiquetas revisadas de Creator
+  Tools ya están activas en los doce idiomas de Cuphead. El menú convierte el
+  resultado a mayúsculas para conservar el estilo nativo.
+- Las filas de configuración se dibujan como una unidad `ETIQUETA: VALOR`, con
+  ajuste de ancho y centrado óptico por glifos. Esto evita diferencias de
+  posición entre idiomas, cambios de fuente dentro de una palabra y el
+  parpadeo del valor anterior al cambiar una opción.
+- Se añadió `LOGO` antes de `COPIAR URL`. Cuando el overlay está activo pero el
+  HUD no debe mostrarse, aparecen el nombre del mod y su etiqueta; al alternar
+  con la vista previa, la salida termina antes de comenzar la siguiente
+  entrada. Ambos recursos flotan de forma leve e independiente y la etiqueta
+  `MOD` usa 1.4 veces su tamaño original.
+- La verificación actual conserva temporalmente `Ctrl+F8` para recorrer idiomas
+  y fuerza Reina Abeja, Lanzaguisantes, segundo disparo vacío, Súper I,
+  Afiladora y Lluvia de tinta. Ambos interruptores deben apagarse antes de una
+  build pública.
+
 ## 0.5.131 - Personaje de la ruleta en la pantalla de calificación (2026-08-16)
 
 - Antes de devolver el equipo prestado, el mod ahora conserva qué personaje

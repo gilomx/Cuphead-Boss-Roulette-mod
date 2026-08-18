@@ -55,6 +55,27 @@ namespace Gilomx.CupheadBossRoulette
         CommonNone,
         CharmCursedRelic,
         CharmDivineRelic,
+        CreatorMenuRouletteOverlay,
+        CreatorMenuStatus,
+        CreatorMenuRetry,
+        CreatorMenuPreview,
+        CreatorMenuSize,
+        CreatorMenuOrder,
+        CreatorMenuAlignment,
+        CreatorMenuOpacity,
+        CreatorMenuLogo,
+        CreatorActionCopyUrl,
+        CreatorActionBack,
+        CreatorValueEnabled,
+        CreatorValueDisabled,
+        CreatorRetryKeep,
+        CreatorRetryReappear,
+        CreatorOrderIconsAbove,
+        CreatorOrderTextAbove,
+        CreatorAlignmentLeft,
+        CreatorAlignmentCenter,
+        CreatorAlignmentRight,
+        CreatorFeedbackUrlCopied,
         ChallengeNoDash,
         ChallengeNoMiniPlane,
         ChallengeMiniPlaneOnly,
@@ -70,7 +91,7 @@ namespace Gilomx.CupheadBossRoulette
         ChallengeNone
     }
 
-    internal sealed class ModLocalization : IDisposable
+    internal sealed partial class ModLocalization : IDisposable
     {
         private readonly Dictionary<ModText, string> spanish =
             new Dictionary<ModText, string>();
@@ -115,6 +136,8 @@ namespace Gilomx.CupheadBossRoulette
             AddPortugueseBrazilTexts();
             AddJapaneseTexts();
             AddSimplifiedChineseTexts();
+            ApplyApprovedLabelReviewTexts();
+            ApplyCreatorToolsBrandTexts();
             CurrentLanguage = ReadCurrentLanguage();
             Localization.OnLanguageChangedEvent += HandleLanguageChanged;
         }

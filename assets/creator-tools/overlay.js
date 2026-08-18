@@ -2,10 +2,12 @@
   "use strict";
 
   const stage = document.getElementById("stage");
+  const result = document.getElementById("result");
   const iconsRoot = document.getElementById("icons");
   const challenge = document.getElementById("challenge");
   const challengeImage = document.getElementById("challenge-image");
   const challengeFallback = document.getElementById("challenge-fallback");
+  const brand = document.getElementById("brand");
 
   let socket = null;
   let reconnectDelay = 250;
@@ -17,6 +19,10 @@
   let exiting = false;
   let entryTimers = [];
   let exitTimers = [];
+  let currentView = "hidden";
+  let targetView = "hidden";
+  let pendingState = null;
+  let logoExitTimer = null;
 
   const iconEntryStep = 280;
   const challengeEntryDelay = 210;
@@ -24,6 +30,7 @@
   const challengeExitDuration = 280;
   const challengeExitDelay = challengeEntryDelay;
   const iconExitStep = iconEntryStep;
+  const logoExitDuration = 620;
 
   function connect() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -57,49 +64,15 @@
       return;
     }
 
-    applySettings(state.settings || {});
-    const visible = Boolean(state.active && state.visible);
-    if (!visible) {
-      previewActive = false;
-      cancelEntryAnimation();
-      if (receivedState) {
-        beginExitAnimation();
-      } else {
-        hideOverlayImmediately();
-      }
-      receivedState = true;
-      return;
-    }
-
-    cancelExitAnimation();
-    const isPreview = Boolean(state.preview);
-    const previewStarting = isPreview && !previewActive;
-    const sessionChanged = currentSession !== state.session;
-    const initial = !receivedState || sessionChanged;
-    if (sessionChanged) {
-      currentSession = state.session;
-      revealed = 0;
-      textVisible = false;
-      rebuildIcons(state.icons || []);
-    } else if (iconsRoot.children.length !== (state.icons || []).length) {
-      rebuildIcons(state.icons || []);
-      revealed = 0;
-    }
-
-    setChallenge(state.challengeText || "", state.labelRevision || 0);
-    stage.classList.remove("hidden");
-    if (previewStarting) {
-      animatePreviewEntry(
-        Math.max(0, state.revealed || 0),
-        Boolean(state.textVisible));
-    } else if (!(isPreview && entryTimers.length > 0)) {
-      revealIcons(Math.max(0, state.revealed || 0), initial);
-      revealChallenge(Boolean(state.textVisible), initial);
-    }
-    previewActive = isPreview;
+    const settings = state.settings || {};
+    applySettings(settings);
+    pendingState = state;
+    targetView = state.active && state.visible
+      ? "hud"
+      : state.active && settings.logo ? "logo" : "hidden";
+    transitionToTarget();
     receivedState = true;
   }
-
   function applySettings(settings) {
     const alignment = ["left", "center", "right"].includes(settings.alignment)
       ? settings.alignment
@@ -118,6 +91,124 @@
     const opacity = Math.max(0.25, Math.min(1, Number(settings.opacity) || 1));
     stage.style.setProperty("--overlay-opacity", String(opacity));
     window.requestAnimationFrame(fitChallengeFallback);
+  }
+
+  function transitionToTarget() {
+    if (currentView === targetView) {
+      if (currentView === "hud") {
+        if (exiting) {
+          cancelExitAnimation();
+        }
+        renderHudState(pendingState, false);
+      } else if (currentView === "logo" &&
+                 brand.classList.contains("brand-exit")) {
+        enterLogo();
+      }
+      return;
+    }
+
+    if (currentView === "logo") {
+      beginLogoExit();
+      return;
+    }
+    if (currentView === "hud") {
+      cancelEntryAnimation();
+      beginExitAnimation();
+      return;
+    }
+    if (targetView === "logo") {
+      enterLogo();
+      return;
+    }
+    if (targetView === "hud") {
+      enterHud();
+      return;
+    }
+    updateStageVisibility();
+  }
+
+  function enterLogo() {
+    if (logoExitTimer !== null) {
+      window.clearTimeout(logoExitTimer);
+      logoExitTimer = null;
+    }
+    currentView = "logo";
+    result.hidden = true;
+    brand.hidden = false;
+    brand.setAttribute("aria-hidden", "false");
+    brand.classList.remove("brand-enter", "brand-exit");
+    void brand.offsetWidth;
+    brand.classList.add("brand-enter");
+    stage.classList.remove("hidden");
+  }
+
+  function beginLogoExit() {
+    if (currentView !== "logo" ||
+        brand.classList.contains("brand-exit")) {
+      return;
+    }
+    brand.classList.remove("brand-enter");
+    void brand.offsetWidth;
+    brand.classList.add("brand-exit");
+    logoExitTimer = window.setTimeout(
+      finishLogoExit, logoExitDuration);
+  }
+
+  function finishLogoExit() {
+    logoExitTimer = null;
+    brand.hidden = true;
+    brand.setAttribute("aria-hidden", "true");
+    brand.classList.remove("brand-enter", "brand-exit");
+    currentView = "hidden";
+    updateStageVisibility();
+    transitionToTarget();
+  }
+
+  function enterHud() {
+    if (!pendingState) {
+      return;
+    }
+    currentView = "hud";
+    brand.hidden = true;
+    brand.setAttribute("aria-hidden", "true");
+    result.hidden = false;
+    stage.classList.remove("hidden");
+    renderHudState(pendingState, true);
+  }
+
+  function renderHudState(state, entering) {
+    if (!state || targetView !== "hud") {
+      return;
+    }
+
+    const isPreview = Boolean(state.preview);
+    const previewStarting = isPreview && !previewActive;
+    const sessionChanged = currentSession !== state.session;
+    const initial = entering || !receivedState || sessionChanged;
+    if (sessionChanged) {
+      currentSession = state.session;
+      revealed = 0;
+      textVisible = false;
+      rebuildIcons(state.icons || []);
+    } else if (iconsRoot.children.length !== (state.icons || []).length) {
+      rebuildIcons(state.icons || []);
+      revealed = 0;
+    }
+
+    setChallenge(state.challengeText || "", state.labelRevision || 0);
+    if (entering || previewStarting) {
+      animateHudEntry(
+        Math.max(0, state.revealed || 0),
+        Boolean(state.textVisible));
+    } else {
+      revealIcons(Math.max(0, state.revealed || 0), initial);
+      revealChallenge(Boolean(state.textVisible), initial);
+    }
+    previewActive = isPreview;
+  }
+
+  function updateStageVisibility() {
+    stage.classList.toggle("hidden", result.hidden && brand.hidden);
   }
 
   function fitChallengeFallback() {
@@ -230,7 +321,7 @@
     textVisible = true;
   }
 
-  function animatePreviewEntry(nextCount, nextTextVisible) {
+  function animateHudEntry(nextCount, nextTextVisible) {
     cancelEntryAnimation();
     const icons = Array.from(iconsRoot.children);
     revealed = 0;
@@ -243,7 +334,7 @@
 
     icons.slice(0, nextCount).forEach((icon, index) => {
       entryTimers.push(window.setTimeout(() => {
-        if (!previewActive || exiting) {
+        if (currentView !== "hud" || targetView !== "hud" || exiting) {
           return;
         }
         icon.classList.remove("settled", "reveal", "exit");
@@ -258,7 +349,7 @@
       : 0;
     if (nextTextVisible) {
       entryTimers.push(window.setTimeout(() => {
-        if (!previewActive || exiting) {
+        if (currentView !== "hud" || targetView !== "hud" || exiting) {
           return;
         }
         challenge.classList.remove("settled", "reveal", "exit");
@@ -276,7 +367,7 @@
   }
 
   function beginExitAnimation() {
-    if (exiting || stage.classList.contains("hidden")) {
+    if (exiting || result.hidden) {
       return;
     }
 
@@ -316,15 +407,20 @@
   }
 
   function finishExitAnimation() {
-    stage.classList.add("hidden");
+    result.hidden = true;
     Array.from(iconsRoot.children).forEach(icon => {
       icon.classList.remove("settled", "reveal", "exit");
     });
     challenge.classList.remove("settled", "reveal", "exit");
+    revealed = 0;
+    textVisible = false;
+    previewActive = false;
     exiting = false;
     exitTimers = [];
+    currentView = "hidden";
+    updateStageVisibility();
+    transitionToTarget();
   }
-
   function cancelExitAnimation() {
     exitTimers.forEach(timer => window.clearTimeout(timer));
     exitTimers = [];
@@ -340,13 +436,37 @@
     entryTimers = [];
   }
 
-  function hideOverlayImmediately() {
+  function hideHudImmediately() {
     cancelEntryAnimation();
     cancelExitAnimation();
     previewActive = false;
-    stage.classList.add("hidden");
+    result.hidden = true;
+    revealed = 0;
+    textVisible = false;
+    Array.from(iconsRoot.children).forEach(icon => {
+      icon.classList.remove("settled", "reveal", "exit");
+    });
+    challenge.classList.remove("settled", "reveal", "exit");
+    if (currentView === "hud") {
+      currentView = "hidden";
+    }
+    updateStageVisibility();
   }
 
+  function hideOverlayImmediately() {
+    targetView = "hidden";
+    pendingState = null;
+    if (logoExitTimer !== null) {
+      window.clearTimeout(logoExitTimer);
+      logoExitTimer = null;
+    }
+    brand.hidden = true;
+    brand.setAttribute("aria-hidden", "true");
+    brand.classList.remove("brand-enter", "brand-exit");
+    hideHudImmediately();
+    currentView = "hidden";
+    updateStageVisibility();
+  }
   window.addEventListener("resize", fitChallengeFallback);
   connect();
 })();
