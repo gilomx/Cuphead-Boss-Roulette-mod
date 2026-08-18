@@ -1,5 +1,18 @@
 # Historial de cambios
 
+## Modo Tieso: compatibilidad con Rey Dado (2026-08-18)
+
+- `StiffMode` queda aprobado funcionalmente para todos los jefes terrestres:
+  fuerza el fijado mientras el jugador está en el suelo, bloquea el dash y
+  conserva el control horizontal durante los saltos.
+- En los subniveles aéreos `DicePalaceFlyingHorse` y
+  `DicePalaceFlyingMemory`, el HUD conserva `MODO TIESO` y la restricción cambia
+  únicamente a bloquear la transformación en miniavión.
+- La prueba manual del recorrido quedó aceptada. Todavía faltan su animación
+  definitiva de tres fotogramas y la revisión de `challenge.stiff_mode` en los
+  doce idiomas; hasta entonces reutiliza el arte de `No Dash` y usa textos
+  provisionales.
+
 ## Creator Tools localizado, centrado y con logo (2026-08-17)
 
 - Las cinco etiquetas de retos nuevos y las 20 etiquetas revisadas de Creator

@@ -9,7 +9,9 @@ Estado: **etapa cerrada, implementada y verificada el 2026-08-17**.
   Creator Tools.
 - Un texto adicional, `creator.menu.logo`, integrado después para la nueva
   opción del overlay.
-- Total actual de esta auditoría: **55 IDs visibles en 12 idiomas**.
+- Total aprobado de esta auditoría: **55 IDs visibles en 12 idiomas**.
+- `challenge.stiff_mode` está implementado con valores provisionales, pero aún
+  no forma parte del total aprobado.
 - Los nombres de jefes, armas, supers y amuletos siguen procediendo de la
   localización oficial de Cuphead.
 
@@ -30,7 +32,13 @@ Tools convierte el texto visible a mayúsculas para conservar el diseño nativo.
 
 ## Próxima ronda
 
-No hay IDs nuevos definidos todavía. Cuando se acuerde otra localización:
+La próxima ronda comienza con un ID definido:
+
+- `challenge.stiff_mode`: nombre visible del nuevo reto Modo Tieso. Español
+  usa provisionalmente `MODO TIESO`; los otros once idiomas usan `STIFF MODE`
+  hasta recibir y aprobar sus traducciones.
+
+Cuando se amplíe esta ronda:
 
 1. Crear un inventario separado con sus IDs y contexto.
 2. No volver a marcar como pendientes las 25 filas cerradas aquí.

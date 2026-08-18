@@ -1,5 +1,25 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Modo Tieso aceptado (2026-08-18)
+
+`ModifierId.StiffMode` permanece correctamente clasificado como
+`ModifierKind.Ground`: los combates aéreos normales no deben ofrecer un reto de
+fijado que allí no tiene efecto. En tierra, el postfix de
+`LevelPlayerMotor.HandleLocked` replica mantener pulsado el botón Lock sólo
+mientras el jugador toca el suelo, bloquea el dash y permite dirigir el salto.
+
+Rey Dado es la excepción porque su cadena terrestre contiene dos salas con
+controles de avión. Cuando el resultado activo es Rey Dado + Modo Tieso,
+`ShouldBlockMiniPlane()` reutiliza el guard de `NoMiniPlane` únicamente dentro
+de `DicePalaceFlyingHorse` y `DicePalaceFlyingMemory`. El HUD y el resultado
+siguen mostrando Modo Tieso; no cambian de reto al entrar en esas salas. La
+prueba manual quedó aceptada el 2026-08-18.
+
+Pendiente antes de cerrar el reto: sustituir `modifiers/nodash_01.png` por su
+animación definitiva de tres fotogramas y revisar `challenge.stiff_mode` en los
+doce idiomas. Español usa provisionalmente `MODO TIESO`; los demás idiomas usan
+`STIFF MODE` como fallback temporal.
+
 ## Estado verificado para el siguiente agente (2026-08-17)
 
 La ronda de localización descrita anteriormente como pendiente está cerrada:
@@ -27,23 +47,21 @@ por lo que nunca se superponen. El nombre y la etiqueta tienen flotaciones
 leves con duraciones/fases distintas; la etiqueta mide 1.4 veces el recurso
 original. El cache-buster actual es `logo-sequence-4`.
 
-### Interruptores temporales activos
+### Estado de los interruptores de prueba tras `5ffa895`
 
-- `EnableLanguageTestShortcut = true`: `Ctrl+F8` recorre los doce idiomas y
-  restaura el idioma original al cerrar el proceso.
-- `ForceQueenBeeInkRainLoadoutForTesting = true`: tiene prioridad sobre el
-  forzado manual de Creator Tools y produce siempre Reina Abeja,
-  Lanzaguisantes, segundo disparo vacío, Súper I, Afiladora y Lluvia de tinta.
+- `EnableLanguageTestShortcut = false`: `Ctrl+F8` volvió a quedar dormido.
+- `ForceQueenBeeInkRainLoadoutForTesting = false`: el forzado de Reina Abeja y
+  Lluvia de tinta quedó desactivado.
 - `ForceLongestOverlayChallengeForTesting = false`: el antiguo forzado de
   `MiniPlaneOnly` está apagado.
 
-Desactivar los dos primeros interruptores antes de preparar una build pública.
-La compilación de cierre terminó con cero errores y cero advertencias; el DLL y
+No queda ningún selector de prueba activo. La compilación de cierre terminó con
+cero errores y cero advertencias; el DLL y
 los assets de overlay instalados se verificaron por SHA-256. Las pruebas
 manuales confirmaron el menú multilingüe, los retos y el comportamiento del
-overlay. No hay una nueva ronda de localización definida todavía; crear un
-inventario nuevo cuando se acuerden sus IDs, sin reabrir las 25 etiquetas ya
-cerradas.
+overlay. La nueva ronda de localización comienza con `challenge.stiff_mode`;
+ampliar su inventario cuando se acuerden más IDs, sin reabrir las 25 etiquetas
+ya cerradas.
 
 ## Creator Tools scope after 0.5.131 (2026-08-16)
 

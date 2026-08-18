@@ -3014,7 +3014,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockMiniPlane()
         {
-            return activeChallenge == ModifierId.NoMiniPlane &&
+            var stiffModeDicePalacePlane =
+                activeChallenge == ModifierId.StiffMode &&
+                IsActiveDicePalaceChallenge() &&
+                ActiveChallengeUsesPlaneControls();
+            return (activeChallenge == ModifierId.NoMiniPlane ||
+                    stiffModeDicePalacePlane) &&
                    ShouldShowActiveChallenge();
         }
 
