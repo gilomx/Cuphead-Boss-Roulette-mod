@@ -46,6 +46,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private CreatorToolsServer creatorToolsServer;
         private bool creatorToolsBattleSessionActive;
+        private bool creatorToolsBattleCompleted;
         private bool creatorToolsBattleVisible;
         private int creatorToolsBattleSessionId;
         private int creatorToolsRevealedIcons;
@@ -236,6 +237,7 @@ namespace Gilomx.CupheadBossRoulette
         private void BeginCreatorToolsBattleSession()
         {
             creatorToolsBattleSessionActive = true;
+            creatorToolsBattleCompleted = false;
             creatorToolsBattleVisible = false;
             creatorToolsBattleSessionId++;
             creatorToolsRevealedIcons = 0;
@@ -256,6 +258,8 @@ namespace Gilomx.CupheadBossRoulette
             if (!visible && creatorToolsBattleSessionActive &&
                 CreatorToolsKeepOverlayAcrossRetries)
                 return;
+            if (visible && creatorToolsBattleCompleted)
+                return;
             if (!creatorToolsBattleSessionActive ||
                 creatorToolsBattleVisible == visible)
                 return;
@@ -263,10 +267,41 @@ namespace Gilomx.CupheadBossRoulette
             PublishCreatorToolsState(false);
         }
 
+        private void ResetCreatorToolsBattleRevealForReappear()
+        {
+            if (!creatorToolsBattleSessionActive ||
+                CreatorToolsKeepOverlayAcrossRetries)
+                return;
+
+            // The replacement scene restarts the native HUD reveal at zero.
+            // Publish that same reset before hiding so the browser cannot
+            // begin with the completed count from the previous scene.
+            creatorToolsRevealedIcons = 0;
+            creatorToolsTextVisible = false;
+        }
+
+        private void CompleteCreatorToolsBattleForLogo()
+        {
+            if (!creatorToolsBattleSessionActive ||
+                creatorToolsBattleCompleted ||
+                !battleHudPresentationActive ||
+                (!battleHudFollowNativeVictoryLayer &&
+                 !battleHudHoldOverlayThroughVictory))
+                return;
+
+            // WinScreen has started. Keep the native/loadout session alive,
+            // but finish the external battle so rating can show the idle logo.
+            creatorToolsBattleCompleted = true;
+            creatorToolsBattleVisible = false;
+            PublishCreatorToolsState(false);
+        }
+
         private void UpdateCreatorToolsBattleReveal(
             int revealedIcons, bool textVisible)
         {
             if (!creatorToolsBattleSessionActive)
+                return;
+            if (creatorToolsBattleCompleted)
                 return;
             if (CreatorToolsKeepOverlayAcrossRetries)
             {
@@ -298,6 +333,7 @@ namespace Gilomx.CupheadBossRoulette
         private void EndCreatorToolsBattleSession()
         {
             creatorToolsBattleSessionActive = false;
+            creatorToolsBattleCompleted = false;
             creatorToolsBattleVisible = false;
             creatorToolsRevealedIcons = 0;
             creatorToolsTextVisible = false;
@@ -332,7 +368,7 @@ namespace Gilomx.CupheadBossRoulette
             var preview = !creatorToolsBattleSessionActive &&
                           creatorToolsPreviewSetting.Value;
             var visible = creatorToolsBattleSessionActive
-                ? creatorToolsBattleVisible
+                ? creatorToolsBattleVisible && !creatorToolsBattleCompleted
                 : preview;
             var icons = preview
                 ? CreatorToolsPreviewIcons()
@@ -351,20 +387,26 @@ namespace Gilomx.CupheadBossRoulette
             var labelRevision = preview
                 ? 0
                 : creatorToolsLabelRevision;
-            var fastRetryExit =
-                creatorToolsBattleSessionActive &&
+            var battleActive = creatorToolsBattleSessionActive &&
+                               !creatorToolsBattleCompleted;
+            var completeRetryExit =
+                battleActive &&
                 !creatorToolsBattleVisible &&
-                !BattleHudUsesPlaneLoadout() &&
+                battleHudExplicitRestartRequested &&
                 creatorToolsRetryBehaviorSetting != null &&
                 creatorToolsRetryBehaviorSetting.Value ==
                 CreatorToolsRetryBehavior.Reappear;
+            var fastRetryExit = completeRetryExit &&
+                                !BattleHudUsesPlaneLoadout();
 
             var builder = new StringBuilder(512);
             builder.Append("{\"type\":\"state\",\"active\":true");
             builder.Append(",\"battleActive\":").Append(
-                creatorToolsBattleSessionActive ? "true" : "false");
+                battleActive ? "true" : "false");
             builder.Append(",\"fastRetryExit\":").Append(
                 fastRetryExit ? "true" : "false");
+            builder.Append(",\"completeExit\":").Append(
+                completeRetryExit ? "true" : "false");
             builder.Append(",\"visible\":").Append(
                 visible ? "true" : "false");
             builder.Append(",\"preview\":").Append(

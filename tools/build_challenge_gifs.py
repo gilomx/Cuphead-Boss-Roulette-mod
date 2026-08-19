@@ -95,7 +95,7 @@ def main() -> None:
 
     readme = output_dir / "README.txt"
     readme.write_text(
-        "Gilomx Boss Roulette - GIFs de retos\n"
+        "La Pichi Ruleta - GIFs de retos\n"
         "\n"
         "Cadencia del juego: 12.5 FPS (80 ms por frame).\n"
         "Cada GIF: 3 frames x 42 ciclos = 126 frames y 10.08 segundos.\n"

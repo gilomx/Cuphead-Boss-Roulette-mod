@@ -96,6 +96,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PrepareChallengeVisualsForRetry()
         {
+            MarkBattleResultHudExplicitRestart();
             if (activeChallenge == ModifierId.None)
                 return;
 
@@ -113,8 +114,6 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PrepareChallengeVisualsForPauseRestart()
         {
-            if (activeChallenge == ModifierId.None)
-                return;
             try
             {
                 // Tower of Power opens a confirmation path instead of
@@ -125,6 +124,10 @@ namespace Gilomx.CupheadBossRoulette
             catch
             {
             }
+
+            MarkBattleResultHudExplicitRestart();
+            if (activeChallenge == ModifierId.None)
+                return;
 
             CaptureChallengeVisualRestartLevel();
             challengeVisualRestartWaitingForBlack = true;
@@ -174,6 +177,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void CompleteChallengeVisualRestartOnFadeInEnd()
         {
+            CompleteBattleResultHudExplicitRestart();
             if (!challengeVisualRestartWaitingForBlack)
                 return;
 

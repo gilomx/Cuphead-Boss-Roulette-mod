@@ -53,26 +53,46 @@ namespace Gilomx.CupheadBossRoulette
         private bool battleHudPresentationActive;
         private bool battleHudFollowNativeVictoryLayer;
         private bool battleHudHoldOverlayThroughVictory;
+        private bool battleHudExplicitRestartRequested;
         private RouletteResult battleHudResultSnapshot;
         private ModifierId battleHudChallengeSnapshot = ModifierId.None;
         private int battleHudImpactPlayedCount;
 
         private void UpdateBattleResultHud()
         {
+            // Retry/Restart owns the external overlay until Cuphead finishes
+            // loading the replacement scene. Dice Palace can keep a valid
+            // battle layer throughout that load, so waiting for a missing
+            // layer would allow the old HUD to become visible again.
+            if (battleHudExplicitRestartRequested)
+            {
+                if (battleHudRoot != null && battleHudRoot.activeSelf)
+                    battleHudRoot.SetActive(false);
+                battleHudOnNativeCanvas = false;
+                return;
+            }
+
             if (!ShouldShowBattleResultHud())
             {
-                SetCreatorToolsBattleVisibility(false);
+                var preserveReveal =
+                    ShouldPreserveBattleHudAcrossDicePalaceHandoff();
+                if (!preserveReveal)
+                {
+                    ResetCreatorToolsBattleRevealForReappear();
+                    SetCreatorToolsBattleVisibility(false);
+                }
                 if (battleHudRoot != null && battleHudRoot.activeSelf)
                     battleHudRoot.SetActive(false);
                 // Dice Palace loads a separate battle scene for every space.
                 // Those internal loads belong to one roulette session, so do
                 // not replay the entry sequence (or its sounds) each time.
-                if (!BattleHudUsesDicePalaceChain())
+                if (!preserveReveal)
                 {
                     battleHudWasVisible = false;
                     battleHudRevealStartedAt = -1f;
                     battleHudImpactPlayedCount = 0;
                 }
+                battleHudExplicitRestartRequested = false;
                 battleHudOnNativeCanvas = false;
                 return;
             }
@@ -82,7 +102,8 @@ namespace Gilomx.CupheadBossRoulette
 
             if (!UpdateBattleResultHudLayer())
             {
-                SetCreatorToolsBattleVisibility(false);
+                if (!ShouldPreserveBattleHudAcrossDicePalaceHandoff())
+                    SetCreatorToolsBattleVisibility(false);
                 battleHudRoot.SetActive(false);
                 // LevelHUD is temporarily disabled by some phase/iris
                 // transitions. Preserve the reveal state so returning to the
@@ -135,6 +156,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudPresentationActive = true;
             battleHudFollowNativeVictoryLayer = false;
             battleHudHoldOverlayThroughVictory = false;
+            battleHudExplicitRestartRequested = false;
             battleHudChallengeSnapshot = activeChallenge;
             battleHudResultSnapshot = new RouletteResult
             {
@@ -178,6 +200,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudPresentationActive = false;
             battleHudFollowNativeVictoryLayer = false;
             battleHudHoldOverlayThroughVictory = false;
+            battleHudExplicitRestartRequested = false;
             battleHudResultSnapshot = null;
             battleHudChallengeSnapshot = ModifierId.None;
             battleHudWasVisible = false;
@@ -481,6 +504,12 @@ namespace Gilomx.CupheadBossRoulette
                    hudResult.Boss < RouletteData.Bosses.Length &&
                    RouletteData.Bosses[hudResult.Boss].Level ==
                    Levels.DicePalaceMain;
+        }
+
+        private bool ShouldPreserveBattleHudAcrossDicePalaceHandoff()
+        {
+            return BattleHudUsesDicePalaceChain() &&
+                   !battleHudExplicitRestartRequested;
         }
 
         private void SetBattleHudVisibleIconCount(int count)
@@ -854,6 +883,28 @@ namespace Gilomx.CupheadBossRoulette
                 revealedIconCount,
                 textProgress > 0f &&
                 battleHudChallengeSnapshot != ModifierId.None);
+        }
+
+        private void MarkBattleResultHudExplicitRestart()
+        {
+            if (!battleHudPresentationActive)
+                return;
+
+            battleHudExplicitRestartRequested = true;
+            ResetCreatorToolsBattleRevealForReappear();
+            SetCreatorToolsBattleVisibility(false);
+        }
+
+        private void CompleteBattleResultHudExplicitRestart()
+        {
+            if (!battleHudExplicitRestartRequested)
+                return;
+
+            battleHudExplicitRestartRequested = false;
+            battleHudWasVisible = false;
+            battleHudRevealStartedAt = -1f;
+            battleHudImpactPlayedCount = 0;
+            ResetCreatorToolsBattleRevealForReappear();
         }
 
         private void ApplyBattleHudEquipmentIcon(RawImage image,
@@ -1369,6 +1420,7 @@ namespace Gilomx.CupheadBossRoulette
             battleHudPresentationActive = false;
             battleHudFollowNativeVictoryLayer = false;
             battleHudHoldOverlayThroughVictory = false;
+            battleHudExplicitRestartRequested = false;
             battleHudResultSnapshot = null;
             battleHudChallengeSnapshot = ModifierId.None;
         }

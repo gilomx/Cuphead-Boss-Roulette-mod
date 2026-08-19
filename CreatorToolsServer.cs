@@ -106,12 +106,12 @@ namespace Gilomx.CupheadBossRoulette
             running = true;
             acceptThread = new Thread(AcceptLoop);
             acceptThread.IsBackground = true;
-            acceptThread.Name = "Las Pichi Ruleta Creator Tools HTTP";
+            acceptThread.Name = "La Pichi Ruleta Creator Tools HTTP";
             acceptThread.Start();
 
             broadcastThread = new Thread(BroadcastLoop);
             broadcastThread.IsBackground = true;
-            broadcastThread.Name = "Las Pichi Ruleta Creator Tools WebSocket";
+            broadcastThread.Name = "La Pichi Ruleta Creator Tools WebSocket";
             broadcastThread.Start();
 
             if (logInfo != null)
@@ -223,7 +223,7 @@ namespace Gilomx.CupheadBossRoulette
                     connection.NoDelay = true;
                     var thread = new Thread(HandleConnection);
                     thread.IsBackground = true;
-                    thread.Name = "Las Pichi Ruleta Creator Tools Client";
+                    thread.Name = "La Pichi Ruleta Creator Tools Client";
                     thread.Start(connection);
                     connection = null;
                 }

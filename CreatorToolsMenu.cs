@@ -14,7 +14,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int CreatorToolsOverlayMenuItemCount = 10;
         private const int CreatorToolsHubMenuItemCount = 2;
         private const string CreatorToolsPauseRowName =
-            "Gilomx Las Pichi Ruleta Pause Row";
+            "Gilomx La Pichi Ruleta Pause Row";
 
         private enum CreatorToolsMenuPage
         {

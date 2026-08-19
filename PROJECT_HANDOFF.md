@@ -1,19 +1,43 @@
-# Cuphead Boss Roulette - Project Handoff
+# La Pichi Ruleta - Project Handoff
 
-## Equip Card blocker pendiente (2026-08-18)
+Current release: **La Pichi Ruleta 0.6.0**.
 
-El checkpoint actual compila e instala, pero **no está validado**: después de
-reemplazar la desactivación directa de `MapEquipUI` por un postfix sobre
-`MapEquipUI.get_CanPause()`, la prueba manual indicó que la Equip Card dejó de
-abrir por completo. Antes de ese experimento sí abría, pero presentaba sprites
-corruptos, navegación inactiva y no podía cerrarse.
+The clean installer is `dist/La-Pichi-Ruleta-0.6.0.zip`: 457 files, 433 tracked
+mod assets, one plugin DLL and the 18-file BepInEx core. Its SHA-256 is
+`1F9978FD3E671948177363635B57AA39CF2C15DEA9EC68112A8426C8935A38F0`.
+Rejected generated audio, configs, logs, caches, PDBs and unrelated plugins are
+not included.
 
-Revisar primero `BlockMapEquipPostfix`, especialmente si
-`IsControllerToggleModifierHeld()` permanece verdadero sin un gatillo real y
-si `cardVisibility` conserva un valor residual. Instrumentar también `visible`,
-`cardVisibility`, el modificador y el `__result` original. No volver a dejar
-`MapEquipUI.enabled = false`. El caso donde `Esc` cierra la ruleta y además abre
-Pausa es una regresión distinta y debe validarse por separado.
+## Equip Card blocker resuelto (2026-08-18)
+
+El commit `a762958` retiró toda activación/desactivación y todo parche sobre
+`MapEquipUI`. La Equip Card nativa vuelve a abrir, navegar y cerrar normalmente
+en el mapa con Creator Tools activo. La prueba manual quedó aceptada en la
+misma sesión que el Stream Overlay.
+
+La causa diferencial de Creator Tools era construir demasiado pronto el
+catálogo web de configuración forzada: esa ruta refrescaba el catálogo de DLC
+durante `Plugin.Awake`, antes de que `MapUI` terminara de inicializar la entrada
+de la Equip Card. `CreatorToolsForceConfig` conserva `/api/config` en
+`ready:false` hasta que `CanUseRouletteOnMap()` confirma que el mapa está listo.
+
+La build siguiente restaura `LT + Equip` sin volver a tocar `MapEquipUI` ni
+`get_CanPause()`: un postfix estrecho sobre
+`AbstractPauseGUI.GetButtonDown(CupheadButton)` actúa sólo cuando la instancia
+es `MapEquipUI` y el botón consultado es `EquipMenu`. Cuphead ejecuta primero
+sus guards nativos; después el mod exige el botón Equip mapeado y LT en el mismo
+joystick, abre o cierra la ruleta y consume únicamente ese edge. `Shift + LT`,
+Equip sin gatillo y combinaciones entre jugadores siguen siendo nativos.
+
+Mientras la ruleta está visible o termina su salida, ese mismo postfix devuelve
+false para Equip y evita que nazca una segunda tarjeta detrás; al llegar
+`cardVisibility` a cero queda liberado. No reintroducir
+`MapEquipUI.enabled = false`, parches a `get_CanPause()`,
+`IsControllerToggleModifierHeld()` ni lectura del combo desde `Plugin.Update`.
+La prueba manual con mando ya confirmó que `LT + Equip` abre/cierra la ruleta y
+que Equip sin gatillo conserva la tarjeta nativa. El detector usa el botón que
+Cuphead tenga mapeado a Equip en ese mismo joystick, no un botón físico
+hardcodeado.
 
 ## Logo fuera de partidas activas (2026-08-18)
 
@@ -21,12 +45,44 @@ El JSON del Stream Overlay publica `battleActive` por separado de `visible`.
 `overlay.js` sólo selecciona la vista Logo cuando `battleActive` es falso; por
 eso `Reappear` puede retirar el HUD al perder y volver a reproducir su entrada
 sin insertar el logo entre ambas animaciones. El cache-buster actual es
-`logo-ground-retry-6`.
+`hud-logo-gap-10`.
 
 La salida rápida sólo se activa cuando la sesión es terrestre, el HUD queda
-oculto y la opción es `Reappear`: iconos de 320 ms separados por 230 ms y texto
-de 240 ms tras 170 ms. Con cinco iconos suma 1.33 s. Las sesiones aéreas
+oculto y la opción es `Reappear`: iconos de 260 ms separados por 180 ms y texto
+de 200 ms tras 130 ms. Con cinco iconos suma 1.05 s. Las sesiones aéreas
 conservan el perfil normal de 770 ms.
+
+Al ocultarse para `Reappear`, los contadores publicados se reinician antes de
+la escena nueva. Así el navegador no reproduce una entrada inmediata con los
+cinco elementos de la escena anterior y otra 1.1 s después cuando el HUD nativo
+comienza su revelado real. Ese reset sólo acompaña las rutas donde el HUD nativo
+también reinicia su reloj; los huecos breves de capa conservan el progreso. Las
+entradas de combate obedecen exclusivamente a `revealed/textVisible`; sólo
+Vista previa programa una secuencia completa del lado del navegador. Los
+hand-offs internos de King Dice mantienen el overlay visible y preservan el
+revelado, mientras los hooks nativos de `Retry` y `Restart` marcan un reinicio
+explícito, ocultan el overlay directamente y no lo liberan hasta
+`SceneLoader.OnFadeInEndEvent`; por eso sí reproducen su salida y entrada aunque
+Dice Palace conserve una capa de batalla válida durante toda la recarga.
+Aunque ese evento llegue antes de completar los 1.05 s, el navegador deja la
+nueva vista en cola: una salida rápida de retry no se puede cancelar a mitad y
+`finishExitAnimation()` aplica después el estado más reciente.
+El JSON separa `completeExit` (salida iniciada por Retry/Restart y obligatoria)
+de `fastRetryExit` (sólo el perfil terrestre de 1.05 s). Así los retries aéreos
+también terminan su salida normal y los huecos incidentales siguen cancelables.
+
+La transición de victoria añade un hand-off estricto HUD → Logo: después de
+`finishExitAnimation()` mantiene ambos nodos ocultos durante 80 ms antes de
+`enterLogo()`. `hudToLogoTimer` bloquea estados Logo repetidos durante ese gap y
+se cancela si el objetivo cambia a HUD o Hidden.
+
+`creatorToolsBattleCompleted` se activa en el postfix de `WinScreen.Awake`,
+después de validar los flags de victoria terminal preparados por
+`KeepBattleResultHudThroughVictory`, sin cerrar aún
+`creatorToolsBattleSessionActive`. Fuerza `battleVisible=false` incluso bajo
+`Keep`, bloquea reaperturas/reveals tardíos y publica `battleActive` como
+`sessionActive && !completed`. Así el logo aparece durante la calificación. Los
+minijefes internos de King Dice no preparan esos flags terminales.
 
 ## Modo Tieso aceptado (2026-08-18)
 
@@ -1444,8 +1500,8 @@ bold, italics, code spans or Markdown separators. Numbered instructions use
 `1)` notation and lists use plain Unicode bullets. It was round-trip verified as
 UTF-8, including Spanish accents.
 
-Last updated: 2026-08-12
-Current local version: 0.5.130
+Last updated: 2026-08-18
+Current local version: 0.6.0
 
 This file is the working context for the next agent. Read it before changing the
 mod. The user has iterated on the layout by eye, so preserve all explicit

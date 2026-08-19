@@ -17,12 +17,14 @@
   let receivedState = false;
   let previewActive = false;
   let exiting = false;
+  let exitMustComplete = false;
   let entryTimers = [];
   let exitTimers = [];
   let currentView = "hidden";
   let targetView = "hidden";
   let pendingState = null;
   let logoExitTimer = null;
+  let hudToLogoTimer = null;
 
   const iconEntryStep = 280;
   const challengeEntryDelay = 210;
@@ -30,11 +32,12 @@
   const challengeExitDuration = 280;
   const challengeExitDelay = challengeEntryDelay;
   const iconExitStep = iconEntryStep;
-  const groundRetryIconExitDuration = 320;
-  const groundRetryChallengeExitDuration = 240;
-  const groundRetryChallengeExitDelay = 170;
-  const groundRetryIconExitStep = 230;
+  const groundRetryIconExitDuration = 260;
+  const groundRetryChallengeExitDuration = 200;
+  const groundRetryChallengeExitDelay = 130;
+  const groundRetryIconExitStep = 180;
   const logoExitDuration = 620;
+  const hudToLogoGapDuration = 80;
 
   function connect() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -99,9 +102,20 @@
   }
 
   function transitionToTarget() {
+    if (hudToLogoTimer !== null) {
+      if (targetView === "logo") {
+        return;
+      }
+      window.clearTimeout(hudToLogoTimer);
+      hudToLogoTimer = null;
+    }
+
     if (currentView === targetView) {
       if (currentView === "hud") {
         if (exiting) {
+          if (exitMustComplete) {
+            return;
+          }
           cancelExitAnimation();
         }
         renderHudState(pendingState, false);
@@ -201,11 +215,14 @@
     }
 
     setChallenge(state.challengeText || "", state.labelRevision || 0);
-    if (entering || previewStarting) {
+    if (previewStarting) {
       animateHudEntry(
         Math.max(0, state.revealed || 0),
         Boolean(state.textVisible));
-    } else {
+    } else if (!(isPreview && entryTimers.length > 0)) {
+      if (!isPreview) {
+        cancelEntryAnimation();
+      }
       revealIcons(Math.max(0, state.revealed || 0), initial);
       revealChallenge(Boolean(state.textVisible), initial);
     }
@@ -379,6 +396,8 @@
     exiting = true;
     const fastRetryExit = Boolean(
       pendingState && pendingState.fastRetryExit);
+    exitMustComplete = Boolean(
+      pendingState && pendingState.completeExit);
     const activeIconExitDuration = fastRetryExit
       ? groundRetryIconExitDuration
       : iconExitDuration;
@@ -438,16 +457,25 @@
     textVisible = false;
     previewActive = false;
     exiting = false;
+    exitMustComplete = false;
     exitTimers = [];
     result.classList.remove("fast-retry-exit");
     currentView = "hidden";
     updateStageVisibility();
+    if (targetView === "logo") {
+      hudToLogoTimer = window.setTimeout(() => {
+        hudToLogoTimer = null;
+        transitionToTarget();
+      }, hudToLogoGapDuration);
+      return;
+    }
     transitionToTarget();
   }
   function cancelExitAnimation() {
     exitTimers.forEach(timer => window.clearTimeout(timer));
     exitTimers = [];
     exiting = false;
+    exitMustComplete = false;
     result.classList.remove("fast-retry-exit");
     Array.from(iconsRoot.children).forEach(icon => {
       icon.classList.remove("exit");
@@ -483,6 +511,10 @@
     if (logoExitTimer !== null) {
       window.clearTimeout(logoExitTimer);
       logoExitTimer = null;
+    }
+    if (hudToLogoTimer !== null) {
+      window.clearTimeout(hudToLogoTimer);
+      hudToLogoTimer = null;
     }
     brand.hidden = true;
     brand.setAttribute("aria-hidden", "true");

@@ -1,4 +1,4 @@
-# Gilomx Boss Roulette
+# La Pichi Ruleta
 
 Mod para Cuphead 1.3.4 que traslada al juego la lógica de la ruleta de
 `gilomx.com`. Funciona tanto con el juego base como con The Delicious Last
@@ -17,8 +17,8 @@ Para extender los indicadores durante una pelea, consulta
 ## Controles
 
 - `F6`: abrir o cerrar la ruleta.
-- Mando: mantener el gatillo izquierdo y pulsar el botón de Equip Card
-  (`ZL + X` en Switch, `LT + Y` en Xbox, `L2 + Triángulo` en PlayStation).
+- Mando: mantener el gatillo izquierdo y pulsar el botón que tengas asignado
+  para abrir la Equip Card.
 - `↑` `↓`: moverse entre las opciones y la acción principal.
 - `←` `→`: cambiar el valor de la opción seleccionada.
 - `Enter`: cambiar una opción o confirmar `¡GIRAR!`/`¡JUGAR!`.
@@ -29,33 +29,76 @@ Para extender los indicadores durante una pelea, consulta
   automática está desactivada.
 - `F7`: volver a girar en ese mismo caso desde el teclado.
 
-El indicador inferior derecho cambia automáticamente con el último dispositivo
-usado. En teclado muestra F6/F7; en mando muestra el gatillo físico y el glifo
-nativo de Equipar (`LT + Y`, `L2 + Triángulo` o `ZL + X`) y el gatillo derecho
-cuando se permite volver a girar.
+La combinación de mando se reconoce únicamente cuando `LT` y el botón Equip
+proceden del mismo joystick. Equip sin `LT` conserva la Equip Card nativa, y
+`Shift` tampoco se confunde con el atajo aunque haya un gatillo sostenido. El
+indicador inferior derecho cambia entre `F6` y la combinación física del mando;
+cuando se permite volver a girar, muestra `F7` o el gatillo derecho según el
+último dispositivo usado.
 
 El giro dura cinco segundos y después detiene, uno por segundo, jefe, armas,
-súper, amuleto y reto. El modo feo añade las restricciones de la ruleta web.
+súper, amuleto y reto. La opción `RETO` añade las restricciones de la ruleta
+web.
 
-## Herramientas para creadores
+## Retos
 
-Desde el menú de pausa del mapa, `LA PICHI RULETA` abre un pequeño hub con la
-configuración de `STREAM OVERLAY`. Cuando su estado está activado, el mismo
-servidor local ofrece el overlay para OBS en
-`http://127.0.0.1:18081/`.
+El catálogo actual incluye:
 
-El menú está localizado en los doce idiomas de Cuphead y conserva el formato
-nativo `ETIQUETA: VALOR`. Además de vista previa, reintento, tamaño, orden,
-alineación y opacidad, la opción `LOGO` muestra la identidad del mod mientras
-el HUD del resultado no está activo. Al alternar entre HUD y logo, uno termina
-su salida antes de que el otro aparezca.
+- `NO DASH`
+- `NO MINIAVIÓN`
+- `SOLO BALAS DE MINIAVIÓN`
+- `NO DISPARO BOMBAS`
+- `SIN PEASHOOTER`
+- `NO EX`
+- `BLANCO Y NEGRO`
+- `MAMÁ ESCUCHO BORROSO`
+- `VOLTEADA DE CABEZA`
+- `UNA VIDA Y TE CALLAS`
+- `LLUVIA DE TINTA`
+- `DISPAROS REBAJADOS`
+- `MODO TIESO`
+
+Los retos compatibles se filtran automáticamente según el jefe y si el
+combate es terrestre o aéreo. `MODO TIESO` simula mantener pulsado el fijado
+mientras el personaje toca el suelo y bloquea el dash. Todavía se puede saltar
+y dirigir el movimiento en el aire. Durante las salas aéreas de Rey Dado,
+conserva el mismo nombre y se adapta bloqueando el miniavión.
+
+## Creator Tools y OBS
+
+Desde el mapa abre `Pausa > LA PICHI RULETA > STREAM OVERLAY`, activa el
+overlay y selecciona `COPIAR URL`. En OBS añade una Fuente de navegador, pega
+esa dirección y usa el mismo ancho y alto que tu lienzo, por ejemplo
+1920 × 1080. El fondo ya es transparente y no necesita CSS personalizado.
+
+`VISTA PREVIA` permite colocar la fuente mientras configuras OBS y se apaga
+automáticamente al salir. Tamaño, orden, alineación, opacidad y logo se
+actualizan en vivo. El menú está localizado en los doce idiomas de Cuphead y
+conserva el formato nativo `ETIQUETA: VALOR`.
+
+El servidor escucha únicamente en `127.0.0.1`: no necesita internet ni una
+cuenta. Su puerto preferido es `18081`; si ya está ocupado, el mod elige y
+guarda otro automáticamente. Por eso conviene usar siempre `COPIAR URL` en vez
+de escribir la dirección manualmente.
+
+`AL REINTENTAR` ofrece dos comportamientos; `REAPARECER` es el predeterminado:
+
+- `MANTENER`: conserva el resultado visible durante el reintento.
+- `REAPARECER`: completa la salida y reproduce una sola entrada con el HUD del
+  intento siguiente. El logo no aparece entre ambas.
+
+Rey Dado se trata como una sola sesión: los cambios internos de tablero y
+minijefe conservan el overlay sin repetir su entrada; un `Reintentar` o
+`Reiniciar` real sí respeta la opción anterior. Si `LOGO` está activo, aparece
+después de que el HUD termina de salir, durante la pantalla de calificación, y
+continúa al volver al mapa.
 
 ## Instalación
 
-El ZIP `Gilomx-Boss-Roulette-<versión>-BepInEx-x64.zip` ya incluye BepInEx y el
-mod. Extrae su contenido directamente en la carpeta de Cuphead y acepta la
-combinación de carpetas; no incluye configuraciones, partidas, logs ni otros
-mods.
+El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su
+contenido directamente en la carpeta del juego y acepta combinar carpetas y
+reemplazar los archivos del mod. El paquete no incluye configuraciones,
+partidas, logs ni otros mods.
 
 Para una instalación manual:
 
@@ -111,6 +154,9 @@ dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
   visible hasta que comienza el cambio real a la pantalla de calificación.
 - Mientras ese resultado temporal siga activo, la Equip Card no puede abrirse
   desde la pantalla de derrota; vuelve a estar disponible al salir al mapa.
+- En el mapa, la Equip Card conserva su entrada y funcionamiento nativos aunque
+  Creator Tools esté activo. Sólo el pulso exacto de `LT + Equip` se reserva
+  para la ruleta; Equip sin gatillo sigue perteneciendo al juego.
 - Los jugadores no pueden caminar por el mapa mientras la ruleta está abierta;
   el movimiento se recupera inmediatamente al cerrarla.
 - Enter/Z y el botón de aceptar no atraviesan la ruleta: una puerta situada

@@ -1,6 +1,65 @@
 # Historial de cambios
 
-## Equip Card nativa: experimento pendiente (2026-08-18)
+## 0.6.0 — La Pichi Ruleta (2026-08-18)
+
+Esta versión reúne Modo Tieso, Creator Tools y su overlay para OBS, la
+continuidad especial de Rey Dado, las animaciones corregidas de reintento y la
+restauración completa de la Equip Card nativa.
+
+### Distribución
+
+- El instalable final se publica como `La-Pichi-Ruleta-0.6.0.zip`.
+- Contiene BepInEx x64, la DLL 0.6.0, el README bilingüe y los 433 assets
+  rastreados del mod; excluye configuraciones, logs, caché, temporales y dos
+  prototipos de audio rechazados.
+- El ZIP contiene 457 archivos y su SHA-256 es
+  `1F9978FD3E671948177363635B57AA39CF2C15DEA9EC68112A8426C8935A38F0`.
+
+### Equip Card nativa restaurada con Creator Tools
+
+- Se retiraron por completo la activación/desactivación y los parches sobre
+  `MapEquipUI`. La Equip Card vuelve a abrir, navegar y cerrar normalmente en
+  el mapa aunque Creator Tools esté activo.
+- El catálogo web de configuración forzada espera hasta que el mapa y su Equip
+  Card hayan terminado de inicializarse antes de consultar el contenido de
+  Cuphead. El servidor y el overlay pueden arrancar sin competir con esa ruta
+  nativa.
+- `F6` y la combinación de gatillo izquierdo + Equip Card abren o cierran la
+  ruleta. El atajo de mando se intercepta dentro de la lectura nativa y sólo
+  consume ese pulso cuando ambos botones proceden del mismo joystick.
+- Equip sin gatillo, `Shift`, `Shift` con un gatillo físico sostenido y botones
+  de jugadores distintos continúan llegando íntegros a la Equip Card. Mientras
+  la ruleta está visible, su lectura se bloquea únicamente para impedir dos
+  tarjetas simultáneas y se libera al terminar la salida.
+- La corrección quedó validada manualmente con Creator Tools, Stream Overlay y
+  la Equip Card funcionando en la misma sesión. La prueba con mando confirmó
+  que `LT + Equip` abre la ruleta y Equip sin gatillo conserva la tarjeta
+  nativa.
+
+### Creator Tools: salida de reintento más rápida
+
+- La salida terrestre de `Al reintentar: Reaparecer` baja de 1.33 a 1.05
+  segundos con cinco iconos y texto de reto.
+- Cada icono sale durante 260 ms con 180 ms entre elementos; el texto espera
+  130 ms y sale durante 200 ms.
+- Al comenzar el reintento se descarta el contador de revelado de la escena
+  anterior. La entrada nueva ya no empieza con cinco elementos para reiniciarse
+  cuando el HUD nativo vuelve a contar desde cero.
+- Las entradas de combate siguen únicamente el contador publicado por Cuphead;
+  sólo Vista previa programa su propia secuencia completa en el navegador.
+- Los cambios internos de casilla de King Dice mantienen el overlay visible y
+  conservan el HUD; sólo un `Reintentar` o `Reiniciar` explícito reproduce su
+  salida y entrada.
+- Si la escena nueva termina de cargar antes que la salida rápida, la entrada
+  queda en espera hasta que salga el último elemento; ya no corta todos los
+  iconos a mitad de la secuencia.
+- En victoria, el logo espera un intervalo visible de 80 ms después de ocultar
+  por completo el HUD de la ruleta; ya no comparte el mismo frame de salida.
+- Al comenzar `WinScreen`, el logo se libera sin cerrar todavía la sesión
+  interna: aparece durante la calificación y continúa al regresar al mapa.
+- La salida aérea y las demás transiciones conservan sus tiempos anteriores.
+
+### Equip Card nativa: experimento fallido, ya superado
 
 - El punto de control retira la activación/desactivación directa de `MapEquipUI`
   y prueba un postfix sobre `MapEquipUI.get_CanPause()` mientras la ruleta posee
@@ -12,7 +71,7 @@
   quedar sin navegación y no cerrar. El fallo de `Esc` que también abre Pausa
   sigue siendo una regresión separada que debe comprobarse después.
 
-## Creator Tools: logo bloqueado durante partidas activas (2026-08-18)
+### Creator Tools: logo bloqueado durante partidas activas
 
 - El estado del Stream Overlay ahora distingue explícitamente una partida
   activa de un HUD temporalmente oculto.
@@ -22,7 +81,7 @@
 - La salida terrestre de `Reaparecer` tarda ahora 1.33 segundos; la salida
   aérea conserva sus 770 ms y las demás salidas mantienen sus tiempos.
 
-## Modo Tieso: compatibilidad con Rey Dado (2026-08-18)
+### Modo Tieso: compatibilidad con Rey Dado
 
 - `StiffMode` queda aprobado funcionalmente para todos los jefes terrestres:
   fuerza el fijado mientras el jugador está en el suelo, bloquea el dash y
@@ -35,7 +94,7 @@
   Tools usa su icono estático de 82 x 82. Sólo queda pendiente la revisión de
   `challenge.stiff_mode` en los doce idiomas.
 
-## Creator Tools localizado, centrado y con logo (2026-08-17)
+### Creator Tools localizado, centrado y con logo
 
 - Las cinco etiquetas de retos nuevos y las 20 etiquetas revisadas de Creator
   Tools ya están activas en los doce idiomas de Cuphead. El menú convierte el
@@ -261,7 +320,7 @@
 - Barbasalada y el reto permanecen forzados únicamente para esa prueba. Los tres
   interruptores temporales deben desactivarse antes de una compilación pública.
 
-Este documento resume los cambios funcionales de Gilomx Boss Roulette. Las
+Este documento resume los cambios funcionales de La Pichi Ruleta. Las
 versiones corresponden al número mostrado por BepInEx al cargar el mod.
 
 ## Desarrollo experimental - Abejita aprobada y cierre de pruebas (2026-08-13)

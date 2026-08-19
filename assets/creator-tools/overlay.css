@@ -230,7 +230,7 @@ body {
 }
 
 #result.fast-retry-exit .result-icon.exit {
-  animation-duration: 320ms;
+  animation-duration: 260ms;
 }
 
 .challenge {
@@ -265,7 +265,7 @@ body {
 }
 
 #result.fast-retry-exit .challenge.exit {
-  animation-duration: 240ms;
+  animation-duration: 200ms;
 }
 
 #challenge-image {

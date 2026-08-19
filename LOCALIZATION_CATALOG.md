@@ -161,7 +161,7 @@ registra lo que aparece hoy, no una traducción definitiva.
 | `ui.slot.charm` | `AMULETO` | Ranura de amuleto |
 | `ui.slot.challenge` | `RETO` | Ranura de reto |
 | `ui.setting.difficulty` | `DIFICULTAD` | Ajuste de dificultad |
-| `ui.setting.challenge` | `RETO` / `MODO FEO` | Activación de retos; falta decidir el nombre público |
+| `ui.setting.challenge` | `RETO` | Activación de retos |
 | `ui.setting.auto_load` | `CARGA AUTOMÁTICA` / `CARGA AUTO` | Carga automática del combate |
 | `ui.value.enabled` | `ACTIVADO` / `ACTIVADA` | Valor activo; hoy cambia por género gramatical |
 | `ui.value.disabled` | `DESACTIVADO` / `DESACTIVADA` | Valor inactivo; hoy cambia por género gramatical |
@@ -180,7 +180,7 @@ registra lo que aparece hoy, no una traducción definitiva.
 | `ui.action.select_save` | `SELECCIONA UNA PARTIDA` | Banda inferior |
 | `ui.challenge_prefix` | `RETO:` | Etiqueta persistente del combate |
 | `ui.controls` | `F6 ABRIR/CERRAR · F7 GIRAR · CTRL+I SELECCIÓN FORZADA` | Ayuda de controles antigua |
-| `ui.controls.controller_toggle` | `Gatillo izquierdo + Equip` | Descripción neutral del atajo de mando; sus etiquetas físicas son ZL+X, LT+Y y L2+Triángulo |
+| `ui.controls.controller_toggle` | `Gatillo izquierdo + Equip` | Atajo de mando; sus etiquetas físicas son ZL+X, LT+Y y L2+Triángulo |
 
 ## Mensajes de estado internos o heredados
 
@@ -253,7 +253,7 @@ buscar, y traducir sólo los avisos que ayudan directamente al jugador.
 
 ## Elementos que normalmente no deben traducirse
 
-- `Gilomx Boss Roulette` y el GUID del plugin.
+- `La Pichi Ruleta` y el GUID del plugin.
 - Teclas `F6`, `F7`, `Enter`, `Esc` y combinaciones de teclado.
 - Nombres de archivos, rutas, sprites y claves de configuración.
 - Valores internos de `Weapon`, `Charm`, `Super`, `Levels` y retos.
@@ -271,8 +271,5 @@ buscar, y traducir sólo los avisos que ayudan directamente al jugador.
 
 ## Decisiones reservadas para el usuario
 
-- Qué idiomas se implementan primero o si se cubren los 12 a la vez.
-- Si `MODO FEO` se traduce literalmente o se renombra como “Modo reto”.
-- Qué redacción debe tener cada reto en cada idioma.
 - Si `Boss Roulette` permanece como marca o se traduce.
 - Si se traducen configuración y logs además de la interfaz.

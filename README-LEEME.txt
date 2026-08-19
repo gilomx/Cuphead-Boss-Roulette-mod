@@ -1,4 +1,4 @@
-LAS PICHI RULETA
+LA PICHI RULETA 0.6.0
 
 
 ENGLISH
@@ -10,7 +10,7 @@ Spin the roulette and let it choose your next boss, weapons, Super, Charm and op
 
 INSTALLATION
 
-1) Extract the contents of the ZIP directly into the folder where Cuphead.exe is located.
+1) Close Cuphead. Extract the ZIP directly into the folder where Cuphead.exe is located and replace the mod files when asked.
 2) Start Cuphead normally.
 3) Load a save file.
 4) From the world map, press F6 to open the roulette.
@@ -51,7 +51,9 @@ Keyboard
 Controller
 
 • Left Trigger + Equip Card button — Open / close the roulette
-• Use your controller normally to navigate and select options.
+• Equip without Left Trigger keeps its normal native behavior
+• Once open, use your controller normally to navigate and select options
+• Right Trigger — Spin again when automatic battle loading is disabled
 
 
 CHALLENGES
@@ -65,18 +67,36 @@ The roulette currently includes:
 • No Peashooter (airplane levels)
 • No EX
 • Black & White
+• Chromatic Chaos
+• Upside Down
+• 1 HP. Deal With It.
+• Ink Rain
+• Damage -50%
+• Stiff Mode
 
 Available challenges automatically change depending on whether the selected boss is a ground or airplane battle.
+
+Stiff Mode behaves like holding Cuphead's native Lock button while grounded and also blocks dashing. You can still jump and steer in the air. In King Dice's airplane rooms, it adapts by blocking mini-plane transformation.
+
+
+CREATOR TOOLS / OBS
+
+From the world map open Pause > LA PICHI RULETA > STREAM OVERLAY. Enable it, choose COPY URL, and paste it into an OBS Browser Source. Match the source size to your OBS canvas; the background is already transparent. Preview helps position it and turns off automatically.
+
+The preferred local port is 18081, but the mod selects another one if needed. Always use COPY URL instead of typing the address manually. The server is available only on this computer while Cuphead and Creator Tools are running; it needs no internet connection. Size, order, alignment, opacity and logo settings update live.
+
+REAPPEAR is the default. KEEP leaves the result visible across retries. REAPPEAR completes the exit and plays one entrance for the next attempt; the logo is never inserted between them. King Dice board and miniboss transitions keep one continuous overlay session, while an actual Retry or Restart follows the selected behavior. With LOGO enabled, it appears during grading after the HUD has fully exited and remains visible on the map.
 
 
 FEATURES
 
 • Simple, Regular and Expert difficulty
 • Single-player and local co-op support
-• Keyboard and controller support
+• Full keyboard and controller support
 • Automatic or manual battle loading
 • Works with or without The Delicious Last Course DLC
 • Supports all 12 languages available in Cuphead
+• Local OBS overlay with live Creator Tools settings
 • Automatically restores your previous equipment after the fight
 
 
@@ -103,7 +123,7 @@ Gira la ruleta y deja que elija tu próximo jefe, armas, Super, Amuleto y un ret
 
 INSTALACIÓN
 
-1) Extrae el contenido del ZIP directamente en la carpeta donde se encuentra Cuphead.exe.
+1) Cierra Cuphead. Extrae el ZIP directamente en la carpeta donde se encuentra Cuphead.exe y reemplaza los archivos del mod cuando se te pregunte.
 2) Inicia Cuphead normalmente.
 3) Carga una partida.
 4) Desde el mapa, presiona F6 para abrir la ruleta.
@@ -143,33 +163,53 @@ Teclado
 
 Mando
 
-• Gatillo izquierdo + botón para abrir la tarjeta de equipamiento — Abrir / cerrar la ruleta
-• Usa el mando normalmente para navegar y seleccionar las opciones.
+• Gatillo izquierdo + botón de la tarjeta de equipamiento — Abrir / cerrar la ruleta
+• Equip sin gatillo izquierdo conserva su funcionamiento nativo
+• Una vez abierta, usa el mando normalmente para navegar y seleccionar las opciones
+• Gatillo derecho — Volver a girar cuando la entrada automática está desactivada
 
 
 RETOS
 
 Actualmente la ruleta incluye:
 
-• Sin Dash
-• Sin miniavión
-• Solo miniavión
-• Sin minibombas (niveles de avión)
+• No Dash
+• No miniavión
+• Solo balas de miniavión
+• No disparo bombas (niveles de avión)
 • Sin Peashooter (niveles de avión)
 • Sin EX
 • Blanco y negro
+• Mamá escucho borroso
+• Volteada de cabeza
+• Una vida y te callas
+• Lluvia de tinta
+• Disparos rebajados
+• Modo Tieso
 
 Los retos disponibles cambian automáticamente dependiendo de si el jefe seleccionado es una batalla terrestre o un nivel de avión.
+
+Modo Tieso se comporta como si mantuvieras pulsado el fijado nativo de Cuphead mientras estás en el suelo y también bloquea el dash. Todavía puedes saltar y dirigir el movimiento en el aire. En las salas aéreas de Rey Dado, se adapta bloqueando la transformación en miniavión.
+
+
+CREATOR TOOLS / OBS
+
+Desde el mapa abre Pausa > LA PICHI RULETA > STREAM OVERLAY. Actívalo, elige COPIAR URL y pega la dirección en una Fuente de navegador de OBS. Usa el tamaño de tu lienzo; el fondo ya es transparente. Vista previa ayuda a colocarlo y se apaga automáticamente.
+
+El puerto local preferido es 18081, pero el mod elige otro si hace falta. Usa siempre COPIAR URL en vez de escribir la dirección manualmente. El servidor sólo está disponible en esta computadora mientras Cuphead y Creator Tools están activos; no necesita internet. Los ajustes de tamaño, orden, alineación, opacidad y logo se actualizan en vivo.
+
+REAPARECER es el valor predeterminado. MANTENER deja el resultado visible durante los reintentos. REAPARECER completa la salida y reproduce una sola entrada para el intento siguiente; nunca inserta el logo entre ambas. Los cambios de tablero y minijefe de Rey Dado conservan una sola sesión del overlay, mientras que un Reintentar o Reiniciar real respeta la opción elegida. Con LOGO activo, aparece durante la calificación después de que el HUD termina de salir y permanece visible en el mapa.
 
 
 CARACTERÍSTICAS
 
 • Dificultad Simple, Regular y Experto
 • Compatible con un jugador y cooperativo local
-• Compatible con teclado y mando
+• Compatibilidad completa con teclado y mando
 • Entrada automática o manual a las batallas
 • Funciona con o sin el DLC The Delicious Last Course
 • Compatible con los 12 idiomas disponibles en Cuphead
+• Overlay local para OBS con ajustes en vivo desde Creator Tools
 • Restaura automáticamente tu equipamiento anterior después de la batalla
 
 

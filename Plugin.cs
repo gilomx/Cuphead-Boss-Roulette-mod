@@ -14,8 +14,8 @@ namespace Gilomx.CupheadBossRoulette
     public sealed partial class Plugin : BaseUnityPlugin
     {
         public const string PluginGuid = "mx.gilomx.cuphead.bossroulette";
-        public const string PluginName = "Gilomx Boss Roulette";
-        public const string PluginVersion = "0.5.131";
+        public const string PluginName = "La Pichi Ruleta";
+        public const string PluginVersion = "0.6.0";
 
         private const float DesignWidth = 1280f;
         private const float DesignHeight = 720f;
@@ -217,6 +217,7 @@ namespace Gilomx.CupheadBossRoulette
         private static Plugin activeInstance;
         private Harmony harmony;
         private int suppressMapPauseUntilFrame = -1;
+        private int controllerToggleHandledFrame = -1;
         private bool rightTriggerWasHeld;
         private float spinStartedAt;
         private float loadAt;
@@ -468,6 +469,19 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(mapPauseCanPause, postfix: new HarmonyMethod(mapPausePostfix));
             else
                 Logger.LogWarning("Could not install the map pause guard.");
+
+            var pauseGetButtonDown = AccessTools.Method(
+                typeof(AbstractPauseGUI), "GetButtonDown",
+                new[] { typeof(CupheadButton) });
+            var interceptMapEquipButtonPostfix = AccessTools.Method(
+                typeof(Plugin), "InterceptMapEquipButtonPostfix");
+            if (pauseGetButtonDown != null &&
+                interceptMapEquipButtonPostfix != null)
+                harmony.Patch(pauseGetButtonDown,
+                    postfix: new HarmonyMethod(interceptMapEquipButtonPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the controller roulette shortcut.");
 
             var mapPlayerCanMove = AccessTools.Method(
                 typeof(MapPlayerController), "CanMove");
@@ -818,7 +832,8 @@ namespace Gilomx.CupheadBossRoulette
 
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion +
-                           " listo. F6 abre/cierra; F7 gira.");
+                           " listo. F6 o gatillo izquierdo + Equip abre/cierra; " +
+                           "F7 o gatillo derecho gira.");
         }
 
         private static void ForceFiveSuperCardsForHudTestPrefix(
@@ -981,6 +996,52 @@ namespace Gilomx.CupheadBossRoulette
                 __result = false;
         }
 
+        private static void InterceptMapEquipButtonPostfix(
+            AbstractPauseGUI __instance, CupheadButton button,
+            ref bool __result)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !(__instance is MapEquipUI) ||
+                button != CupheadButton.EquipMenu)
+                return;
+
+            var frame = Time.frameCount;
+
+            // While the roulette owns the map input, never allow a second
+            // native card to open behind it. The same exact controller combo
+            // remains available to close the roulette.
+            if (plugin.visible)
+            {
+                if (__result && plugin.IsControllerTogglePressed() &&
+                    plugin.controllerToggleHandledFrame != frame)
+                {
+                    plugin.controllerToggleHandledFrame = frame;
+                    plugin.SetVisible(false);
+                }
+                __result = false;
+                return;
+            }
+
+            // Let the closing animation finish before either UI can reopen.
+            if (plugin.cardVisibility > 0.001f ||
+                plugin.controllerToggleHandledFrame == frame)
+            {
+                __result = false;
+                return;
+            }
+
+            // Cuphead must first accept this as a real EquipMenu edge. Then
+            // require the mapped Equip button and LT from the same joystick,
+            // so Shift + a held controller trigger stays completely native.
+            if (!__result || !plugin.CanUseRouletteOnMap() ||
+                !plugin.IsControllerTogglePressed())
+                return;
+
+            plugin.controllerToggleHandledFrame = frame;
+            plugin.SetVisible(true);
+            __result = false;
+        }
+
         private static void BlockMapMovementPostfix(ref bool __result)
         {
             var plugin = activeInstance;
@@ -1029,6 +1090,45 @@ namespace Gilomx.CupheadBossRoulette
             return player != null && player.GetButtonDown((int)button);
         }
 
+        private bool IsControllerTogglePressed()
+        {
+            try
+            {
+                return IsControllerTogglePressed(PlayerId.PlayerOne) ||
+                       IsControllerTogglePressed(PlayerId.PlayerTwo);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsControllerTogglePressed(PlayerId playerId)
+        {
+            var player = PlayerManager.GetPlayerInput(playerId);
+            if (player == null || player.controllers == null ||
+                !player.GetButtonDown((int)CupheadButton.EquipMenu))
+                return false;
+
+            foreach (var joystick in player.controllers.Joysticks)
+            {
+                if (joystick == null || !IsLeftTriggerHeld(joystick))
+                    continue;
+
+                var maps = player.controllers.maps.ButtonMapsWithAction(
+                    joystick, (int)CupheadButton.EquipMenu, true);
+                foreach (var map in maps)
+                {
+                    if (map == null || !map.enabled ||
+                        map.elementType != ControllerElementType.Button)
+                        continue;
+                    if (joystick.GetButtonDownById(map.elementIdentifierId))
+                        return true;
+                }
+            }
+            return false;
+        }
+
         private bool PollControllerRerollPressed()
         {
             var held = false;
@@ -1045,6 +1145,41 @@ namespace Gilomx.CupheadBossRoulette
             var pressed = held && !rightTriggerWasHeld;
             rightTriggerWasHeld = held;
             return pressed;
+        }
+
+        private static bool IsLeftTriggerHeld(Rewired.Joystick joystick)
+        {
+            if (joystick == null)
+                return false;
+
+            foreach (var element in joystick.ElementIdentifiers)
+            {
+                if (element == null)
+                    continue;
+
+                var direct = IsLeftTriggerLabel(element.name);
+                var positive = IsLeftTriggerLabel(element.positiveName);
+                var negative = IsLeftTriggerLabel(element.negativeName);
+                if (!direct && !positive && !negative)
+                    continue;
+
+                if (element.elementType == ControllerElementType.Button)
+                {
+                    if (joystick.GetButtonById(element.id))
+                        return true;
+                    continue;
+                }
+
+                if (element.elementType != ControllerElementType.Axis)
+                    continue;
+
+                var value = joystick.GetAxisById(element.id);
+                if ((direct || positive) && value > 0.5f)
+                    return true;
+                if (negative && value < -0.5f)
+                    return true;
+            }
+            return false;
         }
 
         private static bool IsRightTriggerHeld(Rewired.Player player)
@@ -1104,6 +1239,24 @@ namespace Gilomx.CupheadBossRoulette
                    normalized.Contains("triggerright") ||
                    normalized == "r2" || normalized.EndsWith("r2") ||
                    normalized == "zr" || normalized.EndsWith("zr");
+        }
+
+        private static bool IsLeftTriggerLabel(string label)
+        {
+            if (string.IsNullOrEmpty(label))
+                return false;
+
+            var normalized = "";
+            foreach (var character in label.ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(character))
+                    normalized += character;
+            }
+
+            return normalized.Contains("lefttrigger") ||
+                   normalized.Contains("triggerleft") ||
+                   normalized == "l2" || normalized.EndsWith("l2") ||
+                   normalized == "zl" || normalized.EndsWith("zl");
         }
 
         private bool CanUseRouletteOnMap()
@@ -2230,7 +2383,13 @@ namespace Gilomx.CupheadBossRoulette
             WinScreen __instance)
         {
             var plugin = activeInstance;
-            if (plugin == null || !plugin.rouletteWinCharacterPending)
+            if (plugin == null)
+                return;
+
+            // This postfix runs when the rating screen is ready. Creator Tools
+            // must not depend on the optional character-capture path below.
+            plugin.CompleteCreatorToolsBattleForLogo();
+            if (!plugin.rouletteWinCharacterPending)
                 return;
 
             try
