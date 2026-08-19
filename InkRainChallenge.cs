@@ -1622,24 +1622,24 @@ namespace Gilomx.CupheadBossRoulette
 
             var count = 1;
             var waveRoll = UnityEngine.Random.value;
-            if (difficulty == Level.Mode.Easy && waveRoll < 0.15f)
+            if (difficulty == Level.Mode.Easy && waveRoll < 0.45f)
             {
                 count = 2;
             }
             else if (difficulty == Level.Mode.Normal)
             {
-                if (waveRoll < 0.06f)
+                if (waveRoll < 0.15f)
                     count = 3;
-                else if (waveRoll < 0.40f)
+                else if (waveRoll < 0.50f)
                     count = 2;
             }
             else if (difficulty == Level.Mode.Hard)
             {
-                if (waveRoll < 0.02f)
+                if (waveRoll < 0.10f)
                     count = 4;
-                else if (waveRoll < 0.11f)
+                else if (waveRoll < 0.25f)
                     count = 3;
-                else if (waveRoll < 0.47f)
+                else if (waveRoll < 0.60f)
                     count = 2;
             }
 
@@ -1836,10 +1836,10 @@ namespace Gilomx.CupheadBossRoulette
         private int MaximumVisibleDrops()
         {
             if (difficulty == Level.Mode.Easy)
-                return 4;
+                return 8;
             if (difficulty == Level.Mode.Hard)
-                return 20;
-            return 12;
+                return 30;
+            return 20;
         }
 
         private void ShiftTimersAfterPause(float pausedDuration)
@@ -1870,10 +1870,10 @@ namespace Gilomx.CupheadBossRoulette
         private float NextSpawnDelay()
         {
             if (difficulty == Level.Mode.Easy)
-                return UnityEngine.Random.Range(1.00f, 1.25f);
+                return UnityEngine.Random.Range(0.80f, 1.00f);
             if (difficulty == Level.Mode.Hard)
-                return UnityEngine.Random.Range(0.40f, 0.75f);
-            return UnityEngine.Random.Range(0.65f, 0.90f);
+                return UnityEngine.Random.Range(0.25f, 0.60f);
+            return UnityEngine.Random.Range(0.40f, 0.65f);
         }
 
         private Camera FindGameplayCamera()

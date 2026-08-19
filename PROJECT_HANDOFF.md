@@ -798,12 +798,12 @@ small pools progressively relax the oldest exclusions rather than failing.
 
 Accepted tuning at this checkpoint:
 
-- Easy: 4 visible drops, waves every 1.00-1.25 seconds, 85% single and 15%
+- Easy: 8 visible drops, waves every 0.80-1.00 seconds, 55% single and 45%
   double waves.
-- Normal: 12 visible drops, waves every 0.65-0.90 seconds, 60% single, 34%
-  double and 6% triple waves.
-- Expert: 20 visible drops, waves every 0.40-0.75 seconds, 53% single, 36%
-  double, 9% triple and 2% four-drop waves.
+- Normal: 20 visible drops, waves every 0.40-0.65 seconds, 50% single, 35%
+  double and 15% triple waves.
+- Expert: 30 visible drops, waves every 0.25-0.60 seconds, 40% single, 35%
+  double, 15% triple and 10% four-drop waves.
 - Regular drops use random downward gravity of 0.22-0.32 camera-heights per
   second squared. Ink holds for 2.0 / 2.2 / 2.5 seconds on Easy / Normal /
   Expert and restores over 3 seconds.
@@ -1051,7 +1051,7 @@ attack coroutine stops when the squid changes to its Exit state. The complete
 visual still lasts 3 seconds instead of retaining the real boss enemy for its
 native 5.5/7.5-second attack, so the approved non-blocking level introduction is
 not extended. At that cutoff
-the active ceiling immediately returns to the difficulty's `3/4/13`; no regular
+the active ceiling immediately returns to the difficulty's `8/20/30`; no regular
 wave is added until enough existing drops have left the screen or hit the
 floor. They use the horizontal/vertical velocity
 ranges and gravity that
