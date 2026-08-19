@@ -31,9 +31,7 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool EnableHalfDamageChallenge = true;
         internal static readonly bool ForceHalfDamageChallengeForTesting = false;
 
-        // Creator Tools development master switch. The isolated disabled test
-        // confirmed its inserted pause row exposed Cuphead's native Player 2
-        // entry; the OnPause compatibility patch now preserves native indices.
+        // Creator Tools development master switch.
         internal static readonly bool EnableCreatorTools = true;
 
         internal static bool IsChallengeEnabled(ModifierId id)

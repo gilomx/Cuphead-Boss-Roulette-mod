@@ -78,6 +78,10 @@ namespace Gilomx.CupheadBossRoulette
             string rightTrigger;
             var controllerMode = TryGetControllerPromptInfo(
                 out rewiredPlayerId, out leftTrigger, out rightTrigger);
+            // Opening the roulette stays keyboard-only so the mod never reads
+            // or competes with Cuphead's native EquipMenu action.
+            if (!showReroll)
+                controllerMode = false;
             if (!nativeRoulettePrompt.activeSelf)
                 nativeRoulettePrompt.SetActive(true);
             ApplyNativeRoulettePrompt(

@@ -469,17 +469,6 @@ namespace Gilomx.CupheadBossRoulette
             else
                 Logger.LogWarning("Could not install the map pause guard.");
 
-            var mapEquipCanPause = AccessTools.Method(
-                typeof(MapEquipUI), "get_CanPause");
-            var mapEquipPostfix = AccessTools.Method(
-                typeof(Plugin), "BlockMapEquipPostfix");
-            if (mapEquipCanPause != null && mapEquipPostfix != null)
-                harmony.Patch(mapEquipCanPause,
-                    postfix: new HarmonyMethod(mapEquipPostfix));
-            else
-                Logger.LogWarning(
-                    "Could not install the native Equip Card input guard.");
-
             var mapPlayerCanMove = AccessTools.Method(
                 typeof(MapPlayerController), "CanMove");
             var blockMapMovementPostfix = AccessTools.Method(
@@ -829,7 +818,7 @@ namespace Gilomx.CupheadBossRoulette
 
             StartCoroutine(LoadAudio());
             Logger.LogInfo(PluginName + " " + PluginVersion +
-                           " listo. F6 o gatillo izquierdo + Equip abre/cierra; F7 gira.");
+                           " listo. F6 abre/cierra; F7 gira.");
         }
 
         private static void ForceFiveSuperCardsForHudTestPrefix(
@@ -988,17 +977,7 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin != null &&
                 (plugin.visible ||
-                 Time.frameCount <= plugin.suppressMapPauseUntilFrame ||
-                 plugin.IsControllerToggleModifierHeld()))
-                __result = false;
-        }
-
-        private static void BlockMapEquipPostfix(ref bool __result)
-        {
-            var plugin = activeInstance;
-            if (plugin != null &&
-                (plugin.visible || plugin.cardVisibility > 0.001f ||
-                 plugin.IsControllerToggleModifierHeld()))
+                 Time.frameCount <= plugin.suppressMapPauseUntilFrame))
                 __result = false;
         }
 
@@ -1029,40 +1008,6 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin != null && plugin.blackAndWhiteNativeBaseActive)
                 __result = BlurGamma.Filter.BW;
-        }
-
-        private bool IsControllerTogglePressed()
-        {
-            try
-            {
-                return IsControllerTogglePressed(PlayerId.PlayerOne) ||
-                       IsControllerTogglePressed(PlayerId.PlayerTwo);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static bool IsControllerTogglePressed(PlayerId playerId)
-        {
-            var player = PlayerManager.GetPlayerInput(playerId);
-            return player != null &&
-                   player.GetButtonDown((int)CupheadButton.EquipMenu) &&
-                   IsLeftTriggerHeld(player);
-        }
-
-        private bool IsControllerToggleModifierHeld()
-        {
-            try
-            {
-                return IsLeftTriggerHeld(PlayerManager.GetPlayerInput(PlayerId.PlayerOne)) ||
-                       IsLeftTriggerHeld(PlayerManager.GetPlayerInput(PlayerId.PlayerTwo));
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private bool IsControllerMenuButtonDown(CupheadButton button)
@@ -1100,47 +1045,6 @@ namespace Gilomx.CupheadBossRoulette
             var pressed = held && !rightTriggerWasHeld;
             rightTriggerWasHeld = held;
             return pressed;
-        }
-
-        private static bool IsLeftTriggerHeld(Rewired.Player player)
-        {
-            if (player == null || player.controllers == null)
-                return false;
-
-            foreach (var joystick in player.controllers.Joysticks)
-            {
-                if (joystick == null)
-                    continue;
-
-                foreach (var element in joystick.ElementIdentifiers)
-                {
-                    if (element == null)
-                        continue;
-
-                    var direct = IsLeftTriggerLabel(element.name);
-                    var positive = IsLeftTriggerLabel(element.positiveName);
-                    var negative = IsLeftTriggerLabel(element.negativeName);
-                    if (!direct && !positive && !negative)
-                        continue;
-
-                    if (element.elementType == ControllerElementType.Button)
-                    {
-                        if (joystick.GetButtonById(element.id))
-                            return true;
-                        continue;
-                    }
-
-                    if (element.elementType != ControllerElementType.Axis)
-                        continue;
-
-                    var value = joystick.GetAxisById(element.id);
-                    if ((direct || positive) && value > 0.5f)
-                        return true;
-                    if (negative && value < -0.5f)
-                        return true;
-                }
-            }
-            return false;
         }
 
         private static bool IsRightTriggerHeld(Rewired.Player player)
@@ -1182,24 +1086,6 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
             return false;
-        }
-
-        private static bool IsLeftTriggerLabel(string label)
-        {
-            if (string.IsNullOrEmpty(label))
-                return false;
-
-            var normalized = "";
-            foreach (var character in label.ToLowerInvariant())
-            {
-                if (char.IsLetterOrDigit(character))
-                    normalized += character;
-            }
-
-            return normalized.Contains("lefttrigger") ||
-                   normalized.Contains("triggerleft") ||
-                   normalized == "l2" || normalized.EndsWith("l2") ||
-                   normalized == "zl" || normalized.EndsWith("zl");
         }
 
         private static bool IsRightTriggerLabel(string label)
@@ -1286,8 +1172,7 @@ namespace Gilomx.CupheadBossRoulette
             if (Mathf.Abs(cardVisibility - visibilityTarget) < 0.001f)
                 cardVisibility = visibilityTarget;
 
-            if (onMap &&
-                (toggleShortcut.Value.IsDown() || IsControllerTogglePressed()))
+            if (onMap && toggleShortcut.Value.IsDown())
                 SetVisible(!visible);
             if (onMap && visible && !autoLoad.Value && resultReady &&
                 !running && !pendingLoad &&

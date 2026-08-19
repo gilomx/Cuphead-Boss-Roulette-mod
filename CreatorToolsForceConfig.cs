@@ -21,6 +21,17 @@ namespace Gilomx.CupheadBossRoulette
                 !creatorToolsServer.IsRunning)
                 return;
 
+            // Building the web force panel refreshes Cuphead's DLC catalog.
+            // During Plugin.Awake that is too early: MapUI has not initialized
+            // its native pause/equipment inputs yet. Keep /api/config in its
+            // ready:false state until the map (including Equip Card) is ready.
+            if (!creatorToolsForceInitialized)
+            {
+                if (!CanUseRouletteOnMap())
+                    return;
+                PublishCreatorToolsForceConfig(true);
+            }
+
             string command;
             var changed = false;
             while (creatorToolsServer.TryTakeConfigCommand(out command))
@@ -36,6 +47,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (creatorToolsServer == null ||
                 !creatorToolsServer.IsRunning)
+                return;
+            if (!creatorToolsForceInitialized &&
+                !CanUseRouletteOnMap())
                 return;
             EnsureCreatorToolsForceDefaults();
             creatorToolsServer.SetConfigState(
