@@ -229,6 +229,10 @@ body {
   animation: icon-exit 380ms ease-in both;
 }
 
+#result.fast-retry-exit .result-icon.exit {
+  animation-duration: 320ms;
+}
+
 .challenge {
   display: flex;
   min-height: 34px;
@@ -258,6 +262,10 @@ body {
 
 .challenge.exit {
   animation: challenge-exit 280ms ease-in both;
+}
+
+#result.fast-retry-exit .challenge.exit {
+  animation-duration: 240ms;
 }
 
 #challenge-image {

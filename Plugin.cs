@@ -214,7 +214,6 @@ namespace Gilomx.CupheadBossRoulette
         private bool running;
         private bool pendingLoad;
         private bool resultReady;
-        private MapEquipUI nativeMapEquipUi;
         private static Plugin activeInstance;
         private Harmony harmony;
         private int suppressMapPauseUntilFrame = -1;
@@ -469,6 +468,17 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.Patch(mapPauseCanPause, postfix: new HarmonyMethod(mapPausePostfix));
             else
                 Logger.LogWarning("Could not install the map pause guard.");
+
+            var mapEquipCanPause = AccessTools.Method(
+                typeof(MapEquipUI), "get_CanPause");
+            var mapEquipPostfix = AccessTools.Method(
+                typeof(Plugin), "BlockMapEquipPostfix");
+            if (mapEquipCanPause != null && mapEquipPostfix != null)
+                harmony.Patch(mapEquipCanPause,
+                    postfix: new HarmonyMethod(mapEquipPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the native Equip Card input guard.");
 
             var mapPlayerCanMove = AccessTools.Method(
                 typeof(MapPlayerController), "CanMove");
@@ -983,6 +993,15 @@ namespace Gilomx.CupheadBossRoulette
                 __result = false;
         }
 
+        private static void BlockMapEquipPostfix(ref bool __result)
+        {
+            var plugin = activeInstance;
+            if (plugin != null &&
+                (plugin.visible || plugin.cardVisibility > 0.001f ||
+                 plugin.IsControllerToggleModifierHeld()))
+                __result = false;
+        }
+
         private static void BlockMapMovementPostfix(ref bool __result)
         {
             var plugin = activeInstance;
@@ -1274,8 +1293,6 @@ namespace Gilomx.CupheadBossRoulette
                 !running && !pendingLoad &&
                 (spinShortcut.Value.IsDown() || controllerRerollPressed))
                 StartRoulette();
-            if (visible)
-                SetNativeMapEquipEnabled(false);
             if (visible && cardVisibility > 0.72f && !running && !pendingLoad)
                 HandleCardNavigation();
             if (running)
@@ -1300,7 +1317,7 @@ namespace Gilomx.CupheadBossRoulette
             if (Input.GetKeyDown(KeyCode.Escape) ||
                 IsControllerMenuButtonDown(CupheadButton.Cancel))
             {
-                suppressMapPauseUntilFrame = Time.frameCount;
+                suppressMapPauseUntilFrame = Time.frameCount + 1;
                 SetVisible(false);
                 return;
             }
@@ -1396,25 +1413,6 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private void FindNativeMapEquipUi()
-        {
-            if (nativeMapEquipUi == null)
-                nativeMapEquipUi = UnityEngine.Object.FindObjectOfType<MapEquipUI>();
-        }
-
-        private void SetNativeMapEquipEnabled(bool enabled)
-        {
-            FindNativeMapEquipUi();
-            if (nativeMapEquipUi != null && nativeMapEquipUi.enabled != enabled)
-                nativeMapEquipUi.enabled = enabled;
-        }
-
-        private IEnumerator RestoreNativeMapEquipNextFrame()
-        {
-            yield return null;
-            if (!visible)
-                SetNativeMapEquipEnabled(true);
-        }
         private void SetVisible(bool value)
         {
             if (visible == value)
@@ -1428,11 +1426,6 @@ namespace Gilomx.CupheadBossRoulette
             {
                 navigationIndex = 3;
                 cardRoll = random.Next(-4, 5);
-                SetNativeMapEquipEnabled(false);
-            }
-            else
-            {
-                StartCoroutine(RestoreNativeMapEquipNextFrame());
             }
             PlayNativeMenuSound(visible ? "menu_cardup" : "menu_carddown",
                 visible ? openClip : closeClip, 0.65f);
@@ -3544,7 +3537,6 @@ namespace Gilomx.CupheadBossRoulette
                 harmony.UnpatchSelf();
             if (activeInstance == this)
                 activeInstance = null;
-            SetNativeMapEquipEnabled(true);
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
             DestroyBattleResultHud();

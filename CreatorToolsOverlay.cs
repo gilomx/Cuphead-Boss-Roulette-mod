@@ -351,9 +351,20 @@ namespace Gilomx.CupheadBossRoulette
             var labelRevision = preview
                 ? 0
                 : creatorToolsLabelRevision;
+            var fastRetryExit =
+                creatorToolsBattleSessionActive &&
+                !creatorToolsBattleVisible &&
+                !BattleHudUsesPlaneLoadout() &&
+                creatorToolsRetryBehaviorSetting != null &&
+                creatorToolsRetryBehaviorSetting.Value ==
+                CreatorToolsRetryBehavior.Reappear;
 
             var builder = new StringBuilder(512);
             builder.Append("{\"type\":\"state\",\"active\":true");
+            builder.Append(",\"battleActive\":").Append(
+                creatorToolsBattleSessionActive ? "true" : "false");
+            builder.Append(",\"fastRetryExit\":").Append(
+                fastRetryExit ? "true" : "false");
             builder.Append(",\"visible\":").Append(
                 visible ? "true" : "false");
             builder.Append(",\"preview\":").Append(

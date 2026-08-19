@@ -1,5 +1,27 @@
 # Historial de cambios
 
+## Equip Card nativa: experimento pendiente (2026-08-18)
+
+- El punto de control retira la activación/desactivación directa de `MapEquipUI`
+  y prueba un postfix sobre `MapEquipUI.get_CanPause()` mientras la ruleta posee
+  la entrada o termina su salida.
+- La prueba manual falló: con esta implementación la Equip Card nativa ya no se
+  abre. Este cambio queda publicado sólo para continuar el diagnóstico y no
+  debe considerarse una solución validada.
+- Antes del experimento la tarjeta sí abría, pero podía mostrar sprites dañados,
+  quedar sin navegación y no cerrar. El fallo de `Esc` que también abre Pausa
+  sigue siendo una regresión separada que debe comprobarse después.
+
+## Creator Tools: logo bloqueado durante partidas activas (2026-08-18)
+
+- El estado del Stream Overlay ahora distingue explícitamente una partida
+  activa de un HUD temporalmente oculto.
+- Con `Al reintentar: Reaparecer`, la derrota retira el resultado y el nuevo
+  intento reproduce su entrada sin mostrar el logo durante el intervalo.
+- El logo sólo puede entrar cuando no existe una sesión de batalla activa.
+- La salida terrestre de `Reaparecer` tarda ahora 1.33 segundos; la salida
+  aérea conserva sus 770 ms y las demás salidas mantienen sus tiempos.
+
 ## Modo Tieso: compatibilidad con Rey Dado (2026-08-18)
 
 - `StiffMode` queda aprobado funcionalmente para todos los jefes terrestres:

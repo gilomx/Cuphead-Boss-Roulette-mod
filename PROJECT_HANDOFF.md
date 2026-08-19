@@ -1,5 +1,33 @@
 # Cuphead Boss Roulette - Project Handoff
 
+## Equip Card blocker pendiente (2026-08-18)
+
+El checkpoint actual compila e instala, pero **no está validado**: después de
+reemplazar la desactivación directa de `MapEquipUI` por un postfix sobre
+`MapEquipUI.get_CanPause()`, la prueba manual indicó que la Equip Card dejó de
+abrir por completo. Antes de ese experimento sí abría, pero presentaba sprites
+corruptos, navegación inactiva y no podía cerrarse.
+
+Revisar primero `BlockMapEquipPostfix`, especialmente si
+`IsControllerToggleModifierHeld()` permanece verdadero sin un gatillo real y
+si `cardVisibility` conserva un valor residual. Instrumentar también `visible`,
+`cardVisibility`, el modificador y el `__result` original. No volver a dejar
+`MapEquipUI.enabled = false`. El caso donde `Esc` cierra la ruleta y además abre
+Pausa es una regresión distinta y debe validarse por separado.
+
+## Logo fuera de partidas activas (2026-08-18)
+
+El JSON del Stream Overlay publica `battleActive` por separado de `visible`.
+`overlay.js` sólo selecciona la vista Logo cuando `battleActive` es falso; por
+eso `Reappear` puede retirar el HUD al perder y volver a reproducir su entrada
+sin insertar el logo entre ambas animaciones. El cache-buster actual es
+`logo-ground-retry-6`.
+
+La salida rápida sólo se activa cuando la sesión es terrestre, el HUD queda
+oculto y la opción es `Reappear`: iconos de 320 ms separados por 230 ms y texto
+de 240 ms tras 170 ms. Con cinco iconos suma 1.33 s. Las sesiones aéreas
+conservan el perfil normal de 770 ms.
+
 ## Modo Tieso aceptado (2026-08-18)
 
 `ModifierId.StiffMode` permanece correctamente clasificado como
@@ -1777,8 +1805,9 @@ Boss Roulette version.
 - A controller opens/closes it by holding the physical left trigger and
   pressing Cuphead's `EquipMenu` action: Switch `ZL + X`, Xbox `LT + Y`, or
   PlayStation `L2 + Triangle`. The trigger and Equip press must come from the
-  same Rewired player. The native Equip Card is suppressed while the trigger
-  is held, so the combo cannot open both interfaces.
+  same Rewired player. The current checkpoint experiments with a postfix on
+  `MapEquipUI.get_CanPause()`, but manual validation found that it blocks the
+  native card entirely. Treat this path as unresolved.
 - Arrow keys and the controller's D-pad/left stick move/change options.
   Controller navigation uses Cuphead's native Rewired `MenuUp`, `MenuDown`,
   `MenuLeft`, and `MenuRight` actions, so it follows the game's mappings.
@@ -1792,8 +1821,10 @@ Boss Roulette version.
 - Forced selection from the website is intentionally excluded.
 - The normal Equip Card must continue to open with `Shift` whenever the
   roulette is closed.
-- While the roulette is open, native Equip Card input is temporarily disabled.
-  Restore it on the next frame when the roulette closes.
+- The current `MapEquipUI.get_CanPause()` gate is an unsuccessful experiment:
+  the native card no longer opens in manual testing. Replace or narrow it, but
+  never disable the `MapEquipUI` component itself because that corrupts its
+  native initialization and navigation state.
 
 ## Roulette options and flow
 

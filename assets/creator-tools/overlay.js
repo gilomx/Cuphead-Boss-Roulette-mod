@@ -30,6 +30,10 @@
   const challengeExitDuration = 280;
   const challengeExitDelay = challengeEntryDelay;
   const iconExitStep = iconEntryStep;
+  const groundRetryIconExitDuration = 320;
+  const groundRetryChallengeExitDuration = 240;
+  const groundRetryChallengeExitDelay = 170;
+  const groundRetryIconExitStep = 230;
   const logoExitDuration = 620;
 
   function connect() {
@@ -65,11 +69,12 @@
     }
 
     const settings = state.settings || {};
+    const battleActive = Boolean(state.battleActive);
     applySettings(settings);
     pendingState = state;
     targetView = state.active && state.visible
       ? "hud"
-      : state.active && settings.logo ? "logo" : "hidden";
+      : state.active && !battleActive && settings.logo ? "logo" : "hidden";
     transitionToTarget();
     receivedState = true;
   }
@@ -372,6 +377,21 @@
     }
 
     exiting = true;
+    const fastRetryExit = Boolean(
+      pendingState && pendingState.fastRetryExit);
+    const activeIconExitDuration = fastRetryExit
+      ? groundRetryIconExitDuration
+      : iconExitDuration;
+    const activeChallengeExitDuration = fastRetryExit
+      ? groundRetryChallengeExitDuration
+      : challengeExitDuration;
+    const activeChallengeExitDelay = fastRetryExit
+      ? groundRetryChallengeExitDelay
+      : challengeExitDelay;
+    const activeIconExitStep = fastRetryExit
+      ? groundRetryIconExitStep
+      : iconExitStep;
+    result.classList.toggle("fast-retry-exit", fastRetryExit);
     const icons = Array.from(iconsRoot.children)
       .slice(0, revealed);
 
@@ -380,12 +400,13 @@
         icon.classList.remove("settled", "reveal", "exit");
         void icon.offsetWidth;
         icon.classList.add("exit");
-      }, index * iconExitStep);
+      }, index * activeIconExitStep);
       exitTimers.push(timer);
     });
 
     const challengeStart = icons.length > 0
-      ? (icons.length - 1) * iconExitStep + challengeExitDelay
+      ? (icons.length - 1) * activeIconExitStep +
+        activeChallengeExitDelay
       : 0;
     if (textVisible) {
       exitTimers.push(window.setTimeout(() => {
@@ -396,10 +417,11 @@
     }
 
     const lastIconDelay = icons.length > 0
-      ? (icons.length - 1) * iconExitStep + iconExitDuration
+      ? (icons.length - 1) * activeIconExitStep +
+        activeIconExitDuration
       : 0;
     const challengeEnd = textVisible
-      ? challengeStart + challengeExitDuration
+      ? challengeStart + activeChallengeExitDuration
       : 0;
     exitTimers.push(window.setTimeout(
       finishExitAnimation,
@@ -417,6 +439,7 @@
     previewActive = false;
     exiting = false;
     exitTimers = [];
+    result.classList.remove("fast-retry-exit");
     currentView = "hidden";
     updateStageVisibility();
     transitionToTarget();
@@ -425,6 +448,7 @@
     exitTimers.forEach(timer => window.clearTimeout(timer));
     exitTimers = [];
     exiting = false;
+    result.classList.remove("fast-retry-exit");
     Array.from(iconsRoot.children).forEach(icon => {
       icon.classList.remove("exit");
     });
