@@ -8,6 +8,27 @@ mod assets, one plugin DLL and the 18-file BepInEx core. Its SHA-256 is
 Rejected generated audio, configs, logs, caches, PDBs and unrelated plugins are
 not included.
 
+## Cierre publicado para el siguiente agente (2026-08-19)
+
+- `main` y `origin/main` quedaron sincronizados en `be9f388` (`Release La
+  Pichi Ruleta 0.6.0`). El commit inmediatamente anterior es `a762958` (`Fix
+  Equip Card with Creator Tools enabled`).
+- La compilación final de 0.6.0 terminó con 0 errores y 0 advertencias;
+  `node --check assets/creator-tools/overlay.js` también pasó.
+- La prueba manual aceptó Modo Tieso, la continuidad del overlay en Rey Dado,
+  `Reaparecer`, el logo durante la calificación, la Equip Card nativa y el
+  atajo de mando `LT + botón Equip mapeado`.
+- El ZIP final es el indicado arriba. Su DLL, el DLL compilado y la entrada del
+  ZIP coinciden por SHA-256; el paquete contiene un solo plugin y ningún config,
+  log, caché, PDB ni mod ajeno.
+- El árbol rastreado quedó limpio. Permanecen sin rastrear `dist/`, `tmp/`, dos
+  WAV sintéticos rechazados (`upside_down_cartoon_whistle.wav` y
+  `upside_down_whoosh.wav`) y sus dos generadores. No usar `git add .` ni
+  incluirlos en otra release.
+- No queda un bloqueo funcional conocido para 0.6.0. El siguiente agente debe
+  comenzar con `git pull`, leer esta cabecera y preservar el GUID, nombre de la
+  DLL, carpeta `GilomxBossRoulette` y ruta de configuración existentes.
+
 ## Equip Card blocker resuelto (2026-08-18)
 
 El commit `a762958` retiró toda activación/desactivación y todo parche sobre
