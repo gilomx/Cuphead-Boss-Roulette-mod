@@ -381,7 +381,7 @@ namespace Gilomx.CupheadBossRoulette
             english[ModText.ChallengeHpOne] = "HP.1";
             english[ModText.ChallengeInkRain] = "INK RAIN";
             english[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            english[ModText.ChallengeStiffMode] = "STIFF MODE";
+            english[ModText.ChallengeStiffMode] = "LOCKED MODE";
         }
 
         private void AddFrenchTexts()
@@ -420,7 +420,7 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.ChallengeHpOne] = "HP.1";
             french[ModText.ChallengeInkRain] = "INK RAIN";
             french[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            french[ModText.ChallengeStiffMode] = "STIFF MODE";
+            french[ModText.ChallengeStiffMode] = "VERROUILLÉ";
         }
 
         private void AddItalianTexts()
@@ -459,7 +459,7 @@ namespace Gilomx.CupheadBossRoulette
             italian[ModText.ChallengeHpOne] = "HP.1";
             italian[ModText.ChallengeInkRain] = "INK RAIN";
             italian[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            italian[ModText.ChallengeStiffMode] = "STIFF MODE";
+            italian[ModText.ChallengeStiffMode] = "BLOCCATO";
         }
 
         private void AddGermanTexts()
@@ -498,7 +498,7 @@ namespace Gilomx.CupheadBossRoulette
             german[ModText.ChallengeHpOne] = "HP.1";
             german[ModText.ChallengeInkRain] = "INK RAIN";
             german[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            german[ModText.ChallengeStiffMode] = "STIFF MODE";
+            german[ModText.ChallengeStiffMode] = "FESTGESETZT";
         }
 
         private void AddKoreanTexts()
@@ -537,7 +537,7 @@ namespace Gilomx.CupheadBossRoulette
             korean[ModText.ChallengeHpOne] = "HP.1";
             korean[ModText.ChallengeInkRain] = "INK RAIN";
             korean[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            korean[ModText.ChallengeStiffMode] = "STIFF MODE";
+            korean[ModText.ChallengeStiffMode] = "고정";
         }
 
         private void AddRussianTexts()
@@ -576,7 +576,7 @@ namespace Gilomx.CupheadBossRoulette
             russian[ModText.ChallengeHpOne] = "HP.1";
             russian[ModText.ChallengeInkRain] = "INK RAIN";
             russian[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            russian[ModText.ChallengeStiffMode] = "STIFF MODE";
+            russian[ModText.ChallengeStiffMode] = "ЗАФИКСИРОВАН";
         }
 
         private void AddPolishTexts()
@@ -615,7 +615,7 @@ namespace Gilomx.CupheadBossRoulette
             polish[ModText.ChallengeHpOne] = "HP.1";
             polish[ModText.ChallengeInkRain] = "INK RAIN";
             polish[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            polish[ModText.ChallengeStiffMode] = "STIFF MODE";
+            polish[ModText.ChallengeStiffMode] = "ZABLOKOWANY";
         }
 
         private void AddPortugueseBrazilTexts()
@@ -654,7 +654,7 @@ namespace Gilomx.CupheadBossRoulette
             portugueseBrazil[ModText.ChallengeHpOne] = "HP.1";
             portugueseBrazil[ModText.ChallengeInkRain] = "INK RAIN";
             portugueseBrazil[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            portugueseBrazil[ModText.ChallengeStiffMode] = "STIFF MODE";
+            portugueseBrazil[ModText.ChallengeStiffMode] = "TRAVADO";
         }
 
         private void AddJapaneseTexts()
@@ -693,7 +693,7 @@ namespace Gilomx.CupheadBossRoulette
             japanese[ModText.ChallengeHpOne] = "HP.1";
             japanese[ModText.ChallengeInkRain] = "INK RAIN";
             japanese[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            japanese[ModText.ChallengeStiffMode] = "STIFF MODE";
+            japanese[ModText.ChallengeStiffMode] = "固定";
         }
 
         private void AddSimplifiedChineseTexts()
@@ -732,7 +732,7 @@ namespace Gilomx.CupheadBossRoulette
             simplifiedChinese[ModText.ChallengeHpOne] = "HP.1";
             simplifiedChinese[ModText.ChallengeInkRain] = "INK RAIN";
             simplifiedChinese[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
-            simplifiedChinese[ModText.ChallengeStiffMode] = "STIFF MODE";
+            simplifiedChinese[ModText.ChallengeStiffMode] = "锁定";
         }
     }
 }

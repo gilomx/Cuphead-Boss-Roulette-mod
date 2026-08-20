@@ -91,8 +91,9 @@ restauración completa de la Equip Card nativa.
   únicamente a bloquear la transformación en miniavión.
 - La prueba manual del recorrido quedó aceptada. La animación definitiva usa
   `locked_01..03.png` en la ruleta; el HUD conserva el primer frame y Creator
-  Tools usa su icono estático de 82 x 82. Sólo queda pendiente la revisión de
-  `challenge.stiff_mode` en los doce idiomas.
+  Tools usa su icono estático de 82 x 82.
+- `challenge.stiff_mode` ya usa sus traducciones finales en los doce idiomas;
+  el nombre inglés visible es `LOCKED MODE`.
 
 ### Creator Tools localizado, centrado y con logo
 

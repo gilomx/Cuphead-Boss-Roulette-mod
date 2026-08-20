@@ -1,6 +1,6 @@
 # Histórico de localización por etiqueta
 
-Estado: **25/25 etiquetas históricas implementadas; nueva ronda 1/1 recibida**.
+Estado: **25/25 etiquetas históricas implementadas; nueva ronda 1/1 implementada**.
 
 Este documento conserva literalmente cada entrega del usuario y las decisiones
 compactas posteriores. Las 25 etiquetas se incorporaron al catálogo activo
@@ -10,7 +10,7 @@ archivo se conserva para mantener continuidad con el flujo anterior.
 ## Estado de la recopilación
 
 - Progreso: **25/25 aprobadas e implementadas**.
-- Nueva ronda: **1/1 recibida literalmente; pendiente de implementación**.
+- Nueva ronda: **1/1 recibida literalmente e implementada**.
 - Retos nuevos: **5/5 activos**.
 - Creator Tools: **20/20 activos**.
 - Siguiente etiqueta: **ninguna; todos los IDs definidos están entregados**.
@@ -33,7 +33,10 @@ Ninguna.
 
 ## Nueva ronda: `challenge.stiff_mode`
 
-Estado: **recibida literalmente — 12/12 idiomas; pendiente de implementación**.
+Estado: **recibida literalmente e implementada — 12/12 idiomas**.
+
+La entrega inglesa original `Locked` se conserva abajo literalmente. La
+confirmación posterior para el texto activo es `Locked Mode`.
 
 | Idioma interno | Traducción recibida |
 | --- | --- |

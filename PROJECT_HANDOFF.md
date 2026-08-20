@@ -4,7 +4,7 @@ Current release: **La Pichi Ruleta 0.6.0**.
 
 The clean installer is `dist/La-Pichi-Ruleta-0.6.0.zip`: 457 files, 433 tracked
 mod assets, one plugin DLL and the 18-file BepInEx core. Its SHA-256 is
-`1F9978FD3E671948177363635B57AA39CF2C15DEA9EC68112A8426C8935A38F0`.
+`0086CBA10D97276AF793AC45AB93BD3A24FAFBFEB78D75C3F11D09B04E4FFB0B`.
 Rejected generated audio, configs, logs, caches, PDBs and unrelated plugins are
 not included.
 
@@ -123,10 +123,11 @@ prueba manual quedó aceptada el 2026-08-18.
 El arte definitivo ya está integrado: `assets/modifiers/locked_01..03.png`
 anima la ruleta a través de la convención normal de tres frames, el HUD usa
 `locked_01.png` y Creator Tools resuelve su copia estática de 82 x 82 desde
-`assets/creator-tools/modifiers/locked_01.png`. Sólo queda pendiente revisar
-`challenge.stiff_mode` en los doce idiomas. Español usa
-provisionalmente `MODO TIESO`; los demás idiomas usan `STIFF MODE` como
-fallback temporal.
+`assets/creator-tools/modifiers/locked_01.png`. `challenge.stiff_mode` ya
+está implementado en los doce idiomas mediante
+`ModLocalization.LabelReview.cs`: inglés usa `LOCKED MODE`, ambos españoles
+usan `MODO TIESO` y los otros nueve idiomas usan las entregas finales
+registradas.
 
 ## Estado verificado para el siguiente agente (2026-08-17)
 
@@ -167,9 +168,9 @@ No queda ningún selector de prueba activo. La compilación de cierre terminó c
 cero errores y cero advertencias; el DLL y
 los assets de overlay instalados se verificaron por SHA-256. Las pruebas
 manuales confirmaron el menú multilingüe, los retos y el comportamiento del
-overlay. La nueva ronda de localización comienza con `challenge.stiff_mode`;
-ampliar su inventario cuando se acuerden más IDs, sin reabrir las 25 etiquetas
-ya cerradas.
+overlay. La ronda de `challenge.stiff_mode` quedó cerrada con 12/12 idiomas;
+crear un inventario nuevo cuando se acuerden más IDs, sin reabrir las 25
+etiquetas ya cerradas.
 
 ## Creator Tools scope after 0.5.131 (2026-08-16)
 
