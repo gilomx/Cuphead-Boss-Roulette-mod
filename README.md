@@ -123,6 +123,11 @@ El archivo de configuración se crea en:
 
 ## Documentación del proyecto
 
+Para añadir artículos a Creator Tools, consulta primero la
+[guía del catálogo de interacciones](INTERACTION_CATALOG.md). Define la
+arquitectura común, la etiqueta del donador, su seguimiento, el fade de muerte,
+la limpieza y las pruebas obligatorias para todos los elementos nuevos.
+
 Las propuestas que todavía no forman parte del mod se conservan en
 [Ideas para versiones futuras](FUTURE_IDEAS.md). Este archivo también registra
 la investigación y las pruebas necesarias antes de implementar cada idea.

@@ -24,22 +24,34 @@ export function InteractionsView() {
     interaction,
     optimisticInteractionQueue,
     interactionTesting,
+    applyInteractionMaxActive,
+    applyInteractionRandomTest,
     testInteraction,
   } = useConfig();
   const { t } = useLocalization();
   const [donors, setDonors] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [delays, setDelays] = useState<Record<string, number>>({});
+  const [maxActiveDraft, setMaxActiveDraft] = useState(1);
   const [testingItem, setTestingItem] = useState<string | null>(null);
   const available = interaction?.available ?? false;
+  const randomTestEnabled = interaction?.randomTestEnabled ?? false;
   const queue = [
     ...(interaction?.queue ?? []),
     ...optimisticInteractionQueue,
   ];
   const maxBatch = interaction?.maxBatch ?? 50;
+  const maxDelay = interaction?.maxDelay ?? 3600;
 
   useEffect(() => {
     if (!interactionTesting) setTestingItem(null);
   }, [interactionTesting]);
+
+  useEffect(() => {
+    if (typeof interaction?.maxActive === "number") {
+      setMaxActiveDraft(interaction.maxActive);
+    }
+  }, [interaction?.maxActive]);
 
   return (
     <div className="page page--interactions">
@@ -135,12 +147,71 @@ export function InteractionsView() {
           )}
         </section>
 
+        <div className="interaction-workspace__tools">
+          <section
+            className="interaction-panel interaction-settings-section"
+            aria-labelledby="interaction-settings-title"
+          >
+            <div className="interaction-panel__heading interaction-settings-heading">
+              <h2 id="interaction-settings-title">{t("interactions.settings.title")}</h2>
+              <p>{t("interactions.settings.description")}</p>
+            </div>
+            <form
+              className="interaction-settings"
+              onSubmit={(event) => {
+                event.preventDefault();
+                applyInteractionMaxActive(maxActiveDraft);
+              }}
+            >
+              <label>
+                <span>{t("interactions.settings.maxActiveLabel")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={interaction?.maxActiveLimit ?? 20}
+                  value={maxActiveDraft}
+                  onChange={(event) => setMaxActiveDraft(Math.max(
+                    1,
+                    Math.min(
+                      interaction?.maxActiveLimit ?? 20,
+                      Number(event.target.value) || 1,
+                    ),
+                  ))}
+                />
+              </label>
+              <button type="submit" disabled={!interaction?.ready}>
+                {t("interactions.settings.save")}
+              </button>
+            </form>
+          </section>
+
         <section className="interaction-panel interaction-tests" aria-labelledby="interaction-tests-title">
           <div className="interaction-panel__heading">
             <div>
               <h2 id="interaction-tests-title">{t("interactions.test.title")}</h2>
               <p>{t("interactions.test.description")}</p>
             </div>
+          </div>
+
+          <div className="interaction-random-test" data-active={randomTestEnabled}>
+            <div className="interaction-random-test__copy">
+              <div className="interaction-random-test__title">
+                <strong>{t("interactions.test.random.title")}</strong>
+                <span data-active={randomTestEnabled}>
+                  {t(`interactions.test.random.${randomTestEnabled ? "active" : "inactive"}`)}
+                </span>
+              </div>
+              <p>{t("interactions.test.random.description")}</p>
+            </div>
+            <button
+              type="button"
+              aria-pressed={randomTestEnabled}
+              data-active={randomTestEnabled}
+              disabled={!interaction?.ready}
+              onClick={() => applyInteractionRandomTest(!randomTestEnabled)}
+            >
+              {t(`interactions.test.random.${randomTestEnabled ? "disable" : "enable"}`)}
+            </button>
           </div>
 
           <div className="interaction-table-wrap">
@@ -155,6 +226,7 @@ export function InteractionsView() {
                 {zeppelins.map((zeppelin) => {
                   const donor = donors[zeppelin.id] ?? "";
                   const quantity = quantities[zeppelin.id] ?? 1;
+                  const delay = delays[zeppelin.id] ?? 0;
                   const canQueue = (interaction?.ready ?? false) && donor.trim().length > 0;
                   return (
                     <tr key={zeppelin.id}>
@@ -196,12 +268,29 @@ export function InteractionsView() {
                                 }))}
                               />
                             </label>
+                            <label className="interaction-delay">
+                              <span>{t("interactions.test.delayLabel")}</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={maxDelay}
+                                step={0.5}
+                                value={delay}
+                                onChange={(event) => setDelays((current) => ({
+                                  ...current,
+                                  [zeppelin.id]: Math.max(
+                                    0,
+                                    Math.min(maxDelay, Number(event.target.value) || 0),
+                                  ),
+                                }))}
+                              />
+                            </label>
                             <button
                               type="button"
                               disabled={!canQueue}
                               onClick={() => {
                                 setTestingItem(zeppelin.id);
-                                testInteraction(zeppelin.id, donor, quantity);
+                                testInteraction(zeppelin.id, donor, quantity, delay);
                               }}
                             >
                               {interactionTesting && testingItem === zeppelin.id
@@ -231,6 +320,7 @@ export function InteractionsView() {
             }`)}
           </p>
         </section>
+        </div>
       </div>
     </div>
   );

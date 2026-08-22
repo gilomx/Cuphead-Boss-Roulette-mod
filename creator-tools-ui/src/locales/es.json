@@ -16,6 +16,12 @@
     "catalog": {
       "title": "Catálogo de canjeos"
     },
+    "settings": {
+      "title": "Configuración",
+      "description": "Define cuántos canjeos pueden permanecer activos al mismo tiempo.",
+      "maxActiveLabel": "Elementos simultáneos",
+      "save": "Guardar"
+    },
     "zeppelin": {
       "type": "Enemigo",
       "available": "Disponible durante este combate.",
@@ -41,6 +47,7 @@
       "status": "Estado",
       "active": "Ejecutándose",
       "queued": "En cola",
+      "scheduled": "Esperando tiempo",
       "waiting_game": "Esperando al juego"
     },
     "test": {
@@ -51,17 +58,30 @@
       "donorLabel": "Nombre del donador",
       "donorPlaceholder": "Donador de prueba",
       "quantityLabel": "Veces",
+      "delayLabel": "Espera (s)",
       "action": "Agregar a cola",
-      "testing": "Agregando"
+      "testing": "Agregando",
+      "random": {
+        "title": "Prueba aleatoria",
+        "description": "Lanza mini zepelines y nombres al azar con pausas cortas y variables, sólo mientras una partida está activa.",
+        "active": "Activa",
+        "inactive": "Inactiva",
+        "enable": "Activar",
+        "disable": "Desactivar"
+      }
     },
     "feedback": {
       "ready": "La prueba está lista.",
+      "random_test_enabled": "La prueba aleatoria está activa y esperará a que haya una partida en curso.",
+      "random_test_disabled": "La prueba aleatoria fue desactivada.",
       "unknown_item": "El mod no reconoce este artículo.",
       "native_assets_loading": "Los recursos nativos del zepelín todavía se están preparando.",
       "native_assets_unavailable": "No se pudieron preparar los recursos nativos del zepelín.",
       "requires_gameplay_level": "Inicia cualquier nivel jugable para enviar el zepelín.",
       "waiting_game": "La solicitud ya está visible y espera a que el juego la confirme.",
       "queued": "Los canjeos fueron agregados a la cola.",
+      "settings_saved": "La configuración de interacciones fue guardada.",
+      "invalid_setting": "El valor de configuración no es válido.",
       "queue_full": "La cola alcanzó su límite temporal.",
       "sent": "El mini zepelín fue enviado al combate.",
       "spawn_failed": "No se pudo crear el mini zepelín. Revisa el estado del combate."

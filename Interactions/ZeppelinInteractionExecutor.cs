@@ -11,6 +11,10 @@ namespace Gilomx.CupheadBossRoulette
             AccessTools.Field(typeof(FlyingBlimpLevelEnemy), "stopPoint");
 
         private readonly NativeZeppelinCache nativeCache;
+        private readonly Func<bool> canSpawn;
+        private readonly Action<string> logWarning;
+        private readonly List<ActiveSpawn> activeSpawns =
+            new List<ActiveSpawn>();
         private int purpleSpawnCounter;
 
         internal ZeppelinInteractionExecutor(
@@ -20,6 +24,8 @@ namespace Gilomx.CupheadBossRoulette
             Action<string> logInfo,
             Action<string> logWarning)
         {
+            this.canSpawn = canSpawn;
+            this.logWarning = logWarning;
             nativeCache = new NativeZeppelinCache(
                 coroutineHost,
                 canPreload,
@@ -32,15 +38,17 @@ namespace Gilomx.CupheadBossRoulette
         {
             get
             {
-                return FindBlimpLady() != null ||
-                    (nativeCache.CanSpawn(NativeZeppelinVariant.Purple) &&
-                    nativeCache.CanSpawn(NativeZeppelinVariant.Green));
+                return Evaluate(canSpawn) &&
+                    (FindBlimpLady() != null ||
+                     (nativeCache.CanSpawn(NativeZeppelinVariant.Purple) &&
+                      nativeCache.CanSpawn(NativeZeppelinVariant.Green)));
             }
         }
 
         internal void Update()
         {
             nativeCache.Update();
+            RemoveFinishedSpawns();
         }
 
         internal bool TrySpawn(
@@ -54,9 +62,16 @@ namespace Gilomx.CupheadBossRoulette
             feedbackCode = "spawn_failed";
             error = null;
 
+            if (!Evaluate(canSpawn))
+            {
+                feedbackCode = "requires_gameplay_level";
+                return false;
+            }
+
             NativeZeppelinSpawnParameters parameters;
             if (!NativeZeppelinSpawnPattern.TryCreate(
                 variant,
+                ActiveLanes(),
                 ref purpleSpawnCounter,
                 out parameters,
                 out error))
@@ -85,9 +100,10 @@ namespace Gilomx.CupheadBossRoulette
                     out spawned,
                     out error))
                     return false;
+                TrackSpawn(spawned, parameters.Lane);
                 return true;
             }
-            return TrySpawnNative(
+            var spawnedNative = TrySpawnNative(
                 lady,
                 variant,
                 parameters,
@@ -95,6 +111,9 @@ namespace Gilomx.CupheadBossRoulette
                 out spawned,
                 out feedbackCode,
                 out error);
+            if (spawnedNative)
+                TrackSpawn(spawned, parameters.Lane);
+            return spawnedNative;
         }
 
         private bool TrySpawnNative(
@@ -144,16 +163,61 @@ namespace Gilomx.CupheadBossRoulette
                 StopPointField.SetValue(
                     spawned, parameters.StopDistance);
 
-                var label = spawned.gameObject.AddComponent<
-                    CreatorToolsDonorLabel>();
-                label.Initialize(donor);
+                CreatorToolsInteractionPresentation.PrepareActor(
+                    spawned.gameObject,
+                    donor,
+                    logWarning);
                 return true;
             }
             catch (Exception exception)
             {
-                error = exception.Message;
+                error = exception.ToString();
                 return false;
             }
+        }
+
+        private List<float> ActiveLanes()
+        {
+            RemoveFinishedSpawns();
+            var lanes = new List<float>(activeSpawns.Count);
+            for (var i = 0; i < activeSpawns.Count; i++)
+                lanes.Add(activeSpawns[i].Lane);
+            return lanes;
+        }
+
+        private void TrackSpawn(
+            FlyingBlimpLevelEnemy actor,
+            float lane)
+        {
+            if (actor == null)
+                return;
+            activeSpawns.Add(new ActiveSpawn
+            {
+                Actor = actor,
+                Lane = lane
+            });
+        }
+
+        private void RemoveFinishedSpawns()
+        {
+            for (var i = activeSpawns.Count - 1; i >= 0; i--)
+                if (activeSpawns[i].Actor == null)
+                    activeSpawns.RemoveAt(i);
+        }
+
+        internal void ClearActiveSpawns()
+        {
+            for (var i = 0; i < activeSpawns.Count; i++)
+                if (activeSpawns[i].Actor != null)
+                    UnityEngine.Object.Destroy(
+                        activeSpawns[i].Actor.gameObject);
+            activeSpawns.Clear();
+        }
+
+        private sealed class ActiveSpawn
+        {
+            internal FlyingBlimpLevelEnemy Actor;
+            internal float Lane;
         }
 
         private static FlyingBlimpLevelBlimpLady FindBlimpLady()
@@ -182,9 +246,18 @@ namespace Gilomx.CupheadBossRoulette
             return null;
         }
 
+        private static bool Evaluate(Func<bool> predicate)
+        {
+            if (predicate == null)
+                return false;
+            try { return predicate(); }
+            catch { return false; }
+        }
+
         public void Dispose()
         {
             nativeCache.Dispose();
+            activeSpawns.Clear();
         }
     }
 }

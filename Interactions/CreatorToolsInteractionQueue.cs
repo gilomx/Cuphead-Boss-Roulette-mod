@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
+using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsInteractionQueue : IDisposable
     {
-        internal const int MaximumActive = 1;
         internal const int MaximumBatchSize = 50;
+        internal const int MaximumDelaySeconds = 3600;
         private const int MaximumQueued = 200;
 
         private readonly List<Entry> pending = new List<Entry>();
@@ -28,7 +30,8 @@ namespace Gilomx.CupheadBossRoulette
             string item,
             NativeZeppelinVariant variant,
             string donor,
-            int quantity)
+            int quantity,
+            float delaySeconds)
         {
             var availableSlots = MaximumQueued - Count;
             var count = Math.Max(
@@ -43,7 +46,9 @@ namespace Gilomx.CupheadBossRoulette
                     Id = nextId++,
                     Item = item,
                     Variant = variant,
-                    Donor = donor
+                    Donor = donor,
+                    DelaySeconds = delaySeconds,
+                    ReadyAt = Time.realtimeSinceStartup + delaySeconds
                 });
                 if (nextId <= 0)
                     nextId = 1;
@@ -85,6 +90,11 @@ namespace Gilomx.CupheadBossRoulette
             return changed;
         }
 
+        internal void ClearActive()
+        {
+            active.Clear();
+        }
+
         internal void AppendJson(StringBuilder builder)
         {
             builder.Append('[');
@@ -96,7 +106,10 @@ namespace Gilomx.CupheadBossRoulette
             }
             for (var i = 0; i < pending.Count; i++)
             {
-                AppendEntry(builder, pending[i], "queued", first);
+                AppendEntry(
+                    builder,
+                    pending[i],
+                    pending[i].IsReady ? "queued" : "scheduled", first);
                 first = false;
             }
             builder.Append(']');
@@ -118,7 +131,10 @@ namespace Gilomx.CupheadBossRoulette
             AppendJsonValue(builder, entry.Donor);
             builder.Append("\",\"status\":\"")
                 .Append(status)
-                .Append("\"}");
+                .Append("\",\"delaySeconds\":")
+                .Append(entry.DelaySeconds.ToString(
+                    "0.###", CultureInfo.InvariantCulture))
+                .Append('}');
         }
 
         private static void AppendJsonValue(
@@ -148,7 +164,14 @@ namespace Gilomx.CupheadBossRoulette
             internal string Item;
             internal NativeZeppelinVariant Variant;
             internal string Donor;
+            internal float DelaySeconds;
+            internal float ReadyAt;
             internal FlyingBlimpLevelEnemy Actor;
+
+            internal bool IsReady
+            {
+                get { return Time.realtimeSinceStartup >= ReadyAt; }
+            }
         }
     }
 }

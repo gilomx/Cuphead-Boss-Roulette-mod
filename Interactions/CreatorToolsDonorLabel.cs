@@ -6,12 +6,10 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsDonorLabel : MonoBehaviour
     {
-        private const float VerticalOffset = 86f;
+        private const float FallbackVerticalOffset = 350f;
+        private const float VisualGap = 14f;
         private const float LabelWidth = 320f;
         private const float LabelHeight = 48f;
-
-        private GameObject labelObject;
-        private Transform labelTransform;
 
         internal void Initialize(string value)
         {
@@ -21,68 +19,57 @@ namespace Gilomx.CupheadBossRoulette
             if (donor.Length == 0)
                 return;
 
-            labelObject = new GameObject("CreatorTools_DonorLabel");
-            labelObject.layer = gameObject.layer;
-            labelTransform = labelObject.transform;
-            labelTransform.SetParent(transform, false);
+            GameObject labelObject = null;
+            try
+            {
+                labelObject = new GameObject(
+                    "CreatorTools_DonorLabel");
+                labelObject.layer = gameObject.layer;
 
-            var text = labelObject.AddComponent<TextMeshPro>();
-            text.font = FindGameFont();
-            text.text = donor;
-            text.fontSize = 22f;
-            text.fontStyle = FontStyles.Bold;
-            text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = false;
-            text.richText = false;
-            text.isOrthographic = true;
-            text.color = new Color(1f, 0.94f, 0.76f, 1f);
-            text.outlineColor = new Color32(20, 15, 10, 235);
-            text.outlineWidth = 0.18f;
-            text.rectTransform.sizeDelta = new Vector2(
-                LabelWidth, LabelHeight);
+                var labelText = labelObject.AddComponent<TextMeshPro>();
+                // TextMeshPro replaces the GameObject's Transform with a
+                // RectTransform in this Unity version. Resolve it afterwards.
+                var labelTransform = labelText.rectTransform;
+                labelText.font = FindGameFont();
+                labelText.text = donor;
+                labelText.fontSize = 22f;
+                labelText.fontStyle = FontStyles.Bold;
+                labelText.alignment = TextAlignmentOptions.Center;
+                labelText.enableWordWrapping = false;
+                labelText.richText = false;
+                labelText.isOrthographic = true;
+                labelText.color = new Color(1f, 0.94f, 0.76f, 1f);
+                labelText.outlineColor = new Color32(20, 15, 10, 235);
+                labelText.outlineWidth = 0.18f;
+                labelText.rectTransform.sizeDelta = new Vector2(
+                    LabelWidth, LabelHeight);
+                labelText.rectTransform.pivot = new Vector2(0.5f, 1f);
 
-            MatchActorSorting(text.GetComponent<Renderer>());
-            UpdatePosition();
+                var actorRenderer = GetComponent<SpriteRenderer>();
+                MatchActorSorting(labelText.GetComponent<Renderer>());
+                labelTransform.localScale = transform.lossyScale;
+                labelTransform.rotation = Quaternion.identity;
+
+                var follower = labelObject.AddComponent<
+                    CreatorToolsDonorLabelFollower>();
+                follower.Initialize(
+                    transform,
+                    actorRenderer,
+                    labelText,
+                    FallbackVerticalOffset,
+                    VisualGap);
+            }
+            catch
+            {
+                if (labelObject != null)
+                    Destroy(labelObject);
+                throw;
+            }
         }
 
-        private void LateUpdate()
+        private void MatchActorSorting(Renderer donorLabelRenderer)
         {
-            UpdatePosition();
-        }
-
-        private void OnEnable()
-        {
-            if (labelObject != null)
-                labelObject.SetActive(true);
-        }
-
-        private void OnDisable()
-        {
-            if (labelObject != null)
-                labelObject.SetActive(false);
-        }
-
-        private void OnDestroy()
-        {
-            if (labelObject != null)
-                Destroy(labelObject);
-            labelObject = null;
-            labelTransform = null;
-        }
-
-        private void UpdatePosition()
-        {
-            if (labelTransform == null)
-                return;
-            labelTransform.localPosition = new Vector3(
-                0f, VerticalOffset, 0f);
-            labelTransform.localRotation = Quaternion.identity;
-            labelTransform.localScale = Vector3.one;
-        }
-
-        private void MatchActorSorting(Renderer labelRenderer)
-        {
-            if (labelRenderer == null)
+            if (donorLabelRenderer == null)
                 return;
 
             Renderer reference = null;
@@ -90,7 +77,8 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < renderers.Length; i++)
             {
                 var candidate = renderers[i];
-                if (candidate == null || candidate == labelRenderer)
+                if (candidate == null ||
+                    candidate == donorLabelRenderer)
                     continue;
                 if (reference == null ||
                     candidate.sortingOrder > reference.sortingOrder)
@@ -99,8 +87,10 @@ namespace Gilomx.CupheadBossRoulette
 
             if (reference == null)
                 return;
-            labelRenderer.sortingLayerID = reference.sortingLayerID;
-            labelRenderer.sortingOrder = reference.sortingOrder + 1;
+            donorLabelRenderer.sortingLayerID =
+                reference.sortingLayerID;
+            donorLabelRenderer.sortingOrder =
+                reference.sortingOrder + 1;
         }
 
         private static TMP_FontAsset FindGameFont()
@@ -123,6 +113,107 @@ namespace Gilomx.CupheadBossRoulette
                     "Memphis", StringComparison.OrdinalIgnoreCase) >= 0)
                     return fonts[i];
             return TMP_FontAsset.defaultFontAsset;
+        }
+    }
+
+    internal sealed class CreatorToolsDonorLabelFollower : MonoBehaviour
+    {
+        private const float FadeDuration = 0.6f;
+
+        private Transform actorTransform;
+        private SpriteRenderer actorRenderer;
+        private TextMeshPro text;
+        private float fallbackVerticalOffset;
+        private float visualGap;
+        private float fadeElapsed;
+        private Color originalColor;
+        private Color32 originalOutlineColor;
+        private Vector3 actorOffset;
+        private bool positioned;
+        private bool rendererAnchorCaptured;
+
+        internal void Initialize(
+            Transform actorTransform,
+            SpriteRenderer actorRenderer,
+            TextMeshPro text,
+            float fallbackVerticalOffset,
+            float visualGap)
+        {
+            this.actorTransform = actorTransform;
+            this.actorRenderer = actorRenderer;
+            this.text = text;
+            this.fallbackVerticalOffset = fallbackVerticalOffset;
+            this.visualGap = visualGap;
+            originalColor = text == null ? Color.white : text.color;
+            originalOutlineColor = text == null
+                ? new Color32(0, 0, 0, 0)
+                : text.outlineColor;
+            UpdatePosition();
+        }
+
+        private void LateUpdate()
+        {
+            if (actorTransform != null)
+            {
+                UpdatePosition();
+                return;
+            }
+            UpdateFade();
+        }
+
+        private void UpdatePosition()
+        {
+            if (!rendererAnchorCaptured && actorRenderer != null &&
+                actorRenderer.sprite != null && actorRenderer.enabled &&
+                actorRenderer.gameObject.activeInHierarchy)
+            {
+                var bounds = actorRenderer.bounds;
+                var anchor = new Vector3(
+                    bounds.center.x,
+                    bounds.max.y + visualGap,
+                    bounds.center.z);
+                actorOffset = anchor - actorTransform.position;
+                positioned = true;
+                rendererAnchorCaptured = true;
+            }
+            else if (!positioned && actorTransform != null)
+            {
+                var anchor = actorTransform.TransformPoint(
+                    new Vector3(0f, fallbackVerticalOffset, 0f));
+                actorOffset = anchor - actorTransform.position;
+                positioned = true;
+            }
+            if (positioned && actorTransform != null)
+                transform.position = actorTransform.position + actorOffset;
+            transform.rotation = Quaternion.identity;
+        }
+
+        private void UpdateFade()
+        {
+            if (text == null)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            var speed = Mathf.Max(0f, CupheadTime.GlobalSpeed);
+            if (speed <= 0f)
+                return;
+            fadeElapsed += Time.unscaledDeltaTime * speed;
+            var opacity = 1f - Mathf.Clamp01(
+                fadeElapsed / FadeDuration);
+
+            var color = originalColor;
+            color.a *= opacity;
+            text.color = color;
+
+            var outline = originalOutlineColor;
+            outline.a = (byte)Mathf.RoundToInt(
+                originalOutlineColor.a * opacity);
+            text.outlineColor = outline;
+
+            if (opacity <= 0f)
+                Destroy(gameObject);
         }
     }
 }

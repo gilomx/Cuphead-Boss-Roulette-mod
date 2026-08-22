@@ -56,6 +56,8 @@ export interface RouletteConfigState {
 export interface InteractionConfigState {
   ready: boolean;
   available: boolean;
+  randomTestEnabled: boolean;
+  randomTestRevision: number;
   item: string;
   items: string[];
   lastItem: string;
@@ -65,7 +67,9 @@ export interface InteractionConfigState {
   queueCount: number;
   activeCount: number;
   maxActive: number;
+  maxActiveLimit: number;
   maxBatch: number;
+  maxDelay: number;
   queue: InteractionQueueEntry[];
 }
 
@@ -73,7 +77,8 @@ export interface InteractionQueueEntry {
   id: number;
   item: string;
   donor: string;
-  status: "active" | "queued" | "waiting_game";
+  delaySeconds: number;
+  status: "active" | "queued" | "scheduled" | "waiting_game";
 }
 
 export type ConnectionStatus =

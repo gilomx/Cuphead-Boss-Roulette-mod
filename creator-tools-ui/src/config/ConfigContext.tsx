@@ -26,7 +26,15 @@ interface ConfigValue {
   status: ConnectionStatus;
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
-  testInteraction: (item: string, donor: string, quantity: number) => void;
+  applyInteractionMaxActive: (value: number) => void;
+  applyInteractionRandomTest: (enabled: boolean) => void;
+  testInteraction: (item: string, donor: string, quantity: number, delay: number) => void;
+}
+
+interface DesiredInteractionRandomTest {
+  enabled: boolean;
+  baselineRandomTestRevision: number;
+  requestRevision: number;
 }
 
 const ConfigContext = createContext<ConfigValue | null>(null);
@@ -70,11 +78,20 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const desiredForceRef = useRef<ForceDraft | null>(null);
   const desiredChallengesRef = useRef(new Map<number, boolean>());
+  const desiredInteractionRandomTestRef = useRef<
+    DesiredInteractionRandomTest | null
+  >(null);
+  const randomTestRequestRevisionRef = useRef(0);
+  const randomTestWriteChainRef = useRef<Promise<void>>(Promise.resolve());
+  const loadRequestRevisionRef = useRef(0);
+  const lastAppliedLoadRevisionRef = useRef(0);
   const interactionRevisionRef = useRef<number | null>(null);
   const nextOptimisticInteractionIdRef = useRef(-1);
   const mountedRef = useRef(true);
 
   const load = useCallback(async () => {
+    const loadRevision = loadRequestRevisionRef.current + 1;
+    loadRequestRevisionRef.current = loadRevision;
     try {
       const [configResponse, interactionResponse] = await Promise.all([
         fetch("/api/config", { cache: "no-store" }),
@@ -84,9 +101,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       if (!interactionResponse.ok) throw new Error(`HTTP ${interactionResponse.status}`);
       const next = (await configResponse.json()) as RouletteConfigState;
       const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
-      if (!mountedRef.current) return;
+      if (
+        !mountedRef.current ||
+        loadRevision < lastAppliedLoadRevisionRef.current
+      ) return;
+      lastAppliedLoadRevisionRef.current = loadRevision;
 
-      setInteraction(nextInteraction);
       let interactionPending = false;
       const interactionRevision = interactionRevisionRef.current;
       if (interactionRevision !== null) {
@@ -98,6 +118,25 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setInteractionTesting(false);
         }
       }
+      let visibleInteraction = nextInteraction;
+      let randomTestPending = false;
+      const desiredRandomTest = desiredInteractionRandomTestRef.current;
+      if (desiredRandomTest !== null) {
+        const confirmed =
+          nextInteraction.randomTestRevision >
+            desiredRandomTest.baselineRandomTestRevision &&
+          nextInteraction.randomTestEnabled === desiredRandomTest.enabled;
+        if (confirmed) {
+          desiredInteractionRandomTestRef.current = null;
+        } else {
+          randomTestPending = true;
+          visibleInteraction = {
+            ...nextInteraction,
+            randomTestEnabled: desiredRandomTest.enabled,
+          };
+        }
+      }
+      setInteraction(visibleInteraction);
       if (!next.ready || !nextInteraction.ready) {
         setStatus("connecting");
         return;
@@ -135,9 +174,19 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             })),
           }
         : next);
-      setStatus(forcePending || challengePending || interactionPending ? "pending" : "saved");
+      setStatus(
+        forcePending || challengePending || interactionPending || randomTestPending
+          ? "pending"
+          : "saved",
+      );
     } catch {
-      if (mountedRef.current) setStatus("error");
+      if (
+        mountedRef.current &&
+        loadRevision >= lastAppliedLoadRevisionRef.current
+      ) {
+        lastAppliedLoadRevisionRef.current = loadRevision;
+        setStatus("error");
+      }
     }
   }, []);
 
@@ -197,12 +246,85 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [load],
   );
 
+  const applyInteractionMaxActive = useCallback(
+    (value: number) => {
+      if (!interaction?.ready) return;
+      const normalized = Math.max(
+        1,
+        Math.min(interaction.maxActiveLimit ?? 20, Math.floor(value) || 1),
+      );
+      setInteraction((current) => current
+        ? { ...current, maxActive: normalized }
+        : current);
+      setStatus("saving");
+
+      const query = new URLSearchParams({ maxActive: String(normalized) });
+      void fetch("/api/config/interactions/set?" + query, { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          if (mountedRef.current) setStatus("error");
+        });
+    },
+    [interaction, load],
+  );
+
+  const applyInteractionRandomTest = useCallback(
+    (enabled: boolean) => {
+      if (!interaction?.ready) return;
+      const requestRevision = randomTestRequestRevisionRef.current + 1;
+      randomTestRequestRevisionRef.current = requestRevision;
+      desiredInteractionRandomTestRef.current = {
+        enabled,
+        baselineRandomTestRevision: interaction.randomTestRevision,
+        requestRevision,
+      };
+      setInteraction((current) => current
+        ? { ...current, randomTestEnabled: enabled }
+        : current);
+      setStatus("saving");
+
+      const query = new URLSearchParams({
+        randomTestEnabled: enabled ? "1" : "0",
+      });
+      const send = () => fetch(
+        "/api/config/interactions/set?" + query,
+        { cache: "no-store" },
+      )
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          if (
+            randomTestRequestRevisionRef.current !== requestRevision ||
+            desiredInteractionRandomTestRef.current?.requestRevision !==
+              requestRevision
+          ) return;
+          desiredInteractionRandomTestRef.current = null;
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        });
+      randomTestWriteChainRef.current =
+        randomTestWriteChainRef.current.then(send, send);
+    },
+    [interaction, load],
+  );
+
   const testInteraction = useCallback(
-    (item: string, donor: string, quantity: number) => {
+    (item: string, donor: string, quantity: number, delay: number) => {
       if (!interaction?.ready) return;
       const normalizedQuantity = Math.max(
         1,
         Math.min(interaction.maxBatch ?? 50, Math.floor(quantity) || 1),
+      );
+      const normalizedDelay = Math.max(
+        0,
+        Math.min(interaction.maxDelay ?? 3600, Number(delay) || 0),
       );
       const temporaryIds: number[] = [];
       const optimisticEntries = Array.from({ length: normalizedQuantity }, () => {
@@ -213,6 +335,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           id,
           item,
           donor: donor.trim(),
+          delaySeconds: normalizedDelay,
           status: "waiting_game" as const,
         };
       });
@@ -225,6 +348,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         item,
         donor: donor.trim(),
         quantity: String(normalizedQuantity),
+        delay: String(normalizedDelay),
       });
       void fetch(`/api/config/interactions/test?${query}`, { cache: "no-store" })
         .then((response) => {
@@ -256,7 +380,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       status,
       applyDraft,
       applyChallenge,
+      applyInteractionMaxActive,
       testInteraction,
+      applyInteractionRandomTest,
     }),
     [
       config,
@@ -267,7 +393,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       status,
       applyDraft,
       applyChallenge,
+      applyInteractionMaxActive,
       testInteraction,
+      applyInteractionRandomTest,
     ],
   );
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;

@@ -31,6 +31,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const int CreatorToolsDefaultPort = 18081;
         private const int CreatorToolsPortCandidates = 100;
+        private const float CreatorToolsInteractionStartDelay = 3f;
 
         private ConfigEntry<bool> creatorToolsEnabledSetting;
         private ConfigEntry<int> creatorToolsResolvedPortSetting;
@@ -43,6 +44,8 @@ namespace Gilomx.CupheadBossRoulette
         private ConfigEntry<bool> creatorToolsLogoSetting;
         private ConfigEntry<CreatorToolsRetryBehavior>
             creatorToolsRetryBehaviorSetting;
+        private ConfigEntry<int>
+            creatorToolsInteractionMaximumActiveSetting;
 
         private CreatorToolsServer creatorToolsServer;
         private CreatorToolsInteractionController creatorToolsInteractions;
@@ -58,15 +61,12 @@ namespace Gilomx.CupheadBossRoulette
         private bool creatorToolsLabelRenderFailureLogged;
         private string creatorToolsServerError;
         private bool creatorToolsPortChanged;
+        private int creatorToolsInteractionLevelInstanceId = -1;
+        private float creatorToolsInteractionAllowedAt =
+            float.PositiveInfinity;
 
         private void InitializeCreatorTools()
         {
-            creatorToolsInteractions = new CreatorToolsInteractionController(
-                this,
-                CanPreloadNativeInteractionAssets,
-                CanSpawnCreatorToolsInteraction,
-                delegate(string message) { Logger.LogInfo(message); },
-                delegate(string message) { Logger.LogWarning(message); });
             creatorToolsEnabledSetting = Config.Bind(
                 "Creator Tools", "Activado", false,
                 "Activa el overlay local para OBS.");
@@ -97,6 +97,24 @@ namespace Gilomx.CupheadBossRoulette
                 "Creator Tools", "AlReintentar",
                 CreatorToolsRetryBehavior.Reappear,
                 "Al reintentar, mantiene el overlay o repite su animacion.");
+            creatorToolsInteractionMaximumActiveSetting = Config.Bind(
+                "Creator Tools",
+                "InteraccionesMaximasEnPantalla",
+                1,
+                "Cantidad maxima de interacciones visibles al mismo tiempo.");
+
+            creatorToolsInteractions = new CreatorToolsInteractionController(
+                this,
+                CanPreloadNativeInteractionAssets,
+                CanSpawnCreatorToolsInteraction,
+                GetCreatorToolsInteractionMaximumActive,
+                SetCreatorToolsInteractionMaximumActive,
+                delegate(string message) { Logger.LogInfo(message); },
+                delegate(string message) { Logger.LogWarning(message); });
+            LevelPauseGUI.OnPauseEvent +=
+                OnCreatorToolsInteractionPaused;
+            LevelPauseGUI.OnUnpauseEvent +=
+                OnCreatorToolsInteractionUnpaused;
 
             NormalizeCreatorToolsSettings();
             // Preview is a temporary positioning aid, never a persisted
@@ -118,13 +136,34 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool CanSpawnCreatorToolsInteraction()
         {
-            if (SceneLoader.CurrentlyLoading)
+            if (SceneLoader.CurrentlyLoading ||
+                creatorToolsInteractionLevelInstanceId < 0 ||
+                IsCreatorToolsInteractionPaused())
                 return false;
             var level = Level.Current;
-            if (level == null)
+            if (level == null || level.Ending)
                 return false;
-            return level.LevelType == Level.Type.Battle ||
-                   level.LevelType == Level.Type.Platforming;
+            var gameplayLevel =
+                level.LevelType == Level.Type.Battle ||
+                level.LevelType == Level.Type.Platforming;
+            return gameplayLevel &&
+                   level.GetInstanceID() ==
+                       creatorToolsInteractionLevelInstanceId &&
+                   Time.realtimeSinceStartup >=
+                       creatorToolsInteractionAllowedAt;
+        }
+
+        private static bool IsCreatorToolsInteractionPaused()
+        {
+            try
+            {
+                LevelPauseGUI pauseGui;
+                return TryGetActiveLevelPauseMenu(out pauseGui);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void InstallCreatorToolsPatches()
@@ -133,6 +172,121 @@ namespace Gilomx.CupheadBossRoulette
             NativeZeppelinCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+
+            var levelStarted = HarmonyLib.AccessTools.Method(
+                typeof(Level), "_OnLevelStart");
+            var levelStartedPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsInteractionLevelStartedPostfix");
+            if (levelStarted != null && levelStartedPostfix != null)
+                harmony.Patch(
+                    levelStarted,
+                    postfix: new HarmonyLib.HarmonyMethod(
+                        levelStartedPostfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the Creator Tools interaction start guard.");
+
+            var levelEnded = HarmonyLib.AccessTools.Method(
+                typeof(Level), "_OnLevelEnd");
+            var levelDestroyed = HarmonyLib.AccessTools.Method(
+                typeof(Level), "OnDestroy");
+            var levelEndedPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsInteractionLevelEndedPrefix");
+            var levelDestroyedPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsInteractionLevelDestroyedPrefix");
+            if (levelEnded != null && levelEndedPrefix != null)
+                harmony.Patch(
+                    levelEnded,
+                    prefix: new HarmonyLib.HarmonyMethod(
+                        levelEndedPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the Creator Tools interaction end guard.");
+
+            if (levelDestroyed != null && levelDestroyedPrefix != null)
+                harmony.Patch(
+                    levelDestroyed,
+                    prefix: new HarmonyLib.HarmonyMethod(
+                        levelDestroyedPrefix));
+            else
+                Logger.LogWarning(
+                    "Could not install the Creator Tools interaction scene cleanup.");
+        }
+
+        private static void CreatorToolsInteractionLevelStartedPostfix(
+            Level __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null)
+                return;
+            if (__instance.LevelType != Level.Type.Battle &&
+                __instance.LevelType != Level.Type.Platforming)
+                return;
+
+            Level current;
+            try { current = Level.Current; }
+            catch { return; }
+            if (current == null || current != __instance)
+                return;
+
+            if (plugin.creatorToolsInteractionLevelInstanceId >= 0 &&
+                plugin.creatorToolsInteractionLevelInstanceId !=
+                    __instance.GetInstanceID() &&
+                plugin.creatorToolsInteractions != null)
+                plugin.creatorToolsInteractions.EndGameplayLevel();
+            plugin.creatorToolsInteractionLevelInstanceId =
+                __instance.GetInstanceID();
+            plugin.creatorToolsInteractionAllowedAt =
+                Time.realtimeSinceStartup +
+                CreatorToolsInteractionStartDelay;
+            if (plugin.creatorToolsInteractions != null)
+                plugin.creatorToolsInteractions.InvalidateState();
+        }
+
+        private static void CreatorToolsInteractionLevelEndedPrefix(
+            Level __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                plugin.creatorToolsInteractionLevelInstanceId !=
+                    __instance.GetInstanceID())
+                return;
+
+            plugin.creatorToolsInteractionAllowedAt =
+                float.PositiveInfinity;
+            if (plugin.creatorToolsInteractions != null)
+                plugin.creatorToolsInteractions.SuspendGameplayLevel();
+        }
+
+        private static void CreatorToolsInteractionLevelDestroyedPrefix(
+            Level __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                plugin.creatorToolsInteractionLevelInstanceId !=
+                    __instance.GetInstanceID())
+                return;
+
+            plugin.creatorToolsInteractionLevelInstanceId = -1;
+            plugin.creatorToolsInteractionAllowedAt =
+                float.PositiveInfinity;
+            if (plugin.creatorToolsInteractions != null)
+                plugin.creatorToolsInteractions.EndGameplayLevel();
+        }
+
+        private void OnCreatorToolsInteractionPaused()
+        {
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.InvalidateState();
+        }
+
+        private void OnCreatorToolsInteractionUnpaused()
+        {
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.InvalidateState();
         }
 
         private void NormalizeCreatorToolsSettings()
@@ -149,6 +303,32 @@ namespace Gilomx.CupheadBossRoulette
             if (port < 1024 || port > 65535)
                 creatorToolsResolvedPortSetting.Value =
                     CreatorToolsDefaultPort;
+            SetCreatorToolsInteractionMaximumActive(
+                GetCreatorToolsInteractionMaximumActive());
+        }
+
+        private int GetCreatorToolsInteractionMaximumActive()
+        {
+            if (creatorToolsInteractionMaximumActiveSetting == null)
+                return 1;
+            return Mathf.Clamp(
+                creatorToolsInteractionMaximumActiveSetting.Value,
+                1,
+                CreatorToolsInteractionController.MaximumActiveLimit);
+        }
+
+        private void SetCreatorToolsInteractionMaximumActive(int value)
+        {
+            if (creatorToolsInteractionMaximumActiveSetting == null)
+                return;
+            var normalized = Mathf.Clamp(
+                value,
+                1,
+                CreatorToolsInteractionController.MaximumActiveLimit);
+            if (creatorToolsInteractionMaximumActiveSetting.Value !=
+                normalized)
+                creatorToolsInteractionMaximumActiveSetting.Value =
+                    normalized;
         }
 
         private bool StartCreatorToolsServer()
@@ -250,6 +430,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private void DisposeCreatorTools()
         {
+            LevelPauseGUI.OnPauseEvent -=
+                OnCreatorToolsInteractionPaused;
+            LevelPauseGUI.OnUnpauseEvent -=
+                OnCreatorToolsInteractionUnpaused;
             if (creatorToolsInteractions != null)
             {
                 creatorToolsInteractions.Dispose();

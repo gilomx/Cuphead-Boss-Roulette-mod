@@ -18,9 +18,14 @@ namespace Gilomx.CupheadBossRoulette
         private const float MaximumAttackStop = 535f;
         private const float MinimumRightwardAdjustment = 55f;
         private const float MaximumRightwardAdjustment = 105f;
+        private const float MinimumSafeLane = 120f;
+        private const float MaximumSafeLane = 610f;
+        private const float MinimumLaneSeparation = 165f;
+        private const int RandomLaneAttempts = 32;
 
         internal static bool TryCreate(
             NativeZeppelinVariant variant,
+            IList<float> occupiedLanes,
             ref int purpleSpawnCounter,
             out NativeZeppelinSpawnParameters parameters,
             out string error)
@@ -45,7 +50,7 @@ namespace Gilomx.CupheadBossRoulette
                 parameters = new NativeZeppelinSpawnParameters
                 {
                     Properties = properties,
-                    Lane = ChooseLane(enemy.spawnString),
+                    Lane = ChooseLane(occupiedLanes),
                     StopDistance = ChooseStopDistance(enemy),
                     Parryable = ChooseParryable(
                         enemy, variant, ref purpleSpawnCounter)
@@ -54,31 +59,46 @@ namespace Gilomx.CupheadBossRoulette
             }
             catch (Exception exception)
             {
-                error = exception.Message;
+                error = exception.ToString();
                 return false;
             }
         }
 
-        private static float ChooseLane(string[] patterns)
+        private static float ChooseLane(IList<float> occupiedLanes)
         {
-            if (patterns == null || patterns.Length == 0)
-                return 300f;
+            if (occupiedLanes == null || occupiedLanes.Count == 0)
+                return UnityEngine.Random.Range(
+                    MinimumSafeLane, MaximumSafeLane);
 
-            var pattern = patterns[
-                UnityEngine.Random.Range(0, patterns.Length)];
-            var lanes = ParseLanes(pattern);
-            if (lanes.Count == 0)
+            var bestLane = MinimumSafeLane;
+            var bestDistance = float.MinValue;
+            for (var i = 0; i < RandomLaneAttempts; i++)
             {
-                for (var i = 0; i < patterns.Length; i++)
-                {
-                    lanes = ParseLanes(patterns[i]);
-                    if (lanes.Count > 0)
-                        break;
-                }
+                var candidate = UnityEngine.Random.Range(
+                    MinimumSafeLane, MaximumSafeLane);
+                var distance = MinimumDistance(candidate, occupiedLanes);
+                if (distance >= MinimumLaneSeparation)
+                    return candidate;
+                if (distance <= bestDistance)
+                    continue;
+                bestLane = candidate;
+                bestDistance = distance;
             }
-            return lanes.Count == 0
-                ? 300f
-                : lanes[UnityEngine.Random.Range(0, lanes.Count)];
+            return bestLane;
+        }
+
+        private static float MinimumDistance(
+            float candidate,
+            IList<float> occupiedLanes)
+        {
+            var minimum = float.MaxValue;
+            for (var i = 0; i < occupiedLanes.Count; i++)
+            {
+                var distance = Mathf.Abs(candidate - occupiedLanes[i]);
+                if (distance < minimum)
+                    minimum = distance;
+            }
+            return minimum;
         }
 
         private static float ChooseStopDistance(

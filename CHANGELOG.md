@@ -36,13 +36,17 @@
 - El catálogo web usa tarjetas verticales pequeñas, con el preview arriba y el
   nombre debajo. Se retiró el indicador redundante `Ejecutando cola`; los
   estados operativos viven únicamente en la tabla de la cola.
-- Debajo del catálogo se muestra una cola operativa amplia y una tabla lateral
-  de pruebas con donador y cantidad; los lotes de ambos tipos conservan el
-  orden en que llegaron.
-- `CreatorToolsInteractionQueue` mantiene inicialmente un máximo de un canjeo
-  activo, hasta 200 entradas totales y lotes de hasta 50. El siguiente elemento
-  sólo se ejecuta cuando el enemigo activo termina o muere. Estos límites quedan
-  aislados para convertirlos después en configuración.
+- Debajo del catálogo se muestra una cola operativa amplia. La configuración y
+  las pruebas forman una columna lateral ordenada; cada prueba permite indicar
+  donador, cantidad y espera en segundos.
+- El máximo simultáneo es persistente y configurable de 1 a 20. La cola admite
+  hasta 200 entradas, lotes de 50 y esperas de hasta 3600 segundos; además
+  separa cada despacho por al menos 0.35 segundos para evitar apariciones
+  exactamente simultáneas.
+- La prueba aleatoria alterna entre ambos mini zepelines y seis nombres con
+  intervalos de 1.25 a 3.25 segundos. Su interruptor cambia de estado de forma
+  inmediata aunque el juego esté pausado, pero sólo genera mientras una partida
+  puede recibir interacciones y nunca acumula un backlog automático.
 - Las pruebas aparecen inmediatamente en la tabla aunque Unity esté pausado por
   perder el foco. React las marca como `Esperando al juego` y las sustituye por
   la cola autoritativa cuando el mod incrementa su revisión, sin duplicarlas.
@@ -53,15 +57,26 @@
   o nivel de plataformas.
 - El clon conserva sprites, controladores, clips, proyectil, efecto de disparo,
   piezas de muerte y propiedades originales de la dificultad actual. El nombre
-  del donador ahora es un `TextMeshPro` de mundo con la fuente Memphis del juego:
-  queda anclado como hijo del enemigo, más separado de él y recibe los filtros
-  de la cámara.
-- Cada prueba selecciona una de las cadenas nativas de alturas, una altura de
-  esa cadena y una distancia de parada nativa. El mod la desplaza hacia la
-  derecha con variación adicional y la limita al rango seguro de 390–535; en
+  del donador es un `TextMeshPro` de mundo independiente con la fuente Memphis:
+  captura una sola ancla sobre el sprite, sigue al actor sin saltar cuando
+  cambian sus bounds y recibe los filtros de la cámara.
+- Al destruirse el enemigo, el nombre queda inmóvil en su última posición y
+  desvanece texto y contorno durante 0.6 segundos. El fade respeta
+  `CupheadTime.GlobalSpeed`, por lo que también se congela durante pausa o
+  derrota. Este contrato común está documentado en
+  [INTERACTION_CATALOG.md](INTERACTION_CATALOG.md) para todos los artículos
+  futuros.
+- Cada aparición elige una altura aleatoria dentro del rango seguro 120–610 y
+  procura mantener 165 unidades respecto a actores activos. También toma una
+  distancia de parada nativa, la desplaza hacia la derecha con variación
+  adicional y la limita al rango 390–535; en
   Hilda aplica el valor después de `SummonEnemy()` porque el método original lo
   vuelve a sortear. La variante A mantiene además el contador nativo que alterna
   su proyectil rosa.
+- Ninguna interacción se despacha durante carga, pausa, derrota o cierre del
+  nivel, ni durante los primeros tres segundos de una partida. Los actores que
+  ya estaban en pantalla permanecen congelados al perder y se limpian al
+  destruirse la escena.
 - Se retiró el prototipo portátil que aproximaba el enemigo con una imagen y
   movimiento manual. Los actores jugables se construyen en memoria desde la
   instalación local; los únicos PNG extraídos son los dos previews web.

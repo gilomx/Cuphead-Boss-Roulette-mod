@@ -16,6 +16,12 @@
     "catalog": {
       "title": "Redeem catalog"
     },
+    "settings": {
+      "title": "Settings",
+      "description": "Choose how many redeems may remain active at the same time.",
+      "maxActiveLabel": "Simultaneous items",
+      "save": "Save"
+    },
     "zeppelin": {
       "type": "Enemy",
       "available": "Available during this fight.",
@@ -41,6 +47,7 @@
       "status": "Status",
       "active": "Running",
       "queued": "Queued",
+      "scheduled": "Waiting for time",
       "waiting_game": "Waiting for game"
     },
     "test": {
@@ -51,17 +58,30 @@
       "donorLabel": "Donor name",
       "donorPlaceholder": "Test donor",
       "quantityLabel": "Times",
+      "delayLabel": "Wait (s)",
       "action": "Add to queue",
-      "testing": "Adding"
+      "testing": "Adding",
+      "random": {
+        "title": "Random test",
+        "description": "Sends random mini zeppelins and names at short, varying intervals, only while a match is active.",
+        "active": "Active",
+        "inactive": "Inactive",
+        "enable": "Enable",
+        "disable": "Disable"
+      }
     },
     "feedback": {
       "ready": "The test is ready.",
+      "random_test_enabled": "The random test is active and will wait for a match to be in progress.",
+      "random_test_disabled": "The random test was disabled.",
       "unknown_item": "The mod does not recognize this item.",
       "native_assets_loading": "The zeppelin's native assets are still being prepared.",
       "native_assets_unavailable": "The zeppelin's native assets could not be prepared.",
       "requires_gameplay_level": "Start any gameplay level to send the zeppelin.",
       "waiting_game": "The request is already visible and is waiting for the game to confirm it.",
       "queued": "The redeems were added to the queue.",
+      "settings_saved": "The interaction settings were saved.",
+      "invalid_setting": "The setting value is invalid.",
       "queue_full": "The queue reached its temporary limit.",
       "sent": "The mini zeppelin was sent into the fight.",
       "spawn_failed": "The mini zeppelin could not be created. Check the fight state."

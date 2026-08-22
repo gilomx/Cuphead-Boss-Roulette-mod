@@ -138,15 +138,16 @@ namespace Gilomx.CupheadBossRoulette
                     parameters.Parryable,
                     inertParent);
 
-                var label = spawned.gameObject.AddComponent<
-                    CreatorToolsDonorLabel>();
-                label.Initialize(donor);
+                CreatorToolsInteractionPresentation.PrepareActor(
+                    spawned.gameObject,
+                    donor,
+                    logWarning);
                 spawnedActors.Add(spawned);
                 return true;
             }
             catch (Exception exception)
             {
-                error = exception.Message;
+                error = exception.ToString();
                 if (spawned != null)
                     UnityEngine.Object.Destroy(spawned.gameObject);
                 spawned = null;

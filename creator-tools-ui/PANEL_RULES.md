@@ -41,13 +41,19 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
   tarjetas son un resumen vertical pequeño con el primer frame nativo arriba y
   la información debajo; no contienen descripciones, controles de prueba ni un
   estado operativo duplicado.
-- La zona operativa coloca la cola en el panel principal y una tabla de pruebas
-  a su derecha. Cada fila acepta donador y cantidad. Un lote o varios tipos se
-  agregan al final sin alterar el orden existente.
-- El límite inicial es un elemento activo, 50 elementos por lote y 200 en la
-  cola completa. El canjeo activo permanece visible hasta que su actor termina
-  o muere; entonces avanza el siguiente. Estos límites pertenecen a C#, no a la
-  vista, para permitir su futura configuración y artículos exclusivos.
+- La zona operativa coloca la cola en el panel principal y, a su derecha, la
+  configuración sobre la tabla de pruebas. Cada fila de prueba acepta donador,
+  cantidad y espera en segundos. Un lote o varios tipos se agregan al final sin
+  alterar el orden existente.
+- El máximo simultáneo es persistente y configurable de 1 a 20. Se admiten 50
+  elementos por lote, esperas de hasta 3600 segundos y 200 registros entre
+  activos y pendientes. El canjeo activo permanece visible hasta que su actor
+  termina o muere; entonces libera su cupo. Estos límites y el despacho
+  pertenecen a C#, no a la vista.
+- La prueba aleatoria tiene un interruptor con estado optimista inmediato. Su
+  escritura se serializa y se confirma mediante una revisión independiente para
+  que respuestas antiguas no reviertan el último clic. Sólo genera dentro de
+  una partida activa y no acumula eventos mientras el juego no puede recibirlos.
 - Una prueba se refleja optimistamente en la tabla antes de esperar a `Update`
   de Unity. Sus filas temporales usan `Esperando al juego`; al cambiar la
   revisión del mod se eliminan y se muestra la cola autoritativa recibida. La
@@ -61,25 +67,34 @@ cada reto, los campos `enabled` y `canDisable`. El panel realiza cambios con
 posterior confirma el valor guardado.
 
 `GET /api/config/interactions` entrega disponibilidad, IDs estables, último ID,
-feedback, revisión, límites y la cola autoritativa con estados `queued` y
-`active`. `GET /api/config/interactions/test` recibe `item`, `donor` y
-`quantity`; sólo encola la prueba. Unity la ejecuta después en su hilo principal
-y confirma el resultado incrementando la revisión. Los códigos de feedback se
-traducen en React y nunca se usan como reglas de negocio.
+feedback, revisiones, límites y la cola autoritativa con estados `scheduled`,
+`queued` y `active`. `GET /api/config/interactions/test` recibe `item`, `donor`,
+`quantity` y `delay`; sólo encola la prueba. Unity la ejecuta después en su hilo
+principal y confirma el resultado incrementando la revisión. El endpoint
+`GET /api/config/interactions/set` cambia el máximo simultáneo y la prueba
+aleatoria. Los códigos de feedback se traducen en React y nunca se usan como
+reglas de negocio.
 
 Los zepelines nunca se recrean con sprites, proyectiles o movimiento
 aproximados. El ejecutor usa `enemyPrefabA` para el morado de disparo individual
 y `enemyPrefabB` para el verde de ráfaga, conservando ambos grafos nativos
 completos. Durante Hilda usa `SummonEnemy()`; en los demás niveles instancia el
 clon correspondiente con propiedades frescas de la dificultad actual. El mod
-adapta la posición a la cámara activa y adjunta la etiqueta del donador como
-`TextMeshPro` de mundo con la fuente Memphis para que atraviese los filtros de
-cámara. La etiqueta es hija del actor y se mantiene 86 unidades por encima para
-seguir todo su movimiento. La altura se
-toma de una cadena `spawnString` nativa elegida al azar. La distancia parte de
-`stopDistance.RandomFloat()`, suma un desplazamiento aleatorio de 55–105 hacia
-la derecha y se limita a 390–535; durante Hilda se vuelve a escribir después de
-`SummonEnemy()`. No se fijan coordenadas desde React.
+adapta la posición a la cámara activa y aplica la presentación compartida. La
+etiqueta es un `TextMeshPro` de mundo independiente con la fuente Memphis:
+captura una sola ancla sobre el sprite, sigue el desplazamiento del actor y, al
+destruirse éste, permanece fija mientras texto y contorno desvanecen durante
+0.6 segundos. La altura del actor se elige al azar en el rango seguro 120–610 e
+intenta conservar 165 unidades respecto a los demás actores activos. La
+distancia parte de `stopDistance.RandomFloat()`, suma un desplazamiento
+aleatorio de 55–105 hacia la derecha y se limita a 390–535; durante Hilda se
+vuelve a escribir después de `SummonEnemy()`. No se fijan coordenadas desde
+React. El contrato completo para artículos futuros está en
+[INTERACTION_CATALOG.md](../INTERACTION_CATALOG.md).
+
+El mod bloquea despachos durante carga, pausa, derrota, cierre del nivel y los
+primeros tres segundos de una partida. Los actores ya presentes permanecen
+congelados al perder; la limpieza definitiva ocurre al destruirse la escena.
 
 La validación importante siempre se repite en C#. React puede impedir una
 interacción inválida por ergonomía, pero no es la autoridad para decidir qué
@@ -107,6 +122,9 @@ resultados puede producir la ruleta.
 - Los estados de conexión y las validaciones del mod nunca se ocultan.
 - Una restricción de negocio se implementa en el mod y se refleja en la UI; no
   se confía únicamente en botones deshabilitados o estado local del navegador.
+- Todo artículo visual nuevo reutiliza
+  `CreatorToolsInteractionPresentation.PrepareActor`; no implementa su propia
+  etiqueta, seguimiento o destrucción.
 - Los assets se sirven localmente; el panel no depende de CDNs.
 - `assets/creator-tools/config.*` son salida compilada. El código fuente vive en
   `creator-tools-ui`.

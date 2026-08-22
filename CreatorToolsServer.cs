@@ -555,7 +555,8 @@ namespace Gilomx.CupheadBossRoulette
                     Encoding.UTF8.GetBytes(json), false);
                 return;
             }
-            if (path == "/api/config/interactions/test")
+            if (path == "/api/config/interactions/test" ||
+                path == "/api/config/interactions/set")
             {
                 lock (interactionsLock)
                     interactionCommands.Enqueue(request.Query ?? string.Empty);

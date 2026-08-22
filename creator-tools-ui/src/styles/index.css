@@ -612,6 +612,70 @@ input:focus-visible {
   line-height: 1.12;
 }
 
+.interaction-settings-heading {
+  display: block;
+  min-height: 0;
+}
+
+.interaction-settings-heading p {
+  max-width: 42rem;
+}
+
+.interaction-settings {
+  display: flex;
+  width: 100%;
+  align-items: end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.interaction-workspace__tools {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.interaction-settings label {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.interaction-settings label > span {
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.interaction-settings input,
+.interaction-settings button {
+  min-height: 2.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+}
+
+.interaction-settings input {
+  width: 7rem;
+  padding: 0.55rem 0.68rem;
+  color: var(--color-text);
+  background: var(--color-control);
+}
+
+.interaction-settings button {
+  padding: 0.55rem 1rem;
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 900;
+  background: var(--color-control-active);
+  cursor: pointer;
+}
+
+.interaction-settings button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .interaction-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(25rem, 0.9fr);
@@ -769,6 +833,89 @@ input:focus-visible {
   background: var(--color-warning);
 }
 
+.interaction-random-test {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  background: rgb(255 255 255 / 1.8%);
+}
+
+.interaction-random-test[data-active="true"] {
+  background:
+    linear-gradient(90deg, rgb(120 217 171 / 10%), transparent 72%),
+    rgb(255 255 255 / 1.8%);
+}
+
+.interaction-random-test__copy {
+  min-width: 0;
+}
+
+.interaction-random-test__title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.interaction-random-test__title strong {
+  font-size: 0.88rem;
+}
+
+.interaction-random-test__title span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.45rem;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--color-control);
+}
+
+.interaction-random-test__title span[data-active="true"] {
+  color: #10281d;
+  background: var(--color-success);
+}
+
+.interaction-random-test__copy p {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.interaction-random-test > button {
+  min-height: 2.55rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 900;
+  background: var(--color-control-active);
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.interaction-random-test > button[data-active="true"] {
+  border-color: rgb(255 255 255 / 14%);
+  background: var(--color-control);
+}
+
+.interaction-random-test > button:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-0.06rem);
+}
+
+.interaction-random-test > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .test-table th:first-child,
 .test-table td:first-child {
   width: 9.5rem;
@@ -829,7 +976,7 @@ input:focus-visible {
 
 .interaction-test-fields__action {
   display: grid;
-  grid-template-columns: 4.8rem minmax(7rem, 1fr);
+  grid-template-columns: 4.6rem 5.5rem minmax(7rem, 1fr);
   align-items: end;
   gap: 0.55rem;
 }
@@ -942,7 +1089,8 @@ input:focus-visible {
   .interaction-panel__heading { padding: var(--space-3); }
   .interaction-table th,
   .interaction-table td { padding-inline: 0.7rem; }
-  .interaction-test-fields__action { grid-template-columns: 4.4rem minmax(6.5rem, 1fr); }
+  .interaction-settings { width: 100%; min-width: 0; }
+  .interaction-test-fields__action { grid-template-columns: 4.2rem 5rem minmax(6.5rem, 1fr); }
   .form-grid,
   .form-skeleton { grid-template-columns: 1fr; }
 }
