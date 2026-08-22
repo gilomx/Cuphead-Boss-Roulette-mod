@@ -1,0 +1,121 @@
+{
+  "app": {
+    "name": "La Pichi Ruleta",
+    "documentTitle": "La Pichi Ruleta — Configuración",
+    "language": "Idioma",
+    "openOverlay": "Abrir overlay"
+  },
+  "nav": {
+    "interactions": "Interacciones",
+    "roulette": "Ruleta"
+  },
+  "roulette": {
+    "title": "Ruleta",
+    "description": "Aquí podrás consultar los retos disponibles y configurar un resultado específico para la ruleta.",
+    "challenges": {
+      "title": "Retos disponibles",
+      "description": "Estos son los retos que el mod puede utilizar actualmente.",
+      "enable": "Activar",
+      "disable": "Desactivar",
+      "required": "Debe quedar al menos un reto activo en esta categoría",
+      "plane": "Avión",
+      "ground": "Tierra",
+      "both": "Ambos"
+    },
+    "force": {
+      "title": "Forzar ruleta",
+      "description": "Elige el resultado de la ruleta para grabar intros o preparar una combinación específica.",
+      "enabled": "Forzar ruleta",
+      "boss": "Jefe",
+      "weapon1": "Disparo 1",
+      "weapon2": "Disparo 2",
+      "super": "Súper",
+      "charm": "Amuleto",
+      "modifier": "Reto"
+    }
+  },
+  "status": {
+    "connecting": "Conectando con Cuphead",
+    "saved": "Cambios guardados",
+    "saving": "Guardando cambios",
+    "pending": "Esperando confirmación",
+    "error": "Sin conexión con el mod"
+  },
+  "catalog": {
+    "boss": {
+      "Frogs": "Hosco y Tosco",
+      "Veggies": "La pandilla raíz",
+      "Slime": "Goopy Le Grande",
+      "FlyingBlimp": "Hilda Berg",
+      "Flower": "Clavel de Cagney",
+      "Baroness": "Baronesa Von Bon Bon",
+      "FlyingGenie": "Djimmi el Grande",
+      "Clown": "Beppi el Payaso",
+      "FlyingBird": "Titi Trinos",
+      "Dragon": "Fósforo Sombrío",
+      "Bee": "Reynita Abejita",
+      "Mouse": "Werner Werman",
+      "Pirate": "Capitán Barbasalada",
+      "FlyingMermaid": "Cala María",
+      "SallyStagePlay": "Sally Teatral",
+      "Robot": "Robot del Dr. Kahl",
+      "Train": "Expreso Fantasma",
+      "DicePalaceMain": "Rey Dado",
+      "Devil": "El Diablo",
+      "RumRunners": "Las Alimañas",
+      "FlyingCowboy": "Esther Espuelas",
+      "Airplane": "Los Perritos Pilotos",
+      "Graveyard": "Ángel y Demonio",
+      "SnowCult": "Genovevo de Gelante",
+      "OldMan": "Granitoviejo el Gigante",
+      "Saltbaker": "Chef Saleroso"
+    },
+    "weapon": {
+      "level_weapon_peashot": "Lanzaguisantes",
+      "level_weapon_spreadshot": "Expansión",
+      "level_weapon_homing": "Rastreador",
+      "level_weapon_bouncer": "Globero",
+      "level_weapon_charge": "Carga",
+      "level_weapon_boomerang": "Rodeo",
+      "level_weapon_crackshot": "Tiro Certero",
+      "level_weapon_wide_shot": "Convergencia",
+      "level_weapon_upshot": "Ciclónica",
+      "None": "Nada"
+    },
+    "super": {
+      "level_super_beam": "Súper I",
+      "level_super_invincible": "Súper II",
+      "level_super_ghost": "Súper III",
+      "None": "Nada"
+    },
+    "charm": {
+      "charm_health_up_1": "Corazón",
+      "charm_super_builder": "Café",
+      "charm_smoke_dash": "Bomba de humo",
+      "charm_parry_plus": "Desvío Dulce",
+      "charm_health_up_2": "Corazón Doble",
+      "charm_parry_attack": "Afiladora",
+      "charm_chalice": "Galletita Astral",
+      "charm_curse_0": "Reliquia Maldita",
+      "charm_curse_4": "Reliquia Divina",
+      "charm_healer": "Anillo de Corazón",
+      "None": "Nada"
+    },
+    "modifier": {
+      "NoDash": "No Dash",
+      "NoMiniPlane": "No mini avión",
+      "MiniPlaneOnly": "Solo mini avión",
+      "NoBombs": "No disparo bombas",
+      "NoPeashooter": "No disparo Lanzaguisantes",
+      "NoEx": "No EX",
+      "BlackAndWhite": "Blanco y negro",
+      "RgbShift": "Cambio RGB",
+      "UpsideDown": "Al revés",
+      "HpOne": "HP. 1",
+      "InkRain": "Lluvia de tinta",
+      "HalfDamage": "50% de daño",
+      "StiffMode": "Modo tieso",
+      "None": "Nada"
+    }
+  }
+}

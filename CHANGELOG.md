@@ -1,5 +1,27 @@
 # Historial de cambios
 
+## Siguiente versión — Panel de configuración web
+
+- `/config` ahora es una SPA en React con una estructura persistente preparada
+  para añadir nuevas secciones sin detener conexiones o servicios globales.
+- El panel está localizado exclusivamente en español e inglés y muestra un
+  indicador global bajo el logo para conexión, guardado, confirmación y error.
+- La herramienta de forzado usa selects compartidos, inicia cada campo en su
+  primera opción compatible y reutiliza el icono vacío del Stream Overlay para
+  las opciones `Nada`.
+- Los retos se activan o desactivan con los iconos estáticos del overlay. La
+  selección se guarda en `Juego/RetosDesactivados` y se aplica al resultado
+  aleatorio real.
+- Los retos desactivados continúan apareciendo durante la animación de giro,
+  pero nunca pueden ser el resultado final.
+- Debe permanecer al menos un reto activo en cada categoría: Avión, Tierra y
+  Ambos. El panel bloquea el último y el mod valida la misma regla; una
+  configuración antigua inválida se corrige al iniciar.
+- El encabezado principal se alineó aproximadamente con la zona media del logo
+  y el área de forzado reserva espacio inferior para desplegar los selects.
+- El código fuente vive en `creator-tools-ui`; `assets/creator-tools/config.*`
+  conserva las salidas compiladas que sirve el servidor interno.
+
 ## 0.6.0 — La Pichi Ruleta (2026-08-18)
 
 Esta versión reúne Modo Tieso, Creator Tools y su overlay para OBS, la

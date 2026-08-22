@@ -11,6 +11,8 @@ obj/
 # Local packages and logs
 packages/
 *.log
+node_modules/
+*.tsbuildinfo
 
 # OS metadata
 .DS_Store

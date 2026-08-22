@@ -180,6 +180,7 @@ namespace Gilomx.CupheadBossRoulette
         private ConfigEntry<bool> autoLoad;
         private ConfigEntry<Level.Mode> difficultySetting;
         private ConfigEntry<bool> challengeSetting;
+        private ConfigEntry<string> disabledChallengesSetting;
         private ConfigEntry<float> loadDelay;
         private ModLocalization modLocalization;
         private GameTheme theme;
@@ -430,6 +431,10 @@ namespace Gilomx.CupheadBossRoulette
                 "Dificultad usada por la ruleta: Easy, Normal o Hard.");
             challengeSetting = Config.Bind("Juego", "Reto", false,
                 "Activa los retos adicionales de la ruleta.");
+            disabledChallengesSetting = Config.Bind("Juego",
+                "RetosDesactivados", string.Empty,
+                "Retos que la ruleta debe omitir, separados por comas.");
+            LoadCreatorToolsDisabledChallenges();
             loadDelay = Config.Bind("Juego", "DemoraAntesDeCargar", 1.25f, "Segundos entre el resultado final y la carga.");
             difficulty = difficultySetting.Value == Level.Mode.Easy ||
                          difficultySetting.Value == Level.Mode.Hard
@@ -1659,7 +1664,7 @@ namespace Gilomx.CupheadBossRoulette
 
             if (uglyMode && forcedModifier < 0)
             {
-                var valid = RouletteData.ValidModifierIndices(RouletteData.Bosses[boss]);
+                var valid = CreatorToolsValidModifierIndices(RouletteData.Bosses[boss]);
                 if (valid.Count > 0)
                     modifier = valid[random.Next(valid.Count)];
             }
@@ -3377,7 +3382,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private int CurrentRollingModifier(int bossIndex)
         {
-            var valid = RouletteData.ValidModifierIndices(RouletteData.Bosses[bossIndex]);
+            // Keep every compatible challenge in the spinning animation.
+            // Creator Tools exclusions only affect the final random result.
+            var valid = RouletteData.ValidModifierIndices(
+                RouletteData.Bosses[bossIndex]);
             return valid.Count == 0 ? RouletteData.Modifiers.Length - 1 : valid[Wrap(ticker, valid.Count)];
         }
 

@@ -1,0 +1,121 @@
+{
+  "app": {
+    "name": "La Pichi Ruleta",
+    "documentTitle": "La Pichi Ruleta — Settings",
+    "language": "Language",
+    "openOverlay": "Open overlay"
+  },
+  "nav": {
+    "interactions": "Interactions",
+    "roulette": "Roulette"
+  },
+  "roulette": {
+    "title": "Roulette",
+    "description": "Review the available challenges and configure a specific result for the roulette.",
+    "challenges": {
+      "title": "Available challenges",
+      "description": "These are the challenges the mod can currently use.",
+      "enable": "Enable",
+      "disable": "Disable",
+      "required": "At least one challenge must remain active in this category",
+      "plane": "Airplane",
+      "ground": "Ground",
+      "both": "Both"
+    },
+    "force": {
+      "title": "Force roulette",
+      "description": "Choose the roulette result to record intros or prepare a specific combination.",
+      "enabled": "Force roulette",
+      "boss": "Boss",
+      "weapon1": "Shot 1",
+      "weapon2": "Shot 2",
+      "super": "Super",
+      "charm": "Charm",
+      "modifier": "Challenge"
+    }
+  },
+  "status": {
+    "connecting": "Connecting to Cuphead",
+    "saved": "Changes saved",
+    "saving": "Saving changes",
+    "pending": "Waiting for confirmation",
+    "error": "Cannot connect to the mod"
+  },
+  "catalog": {
+    "boss": {
+      "Frogs": "Ribby and Croaks",
+      "Veggies": "The Root Pack",
+      "Slime": "Goopy Le Grande",
+      "FlyingBlimp": "Hilda Berg",
+      "Flower": "Cagney Carnation",
+      "Baroness": "Baroness Von Bon Bon",
+      "FlyingGenie": "Djimmi the Great",
+      "Clown": "Beppi the Clown",
+      "FlyingBird": "Wally Warbles",
+      "Dragon": "Grim Matchstick",
+      "Bee": "Rumor Honeybottoms",
+      "Mouse": "Werner Werman",
+      "Pirate": "Captain Brineybeard",
+      "FlyingMermaid": "Cala Maria",
+      "SallyStagePlay": "Sally Stageplay",
+      "Robot": "Dr. Kahl's Robot",
+      "Train": "Phantom Express",
+      "DicePalaceMain": "King Dice",
+      "Devil": "The Devil",
+      "RumRunners": "Moonshine Mob",
+      "FlyingCowboy": "Esther Winchester",
+      "Airplane": "The Howling Aces",
+      "Graveyard": "Angel and Demon",
+      "SnowCult": "Mortimer Freeze",
+      "OldMan": "Glumstone the Giant",
+      "Saltbaker": "Chef Saltbaker"
+    },
+    "weapon": {
+      "level_weapon_peashot": "Peashooter",
+      "level_weapon_spreadshot": "Spread",
+      "level_weapon_homing": "Chaser",
+      "level_weapon_bouncer": "Lobber",
+      "level_weapon_charge": "Charge",
+      "level_weapon_boomerang": "Roundabout",
+      "level_weapon_crackshot": "Crackshot",
+      "level_weapon_wide_shot": "Converge",
+      "level_weapon_upshot": "Twist-Up",
+      "None": "None"
+    },
+    "super": {
+      "level_super_beam": "Super Art I",
+      "level_super_invincible": "Super Art II",
+      "level_super_ghost": "Super Art III",
+      "None": "None"
+    },
+    "charm": {
+      "charm_health_up_1": "Heart",
+      "charm_super_builder": "Coffee",
+      "charm_smoke_dash": "Smoke Bomb",
+      "charm_parry_plus": "P. Sugar",
+      "charm_health_up_2": "Twin Heart",
+      "charm_parry_attack": "Whetstone",
+      "charm_chalice": "Astral Cookie",
+      "charm_curse_0": "Cursed Relic",
+      "charm_curse_4": "Divine Relic",
+      "charm_healer": "Heart Ring",
+      "None": "None"
+    },
+    "modifier": {
+      "NoDash": "No Dash",
+      "NoMiniPlane": "No Mini Plane",
+      "MiniPlaneOnly": "Mini Plane Only",
+      "NoBombs": "No Bombs",
+      "NoPeashooter": "No Peashooter",
+      "NoEx": "No EX",
+      "BlackAndWhite": "Black and White",
+      "RgbShift": "RGB Shift",
+      "UpsideDown": "Upside Down",
+      "HpOne": "HP. 1",
+      "InkRain": "Ink Rain",
+      "HalfDamage": "50% Damage",
+      "StiffMode": "Stiff Mode",
+      "None": "None"
+    }
+  }
+}

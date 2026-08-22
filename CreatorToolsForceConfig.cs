@@ -14,6 +14,8 @@ namespace Gilomx.CupheadBossRoulette
         private int creatorToolsForceSuper;
         private int creatorToolsForceCharm;
         private int creatorToolsForceModifier;
+        private readonly HashSet<ModifierId> creatorToolsDisabledChallenges =
+            new HashSet<ModifierId>();
 
         private void UpdateCreatorToolsForceConfig()
         {
@@ -67,14 +69,21 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsForceWeapon1 = FirstAvailable(
                     availableWeaponIndices, 0, true,
                     RouletteData.Weapons.Length - 1);
-                creatorToolsForceWeapon2 =
-                    RouletteData.Weapons.Length - 1;
-                creatorToolsForceSuper =
-                    RouletteData.Supers.Length - 1;
-                creatorToolsForceCharm =
-                    RouletteData.Charms.Length - 1;
-                creatorToolsForceModifier =
-                    RouletteData.Modifiers.Length - 1;
+                var emptyWeapon = RouletteData.Weapons.Length - 1;
+                creatorToolsForceWeapon2 = FirstAvailableExcept(
+                    availableWeaponIndices, creatorToolsForceWeapon1,
+                    emptyWeapon);
+                creatorToolsForceSuper = FirstAvailable(
+                    availableSuperIndices, RouletteData.Supers.Length - 1,
+                    false, RouletteData.Supers.Length - 1);
+                creatorToolsForceCharm = FirstAvailable(
+                    availableCharmIndices, RouletteData.Charms.Length - 1,
+                    false, RouletteData.Charms.Length - 1);
+                var validModifiers = RouletteData.ValidModifierIndices(
+                    RouletteData.Bosses[creatorToolsForceBoss]);
+                creatorToolsForceModifier = validModifiers.Count > 0
+                    ? validModifiers[0]
+                    : RouletteData.Modifiers.Length - 1;
                 creatorToolsForceInitialized = true;
             }
             SanitizeCreatorToolsForceSelection();
@@ -91,6 +100,139 @@ namespace Gilomx.CupheadBossRoulette
             return fallback;
         }
 
+        private static int FirstAvailableExcept(List<int> pool,
+            int rejected, int fallback)
+        {
+            for (var i = 0; i < pool.Count; i++)
+            {
+                if (pool[i] != rejected)
+                    return pool[i];
+            }
+            return fallback;
+        }
+
+        private void LoadCreatorToolsDisabledChallenges()
+        {
+            creatorToolsDisabledChallenges.Clear();
+            if (disabledChallengesSetting == null ||
+                string.IsNullOrEmpty(disabledChallengesSetting.Value))
+                return;
+
+            var names = disabledChallengesSetting.Value.Split(',');
+            for (var i = 0; i < names.Length; i++)
+            {
+                try
+                {
+                    var id = (ModifierId)Enum.Parse(typeof(ModifierId),
+                        names[i].Trim(), true);
+                    if (id != ModifierId.None &&
+                        ExperimentalFeatures.IsChallengeEnabled(id))
+                        creatorToolsDisabledChallenges.Add(id);
+                }
+                catch
+                {
+                }
+            }
+            if (EnsureOneCreatorToolsChallengePerKind())
+                SaveCreatorToolsDisabledChallenges();
+        }
+
+        private void SaveCreatorToolsDisabledChallenges()
+        {
+            if (disabledChallengesSetting == null)
+                return;
+            var names = new List<string>();
+            for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+            {
+                var id = RouletteData.Modifiers[i].Id;
+                if (creatorToolsDisabledChallenges.Contains(id))
+                    names.Add(id.ToString());
+            }
+            disabledChallengesSetting.Value = string.Join(",",
+                names.ToArray());
+            Config.Save();
+        }
+
+        private bool IsCreatorToolsChallengeEnabled(ModifierId id)
+        {
+            return ExperimentalFeatures.IsChallengeEnabled(id) &&
+                   !creatorToolsDisabledChallenges.Contains(id);
+        }
+
+        private bool EnsureOneCreatorToolsChallengePerKind()
+        {
+            var changed = false;
+            var kinds = new[]
+            {
+                ModifierKind.Plane,
+                ModifierKind.Ground,
+                ModifierKind.Both
+            };
+            for (var kindIndex = 0; kindIndex < kinds.Length; kindIndex++)
+            {
+                var fallback = ModifierId.None;
+                var hasEnabled = false;
+                for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+                {
+                    var modifier = RouletteData.Modifiers[i];
+                    if (modifier.Id == ModifierId.None ||
+                        modifier.Kind != kinds[kindIndex] ||
+                        !ExperimentalFeatures.IsChallengeEnabled(modifier.Id))
+                        continue;
+                    if (fallback == ModifierId.None)
+                        fallback = modifier.Id;
+                    if (!creatorToolsDisabledChallenges.Contains(modifier.Id))
+                    {
+                        hasEnabled = true;
+                        break;
+                    }
+                }
+                if (!hasEnabled && fallback != ModifierId.None &&
+                    creatorToolsDisabledChallenges.Remove(fallback))
+                    changed = true;
+            }
+            return changed;
+        }
+
+        private bool CanDisableCreatorToolsChallenge(ModifierId id)
+        {
+            ModifierKind kind = ModifierKind.Both;
+            var found = false;
+            for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+            {
+                if (RouletteData.Modifiers[i].Id != id)
+                    continue;
+                kind = RouletteData.Modifiers[i].Kind;
+                found = true;
+                break;
+            }
+            if (!found || id == ModifierId.None)
+                return false;
+
+            var enabledCount = 0;
+            for (var i = 0; i < RouletteData.Modifiers.Length; i++)
+            {
+                var modifier = RouletteData.Modifiers[i];
+                if (modifier.Id != ModifierId.None &&
+                    modifier.Kind == kind &&
+                    IsCreatorToolsChallengeEnabled(modifier.Id))
+                    enabledCount++;
+            }
+            return enabledCount > 1;
+        }
+
+        private List<int> CreatorToolsValidModifierIndices(BossEntry boss)
+        {
+            var valid = RouletteData.ValidModifierIndices(boss);
+            for (var i = valid.Count - 1; i >= 0; i--)
+            {
+                if (!IsCreatorToolsChallengeEnabled(
+                    RouletteData.Modifiers[valid[i]].Id))
+                    valid.RemoveAt(i);
+            }
+            return valid;
+        }
+
         private void SanitizeCreatorToolsForceSelection()
         {
             if (!availableBossIndices.Contains(creatorToolsForceBoss))
@@ -105,23 +247,29 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsForceWeapon1 = FirstAvailable(
                     availableWeaponIndices, 0, true, emptyWeapon);
 
-            if (!availableWeaponIndices.Contains(
-                    creatorToolsForceWeapon2))
-                creatorToolsForceWeapon2 = emptyWeapon;
-            if (creatorToolsForceWeapon2 == creatorToolsForceWeapon1)
-                creatorToolsForceWeapon2 = emptyWeapon;
+            if (!availableWeaponIndices.Contains(creatorToolsForceWeapon2) ||
+                creatorToolsForceWeapon2 == creatorToolsForceWeapon1)
+                creatorToolsForceWeapon2 = FirstAvailableExcept(
+                    availableWeaponIndices, creatorToolsForceWeapon1,
+                    emptyWeapon);
 
             if (!availableSuperIndices.Contains(creatorToolsForceSuper))
-                creatorToolsForceSuper = RouletteData.Supers.Length - 1;
+                creatorToolsForceSuper = FirstAvailable(
+                    availableSuperIndices, RouletteData.Supers.Length - 1,
+                    false, RouletteData.Supers.Length - 1);
             if (!availableCharmIndices.Contains(creatorToolsForceCharm))
-                creatorToolsForceCharm = RouletteData.Charms.Length - 1;
+                creatorToolsForceCharm = FirstAvailable(
+                    availableCharmIndices, RouletteData.Charms.Length - 1,
+                    false, RouletteData.Charms.Length - 1);
 
             var validModifiers = RouletteData.ValidModifierIndices(
                 RouletteData.Bosses[creatorToolsForceBoss]);
             var none = RouletteData.Modifiers.Length - 1;
             if (creatorToolsForceModifier != none &&
                 !validModifiers.Contains(creatorToolsForceModifier))
-                creatorToolsForceModifier = none;
+                creatorToolsForceModifier = validModifiers.Count > 0
+                    ? validModifiers[0]
+                    : none;
         }
 
         private void ApplyCreatorToolsForceCommand(string query)
@@ -142,6 +290,40 @@ namespace Gilomx.CupheadBossRoulette
             if (TryCreatorToolsInt(values, "modifier", out parsed))
                 creatorToolsForceModifier = parsed;
 
+            int challengeIndex;
+            string challengeEnabled;
+            if (TryCreatorToolsInt(values, "challenge",
+                    out challengeIndex) &&
+                challengeIndex >= 0 &&
+                challengeIndex < RouletteData.Modifiers.Length &&
+                values.TryGetValue("challengeEnabled",
+                    out challengeEnabled))
+            {
+                var challengeId = RouletteData.Modifiers[challengeIndex].Id;
+                if (challengeId != ModifierId.None &&
+                    ExperimentalFeatures.IsChallengeEnabled(challengeId))
+                {
+                    var shouldEnable = challengeEnabled == "1" ||
+                        string.Equals(challengeEnabled, "true",
+                            StringComparison.OrdinalIgnoreCase);
+                    var canChange = shouldEnable ||
+                        CanDisableCreatorToolsChallenge(challengeId);
+                    var changed = canChange && (shouldEnable
+                        ? creatorToolsDisabledChallenges.Remove(challengeId)
+                        : creatorToolsDisabledChallenges.Add(challengeId));
+                    if (!canChange)
+                        Logger.LogWarning("No se puede desactivar " +
+                            challengeId + ": debe quedar al menos un reto " +
+                            "activo en su categoría.");
+                    if (changed)
+                    {
+                        SaveCreatorToolsDisabledChallenges();
+                        Logger.LogInfo("Reto web " + challengeId +
+                            (shouldEnable ? " activado." : " desactivado."));
+                    }
+                }
+            }
+
             string enabled;
             if (values.TryGetValue("enabled", out enabled))
                 creatorToolsForceEnabled = enabled == "1" ||
@@ -153,9 +335,12 @@ namespace Gilomx.CupheadBossRoulette
                 ? RouletteData.Modifiers[creatorToolsForceModifier].Id !=
                     ModifierId.None
                 : challengeSetting.Value;
-            Logger.LogInfo(creatorToolsForceEnabled
-                ? "Forzado web de ruleta activado."
-                : "Forzado web de ruleta desactivado.");
+            if (values.ContainsKey("enabled"))
+            {
+                Logger.LogInfo(creatorToolsForceEnabled
+                    ? "Forzado web de ruleta activado."
+                    : "Forzado web de ruleta desactivado.");
+            }
         }
 
         private static Dictionary<string, string> ParseCreatorToolsQuery(
@@ -338,6 +523,16 @@ namespace Gilomx.CupheadBossRoulette
                     .Append(modifier.Id == ModifierId.None
                         ? "true"
                         : "false")
+                    .Append(",\"enabled\":")
+                    .Append(modifier.Id == ModifierId.None ||
+                        IsCreatorToolsChallengeEnabled(modifier.Id)
+                            ? "true"
+                            : "false")
+                    .Append(",\"canDisable\":")
+                    .Append(modifier.Id != ModifierId.None &&
+                        CanDisableCreatorToolsChallenge(modifier.Id)
+                            ? "true"
+                            : "false")
                     .Append(",\"kind\":\"")
                     .Append(modifier.Kind == ModifierKind.Plane
                         ? "plane"

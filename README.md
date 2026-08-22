@@ -93,6 +93,13 @@ minijefe conservan el overlay sin repetir su entrada; un `Reintentar` o
 después de que el HUD termina de salir, durante la pantalla de calificación, y
 continúa al volver al mapa.
 
+El servidor también publica `/config`, un panel React para configurar la
+ruleta sin recargar la aplicación. Permite activar o excluir retos, preparar un
+resultado forzado y consultar el estado global de guardado. Los retos excluidos
+siguen girando visualmente, pero no pueden ser elegidos; siempre debe quedar al
+menos uno activo en Avión, Tierra y Ambos. Su comportamiento y reglas de
+desarrollo están documentados en [Reglas del panel](creator-tools-ui/PANEL_RULES.md).
+
 ## Instalación
 
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su
