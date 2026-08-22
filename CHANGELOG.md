@@ -22,6 +22,53 @@
 - El código fuente vive en `creator-tools-ui`; `assets/creator-tools/config.*`
   conserva las salidas compiladas que sirve el servidor interno.
 
+### Primeros artículos del catálogo de interacciones
+
+- La misma SPA sirve `/config`, `/config/roulette` y `/config/interactions`.
+  El shell, sus proveedores, el indicador global y el selector ES/EN permanecen
+  montados al cambiar entre Ruleta e Interacciones.
+- La vista nueva reutiliza los tokens y componentes del panel React. El catálogo
+  incluye los mini zepelines verde y morado de Hilda Berg, cada uno con el
+  primer frame original de su animación inactiva como preview local.
+- El servidor expone una cola independiente para pruebas de interacciones. El
+  hilo de red sólo encola el ID y el nombre; el controlador ejecuta el efecto
+  desde el `Update` principal de Unity.
+- El catálogo web usa tarjetas verticales pequeñas, con el preview arriba y el
+  nombre debajo. Se retiró el indicador redundante `Ejecutando cola`; los
+  estados operativos viven únicamente en la tabla de la cola.
+- Debajo del catálogo se muestra una cola operativa amplia y una tabla lateral
+  de pruebas con donador y cantidad; los lotes de ambos tipos conservan el
+  orden en que llegaron.
+- `CreatorToolsInteractionQueue` mantiene inicialmente un máximo de un canjeo
+  activo, hasta 200 entradas totales y lotes de hasta 50. El siguiente elemento
+  sólo se ejecuta cuando el enemigo activo termina o muere. Estos límites quedan
+  aislados para convertirlos después en configuración.
+- Las pruebas aparecen inmediatamente en la tabla aunque Unity esté pausado por
+  perder el foco. React las marca como `Esperando al juego` y las sustituye por
+  la cola autoritativa cuando el mod incrementa su revisión, sin duplicarlas.
+- `hilda_purple_zeppelin` reutiliza `enemyPrefabA` y conserva su disparo
+  individual; `hilda_green_zeppelin` reutiliza `enemyPrefabB` y conserva su
+  ráfaga nativa. Durante Hilda llaman a `SummonEnemy()`; desde el mapa se
+  precargan ambos prefabs de forma aditiva y se reutilizan en cualquier batalla
+  o nivel de plataformas.
+- El clon conserva sprites, controladores, clips, proyectil, efecto de disparo,
+  piezas de muerte y propiedades originales de la dificultad actual. El nombre
+  del donador ahora es un `TextMeshPro` de mundo con la fuente Memphis del juego:
+  queda anclado como hijo del enemigo, más separado de él y recibe los filtros
+  de la cámara.
+- Cada prueba selecciona una de las cadenas nativas de alturas, una altura de
+  esa cadena y una distancia de parada nativa. El mod la desplaza hacia la
+  derecha con variación adicional y la limita al rango seguro de 390–535; en
+  Hilda aplica el valor después de `SummonEnemy()` porque el método original lo
+  vuelve a sortear. La variante A mantiene además el contador nativo que alterna
+  su proyectil rosa.
+- Se retiró el prototipo portátil que aproximaba el enemigo con una imagen y
+  movimiento manual. Los actores jugables se construyen en memoria desde la
+  instalación local; los únicos PNG extraídos son los dos previews web.
+- La coordinación vive en `CreatorToolsInteractionController.cs`; el ejecutor
+  y la etiqueta del donador están separados bajo `Interactions`. No se añadió
+  lógica de canje específica a `Plugin.cs`.
+
 ## 0.6.0 — La Pichi Ruleta (2026-08-18)
 
 Esta versión reúne Modo Tieso, Creator Tools y su overlay para OBS, la

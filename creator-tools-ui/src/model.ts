@@ -53,6 +53,29 @@ export interface RouletteConfigState {
   modifiers: ModifierOption[];
 }
 
+export interface InteractionConfigState {
+  ready: boolean;
+  available: boolean;
+  item: string;
+  items: string[];
+  lastItem: string;
+  feedback: string;
+  error: boolean;
+  revision: number;
+  queueCount: number;
+  activeCount: number;
+  maxActive: number;
+  maxBatch: number;
+  queue: InteractionQueueEntry[];
+}
+
+export interface InteractionQueueEntry {
+  id: number;
+  item: string;
+  donor: string;
+  status: "active" | "queued" | "waiting_game";
+}
+
 export type ConnectionStatus =
   | "connecting"
   | "saved"

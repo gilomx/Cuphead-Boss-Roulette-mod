@@ -11,6 +11,8 @@ import {
 import type {
   ConnectionStatus,
   ForceDraft,
+  InteractionConfigState,
+  InteractionQueueEntry,
   RouletteConfigState,
   RouletteSelection,
 } from "../model";
@@ -18,9 +20,13 @@ import type {
 interface ConfigValue {
   config: RouletteConfigState | null;
   draft: ForceDraft | null;
+  interaction: InteractionConfigState | null;
+  optimisticInteractionQueue: InteractionQueueEntry[];
+  interactionTesting: boolean;
   status: ConnectionStatus;
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
+  testInteraction: (item: string, donor: string, quantity: number) => void;
 }
 
 const ConfigContext = createContext<ConfigValue | null>(null);
@@ -56,21 +62,46 @@ function queryFor(draft: ForceDraft) {
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<RouletteConfigState | null>(null);
   const [draft, setDraft] = useState<ForceDraft | null>(null);
+  const [interaction, setInteraction] = useState<InteractionConfigState | null>(null);
+  const [optimisticInteractionQueue, setOptimisticInteractionQueue] = useState<
+    InteractionQueueEntry[]
+  >([]);
+  const [interactionTesting, setInteractionTesting] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const desiredForceRef = useRef<ForceDraft | null>(null);
   const desiredChallengesRef = useRef(new Map<number, boolean>());
+  const interactionRevisionRef = useRef<number | null>(null);
+  const nextOptimisticInteractionIdRef = useRef(-1);
   const mountedRef = useRef(true);
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/config", { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const next = (await response.json()) as RouletteConfigState;
-      if (!next.ready) {
-        if (mountedRef.current) setStatus("connecting");
+      const [configResponse, interactionResponse] = await Promise.all([
+        fetch("/api/config", { cache: "no-store" }),
+        fetch("/api/config/interactions", { cache: "no-store" }),
+      ]);
+      if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
+      if (!interactionResponse.ok) throw new Error(`HTTP ${interactionResponse.status}`);
+      const next = (await configResponse.json()) as RouletteConfigState;
+      const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
+      if (!mountedRef.current) return;
+
+      setInteraction(nextInteraction);
+      let interactionPending = false;
+      const interactionRevision = interactionRevisionRef.current;
+      if (interactionRevision !== null) {
+        if (nextInteraction.revision === interactionRevision) {
+          interactionPending = true;
+        } else {
+          interactionRevisionRef.current = null;
+          setOptimisticInteractionQueue([]);
+          setInteractionTesting(false);
+        }
+      }
+      if (!next.ready || !nextInteraction.ready) {
+        setStatus("connecting");
         return;
       }
-      if (!mountedRef.current) return;
 
       const desiredForce = desiredForceRef.current;
       let forcePending = false;
@@ -104,7 +135,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             })),
           }
         : next);
-      setStatus(forcePending || challengePending ? "pending" : "saved");
+      setStatus(forcePending || challengePending || interactionPending ? "pending" : "saved");
     } catch {
       if (mountedRef.current) setStatus("error");
     }
@@ -166,9 +197,78 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [load],
   );
 
+  const testInteraction = useCallback(
+    (item: string, donor: string, quantity: number) => {
+      if (!interaction?.ready) return;
+      const normalizedQuantity = Math.max(
+        1,
+        Math.min(interaction.maxBatch ?? 50, Math.floor(quantity) || 1),
+      );
+      const temporaryIds: number[] = [];
+      const optimisticEntries = Array.from({ length: normalizedQuantity }, () => {
+        const id = nextOptimisticInteractionIdRef.current;
+        nextOptimisticInteractionIdRef.current -= 1;
+        temporaryIds.push(id);
+        return {
+          id,
+          item,
+          donor: donor.trim(),
+          status: "waiting_game" as const,
+        };
+      });
+      setOptimisticInteractionQueue((current) => [...current, ...optimisticEntries]);
+      interactionRevisionRef.current = interaction.revision;
+      setInteractionTesting(true);
+      setStatus("saving");
+
+      const query = new URLSearchParams({
+        item,
+        donor: donor.trim(),
+        quantity: String(normalizedQuantity),
+      });
+      void fetch(`/api/config/interactions/test?${query}`, { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (mountedRef.current) setStatus("pending");
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          interactionRevisionRef.current = null;
+          setOptimisticInteractionQueue((current) => current.filter(
+            (entry) => !temporaryIds.includes(entry.id),
+          ));
+          if (mountedRef.current) {
+            setInteractionTesting(false);
+            setStatus("error");
+          }
+        });
+    },
+    [interaction, load],
+  );
+
   const value = useMemo(
-    () => ({ config, draft, status, applyDraft, applyChallenge }),
-    [config, draft, status, applyDraft, applyChallenge],
+    () => ({
+      config,
+      draft,
+      interaction,
+      optimisticInteractionQueue,
+      interactionTesting,
+      status,
+      applyDraft,
+      applyChallenge,
+      testInteraction,
+    }),
+    [
+      config,
+      draft,
+      interaction,
+      optimisticInteractionQueue,
+      interactionTesting,
+      status,
+      applyDraft,
+      applyChallenge,
+      testInteraction,
+    ],
   );
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
 }

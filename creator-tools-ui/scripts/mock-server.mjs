@@ -6,6 +6,11 @@ const port = 18081;
 const assetsRoot = resolve(process.cwd(), "../assets") + sep;
 const selection = { boss: 0, weapon1: 0, weapon2: 1, super: 0, charm: 0, modifier: 0 };
 let enabled = false;
+let interactionRevision = 0;
+let interactionFeedback = "ready";
+let interactionLastItem = "";
+let interactionNextId = 1;
+let interactionQueue = [];
 
 const bosses = [
   { id: 0, name: "Hosco y Tosco", plane: false },
@@ -106,6 +111,45 @@ createServer((req, res) => {
         if (Number.isInteger(value)) selection[key] = value;
       }
     }
+    json(res, { ok: true }, 202);
+    return;
+  }
+  if (url.pathname === "/api/config/interactions") {
+    json(res, {
+      ready: true,
+      available: true,
+      item: "hilda_green_zeppelin",
+      items: ["hilda_green_zeppelin", "hilda_purple_zeppelin"],
+      lastItem: interactionLastItem,
+      feedback: interactionFeedback,
+      error: false,
+      revision: interactionRevision,
+      queueCount: interactionQueue.length,
+      activeCount: interactionQueue.filter((entry) => entry.status === "active").length,
+      maxActive: 1,
+      maxBatch: 50,
+      queue: interactionQueue,
+    });
+    return;
+  }
+  if (url.pathname === "/api/config/interactions/test") {
+    interactionLastItem = url.searchParams.get("item") ?? "";
+    const donor = (url.searchParams.get("donor") ?? "DONOR").slice(0, 32);
+    const quantity = Math.max(1, Math.min(50, Number(url.searchParams.get("quantity")) || 1));
+    for (let index = 0; index < quantity; index += 1) {
+      interactionQueue.push({
+        id: interactionNextId,
+        item: interactionLastItem,
+        donor,
+        status: "queued",
+      });
+      interactionNextId += 1;
+    }
+    if (!interactionQueue.some((entry) => entry.status === "active") && interactionQueue[0]) {
+      interactionQueue[0].status = "active";
+    }
+    interactionFeedback = "queued";
+    interactionRevision += 1;
     json(res, { ok: true }, 202);
     return;
   }

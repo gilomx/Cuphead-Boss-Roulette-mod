@@ -467,7 +467,7 @@ namespace Gilomx.CupheadBossRoulette
                 CompleteChallengeVisualRestartOnFadeInEnd;
             harmony = new Harmony(PluginGuid);
             if (ExperimentalFeatures.EnableCreatorTools)
-                InstallCreatorToolsMenuPatches();
+                InstallCreatorToolsPatches();
             var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
             var mapPausePostfix = AccessTools.Method(typeof(Plugin), "BlockMapPausePostfix");
             if (mapPauseCanPause != null && mapPausePostfix != null)

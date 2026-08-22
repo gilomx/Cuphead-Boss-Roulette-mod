@@ -3,6 +3,10 @@
 Panel web local de La Pichi Ruleta. React se compila a los tres archivos que el
 servidor interno ya publica: `config.html`, `config.css` y `config.js`.
 
+Las rutas `/config`, `/config/roulette` y `/config/interactions` entregan ese
+mismo documento. La SPA conserva el shell y cambia únicamente la vista central;
+`/config` abre Ruleta como sección inicial.
+
 ## Desarrollo
 
 ```powershell
@@ -17,6 +21,13 @@ y `/assets`. Para trabajar sin Cuphead, inicia primero el servidor simulado:
 ```powershell
 node scripts/mock-server.mjs
 ```
+
+El servidor simulado habilita los mini zepelines verde y morado y conserva los
+lotes mixtos en la cola para revisar el catálogo compacto, la tabla de pruebas
+y sus estados. En el mod real se preparan ambos prefabs nativos desde el mapa y
+se habilitan en cualquier batalla o nivel de plataformas. No existe una
+recreación portátil aproximada. Sus previews se regeneran con
+`tools/extract_native_zeppelin_previews.py` desde el primer frame nativo.
 
 ## Reglas permanentes
 

@@ -6,8 +6,66 @@
     "openOverlay": "Open overlay"
   },
   "nav": {
-    "interactions": "Interactions",
-    "roulette": "Roulette"
+    "group": "Creator Tools",
+    "roulette": "Roulette",
+    "interactions": "Interactions"
+  },
+  "interactions": {
+    "title": "Interactions",
+    "description": "Manage the redeems entering the game and test their execution order.",
+    "catalog": {
+      "title": "Redeem catalog"
+    },
+    "zeppelin": {
+      "type": "Enemy",
+      "available": "Available during this fight.",
+      "requiresGameplay": "Start any gameplay level to enable the test; the native prefabs are prepared from the map.",
+      "green": {
+        "title": "Green mini zeppelin",
+        "imageAlt": "Original first frame of Hilda Berg's green mini zeppelin"
+      },
+      "purple": {
+        "title": "Purple mini zeppelin",
+        "imageAlt": "Original first frame of Hilda Berg's purple mini zeppelin"
+      }
+    },
+    "queue": {
+      "title": "Redeem queue",
+      "description": "One item runs at a time. The rest wait in the order they arrived.",
+      "countLabel": "Items in queue",
+      "emptyTitle": "The queue is empty",
+      "emptyDescription": "Add one or more tests from the table to review their execution order here.",
+      "position": "Order",
+      "item": "Redeem",
+      "donor": "Donor",
+      "status": "Status",
+      "active": "Running",
+      "queued": "Queued",
+      "waiting_game": "Waiting for game"
+    },
+    "test": {
+      "title": "Tests",
+      "description": "Add one or more redeems without changing the order of items already waiting.",
+      "item": "Redeem",
+      "configuration": "Test data",
+      "donorLabel": "Donor name",
+      "donorPlaceholder": "Test donor",
+      "quantityLabel": "Times",
+      "action": "Add to queue",
+      "testing": "Adding"
+    },
+    "feedback": {
+      "ready": "The test is ready.",
+      "unknown_item": "The mod does not recognize this item.",
+      "native_assets_loading": "The zeppelin's native assets are still being prepared.",
+      "native_assets_unavailable": "The zeppelin's native assets could not be prepared.",
+      "requires_gameplay_level": "Start any gameplay level to send the zeppelin.",
+      "waiting_game": "The request is already visible and is waiting for the game to confirm it.",
+      "queued": "The redeems were added to the queue.",
+      "queue_full": "The queue reached its temporary limit.",
+      "sent": "The mini zeppelin was sent into the fight.",
+      "spawn_failed": "The mini zeppelin could not be created. Check the fight state."
+    }
   },
   "roulette": {
     "title": "Roulette",

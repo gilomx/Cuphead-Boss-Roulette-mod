@@ -23,6 +23,9 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object configLock = new object();
         private readonly Queue<string> configCommands =
             new Queue<string>();
+        private readonly object interactionsLock = new object();
+        private readonly Queue<string> interactionCommands =
+            new Queue<string>();
         private readonly object clientsLock = new object();
         private readonly List<WebSocketClient> clients =
             new List<WebSocketClient>();
@@ -39,6 +42,8 @@ namespace Gilomx.CupheadBossRoulette
         private int challengeLabelRevision;
         private string latestConfigState =
             "{\"enabled\":false,\"ready\":false}";
+        private string latestInteractionsState =
+            "{\"ready\":false,\"available\":false}";
 
         internal int Port { get; private set; }
 
@@ -161,6 +166,28 @@ namespace Gilomx.CupheadBossRoulette
                     return false;
                 }
                 command = configCommands.Dequeue();
+                return true;
+            }
+        }
+
+        internal void SetInteractionsState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (interactionsLock)
+                latestInteractionsState = json;
+        }
+
+        internal bool TryTakeInteractionCommand(out string command)
+        {
+            lock (interactionsLock)
+            {
+                if (interactionCommands.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = interactionCommands.Dequeue();
                 return true;
             }
         }
@@ -470,28 +497,35 @@ namespace Gilomx.CupheadBossRoulette
                     "application/javascript; charset=utf-8", false);
                 return;
             }
-            if (path == "/config" || path == "/config.html")
+            if (path == "/config" || path == "/config/" ||
+                path == "/config.html" ||
+                path == "/config/roulette" ||
+                path == "/config/roulette/" ||
+                path == "/config/roulette.html" ||
+                path == "/config/interactions" ||
+                path == "/config/interactions/" ||
+                path == "/config/interactions.html")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.html"),
                     "text/html; charset=utf-8", false);
                 return;
             }
-            if (path == "/config.css")
+            if (path == "/config/roulette.css" || path == "/config.css")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.css"),
                     "text/css; charset=utf-8", false);
                 return;
             }
-            if (path == "/config.js")
+            if (path == "/config/roulette.js" || path == "/config.js")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.js"),
                     "application/javascript; charset=utf-8", false);
                 return;
             }
-            if (path == "/api/config")
+            if (path == "/api/config/roulette" || path == "/api/config")
             {
                 string json;
                 lock (configLock)
@@ -501,7 +535,8 @@ namespace Gilomx.CupheadBossRoulette
                     Encoding.UTF8.GetBytes(json), false);
                 return;
             }
-            if (path == "/api/config/set")
+            if (path == "/api/config/roulette/set" ||
+                path == "/api/config/set")
             {
                 lock (configLock)
                     configCommands.Enqueue(request.Query ?? string.Empty);
@@ -509,7 +544,27 @@ namespace Gilomx.CupheadBossRoulette
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
                 return;
-            }            if (path == "/generated/challenge.png")
+            }
+            if (path == "/api/config/interactions")
+            {
+                string json;
+                lock (interactionsLock)
+                    json = latestInteractionsState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/config/interactions/test")
+            {
+                lock (interactionsLock)
+                    interactionCommands.Enqueue(request.Query ?? string.Empty);
+                WriteResponse(stream, 202, "Accepted",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                return;
+            }
+            if (path == "/generated/challenge.png")
             {
                 byte[] png;
                 int revision;

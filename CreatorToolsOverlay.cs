@@ -45,6 +45,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsRetryBehaviorSetting;
 
         private CreatorToolsServer creatorToolsServer;
+        private CreatorToolsInteractionController creatorToolsInteractions;
         private bool creatorToolsBattleSessionActive;
         private bool creatorToolsBattleCompleted;
         private bool creatorToolsBattleVisible;
@@ -60,6 +61,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private void InitializeCreatorTools()
         {
+            creatorToolsInteractions = new CreatorToolsInteractionController(
+                this,
+                CanPreloadNativeInteractionAssets,
+                CanSpawnCreatorToolsInteraction,
+                delegate(string message) { Logger.LogInfo(message); },
+                delegate(string message) { Logger.LogWarning(message); });
             creatorToolsEnabledSetting = Config.Bind(
                 "Creator Tools", "Activado", false,
                 "Activa el overlay local para OBS.");
@@ -99,6 +106,33 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsPreviewSetting.Value = false;
             if (creatorToolsEnabledSetting.Value)
                 StartCreatorToolsServer();
+        }
+
+        private bool CanPreloadNativeInteractionAssets()
+        {
+            return creatorToolsEnabledSetting != null &&
+                   creatorToolsEnabledSetting.Value &&
+                   !SceneLoader.CurrentlyLoading &&
+                   CanUseRouletteOnMap();
+        }
+
+        private bool CanSpawnCreatorToolsInteraction()
+        {
+            if (SceneLoader.CurrentlyLoading)
+                return false;
+            var level = Level.Current;
+            if (level == null)
+                return false;
+            return level.LevelType == Level.Type.Battle ||
+                   level.LevelType == Level.Type.Platforming;
+        }
+
+        private void InstallCreatorToolsPatches()
+        {
+            InstallCreatorToolsMenuPatches();
+            NativeZeppelinCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
         }
 
         private void NormalizeCreatorToolsSettings()
@@ -210,10 +244,17 @@ namespace Gilomx.CupheadBossRoulette
 
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.Update(creatorToolsServer);
         }
 
         private void DisposeCreatorTools()
         {
+            if (creatorToolsInteractions != null)
+            {
+                creatorToolsInteractions.Dispose();
+                creatorToolsInteractions = null;
+            }
             if (creatorToolsServer == null)
                 return;
             creatorToolsServer.Dispose();

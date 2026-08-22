@@ -6,8 +6,66 @@
     "openOverlay": "Abrir overlay"
   },
   "nav": {
-    "interactions": "Interacciones",
-    "roulette": "Ruleta"
+    "group": "Creator Tools",
+    "roulette": "Ruleta",
+    "interactions": "Interacciones"
+  },
+  "interactions": {
+    "title": "Interacciones",
+    "description": "Administra los canjeos que entran al juego y prueba su orden de ejecución.",
+    "catalog": {
+      "title": "Catálogo de canjeos"
+    },
+    "zeppelin": {
+      "type": "Enemigo",
+      "available": "Disponible durante este combate.",
+      "requiresGameplay": "Inicia cualquier nivel jugable para habilitar la prueba; los prefabs nativos se preparan desde el mapa.",
+      "green": {
+        "title": "Mini zepelín verde",
+        "imageAlt": "Primer frame original del mini zepelín verde de Hilda Berg"
+      },
+      "purple": {
+        "title": "Mini zepelín morado",
+        "imageAlt": "Primer frame original del mini zepelín morado de Hilda Berg"
+      }
+    },
+    "queue": {
+      "title": "Cola de canjeos",
+      "description": "Se ejecuta un elemento a la vez. Los siguientes esperan en el orden en que llegaron.",
+      "countLabel": "Elementos en la cola",
+      "emptyTitle": "La cola está vacía",
+      "emptyDescription": "Agrega una o varias pruebas desde la tabla para ver aquí su orden de ejecución.",
+      "position": "Orden",
+      "item": "Canjeo",
+      "donor": "Donador",
+      "status": "Estado",
+      "active": "Ejecutándose",
+      "queued": "En cola",
+      "waiting_game": "Esperando al juego"
+    },
+    "test": {
+      "title": "Pruebas",
+      "description": "Agrega uno o varios canjeos sin alterar el orden de los que ya están esperando.",
+      "item": "Canjeo",
+      "configuration": "Datos de prueba",
+      "donorLabel": "Nombre del donador",
+      "donorPlaceholder": "Donador de prueba",
+      "quantityLabel": "Veces",
+      "action": "Agregar a cola",
+      "testing": "Agregando"
+    },
+    "feedback": {
+      "ready": "La prueba está lista.",
+      "unknown_item": "El mod no reconoce este artículo.",
+      "native_assets_loading": "Los recursos nativos del zepelín todavía se están preparando.",
+      "native_assets_unavailable": "No se pudieron preparar los recursos nativos del zepelín.",
+      "requires_gameplay_level": "Inicia cualquier nivel jugable para enviar el zepelín.",
+      "waiting_game": "La solicitud ya está visible y espera a que el juego la confirme.",
+      "queued": "Los canjeos fueron agregados a la cola.",
+      "queue_full": "La cola alcanzó su límite temporal.",
+      "sent": "El mini zepelín fue enviado al combate.",
+      "spawn_failed": "No se pudo crear el mini zepelín. Revisa el estado del combate."
+    }
   },
   "roulette": {
     "title": "Ruleta",

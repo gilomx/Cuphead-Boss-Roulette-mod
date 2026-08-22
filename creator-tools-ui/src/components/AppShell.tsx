@@ -1,9 +1,16 @@
 import type { ReactNode } from "react";
+import type { ConfigSection } from "../App";
 import { useConfig } from "../config/ConfigContext";
 import { useLocalization } from "../i18n/LocalizationContext";
 import { StatusBadge } from "./StatusBadge";
 
-export function AppShell({ children }: { children: ReactNode }) {
+interface AppShellProps {
+  activeSection: ConfigSection;
+  children: ReactNode;
+  onSectionChange: (section: ConfigSection) => void;
+}
+
+export function AppShell({ activeSection, children, onSectionChange }: AppShellProps) {
   const { locale, setLocale, t } = useLocalization();
   const { status } = useConfig();
   return (
@@ -16,10 +23,23 @@ export function AppShell({ children }: { children: ReactNode }) {
           <StatusBadge status={status} />
         </div>
 
-        <nav className="sidebar__nav" aria-label={t("nav.interactions")}>
-          <p className="sidebar__group">{t("nav.interactions")}</p>
-          <button className="sidebar__item sidebar__item--active" type="button" aria-current="page">
+        <nav className="sidebar__nav" aria-label={t("nav.group")}>
+          <p className="sidebar__group">{t("nav.group")}</p>
+          <button
+            className={`sidebar__item${activeSection === "roulette" ? " sidebar__item--active" : ""}`}
+            type="button"
+            aria-current={activeSection === "roulette" ? "page" : undefined}
+            onClick={() => onSectionChange("roulette")}
+          >
             {t("nav.roulette")}
+          </button>
+          <button
+            className={`sidebar__item${activeSection === "interactions" ? " sidebar__item--active" : ""}`}
+            type="button"
+            aria-current={activeSection === "interactions" ? "page" : undefined}
+            onClick={() => onSectionChange("interactions")}
+          >
+            {t("nav.interactions")}
           </button>
         </nav>
 
