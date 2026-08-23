@@ -49,6 +49,20 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal static void MarkInheritedGameplayCameraScale(
+            GameObject actor,
+            float factor)
+        {
+            if (actor == null)
+                return;
+            var marker = actor.GetComponent<
+                CreatorToolsInteractionCameraScale>();
+            if (marker == null)
+                marker = actor.AddComponent<
+                    CreatorToolsInteractionCameraScale>();
+            marker.Factor = Mathf.Max(0.01f, factor);
+        }
+
         internal static void BringActorToFront(GameObject actor)
         {
             if (actor == null)

@@ -10,6 +10,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float VisualGap = 14f;
         private const float LabelWidth = 320f;
         private const float LabelHeight = 48f;
+        private CreatorToolsDonorLabelFollower follower;
 
         internal void Initialize(string value)
         {
@@ -56,10 +57,11 @@ namespace Gilomx.CupheadBossRoulette
                     ? GetComponent<SpriteRenderer>()
                     : anchorRenderer;
                 MatchActorSorting(labelText.GetComponent<Renderer>());
-                labelTransform.localScale = transform.lossyScale;
+                labelTransform.localScale = AbsoluteScale(
+                    transform.lossyScale);
                 labelTransform.rotation = Quaternion.identity;
 
-                var follower = labelObject.AddComponent<
+                follower = labelObject.AddComponent<
                     CreatorToolsDonorLabelFollower>();
                 var cameraScale = GetComponent<
                     CreatorToolsInteractionCameraScale>();
@@ -79,6 +81,48 @@ namespace Gilomx.CupheadBossRoulette
                     Destroy(labelObject);
                 throw;
             }
+        }
+
+        internal bool RebindTo(
+            GameObject actor,
+            SpriteRenderer anchorRenderer,
+            float dynamicAnchorSeconds)
+        {
+            if (actor == null || follower == null)
+                return false;
+
+            var cameraScale = actor.GetComponent<
+                CreatorToolsInteractionCameraScale>();
+            var scaleFactor = cameraScale == null
+                ? 1f
+                : Mathf.Max(0.01f, cameraScale.Factor);
+            follower.Rebind(
+                actor.transform,
+                anchorRenderer,
+                FallbackVerticalOffset,
+                VisualGap * scaleFactor,
+                dynamicAnchorSeconds);
+            return true;
+        }
+
+        internal void Hide()
+        {
+            if (follower != null)
+                follower.Hide();
+        }
+
+        internal void FadeInWhenActorVisible(float duration)
+        {
+            if (follower != null)
+                follower.FadeInWhenActorVisible(duration);
+        }
+
+        private static Vector3 AbsoluteScale(Vector3 value)
+        {
+            return new Vector3(
+                Mathf.Abs(value.x),
+                Mathf.Abs(value.y),
+                Mathf.Abs(value.z));
         }
 
         private void MatchActorSorting(Renderer donorLabelRenderer)
@@ -145,6 +189,14 @@ namespace Gilomx.CupheadBossRoulette
         private Vector3 actorOffset;
         private bool positioned;
         private bool rendererAnchorCaptured;
+        private float dynamicAnchorRemaining;
+        private float currentOpacity = 1f;
+        private float fadeInDuration;
+        private float fadeInElapsed;
+        private float fadeOutStartOpacity = 1f;
+        private bool waitingForActorVisibility;
+        private bool fadingIn;
+        private bool fadeOutStarted;
 
         internal void Initialize(
             Transform actorTransform,
@@ -153,16 +205,62 @@ namespace Gilomx.CupheadBossRoulette
             float fallbackVerticalOffset,
             float visualGap)
         {
-            this.actorTransform = actorTransform;
-            this.actorRenderer = actorRenderer;
             this.text = text;
-            this.fallbackVerticalOffset = fallbackVerticalOffset;
-            this.visualGap = visualGap;
             originalColor = text == null ? Color.white : text.color;
             originalOutlineColor = text == null
                 ? new Color32(0, 0, 0, 0)
                 : text.outlineColor;
+            Rebind(
+                actorTransform,
+                actorRenderer,
+                fallbackVerticalOffset,
+                visualGap,
+                0f);
+        }
+
+        internal void Rebind(
+            Transform newActorTransform,
+            SpriteRenderer newActorRenderer,
+            float newFallbackVerticalOffset,
+            float newVisualGap,
+            float dynamicAnchorSeconds)
+        {
+            actorTransform = newActorTransform;
+            actorRenderer = newActorRenderer;
+            fallbackVerticalOffset = newFallbackVerticalOffset;
+            visualGap = newVisualGap;
+            actorOffset = Vector3.zero;
+            positioned = false;
+            rendererAnchorCaptured = false;
+            dynamicAnchorRemaining = Mathf.Max(
+                0f, dynamicAnchorSeconds);
+            fadeOutStarted = false;
+            fadeElapsed = 0f;
+            if (text != null && actorTransform != null)
+                text.rectTransform.localScale = new Vector3(
+                    Mathf.Abs(actorTransform.lossyScale.x),
+                    Mathf.Abs(actorTransform.lossyScale.y),
+                    Mathf.Abs(actorTransform.lossyScale.z));
             UpdatePosition();
+        }
+
+        internal void Hide()
+        {
+            waitingForActorVisibility = false;
+            fadingIn = false;
+            fadeInElapsed = 0f;
+            currentOpacity = 0f;
+            ApplyOpacity(currentOpacity);
+        }
+
+        internal void FadeInWhenActorVisible(float duration)
+        {
+            fadeInDuration = Mathf.Max(0.01f, duration);
+            fadeInElapsed = 0f;
+            currentOpacity = 0f;
+            waitingForActorVisibility = true;
+            fadingIn = false;
+            ApplyOpacity(currentOpacity);
         }
 
         private void LateUpdate()
@@ -170,6 +268,7 @@ namespace Gilomx.CupheadBossRoulette
             if (actorTransform != null)
             {
                 UpdatePosition();
+                UpdateFadeIn();
                 return;
             }
             UpdateFade();
@@ -177,7 +276,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdatePosition()
         {
-            if (!rendererAnchorCaptured && actorRenderer != null &&
+            if ((!rendererAnchorCaptured ||
+                 dynamicAnchorRemaining > 0f) &&
+                actorRenderer != null &&
                 actorRenderer.sprite != null && actorRenderer.enabled &&
                 actorRenderer.gameObject.activeInHierarchy)
             {
@@ -188,7 +289,8 @@ namespace Gilomx.CupheadBossRoulette
                     bounds.center.z);
                 actorOffset = anchor - actorTransform.position;
                 positioned = true;
-                rendererAnchorCaptured = true;
+                if (dynamicAnchorRemaining <= 0f)
+                    rendererAnchorCaptured = true;
             }
             else if (!positioned && actorTransform != null)
             {
@@ -200,6 +302,16 @@ namespace Gilomx.CupheadBossRoulette
             if (positioned && actorTransform != null)
                 transform.position = actorTransform.position + actorOffset;
             transform.rotation = Quaternion.identity;
+
+            if (dynamicAnchorRemaining <= 0f)
+                return;
+            var speed = Mathf.Max(0f, CupheadTime.GlobalSpeed);
+            dynamicAnchorRemaining = Mathf.Max(
+                0f,
+                dynamicAnchorRemaining -
+                Time.unscaledDeltaTime * speed);
+            if (dynamicAnchorRemaining <= 0f && positioned)
+                rendererAnchorCaptured = true;
         }
 
         private void UpdateFade()
@@ -210,24 +322,87 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
+            if (!fadeOutStarted)
+            {
+                fadeOutStarted = true;
+                fadeElapsed = 0f;
+                fadeOutStartOpacity = currentOpacity;
+                waitingForActorVisibility = false;
+                fadingIn = false;
+            }
+
             var speed = Mathf.Max(0f, CupheadTime.GlobalSpeed);
             if (speed <= 0f)
                 return;
             fadeElapsed += Time.unscaledDeltaTime * speed;
-            var opacity = 1f - Mathf.Clamp01(
-                fadeElapsed / FadeDuration);
+            currentOpacity = fadeOutStartOpacity *
+                (1f - Mathf.Clamp01(fadeElapsed / FadeDuration));
+            ApplyOpacity(currentOpacity);
 
+            if (currentOpacity <= 0f)
+                Destroy(gameObject);
+        }
+
+        private void UpdateFadeIn()
+        {
+            if (waitingForActorVisibility)
+            {
+                if (!ActorIsVisible())
+                    return;
+                waitingForActorVisibility = false;
+                fadingIn = true;
+            }
+            if (!fadingIn)
+                return;
+
+            var speed = Mathf.Max(0f, CupheadTime.GlobalSpeed);
+            if (speed <= 0f)
+                return;
+            fadeInElapsed += Time.unscaledDeltaTime * speed;
+            currentOpacity = Mathf.Clamp01(
+                fadeInElapsed / fadeInDuration);
+            ApplyOpacity(currentOpacity);
+            if (currentOpacity >= 1f)
+                fadingIn = false;
+        }
+
+        private bool ActorIsVisible()
+        {
+            if (actorTransform == null)
+                return false;
+            var camera = Camera.main;
+            if (camera == null || !camera.enabled)
+                return false;
+            if (actorRenderer == null || actorRenderer.sprite == null ||
+                !actorRenderer.enabled ||
+                !actorRenderer.gameObject.activeInHierarchy)
+            {
+                var point = camera.WorldToViewportPoint(
+                    actorTransform.position);
+                return point.z >= 0f && point.x >= 0f && point.x <= 1f &&
+                    point.y >= 0f && point.y <= 1f;
+            }
+
+            var bounds = actorRenderer.bounds;
+            var minimum = camera.WorldToViewportPoint(bounds.min);
+            var maximum = camera.WorldToViewportPoint(bounds.max);
+            return maximum.z >= 0f && maximum.x >= 0f &&
+                minimum.x <= 1f && maximum.y >= 0f && minimum.y <= 1f;
+        }
+
+        private void ApplyOpacity(float opacity)
+        {
+            if (text == null)
+                return;
+            var normalized = Mathf.Clamp01(opacity);
             var color = originalColor;
-            color.a *= opacity;
+            color.a *= normalized;
             text.color = color;
 
             var outline = originalOutlineColor;
             outline.a = (byte)Mathf.RoundToInt(
-                originalOutlineColor.a * opacity);
+                originalOutlineColor.a * normalized);
             text.outlineColor = outline;
-
-            if (opacity <= 0f)
-                Destroy(gameObject);
         }
     }
 }

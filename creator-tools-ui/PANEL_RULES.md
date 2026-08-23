@@ -36,10 +36,12 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
   La ruta base abre Ruleta; el historial del navegador cambia de vista sin
   desmontar el shell ni volver a solicitar el documento.
 - Interacciones muestra el catálogo de canjeos. `hilda_purple_zeppelin`,
-  `hilda_green_zeppelin` y `rootpack_homing_carrot` están disponibles en
-  cualquier batalla o nivel de plataformas después de preparar los prefabs
+  `hilda_green_zeppelin`, `rootpack_homing_carrot` y
+  `cagney_homing_plant` están disponibles en cualquier batalla o nivel de
+  plataformas después de preparar los prefabs
   originales desde el mapa. La zanahoria aparece como `Proyectil`; los dos
-  zepelines aparecen como `Enemigo`. Las tarjetas son un resumen vertical
+  zepelines y la semilla aparecen como `Enemigo`. Las tarjetas son un resumen
+  vertical
   pequeño con el primer frame nativo arriba y la información debajo; no
   contienen descripciones, controles de prueba ni un estado operativo
   duplicado.

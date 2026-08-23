@@ -42,6 +42,13 @@
         "imageAlt": "Original first frame of the Root Pack's homing carrot projectile"
       }
     },
+    "cagney": {
+      "type": "Enemy",
+      "homingPlant": {
+        "title": "Cagney's blue seed",
+        "imageAlt": "Original first frame of Cagney Carnation's blue seed"
+      }
+    },
     "queue": {
       "title": "Redeem queue",
       "description": "Items run up to the configured simultaneous limit. The rest wait in arrival order.",

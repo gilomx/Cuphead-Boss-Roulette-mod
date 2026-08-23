@@ -8,12 +8,14 @@ namespace Gilomx.CupheadBossRoulette
         internal const string GreenZeppelin = "hilda_green_zeppelin";
         internal const string PurpleZeppelin = "hilda_purple_zeppelin";
         internal const string HomingCarrot = "rootpack_homing_carrot";
+        internal const string CagneyHomingPlant = "cagney_homing_plant";
 
         internal static readonly string[] All =
         {
             GreenZeppelin,
             PurpleZeppelin,
-            HomingCarrot
+            HomingCarrot,
+            CagneyHomingPlant
         };
     }
 

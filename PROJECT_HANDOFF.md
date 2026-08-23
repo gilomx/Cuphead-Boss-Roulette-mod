@@ -191,7 +191,7 @@ same registry feeds the random test. The React `interactionItems` collection
 feeds both catalog cards and manual-test rows. Every future item must be added to
 both paths, with no one-off random-test list.
 
-The first three test items use Cuphead's original runtime mapping:
+The first four test items use Cuphead's original runtime mapping:
 `hilda_purple_zeppelin` uses `enemyPrefabA` and its native single shot, while
 `hilda_green_zeppelin` uses `enemyPrefabB` and its native spread attack. In
 Hilda both go through `SummonEnemy()`. On the map, `NativeZeppelinCache`
@@ -239,6 +239,31 @@ main visual renderer is passed explicitly to the shared donor-label presentation
 because the projectile can render below its root. Its preview is extracted by
 `tools/extract_native_homing_carrot_preview.py`.
 
+`cagney_homing_plant` uses native blue seed variant `A` from
+`FlowerLevelEnemySeed`; its `OnSpawnPlant` animation event creates the homing
+`FlowerLevelVenusSpawn`. The seed starts fully above a random viewport X and
+uses current-difficulty `LevelProperties.Flower`. Ground and platforming levels
+retain native ground collision. Plane levels suppress that callback, and every
+seed has a common fallback: once its complete sprite passes 16 base units below
+the lower viewport edge, the runtime freezes its fall and invokes native
+`OnSeedLand` there. This lets the plant grow offscreen and fly back naturally
+when a level has no floor.
+
+`CagneyHomingPlantInteractionState` owns the complete seed-to-plant lifetime, so
+one queue slot remains active until the resulting plant dies. A scoped Harmony
+postfix identifies the Venus instance created by this catalog seed. The same
+donor label is created hidden while the seed falls, rebinds to the plant and
+starts a 0.45-second fade only after the plant renderer intersects the viewport.
+It tracks changing bounds for only 0.55 seconds of growth before locking its
+offset again; never create a second label for this transition. Donor-label world
+scale always uses absolute components so a native negative X orientation cannot
+mirror the text. The plant inherits camera-size normalization
+through a scaled wrapper, while its own local X scale returns to native `±1`.
+This is required because native `move_cr` multiplies movement by local scale;
+scaling the plant root directly changes speed. The wrapper keeps sprite and
+collider proportional without changing HP, damage, rotation or movement. Its
+preview comes from `tools/extract_native_cagney_homing_plant_preview.py`.
+
 `CreatorToolsInteractionPresentation.MatchGameplayCameraScale` preserves visual
 size between bosses by multiplying native root scale by
 `(camera.orthographicSize * 2) / 720`. Cuphead's base camera height is 720, while
@@ -260,7 +285,7 @@ apply their camera factor to the returned projectile root exactly once. Scale
 the complete projectile root so its sprite and collider stay aligned; do not
 mutate shared native prefabs or change damage and speed.
 
-`NativeInteractionPreloadCoordinator` serializes the Hilda and Root Pack
+`NativeInteractionPreloadCoordinator` serializes the Hilda, Root Pack and Cagney
 additive scene captures. Never start two native catalog scene loads concurrently
 while either operation is waiting below scene activation; Unity's async scene
 queue can stall. Each cache retains its own narrow Harmony lifecycle guard,

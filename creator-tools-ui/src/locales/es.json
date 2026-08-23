@@ -42,6 +42,13 @@
         "imageAlt": "Primer frame original de la zanahoria teledirigida de La pandilla raíz"
       }
     },
+    "cagney": {
+      "type": "Enemigo",
+      "homingPlant": {
+        "title": "Semilla azul de Cagney",
+        "imageAlt": "Primer frame original de la semilla azul de Clavel de Cagney"
+      }
+    },
     "queue": {
       "title": "Cola de canjeos",
       "description": "Los elementos se ejecutan según el máximo simultáneo configurado. Los siguientes esperan en el orden en que llegaron.",

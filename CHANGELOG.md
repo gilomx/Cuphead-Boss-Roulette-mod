@@ -29,8 +29,8 @@
   montados al cambiar entre Ruleta e Interacciones.
 - La vista nueva reutiliza los tokens y componentes del panel React. El catálogo
   incluye los mini zepelines verde y morado de Hilda Berg y la zanahoria
-  teledirigida de La pandilla raíz, cada uno con un frame original como preview
-  local.
+  teledirigida de La pandilla raíz, además de la semilla azul de Clavel de
+  Cagney; cada uno usa un frame original como preview local.
 - El servidor expone una cola independiente para pruebas de interacciones. El
   hilo de red sólo encola el ID y el nombre; el controlador ejecuta el efecto
   desde el `Update` principal de Unity.
@@ -65,8 +65,18 @@
   sustituye el padre por una instancia inerte persistente. No añade TTL: ocupa
   su cupo hasta morir por disparos, jugador, suelo o el respaldo nativo de 1000
   segundos, y se limpia al cambiar de nivel.
-- Las escenas nativas de Hilda y La pandilla raíz se precargan de forma aditiva
-  desde el mapa bajo un coordinador único, por lo que nunca quedan dos cargas
+- `cagney_homing_plant` reutiliza la semilla nativa azul de Cagney y toda su
+  transición a `FlowerLevelVenusSpawn`. En tierra aterriza sobre el piso real;
+  en avión o al caer por un hueco cruza completamente el borde inferior, crece
+  fuera de cámara y regresa persiguiendo al jugador. Una sola etiqueta permanece
+  oculta durante la caída, se transfiere a la planta y aparece con un fade de
+  0.45 segundos cuando ésta entra a pantalla. Acompaña sus primeros 0.55 segundos
+  de crecimiento antes de fijar la separación.
+- Las etiquetas normalizan a positivo la escala mundial heredada. Las plantas
+  conservan su orientación nativa izquierda/derecha sin volver espejo el nombre
+  del donador.
+- Las escenas nativas de Hilda, La pandilla raíz y Cagney se precargan de forma
+  aditiva desde el mapa bajo un coordinador único, por lo que nunca quedan dos cargas
   retenidas a la vez. Los lifecycle de cada escena se bloquean sólo durante su
   propia captura y luego se descargan las raíces temporales.
 - El clon conserva sprites, controladores, clips, proyectil, efecto de disparo,
@@ -97,6 +107,9 @@
   cámara relativa al encuadre base de 720 unidades. Así conservan tamaño aparente
   y colisión en jefes con zoom alejado, incluido Chef Saleroso; la etiqueta usa
   el mismo factor para mantener su distancia visual.
+- La planta de Cagney usa esa escala en un wrapper y conserva su root interno en
+  escala nativa, porque su movimiento original multiplica la velocidad por
+  `localScale.x`. Así se corrige el tamaño sin acelerar al enemigo.
 - La compensación actual se aplica al actor raíz. Las balas que los zepelines
   crean como roots independientes todavía conservan su escala mundial nativa y
   quedan registradas como ajuste pendiente para cámaras alejadas.

@@ -64,6 +64,12 @@ namespace Gilomx.CupheadBossRoulette
                 canSpawnInteraction,
                 logInfo,
                 logWarning));
+            executors.Add(new CagneyHomingPlantInteractionExecutor(
+                coroutineHost,
+                canPreloadNativeAssets,
+                canSpawnInteraction,
+                logInfo,
+                logWarning));
         }
 
         internal void Update(CreatorToolsServer server)

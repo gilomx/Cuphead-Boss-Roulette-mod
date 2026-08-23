@@ -24,6 +24,13 @@ const interactionItems = [
     typeKey: "interactions.rootpack.type",
     image: "/assets/creator-tools/interactions/homing-carrot.png",
   },
+  {
+    id: "cagney_homing_plant",
+    titleKey: "interactions.cagney.homingPlant.title",
+    imageAltKey: "interactions.cagney.homingPlant.imageAlt",
+    typeKey: "interactions.cagney.type",
+    image: "/assets/creator-tools/interactions/cagney-homing-plant.png",
+  },
 ] as const;
 
 function interactionItemFor(item: string) {

@@ -2,8 +2,8 @@
 
 Esta guía define el contrato técnico que deben respetar todos los artículos
 nuevos del catálogo de Creator Tools. Las implementaciones de referencia son
-los mini zepelines verde y morado y la zanahoria teledirigida de La pandilla
-raíz.
+los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
+raíz y la semilla azul de Clavel de Cagney.
 
 ## Arquitectura obligatoria
 
@@ -81,11 +81,20 @@ no modificar velocidad, daño ni los prefabs nativos compartidos.
 - Los bounds no se recalculan en cada frame. Una animación puede cambiar mucho
   el tamaño del sprite y recalcular el borde haría brincar el nombre, sobre todo
   durante la animación de muerte.
+- La única excepción actual es una transición explícita entre dos actores. La
+  semilla azul crea la etiqueta oculta, la transfiere a la planta y sigue sus
+  bounds sólo durante 0.55 segundos de crecimiento; después vuelve a fijar un
+  único offset. Cuando el sprite de la planta entra al viewport, la etiqueta
+  aparece con un fade de 0.45 segundos. No se crea una segunda etiqueta y la
+  muerte nunca activa seguimiento dinámico.
 - Si el renderer todavía no está listo se usa temporalmente un desplazamiento
   vertical de 350 unidades. Cuando aparece un sprite válido se captura el ancla
   definitiva una sola vez.
 - Nunca se debe crear un seguidor paralelo ni calcular una posición de pantalla
   para resolver una geometría distinta.
+- La escala mundial copiada a la etiqueta siempre usa valores absolutos. Un
+  actor puede conservar `lossyScale.x` negativo para mirar al otro lado, pero
+  el texto del donador nunca debe heredarlo ni aparecer espejeado.
 
 ### Muerte, fade y destrucción
 
@@ -157,8 +166,29 @@ siendo la limpieza definitiva al abandonar o reiniciar. El renderer principal
 se entrega explícitamente a `PrepareActor` porque puede vivir en un hijo del
 objeto raíz.
 
-Las precargas de escenas de catálogo se serializan mediante
-`NativeInteractionPreloadCoordinator`. Todo cache nuevo que retenga una carga
+## Enemigo nativo con transición de actor
+
+`cagney_homing_plant` reutiliza la variante nativa `A` de
+`FlowerLevelEnemySeed`, el paraguas azul que genera
+`FlowerLevelVenusSpawn`. La semilla entra completamente desde arriba, conserva
+la velocidad de caída de la dificultad y usa el suelo real cuando lo encuentra.
+En avión se ignoran las colisiones de suelo; si no existe piso o cae por un
+hueco, espera a quedar completamente debajo del borde inferior, se detiene 16
+unidades base fuera de cámara e inicia allí `OnSeedLand`. La animación nativa
+crea la planta, que termina de crecer y persigue al jugador con sus HP, giro,
+velocidad, daño, colisiones y muerte originales.
+
+Semilla y planta son roots distintos. Un estado compuesto conserva el mismo
+cupo desde la caída hasta la muerte de la planta. La etiqueta permanece
+invisible mientras cae la semilla, se transfiere al nuevo actor y comienza su
+fade de entrada sólo cuando la planta es visible. La escala visual de la planta vive en un wrapper: su
+root nativo mantiene `localScale.x` en `±1`, porque `move_cr` multiplica el
+avance por ese valor. Escalar directamente ese root alteraría su velocidad en
+jefes con cámara alejada. El wrapper escala juntos sprite y `Collider2D` sin
+modificar movimiento ni estadísticas.
+
+Las precargas de escenas de Hilda, La pandilla raíz y Cagney se serializan
+mediante `NativeInteractionPreloadCoordinator`. Todo cache nuevo que retenga una carga
 aditiva antes de activarla debe adquirir y liberar ese coordinador, incluso en
 fallo o `Dispose`, para no bloquear la cola asíncrona de escenas de Unity. Sus
 prefixes Harmony deben comprobar además que `__instance` pertenece a la escena
@@ -194,14 +224,19 @@ durante la precarga.
 - Probar el artículo solo y con el máximo simultáneo en 2 o más.
 - Confirmar la entrada prevista de cada tipo y la separación entre actores. Los
   zepelines usan alturas variadas; la zanahoria debe entrar desde fuera de todo
-  el borde superior.
+  el borde superior. La semilla azul también entra desde arriba; en tierra debe
+  brotar al tocar piso y en avión debe desaparecer bajo el borde inferior antes
+  de que la planta crezca y regrese persiguiendo al jugador.
 - Comparar al menos un jefe con cámara base y otro con zoom alejado, como Chef
   Saleroso; sprite, colisión, etiqueta y separación deben conservar el mismo
   tamaño aparente.
 - Confirmar que nombre y actor están delante del jefe y bajo los filtros del
   juego.
 - Verificar que el nombre sigue al actor sin cambiar de distancia durante sus
-  animaciones.
+  animaciones. Para la semilla azul debe permanecer invisible durante la caída,
+  aparecer con fade cuando la planta entre a pantalla, acompañar el crecimiento
+  y quedar fijada sobre la planta sin parpadeo ni texto espejeado en ninguna
+  dirección.
 - Matar al actor y comprobar que el nombre no salta, queda en su última posición
   y desvanece texto y contorno en aproximadamente 0.6 segundos.
 - Pausar con un actor vivo y durante el fade: nada debe moverse ni desaparecer.
