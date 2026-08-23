@@ -5,7 +5,8 @@ using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
 {
-    internal sealed class ZeppelinInteractionExecutor : IDisposable
+    internal sealed class ZeppelinInteractionExecutor :
+        ICreatorToolsInteractionExecutor
     {
         private static readonly System.Reflection.FieldInfo StopPointField =
             AccessTools.Field(typeof(FlyingBlimpLevelEnemy), "stopPoint");
@@ -45,7 +46,46 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        internal void Update()
+        public bool Supports(string item)
+        {
+            NativeZeppelinVariant variant;
+            return TryResolveVariant(item, out variant);
+        }
+
+        public bool IsAvailable(string item)
+        {
+            return Supports(item) && Available;
+        }
+
+        public bool TrySpawn(
+            string item,
+            string donor,
+            out ICreatorToolsInteractionHandle handle,
+            out string feedbackCode,
+            out string error)
+        {
+            handle = null;
+            NativeZeppelinVariant variant;
+            if (!TryResolveVariant(item, out variant))
+            {
+                feedbackCode = "unknown_item";
+                error = "The zeppelin executor does not support " + item + ".";
+                return false;
+            }
+
+            FlyingBlimpLevelEnemy spawned;
+            if (!TrySpawn(
+                variant,
+                donor,
+                out spawned,
+                out feedbackCode,
+                out error))
+                return false;
+            handle = new CreatorToolsUnityObjectInteractionHandle(spawned);
+            return true;
+        }
+
+        public void Update()
         {
             nativeCache.Update();
             RemoveFinishedSpawns();
@@ -179,9 +219,25 @@ namespace Gilomx.CupheadBossRoulette
         private List<float> ActiveLanes()
         {
             RemoveFinishedSpawns();
-            var lanes = new List<float>(activeSpawns.Count);
+            var lanes = new List<float>(activeSpawns.Count + 4);
             for (var i = 0; i < activeSpawns.Count; i++)
                 lanes.Add(activeSpawns[i].Lane);
+
+            var camera = Camera.main;
+            if (camera == null)
+                return lanes;
+            var catalogActors = UnityEngine.Object.FindObjectsOfType<
+                CreatorToolsDonorLabel>();
+            for (var i = 0; i < catalogActors.Length; i++)
+            {
+                var actor = catalogActors[i];
+                if (actor == null ||
+                    actor.GetComponent<FlyingBlimpLevelEnemy>() != null)
+                    continue;
+                lanes.Add(
+                    camera.transform.position.y + 360f -
+                    actor.transform.position.y);
+            }
             return lanes;
         }
 
@@ -212,6 +268,29 @@ namespace Gilomx.CupheadBossRoulette
                     UnityEngine.Object.Destroy(
                         activeSpawns[i].Actor.gameObject);
             activeSpawns.Clear();
+        }
+
+        public void EndGameplayLevel()
+        {
+            ClearActiveSpawns();
+        }
+
+        private static bool TryResolveVariant(
+            string item,
+            out NativeZeppelinVariant variant)
+        {
+            if (item == CreatorToolsInteractionIds.GreenZeppelin)
+            {
+                variant = NativeZeppelinVariant.Green;
+                return true;
+            }
+            if (item == CreatorToolsInteractionIds.PurpleZeppelin)
+            {
+                variant = NativeZeppelinVariant.Purple;
+                return true;
+            }
+            variant = NativeZeppelinVariant.Purple;
+            return false;
         }
 
         private sealed class ActiveSpawn

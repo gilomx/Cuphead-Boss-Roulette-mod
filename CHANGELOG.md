@@ -28,8 +28,9 @@
   El shell, sus proveedores, el indicador global y el selector ES/EN permanecen
   montados al cambiar entre Ruleta e Interacciones.
 - La vista nueva reutiliza los tokens y componentes del panel React. El catálogo
-  incluye los mini zepelines verde y morado de Hilda Berg, cada uno con el
-  primer frame original de su animación inactiva como preview local.
+  incluye los mini zepelines verde y morado de Hilda Berg y la zanahoria
+  teledirigida de La pandilla raíz, cada uno con un frame original como preview
+  local.
 - El servidor expone una cola independiente para pruebas de interacciones. El
   hilo de red sólo encola el ID y el nombre; el controlador ejecuta el efecto
   desde el `Update` principal de Unity.
@@ -43,10 +44,13 @@
   hasta 200 entradas, lotes de 50 y esperas de hasta 3600 segundos; además
   separa cada despacho por al menos 0.35 segundos para evitar apariciones
   exactamente simultáneas.
-- La prueba aleatoria alterna entre ambos mini zepelines y seis nombres con
-  intervalos de 1.25 a 3.25 segundos. Su interruptor cambia de estado de forma
-  inmediata aunque el juego esté pausado, pero sólo genera mientras una partida
-  puede recibir interacciones y nunca acumula un backlog automático.
+- La prueba aleatoria elige entre todos los artículos disponibles del catálogo y
+  seis nombres con intervalos de 1.25 a 3.25 segundos. Su interruptor cambia de
+  estado de forma inmediata aunque el juego esté pausado, pero sólo genera
+  mientras una partida puede recibir interacciones y nunca acumula un backlog
+  automático. Los IDs y ejecutores forman el registro común: todo artículo
+  futuro debe aparecer también en la prueba manual y entra automáticamente al
+  conjunto aleatorio cuando está disponible.
 - Las pruebas aparecen inmediatamente en la tabla aunque Unity esté pausado por
   perder el foco. React las marca como `Esperando al juego` y las sustituye por
   la cola autoritativa cuando el mod incrementa su revisión, sin duplicarlas.
@@ -55,31 +59,54 @@
   ráfaga nativa. Durante Hilda llaman a `SummonEnemy()`; desde el mapa se
   precargan ambos prefabs de forma aditiva y se reutilizan en cualquier batalla
   o nivel de plataformas.
+- `rootpack_homing_carrot` reutiliza el prefab
+  `VeggiesLevelCarrotHomingProjectile` de la fase de Psycarrot. Conserva la
+  persecución, colisión, daño, vida por dificultad y muerte originales; sólo se
+  sustituye el padre por una instancia inerte persistente. No añade TTL: ocupa
+  su cupo hasta morir por disparos, jugador, suelo o el respaldo nativo de 1000
+  segundos, y se limpia al cambiar de nivel.
+- Las escenas nativas de Hilda y La pandilla raíz se precargan de forma aditiva
+  desde el mapa bajo un coordinador único, por lo que nunca quedan dos cargas
+  retenidas a la vez. Los lifecycle de cada escena se bloquean sólo durante su
+  propia captura y luego se descargan las raíces temporales.
 - El clon conserva sprites, controladores, clips, proyectil, efecto de disparo,
   piezas de muerte y propiedades originales de la dificultad actual. El nombre
   del donador es un `TextMeshPro` de mundo independiente con la fuente Memphis:
   captura una sola ancla sobre el sprite, sigue al actor sin saltar cuando
   cambian sus bounds y recibe los filtros de la cámara.
-- Al destruirse el enemigo, el nombre queda inmóvil en su última posición y
+- Al destruirse el actor, el nombre queda inmóvil en su última posición y
   desvanece texto y contorno durante 0.6 segundos. El fade respeta
   `CupheadTime.GlobalSpeed`, por lo que también se congela durante pausa o
   derrota. Este contrato común está documentado en
   [INTERACTION_CATALOG.md](INTERACTION_CATALOG.md) para todos los artículos
   futuros.
-- Cada aparición elige una altura aleatoria dentro del rango seguro 120–610 y
+- Cada zepelín elige una altura aleatoria dentro del rango seguro 120–610 y
   procura mantener 165 unidades respecto a actores activos. También toma una
   distancia de parada nativa, la desplaza hacia la derecha con variación
   adicional y la limita al rango 390–535; en
   Hilda aplica el valor después de `SummonEnemy()` porque el método original lo
   vuelve a sortear. La variante A mantiene además el contador nativo que alterna
   su proyectil rosa.
+- La zanahoria elige cualquier X del borde superior. Después de aplicar la
+  escala del nivel se desplaza por sus bounds hasta dejar el pixel más bajo 16
+  unidades base fuera de cámara, de modo que cuerpo y nombre entran desde arriba
+  sin aparecer de golpe. Prueba hasta 24 X para separarse de jugadores y actores
+  donados; los zepelines también reservan la franja vertical ocupada por otros
+  tipos del catálogo.
+- Todos los actores del catálogo multiplican su escala nativa por la altura de
+  cámara relativa al encuadre base de 720 unidades. Así conservan tamaño aparente
+  y colisión en jefes con zoom alejado, incluido Chef Saleroso; la etiqueta usa
+  el mismo factor para mantener su distancia visual.
+- La compensación actual se aplica al actor raíz. Las balas que los zepelines
+  crean como roots independientes todavía conservan su escala mundial nativa y
+  quedan registradas como ajuste pendiente para cámaras alejadas.
 - Ninguna interacción se despacha durante carga, pausa, derrota o cierre del
   nivel, ni durante los primeros tres segundos de una partida. Los actores que
   ya estaban en pantalla permanecen congelados al perder y se limpian al
   destruirse la escena.
 - Se retiró el prototipo portátil que aproximaba el enemigo con una imagen y
   movimiento manual. Los actores jugables se construyen en memoria desde la
-  instalación local; los únicos PNG extraídos son los dos previews web.
+  instalación local; los PNG extraídos se usan únicamente como previews web.
 - La coordinación vive en `CreatorToolsInteractionController.cs`; el ejecutor
   y la etiqueta del donador están separados bajo `Interactions`. No se añadió
   lógica de canje específica a `Plugin.cs`.

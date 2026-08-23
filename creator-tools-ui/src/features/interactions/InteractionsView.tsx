@@ -2,21 +2,32 @@ import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 
-const zeppelins = [
+const interactionItems = [
   {
     id: "hilda_green_zeppelin",
-    key: "green",
+    titleKey: "interactions.zeppelin.green.title",
+    imageAltKey: "interactions.zeppelin.green.imageAlt",
+    typeKey: "interactions.zeppelin.type",
     image: "/assets/creator-tools/interactions/green-zeppelin.png",
   },
   {
     id: "hilda_purple_zeppelin",
-    key: "purple",
+    titleKey: "interactions.zeppelin.purple.title",
+    imageAltKey: "interactions.zeppelin.purple.imageAlt",
+    typeKey: "interactions.zeppelin.type",
     image: "/assets/creator-tools/interactions/purple-zeppelin.png",
+  },
+  {
+    id: "rootpack_homing_carrot",
+    titleKey: "interactions.rootpack.homingCarrot.title",
+    imageAltKey: "interactions.rootpack.homingCarrot.imageAlt",
+    typeKey: "interactions.rootpack.type",
+    image: "/assets/creator-tools/interactions/homing-carrot.png",
   },
 ] as const;
 
-function zeppelinFor(item: string) {
-  return zeppelins.find((zeppelin) => zeppelin.id === item);
+function interactionItemFor(item: string) {
+  return interactionItems.find((catalogItem) => catalogItem.id === item);
 }
 
 export function InteractionsView() {
@@ -68,17 +79,17 @@ export function InteractionsView() {
         </div>
 
         <div className="interaction-catalog">
-          {zeppelins.map((zeppelin) => (
-            <article className="interaction-card" key={zeppelin.id}>
+          {interactionItems.map((item) => (
+            <article className="interaction-card" key={item.id}>
               <div className="interaction-card__visual">
                 <img
-                  src={zeppelin.image}
-                  alt={t(`interactions.zeppelin.${zeppelin.key}.imageAlt`)}
+                  src={item.image}
+                  alt={t(item.imageAltKey)}
                 />
               </div>
               <div className="interaction-card__content">
-                <p className="interaction-card__eyebrow">{t("interactions.zeppelin.type")}</p>
-                <h3>{t(`interactions.zeppelin.${zeppelin.key}.title`)}</h3>
+                <p className="interaction-card__eyebrow">{t(item.typeKey)}</p>
+                <h3>{t(item.titleKey)}</h3>
               </div>
             </article>
           ))}
@@ -115,7 +126,7 @@ export function InteractionsView() {
                 </thead>
                 <tbody>
                   {queue.map((entry, index) => {
-                    const zeppelin = zeppelinFor(entry.item);
+                    const item = interactionItemFor(entry.item);
                     const displayStatus = entry.status === "queued" && !available
                       ? "waiting_game"
                       : entry.status;
@@ -124,10 +135,10 @@ export function InteractionsView() {
                         <td className="queue-table__position">{index + 1}</td>
                         <td>
                           <div className="interaction-item-label">
-                            {zeppelin ? <img src={zeppelin.image} alt="" /> : null}
+                            {item ? <img src={item.image} alt="" /> : null}
                             <span>
-                              {zeppelin
-                                ? t(`interactions.zeppelin.${zeppelin.key}.title`)
+                              {item
+                                ? t(item.titleKey)
                                 : entry.item}
                             </span>
                           </div>
@@ -223,17 +234,17 @@ export function InteractionsView() {
                 </tr>
               </thead>
               <tbody>
-                {zeppelins.map((zeppelin) => {
-                  const donor = donors[zeppelin.id] ?? "";
-                  const quantity = quantities[zeppelin.id] ?? 1;
-                  const delay = delays[zeppelin.id] ?? 0;
+                {interactionItems.map((item) => {
+                  const donor = donors[item.id] ?? "";
+                  const quantity = quantities[item.id] ?? 1;
+                  const delay = delays[item.id] ?? 0;
                   const canQueue = (interaction?.ready ?? false) && donor.trim().length > 0;
                   return (
-                    <tr key={zeppelin.id}>
+                    <tr key={item.id}>
                       <td>
                         <div className="interaction-item-label interaction-item-label--test">
-                          <img src={zeppelin.image} alt="" />
-                          <span>{t(`interactions.zeppelin.${zeppelin.key}.title`)}</span>
+                          <img src={item.image} alt="" />
+                          <span>{t(item.titleKey)}</span>
                         </div>
                       </td>
                       <td>
@@ -247,7 +258,7 @@ export function InteractionsView() {
                               placeholder={t("interactions.test.donorPlaceholder")}
                               onChange={(event) => setDonors((current) => ({
                                 ...current,
-                                [zeppelin.id]: event.target.value,
+                                [item.id]: event.target.value,
                               }))}
                             />
                           </label>
@@ -261,7 +272,7 @@ export function InteractionsView() {
                                 value={quantity}
                                 onChange={(event) => setQuantities((current) => ({
                                   ...current,
-                                  [zeppelin.id]: Math.max(
+                                  [item.id]: Math.max(
                                     1,
                                     Math.min(maxBatch, Number(event.target.value) || 1),
                                   ),
@@ -278,7 +289,7 @@ export function InteractionsView() {
                                 value={delay}
                                 onChange={(event) => setDelays((current) => ({
                                   ...current,
-                                  [zeppelin.id]: Math.max(
+                                  [item.id]: Math.max(
                                     0,
                                     Math.min(maxDelay, Number(event.target.value) || 0),
                                   ),
@@ -289,11 +300,11 @@ export function InteractionsView() {
                               type="button"
                               disabled={!canQueue}
                               onClick={() => {
-                                setTestingItem(zeppelin.id);
-                                testInteraction(zeppelin.id, donor, quantity, delay);
+                                setTestingItem(item.id);
+                                testInteraction(item.id, donor, quantity, delay);
                               }}
                             >
-                              {interactionTesting && testingItem === zeppelin.id
+                              {interactionTesting && testingItem === item.id
                                 ? t("interactions.test.testing")
                                 : t("interactions.test.action")}
                             </button>

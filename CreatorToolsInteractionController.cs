@@ -8,9 +8,6 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsInteractionController : IDisposable
     {
-        internal const string GreenZeppelinId = "hilda_green_zeppelin";
-        internal const string PurpleZeppelinId = "hilda_purple_zeppelin";
-
         private const float RandomTestMinimumIntervalSeconds = 1.25f;
         private const float RandomTestMaximumIntervalSeconds = 3.25f;
         private const float MinimumDispatchSeparationSeconds = 0.35f;
@@ -26,7 +23,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
-        private readonly ZeppelinInteractionExecutor zeppelins;
+        private readonly List<ICreatorToolsInteractionExecutor> executors =
+            new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
         private readonly Action<int> setMaximumActive;
         private readonly CreatorToolsInteractionQueue interactionQueue =
@@ -54,17 +52,24 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
             this.setMaximumActive = setMaximumActive;
-            zeppelins = new ZeppelinInteractionExecutor(
+            executors.Add(new ZeppelinInteractionExecutor(
                 coroutineHost,
                 canPreloadNativeAssets,
                 canSpawnInteraction,
                 logInfo,
-                logWarning);
+                logWarning));
+            executors.Add(new HomingCarrotInteractionExecutor(
+                coroutineHost,
+                canPreloadNativeAssets,
+                canSpawnInteraction,
+                logInfo,
+                logWarning));
         }
 
         internal void Update(CreatorToolsServer server)
         {
-            zeppelins.Update();
+            for (var i = 0; i < executors.Count; i++)
+                executors[i].Update();
             interactionQueue.RemoveFinished();
             if (server == null || !server.IsRunning)
                 return;
@@ -73,7 +78,7 @@ namespace Gilomx.CupheadBossRoulette
             while (server.TryTakeInteractionCommand(out query))
                 ProcessCommand(ParseQuery(query));
 
-            var available = zeppelins.Available;
+            var available = AnyItemAvailable();
             UpdateRandomTest(available);
             if (available)
                 ProcessQueue();
@@ -93,8 +98,9 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void EndGameplayLevel()
         {
-            zeppelins.ClearActiveSpawns();
             interactionQueue.ClearActive();
+            for (var i = 0; i < executors.Count; i++)
+                executors[i].EndGameplayLevel();
             SuspendGameplayLevel();
         }
 
@@ -167,23 +173,30 @@ namespace Gilomx.CupheadBossRoulette
                 interactionQueue.Count != interactionQueue.ActiveCount)
                 return;
 
-            var green = UnityEngine.Random.Range(0, 2) == 0;
-            var item = green ? GreenZeppelinId : PurpleZeppelinId;
-            var variant = green
-                ? NativeZeppelinVariant.Green
-                : NativeZeppelinVariant.Purple;
+            var availableItems = new List<string>();
+            for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
+            {
+                var candidate = CreatorToolsInteractionIds.All[i];
+                var executor = FindExecutor(candidate);
+                if (executor != null && executor.IsAvailable(candidate))
+                    availableItems.Add(candidate);
+            }
+            if (availableItems.Count == 0)
+                return;
+
+            var item = availableItems[UnityEngine.Random.Range(
+                0, availableItems.Count)];
             var donor = RandomTestDonors[UnityEngine.Random.Range(
                 0, RandomTestDonors.Length)];
             if (interactionQueue.Enqueue(
-                item, variant, donor, 1, 0f) <= 0)
+                item, donor, 1, 0f) <= 0)
                 return;
 
             lastItem = item;
             lastState = null;
             if (logInfo != null)
                 logInfo(
-                    "Prueba aleatoria de mini zepelin " +
-                    variant.ToString().ToLowerInvariant() +
+                    "Prueba aleatoria de " + item +
                     " agregada para " + donor + ".");
         }
 
@@ -203,8 +216,8 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
-            NativeZeppelinVariant variant;
-            if (!TryResolveVariant(item, out variant))
+            var executor = FindExecutor(item);
+            if (executor == null)
             {
                 lastItem = item ?? string.Empty;
                 SetFeedback("unknown_item", true);
@@ -219,14 +232,13 @@ namespace Gilomx.CupheadBossRoulette
             var quantity = ParseQuantity(values);
             var delaySeconds = ParseDelaySeconds(values);
             var added = interactionQueue.Enqueue(
-                item, variant, donor, quantity, delaySeconds);
+                item, donor, quantity, delaySeconds);
             if (added > 0)
             {
                 SetFeedback("queued", false);
                 if (logInfo != null)
                     logInfo(
-                        added + " canje(s) de mini zepelin " +
-                        variant.ToString().ToLowerInvariant() +
+                        added + " canje(s) de " + item +
                         " agregados a la cola para " + donor + ".");
                 return;
             }
@@ -266,17 +278,26 @@ namespace Gilomx.CupheadBossRoulette
             if (entry == null || !entry.IsReady)
                 return;
 
-            FlyingBlimpLevelEnemy spawned;
+            var executor = FindExecutor(entry.Item);
+            if (executor == null)
+            {
+                interactionQueue.RejectFirst();
+                lastItem = entry.Item;
+                SetFeedback("unknown_item", true);
+                return;
+            }
+
+            ICreatorToolsInteractionHandle handle;
             string feedbackCode;
             string error;
-            if (zeppelins.TrySpawn(
-                entry.Variant,
+            if (executor.TrySpawn(
+                entry.Item,
                 entry.Donor,
-                out spawned,
+                out handle,
                 out feedbackCode,
                 out error))
             {
-                interactionQueue.ActivateFirst(spawned);
+                interactionQueue.ActivateFirst(handle);
                 nextDispatchAt = now +
                     MinimumDispatchSeparationSeconds;
                 if (logInfo != null)
@@ -295,7 +316,7 @@ namespace Gilomx.CupheadBossRoulette
             SetFeedback(feedbackCode, true);
             if (logWarning != null)
                 logWarning(
-                    entry.Variant + " zeppelin interaction failed: " +
+                    entry.Item + " interaction failed: " +
                     (string.IsNullOrEmpty(error)
                         ? "No diagnostic detail was returned."
                         : error));
@@ -328,12 +349,17 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append("{\"ready\":true,\"available\":")
                 .Append(available ? "true" : "false")
                 .Append(",\"item\":\"")
-                .Append(GreenZeppelinId)
-                .Append("\",\"items\":[\"")
-                .Append(GreenZeppelinId)
-                .Append("\",\"")
-                .Append(PurpleZeppelinId)
-                .Append("\"],\"lastItem\":\"");
+                .Append(CreatorToolsInteractionIds.All[0])
+                .Append("\",\"items\":[");
+            for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
+            {
+                if (i > 0)
+                    builder.Append(',');
+                builder.Append('"');
+                AppendJson(builder, CreatorToolsInteractionIds.All[i]);
+                builder.Append('"');
+            }
+            builder.Append("],\"lastItem\":\"");
             AppendJson(builder, lastItem);
             builder.Append("\",\"feedback\":\"");
             AppendJson(builder, feedback);
@@ -362,21 +388,23 @@ namespace Gilomx.CupheadBossRoulette
             return builder.ToString();
         }
 
-        private static bool TryResolveVariant(
-            string item,
-            out NativeZeppelinVariant variant)
+        private ICreatorToolsInteractionExecutor FindExecutor(string item)
         {
-            if (item == GreenZeppelinId)
+            for (var i = 0; i < executors.Count; i++)
+                if (executors[i].Supports(item))
+                    return executors[i];
+            return null;
+        }
+
+        private bool AnyItemAvailable()
+        {
+            for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
             {
-                variant = NativeZeppelinVariant.Green;
-                return true;
+                var item = CreatorToolsInteractionIds.All[i];
+                var executor = FindExecutor(item);
+                if (executor != null && executor.IsAvailable(item))
+                    return true;
             }
-            if (item == PurpleZeppelinId)
-            {
-                variant = NativeZeppelinVariant.Purple;
-                return true;
-            }
-            variant = NativeZeppelinVariant.Purple;
             return false;
         }
 
@@ -487,7 +515,9 @@ namespace Gilomx.CupheadBossRoulette
         public void Dispose()
         {
             interactionQueue.Dispose();
-            zeppelins.Dispose();
+            for (var i = 0; i < executors.Count; i++)
+                executors[i].Dispose();
+            executors.Clear();
             randomTestEnabled = false;
             nextRandomTestAt = -1f;
             nextDispatchAt = -1f;

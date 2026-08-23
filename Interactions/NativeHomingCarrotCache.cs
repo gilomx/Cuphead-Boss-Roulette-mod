@@ -7,17 +7,15 @@ using UnityEngine.SceneManagement;
 
 namespace Gilomx.CupheadBossRoulette
 {
-    internal enum NativeZeppelinVariant
+    internal sealed class NativeHomingCarrotCache : IDisposable
     {
-        Purple,
-        Green
-    }
+        private const string VeggiesSceneName = "scene_level_veggies";
 
-    internal sealed class NativeZeppelinCache : IDisposable
-    {
-        private const string HildaSceneName =
-            "scene_level_flying_blimp";
-
+        private static readonly System.Reflection.FieldInfo HomingPrefabField =
+            AccessTools.Field(typeof(VeggiesLevelCarrot), "homingPrefab");
+        private static readonly System.Reflection.FieldInfo ParentField =
+            AccessTools.Field(
+                typeof(VeggiesLevelCarrotHomingProjectile), "parent");
         private static bool suppressPreloadLifecycle;
 
         private readonly MonoBehaviour coroutineHost;
@@ -25,19 +23,19 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Func<bool> canSpawn;
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
-        private readonly List<FlyingBlimpLevelEnemy> spawnedActors =
-            new List<FlyingBlimpLevelEnemy>();
+        private readonly List<VeggiesLevelCarrotHomingProjectile>
+            spawnedActors =
+                new List<VeggiesLevelCarrotHomingProjectile>();
 
-        private FlyingBlimpLevelEnemy purpleTemplate;
-        private FlyingBlimpLevelEnemy greenTemplate;
-        private FlyingBlimpLevelBlimpLady inertParent;
+        private VeggiesLevelCarrotHomingProjectile template;
+        private VeggiesLevelCarrot inertParent;
         private GameObject inertParentRoot;
         private Scene preloadedScene;
         private bool preloadStarted;
         private bool preloadFailed;
         private bool disposed;
 
-        internal NativeZeppelinCache(
+        internal NativeHomingCarrotCache(
             MonoBehaviour coroutineHost,
             Func<bool> canPreload,
             Func<bool> canSpawn,
@@ -51,9 +49,9 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
         }
 
-        internal bool Ready(NativeZeppelinVariant variant)
+        internal bool Ready
         {
-            return GetTemplate(variant) != null;
+            get { return template != null && inertParent != null; }
         }
 
         internal bool Failed
@@ -61,14 +59,9 @@ namespace Gilomx.CupheadBossRoulette
             get { return preloadFailed; }
         }
 
-        private bool AllReady
+        internal bool CanSpawn
         {
-            get { return purpleTemplate != null && greenTemplate != null; }
-        }
-
-        internal bool CanSpawn(NativeZeppelinVariant variant)
-        {
-            return Ready(variant) && Evaluate(canSpawn);
+            get { return Ready && Evaluate(canSpawn); }
         }
 
         internal void Update()
@@ -77,9 +70,9 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!AllReady)
-                CaptureFromLoadedHilda();
-            if (AllReady || preloadStarted || preloadFailed ||
+            if (!Ready)
+                CaptureFromLoadedVeggies();
+            if (Ready || preloadStarted || preloadFailed ||
                 coroutineHost == null || !Evaluate(canPreload))
                 return;
 
@@ -100,20 +93,18 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal bool TrySpawn(
-            NativeZeppelinVariant variant,
-            NativeZeppelinSpawnParameters parameters,
+            NativeHomingCarrotSpawnParameters parameters,
             string donor,
-            out FlyingBlimpLevelEnemy spawned,
+            out VeggiesLevelCarrotHomingProjectile spawned,
             out string error)
         {
             spawned = null;
             error = null;
-            var selectedTemplate = GetTemplate(variant);
-            if (selectedTemplate == null)
+            if (!Ready)
             {
                 error = preloadFailed
-                    ? "Cuphead's native zeppelin assets could not be cached."
-                    : "Cuphead's native zeppelin assets are still loading.";
+                    ? "Cuphead's native homing carrot asset could not be cached."
+                    : "Cuphead's native homing carrot asset is still loading.";
                 return false;
             }
             if (!Evaluate(canSpawn))
@@ -121,37 +112,46 @@ namespace Gilomx.CupheadBossRoulette
                 error = "No active gameplay level can receive the interaction.";
                 return false;
             }
+            if (parameters == null)
+            {
+                error = "No homing carrot spawn parameters were supplied.";
+                return false;
+            }
 
             try
             {
-                var camera = FindGameplayCamera();
-                if (camera == null)
+                var target = PlayerManager.GetNext();
+                if (target == null)
                     throw new InvalidOperationException(
-                        "No gameplay camera is active.");
+                        "No active player can be targeted by the homing carrot.");
 
-                var cameraCenter = camera.transform.position;
-                var startPoint = new Vector3(
-                    cameraCenter.x, parameters.Lane, 0f);
-                var stopPoint = cameraCenter.x +
-                    parameters.StopDistance;
+                spawned = template.Create(
+                    target,
+                    inertParent,
+                    parameters.Position,
+                    parameters.Speed,
+                    parameters.RotationSpeed,
+                    parameters.Health);
+                if (spawned == null)
+                    throw new InvalidOperationException(
+                        "Cuphead did not create the native homing carrot.");
 
-                spawned = UnityEngine.Object.Instantiate(selectedTemplate);
                 spawned.gameObject.name =
-                    "CreatorTools_Native" + variant + "Zeppelin";
-                spawned.transform.position = new Vector3(
-                    cameraCenter.x + 740f,
-                    cameraCenter.y + 360f - parameters.Lane,
-                    0f);
+                    "CreatorTools_NativeHomingCarrot";
                 spawned.gameObject.SetActive(true);
-                spawned.Init(
-                    parameters.Properties,
-                    startPoint,
-                    stopPoint,
-                    parameters.Parryable,
-                    inertParent);
+
+                var cameraScale = CreatorToolsInteractionPresentation.
+                    MatchGameplayCameraScale(
+                        spawned.gameObject,
+                        logWarning);
+                MoveFullyAboveUpperEdge(
+                    spawned.gameObject,
+                    parameters.Position.y,
+                    16f * cameraScale);
 
                 CreatorToolsInteractionPresentation.PrepareActor(
                     spawned.gameObject,
+                    FindLabelAnchor(spawned.gameObject),
                     donor,
                     logWarning);
                 spawnedActors.Add(spawned);
@@ -167,14 +167,24 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal void ClearSpawnedActors()
+        {
+            for (var i = 0; i < spawnedActors.Count; i++)
+                if (spawnedActors[i] != null)
+                    UnityEngine.Object.Destroy(
+                        spawnedActors[i].gameObject);
+            spawnedActors.Clear();
+        }
+
         internal static void InstallLifecyclePatches(
             Harmony harmony,
             Action<string> logWarning)
         {
             if (harmony == null)
                 return;
+
             var prefix = AccessTools.Method(
-                typeof(NativeZeppelinCache),
+                typeof(NativeHomingCarrotCache),
                 "AllowPreloadedSceneLifecycle");
             var methods = new[]
             {
@@ -182,9 +192,10 @@ namespace Gilomx.CupheadBossRoulette
                 AccessTools.Method(typeof(Level), "OnEnable"),
                 AccessTools.Method(typeof(Level), "OnDisable"),
                 AccessTools.Method(typeof(Level), "OnDestroy"),
-                AccessTools.Method(typeof(FlyingBlimpLevel), "Start"),
-                AccessTools.Method(
-                    typeof(FlyingBlimpLevelBlimpLady), "Awake")
+                AccessTools.Method(typeof(VeggiesLevel), "Start"),
+                AccessTools.Method(typeof(VeggiesLevel), "OnDestroy"),
+                AccessTools.Method(typeof(VeggiesLevelCarrot), "Start"),
+                AccessTools.Method(typeof(VeggiesLevelCarrot), "OnLevelEnd")
             };
             for (var i = 0; i < methods.Length; i++)
             {
@@ -192,7 +203,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     if (logWarning != null)
                         logWarning(
-                            "Could not install a native interaction preload guard.");
+                            "Could not install the homing carrot preload guard.");
                     continue;
                 }
                 harmony.Patch(
@@ -203,7 +214,7 @@ namespace Gilomx.CupheadBossRoulette
         private static bool AllowPreloadedSceneLifecycle(object __instance)
         {
             return !suppressPreloadLifecycle ||
-                !BelongsToScene(__instance, HildaSceneName);
+                !BelongsToScene(__instance, VeggiesSceneName);
         }
 
         private static bool BelongsToScene(object instance, string sceneName)
@@ -262,7 +273,7 @@ namespace Gilomx.CupheadBossRoulette
             try
             {
                 load = SceneManager.LoadSceneAsync(
-                    HildaSceneName, LoadSceneMode.Additive);
+                    VeggiesSceneName, LoadSceneMode.Additive);
             }
             catch (Exception exception)
             {
@@ -276,105 +287,102 @@ namespace Gilomx.CupheadBossRoulette
             while (!disposed && load.progress < 0.9f)
                 yield return null;
 
-            if (!disposed && !AllReady)
+            if (!disposed && !Ready)
                 CaptureFromLoadedResources();
 
             load.allowSceneActivation = true;
             while (!load.isDone)
                 yield return null;
 
-            if (preloadedScene.IsValid() && preloadedScene.isLoaded)
+            var scene = preloadedScene;
+            if (!scene.IsValid() || !scene.isLoaded)
+                scene = SceneManager.GetSceneByName(VeggiesSceneName);
+            if (scene.IsValid() && scene.isLoaded)
             {
-                if (!AllReady)
-                    CaptureFromScene(preloadedScene);
-                var unload = SceneManager.UnloadSceneAsync(preloadedScene);
+                DeactivateSceneRoots(scene);
+                if (!disposed && !Ready)
+                    CaptureFromScene(scene);
+                var unload = SceneManager.UnloadSceneAsync(scene);
                 if (unload != null)
                     while (!unload.isDone)
                         yield return null;
             }
 
-            if (!AllReady && !preloadFailed)
+            if (!disposed && !Ready && !preloadFailed)
                 FailPreload(
-                    "The native FlyingBlimp enemy prefabs A and B were not found.");
+                    "The native Root Pack homing carrot prefab was not found.");
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (!suppressPreloadLifecycle ||
                 !string.Equals(
-                    scene.name, HildaSceneName,
+                    scene.name,
+                    VeggiesSceneName,
                     StringComparison.OrdinalIgnoreCase))
                 return;
 
             preloadedScene = scene;
             DeactivateSceneRoots(scene);
-            if (!AllReady)
+            if (!Ready)
                 CaptureFromScene(scene);
         }
 
-        private void CaptureFromLoadedHilda()
+        private void CaptureFromLoadedVeggies()
         {
-            var lady = UnityEngine.Object.FindObjectOfType<
-                FlyingBlimpLevelBlimpLady>();
-            if (lady != null)
-                CaptureTemplates(lady);
+            var carrots = Resources.FindObjectsOfTypeAll<
+                VeggiesLevelCarrot>();
+            for (var i = 0; i < carrots.Length && !Ready; i++)
+                CaptureTemplate(carrots[i]);
         }
 
         private void CaptureFromLoadedResources()
         {
-            var ladies = Resources.FindObjectsOfTypeAll<
-                FlyingBlimpLevelBlimpLady>();
-            for (var i = 0; i < ladies.Length && !AllReady; i++)
-                if (ladies[i] != null)
+            var carrots = Resources.FindObjectsOfTypeAll<
+                VeggiesLevelCarrot>();
+            for (var i = 0; i < carrots.Length && !Ready; i++)
+            {
+                var carrot = carrots[i];
+                if (carrot == null)
+                    continue;
+                var scene = carrot.gameObject.scene;
+                if (scene.IsValid() && scene.isLoaded &&
+                    string.Equals(
+                        scene.name,
+                        VeggiesSceneName,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    var scene = ladies[i].gameObject.scene;
-                    if (scene.IsValid() && scene.isLoaded &&
-                        string.Equals(
-                            scene.name,
-                            HildaSceneName,
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        preloadedScene = scene;
-                        DeactivateSceneRoots(scene);
-                    }
-                    CaptureTemplates(ladies[i]);
+                    preloadedScene = scene;
+                    DeactivateSceneRoots(scene);
                 }
+                CaptureTemplate(carrot);
+            }
         }
 
         private void CaptureFromScene(Scene scene)
         {
+            if (!scene.IsValid() || !scene.isLoaded)
+                return;
             var roots = scene.GetRootGameObjects();
-            for (var i = 0; i < roots.Length && !AllReady; i++)
+            for (var i = 0; i < roots.Length && !Ready; i++)
             {
-                var ladies = roots[i].GetComponentsInChildren<
-                    FlyingBlimpLevelBlimpLady>(true);
-                for (var j = 0; j < ladies.Length && !AllReady; j++)
-                    CaptureTemplates(ladies[j]);
+                var carrots = roots[i].GetComponentsInChildren<
+                    VeggiesLevelCarrot>(true);
+                for (var j = 0; j < carrots.Length && !Ready; j++)
+                    CaptureTemplate(carrots[j]);
             }
         }
 
-        private void CaptureTemplates(FlyingBlimpLevelBlimpLady lady)
+        private bool CaptureTemplate(VeggiesLevelCarrot carrot)
         {
-            CaptureTemplate(
-                lady, NativeZeppelinVariant.Purple, "enemyPrefabA");
-            CaptureTemplate(
-                lady, NativeZeppelinVariant.Green, "enemyPrefabB");
-        }
-
-        private bool CaptureTemplate(
-            FlyingBlimpLevelBlimpLady lady,
-            NativeZeppelinVariant variant,
-            string fieldName)
-        {
-            if (lady == null || Ready(variant))
-                return Ready(variant);
+            if (carrot == null || Ready)
+                return Ready;
             try
             {
-                var prefabField = AccessTools.Field(
-                    typeof(FlyingBlimpLevelBlimpLady), fieldName);
-                var source = prefabField == null
+                var source = HomingPrefabField == null
                     ? null
-                    : prefabField.GetValue(lady) as FlyingBlimpLevelEnemy;
+                    : HomingPrefabField.GetValue(carrot) as
+                        VeggiesLevelCarrotHomingProjectile;
                 if (source == null)
                     return false;
 
@@ -384,9 +392,7 @@ namespace Gilomx.CupheadBossRoulette
                     source.gameObject.SetActive(false);
                 try
                 {
-                    SetTemplate(
-                        variant,
-                        UnityEngine.Object.Instantiate(source));
+                    template = UnityEngine.Object.Instantiate(source);
                 }
                 finally
                 {
@@ -394,31 +400,29 @@ namespace Gilomx.CupheadBossRoulette
                         source.gameObject.SetActive(true);
                 }
 
-                var captured = GetTemplate(variant);
-                if (captured == null)
+                if (template == null)
                     return false;
-                captured.gameObject.name =
-                    "CreatorTools_Native" + variant +
-                    "Zeppelin_Template";
-                captured.gameObject.SetActive(false);
-                var parentField = AccessTools.Field(
-                    typeof(FlyingBlimpLevelEnemy), "parent");
-                if (parentField != null)
-                    parentField.SetValue(captured, inertParent);
-                UnityEngine.Object.DontDestroyOnLoad(captured.gameObject);
+                template.gameObject.name =
+                    "CreatorTools_NativeHomingCarrot_Template";
+                template.gameObject.SetActive(false);
+                if (ParentField != null)
+                    ParentField.SetValue(template, inertParent);
+                UnityEngine.Object.DontDestroyOnLoad(template.gameObject);
+                preloadFailed = false;
                 if (logInfo != null)
                     logInfo(
-                        "Prefab nativo del mini zepelin " +
-                        variant.ToString().ToLowerInvariant() +
-                        " guardado para todos los niveles.");
+                        "Prefab nativo de la zanahoria teledirigida " +
+                        "guardado para todos los niveles.");
                 return true;
             }
             catch (Exception exception)
             {
+                if (template != null)
+                    UnityEngine.Object.Destroy(template.gameObject);
+                template = null;
                 if (logWarning != null)
                     logWarning(
-                        "Could not cache Cuphead's native " + variant +
-                        " zeppelin: " +
+                        "Could not cache Cuphead's native homing carrot: " +
                         exception.Message);
                 return false;
             }
@@ -429,10 +433,9 @@ namespace Gilomx.CupheadBossRoulette
             if (inertParent != null)
                 return;
             inertParentRoot = new GameObject(
-                "CreatorTools_NativeZeppelin_Parent");
+                "CreatorTools_NativeHomingCarrot_Parent");
             inertParentRoot.SetActive(false);
-            inertParent = inertParentRoot.AddComponent<
-                FlyingBlimpLevelBlimpLady>();
+            inertParent = inertParentRoot.AddComponent<VeggiesLevelCarrot>();
             UnityEngine.Object.DontDestroyOnLoad(inertParentRoot);
         }
 
@@ -451,7 +454,7 @@ namespace Gilomx.CupheadBossRoulette
             SceneManager.sceneLoaded -= OnSceneLoaded;
             suppressPreloadLifecycle = false;
             NativeInteractionPreloadCoordinator.Release(this);
-            if (AllReady)
+            if (Ready)
                 preloadFailed = false;
         }
 
@@ -460,20 +463,7 @@ namespace Gilomx.CupheadBossRoulette
             preloadFailed = true;
             if (logWarning != null)
                 logWarning(
-                    "Native zeppelin preload failed: " + error);
-        }
-
-        private static Camera FindGameplayCamera()
-        {
-            var main = Camera.main;
-            if (main != null && main.enabled)
-                return main;
-            var cameras = UnityEngine.Object.FindObjectsOfType<Camera>();
-            for (var i = 0; i < cameras.Length; i++)
-                if (cameras[i] != null && cameras[i].enabled &&
-                    cameras[i].orthographic)
-                    return cameras[i];
-            return null;
+                    "Native homing carrot preload failed: " + error);
         }
 
         private void RemoveDestroyedActors()
@@ -483,18 +473,73 @@ namespace Gilomx.CupheadBossRoulette
                     spawnedActors.RemoveAt(i);
         }
 
+        private static SpriteRenderer FindLabelAnchor(GameObject actor)
+        {
+            if (actor == null)
+                return null;
+            var renderers = actor.GetComponentsInChildren<SpriteRenderer>(true);
+            SpriteRenderer fallback = null;
+            SpriteRenderer best = null;
+            var bestArea = -1f;
+            for (var i = 0; i < renderers.Length; i++)
+            {
+                var renderer = renderers[i];
+                if (renderer == null)
+                    continue;
+                if (fallback == null ||
+                    (renderer.enabled && renderer.gameObject.activeInHierarchy))
+                    fallback = renderer;
+                if (renderer.sprite == null || !renderer.enabled ||
+                    !renderer.gameObject.activeInHierarchy)
+                    continue;
+                var size = renderer.sprite.bounds.size;
+                var area = Mathf.Abs(size.x * size.y);
+                if (area <= bestArea)
+                    continue;
+                best = renderer;
+                bestArea = area;
+            }
+            return best == null ? fallback : best;
+        }
+
+        private static void MoveFullyAboveUpperEdge(
+            GameObject actor,
+            float upperBoundaryY,
+            float margin)
+        {
+            if (actor == null)
+                return;
+            var renderers = actor.GetComponentsInChildren<SpriteRenderer>(true);
+            var lowestY = float.MaxValue;
+            for (var i = 0; i < renderers.Length; i++)
+            {
+                var renderer = renderers[i];
+                if (renderer == null || renderer.sprite == null ||
+                    !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                    continue;
+                lowestY = Mathf.Min(lowestY, renderer.bounds.min.y);
+            }
+
+            var targetLowestY = upperBoundaryY + Mathf.Max(1f, margin);
+            if (lowestY == float.MaxValue)
+            {
+                var position = actor.transform.position;
+                position.y = targetLowestY + Mathf.Max(80f, margin * 5f);
+                actor.transform.position = position;
+                return;
+            }
+
+            var adjustment = targetLowestY - lowestY;
+            if (adjustment > 0f)
+                actor.transform.position += Vector3.up * adjustment;
+        }
+
         private static bool Evaluate(Func<bool> condition)
         {
             if (condition == null)
                 return false;
-            try
-            {
-                return condition();
-            }
-            catch
-            {
-                return false;
-            }
+            try { return condition(); }
+            catch { return false; }
         }
 
         public void Dispose()
@@ -503,39 +548,14 @@ namespace Gilomx.CupheadBossRoulette
             SceneManager.sceneLoaded -= OnSceneLoaded;
             suppressPreloadLifecycle = false;
             NativeInteractionPreloadCoordinator.Release(this);
-            for (var i = 0; i < spawnedActors.Count; i++)
-                if (spawnedActors[i] != null)
-                    UnityEngine.Object.Destroy(
-                        spawnedActors[i].gameObject);
-            spawnedActors.Clear();
-            if (purpleTemplate != null)
-                UnityEngine.Object.Destroy(purpleTemplate.gameObject);
-            if (greenTemplate != null)
-                UnityEngine.Object.Destroy(greenTemplate.gameObject);
+            ClearSpawnedActors();
+            if (template != null)
+                UnityEngine.Object.Destroy(template.gameObject);
             if (inertParentRoot != null)
                 UnityEngine.Object.Destroy(inertParentRoot);
-            purpleTemplate = null;
-            greenTemplate = null;
+            template = null;
             inertParent = null;
             inertParentRoot = null;
-        }
-
-        private FlyingBlimpLevelEnemy GetTemplate(
-            NativeZeppelinVariant variant)
-        {
-            return variant == NativeZeppelinVariant.Green
-                ? greenTemplate
-                : purpleTemplate;
-        }
-
-        private void SetTemplate(
-            NativeZeppelinVariant variant,
-            FlyingBlimpLevelEnemy value)
-        {
-            if (variant == NativeZeppelinVariant.Green)
-                greenTemplate = value;
-            else
-                purpleTemplate = value;
         }
     }
 }

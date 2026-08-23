@@ -13,6 +13,13 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void Initialize(string value)
         {
+            Initialize(value, null);
+        }
+
+        internal void Initialize(
+            string value,
+            SpriteRenderer anchorRenderer)
+        {
             var donor = string.IsNullOrEmpty(value)
                 ? string.Empty
                 : value.ToUpperInvariant();
@@ -45,19 +52,26 @@ namespace Gilomx.CupheadBossRoulette
                     LabelWidth, LabelHeight);
                 labelText.rectTransform.pivot = new Vector2(0.5f, 1f);
 
-                var actorRenderer = GetComponent<SpriteRenderer>();
+                var actorRenderer = anchorRenderer == null
+                    ? GetComponent<SpriteRenderer>()
+                    : anchorRenderer;
                 MatchActorSorting(labelText.GetComponent<Renderer>());
                 labelTransform.localScale = transform.lossyScale;
                 labelTransform.rotation = Quaternion.identity;
 
                 var follower = labelObject.AddComponent<
                     CreatorToolsDonorLabelFollower>();
+                var cameraScale = GetComponent<
+                    CreatorToolsInteractionCameraScale>();
+                var scaleFactor = cameraScale == null
+                    ? 1f
+                    : Mathf.Max(0.01f, cameraScale.Factor);
                 follower.Initialize(
                     transform,
                     actorRenderer,
                     labelText,
                     FallbackVerticalOffset,
-                    VisualGap);
+                    VisualGap * scaleFactor);
             }
             catch
             {

@@ -28,7 +28,6 @@ namespace Gilomx.CupheadBossRoulette
 
         internal int Enqueue(
             string item,
-            NativeZeppelinVariant variant,
             string donor,
             int quantity,
             float delaySeconds)
@@ -45,7 +44,6 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     Id = nextId++,
                     Item = item,
-                    Variant = variant,
                     Donor = donor,
                     DelaySeconds = delaySeconds,
                     ReadyAt = Time.realtimeSinceStartup + delaySeconds
@@ -61,13 +59,13 @@ namespace Gilomx.CupheadBossRoulette
             return pending.Count == 0 ? null : pending[0];
         }
 
-        internal void ActivateFirst(FlyingBlimpLevelEnemy actor)
+        internal void ActivateFirst(ICreatorToolsInteractionHandle handle)
         {
             if (pending.Count == 0)
                 return;
             var entry = pending[0];
             pending.RemoveAt(0);
-            entry.Actor = actor;
+            entry.Handle = handle;
             active.Add(entry);
         }
 
@@ -82,8 +80,9 @@ namespace Gilomx.CupheadBossRoulette
             var changed = false;
             for (var i = active.Count - 1; i >= 0; i--)
             {
-                if (active[i].Actor != null)
+                if (!IsFinished(active[i]))
                     continue;
+                DisposeHandle(active[i]);
                 active.RemoveAt(i);
                 changed = true;
             }
@@ -92,7 +91,26 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void ClearActive()
         {
+            for (var i = 0; i < active.Count; i++)
+                DisposeHandle(active[i]);
             active.Clear();
+        }
+
+        private static bool IsFinished(Entry entry)
+        {
+            if (entry == null || entry.Handle == null)
+                return true;
+            try { return entry.Handle.IsComplete; }
+            catch { return true; }
+        }
+
+        private static void DisposeHandle(Entry entry)
+        {
+            if (entry == null || entry.Handle == null)
+                return;
+            try { entry.Handle.Dispose(); }
+            catch { }
+            entry.Handle = null;
         }
 
         internal void AppendJson(StringBuilder builder)
@@ -154,19 +172,18 @@ namespace Gilomx.CupheadBossRoulette
 
         public void Dispose()
         {
+            ClearActive();
             pending.Clear();
-            active.Clear();
         }
 
         internal sealed class Entry
         {
             internal int Id;
             internal string Item;
-            internal NativeZeppelinVariant Variant;
             internal string Donor;
             internal float DelaySeconds;
             internal float ReadyAt;
-            internal FlyingBlimpLevelEnemy Actor;
+            internal ICreatorToolsInteractionHandle Handle;
 
             internal bool IsReady
             {

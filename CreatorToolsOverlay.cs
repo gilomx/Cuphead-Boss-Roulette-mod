@@ -172,6 +172,9 @@ namespace Gilomx.CupheadBossRoulette
             NativeZeppelinCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+            NativeHomingCarrotCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
 
             var levelStarted = HarmonyLib.AccessTools.Method(
                 typeof(Level), "_OnLevelStart");

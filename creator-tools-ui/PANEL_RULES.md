@@ -35,12 +35,14 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
 - `/config`, `/config/roulette` y `/config/interactions` cargan la misma SPA.
   La ruta base abre Ruleta; el historial del navegador cambia de vista sin
   desmontar el shell ni volver a solicitar el documento.
-- Interacciones muestra el catálogo de canjeos. `hilda_purple_zeppelin` y
-  `hilda_green_zeppelin` están disponibles en cualquier batalla o nivel de
-  plataformas después de preparar los prefabs originales desde el mapa. Las
-  tarjetas son un resumen vertical pequeño con el primer frame nativo arriba y
-  la información debajo; no contienen descripciones, controles de prueba ni un
-  estado operativo duplicado.
+- Interacciones muestra el catálogo de canjeos. `hilda_purple_zeppelin`,
+  `hilda_green_zeppelin` y `rootpack_homing_carrot` están disponibles en
+  cualquier batalla o nivel de plataformas después de preparar los prefabs
+  originales desde el mapa. La zanahoria aparece como `Proyectil`; los dos
+  zepelines aparecen como `Enemigo`. Las tarjetas son un resumen vertical
+  pequeño con el primer frame nativo arriba y la información debajo; no
+  contienen descripciones, controles de prueba ni un estado operativo
+  duplicado.
 - La zona operativa coloca la cola en el panel principal y, a su derecha, la
   configuración sobre la tabla de pruebas. Cada fila de prueba acepta donador,
   cantidad y espera en segundos. Un lote o varios tipos se agregan al final sin
@@ -54,6 +56,8 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
   escritura se serializa y se confirma mediante una revisión independiente para
   que respuestas antiguas no reviertan el último clic. Sólo genera dentro de
   una partida activa y no acumula eventos mientras el juego no puede recibirlos.
+  Todo artículo nuevo del catálogo se incorpora también a la tabla de prueba
+  manual y al conjunto elegible de esta prueba aleatoria.
 - Una prueba se refleja optimistamente en la tabla antes de esperar a `Update`
   de Unity. Sus filas temporales usan `Esperando al juego`; al cambiar la
   revisión del mod se eliminan y se muestra la cola autoritativa recibida. La

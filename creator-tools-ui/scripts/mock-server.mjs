@@ -146,7 +146,11 @@ createServer((req, res) => {
       randomTestEnabled: interactionRandomTestEnabled,
       randomTestRevision: interactionRandomTestRevision,
       item: "hilda_green_zeppelin",
-      items: ["hilda_green_zeppelin", "hilda_purple_zeppelin"],
+      items: [
+        "hilda_green_zeppelin",
+        "hilda_purple_zeppelin",
+        "rootpack_homing_carrot",
+      ],
       lastItem: interactionLastItem,
       feedback: interactionFeedback,
       error: false,

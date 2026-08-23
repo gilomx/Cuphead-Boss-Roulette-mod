@@ -35,9 +35,16 @@
         "imageAlt": "Original first frame of Hilda Berg's purple mini zeppelin"
       }
     },
+    "rootpack": {
+      "type": "Projectile",
+      "homingCarrot": {
+        "title": "Homing carrot",
+        "imageAlt": "Original first frame of the Root Pack's homing carrot projectile"
+      }
+    },
     "queue": {
       "title": "Redeem queue",
-      "description": "One item runs at a time. The rest wait in the order they arrived.",
+      "description": "Items run up to the configured simultaneous limit. The rest wait in arrival order.",
       "countLabel": "Items in queue",
       "emptyTitle": "The queue is empty",
       "emptyDescription": "Add one or more tests from the table to review their execution order here.",
@@ -63,7 +70,7 @@
       "testing": "Adding",
       "random": {
         "title": "Random test",
-        "description": "Sends random mini zeppelins and names at short, varying intervals, only while a match is active.",
+        "description": "Sends random catalog items and names at short, varying intervals, only while a match is active.",
         "active": "Active",
         "inactive": "Inactive",
         "enable": "Enable",
@@ -75,16 +82,16 @@
       "random_test_enabled": "The random test is active and will wait for a match to be in progress.",
       "random_test_disabled": "The random test was disabled.",
       "unknown_item": "The mod does not recognize this item.",
-      "native_assets_loading": "The zeppelin's native assets are still being prepared.",
-      "native_assets_unavailable": "The zeppelin's native assets could not be prepared.",
-      "requires_gameplay_level": "Start any gameplay level to send the zeppelin.",
+      "native_assets_loading": "The item's native assets are still being prepared.",
+      "native_assets_unavailable": "The item's native assets could not be prepared.",
+      "requires_gameplay_level": "Start any gameplay level to send the redeem.",
       "waiting_game": "The request is already visible and is waiting for the game to confirm it.",
       "queued": "The redeems were added to the queue.",
       "settings_saved": "The interaction settings were saved.",
       "invalid_setting": "The setting value is invalid.",
       "queue_full": "The queue reached its temporary limit.",
-      "sent": "The mini zeppelin was sent into the fight.",
-      "spawn_failed": "The mini zeppelin could not be created. Check the fight state."
+      "sent": "The item was sent into the fight.",
+      "spawn_failed": "The item could not be created. Check the fight state."
     }
   },
   "roulette": {
