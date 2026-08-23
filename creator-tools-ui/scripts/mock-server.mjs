@@ -151,6 +151,7 @@ createServer((req, res) => {
         "hilda_purple_zeppelin",
         "rootpack_homing_carrot",
         "cagney_homing_plant",
+        "frogs_firefly",
       ],
       lastItem: interactionLastItem,
       feedback: interactionFeedback,

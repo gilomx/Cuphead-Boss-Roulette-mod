@@ -3,7 +3,8 @@
 Esta guía define el contrato técnico que deben respetar todos los artículos
 nuevos del catálogo de Creator Tools. Las implementaciones de referencia son
 los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
-raíz y la semilla azul de Clavel de Cagney.
+raíz, la semilla azul de Clavel de Cagney y la luciérnaga incendiada de Hosco
+y Tosco.
 
 ## Arquitectura obligatoria
 
@@ -48,11 +49,21 @@ reutilizarlos mediante `PrepareActor`.
 4. El rectángulo mide 320 × 48 y usa el pivote `(0.5, 1)`. Esta es la posición
    vertical aprobada después del ajuste visual; no debe volver a centrarse el
    pivote sin una prueba comparativa dentro del juego.
-5. `BringActorToFront` mueve todos los renderers del actor a la capa de gameplay
-   más alta y conserva su orden relativo. La etiqueta copia la capa del
-   renderer superior y usa el siguiente `sortingOrder`. Esto mantiene actor y
-   nombre al frente sin sacarlos del procesamiento de la cámara.
-6. `MatchGameplayCameraScale` multiplica la escala nativa del root por
+5. `BringActorToFront` registra actor y etiqueta en
+   `CreatorToolsInteractionRenderPriority`. En gameplay normal reafirma cada
+   `LateUpdate` la capa `ForegroundEffects`, conservando el orden relativo del
+   actor y colocando la etiqueta justo después. Esto evita que `Start`, un
+   `Animator` o un jefe vuelvan a dejar el elemento detrás de sus capas.
+6. Cuando un `PlayerScreenEffectController` muestra un sprite de cobertura,
+   actor y etiqueta bajan temporalmente a `Enemies`. Así el oscurecimiento de
+   transformaciones, pausas y filtros permanece por delante; al desaparecer la
+   cobertura ambos regresan a `ForegroundEffects`. No se debe usar la capa
+   global más alta, porque también supera UI, filtros y transiciones.
+   `FireSingle` y `FireSpreadshot` requieren el mismo tratamiento para cada
+   proyectil nuevo: se comparan los `FlyingBlimpLevelEnemyProjectile` antes y
+   después del disparo y sólo las balas nacidas de un zepelín marcado como
+   interacción reciben `CreatorToolsInteractionRenderPriority`.
+7. `MatchGameplayCameraScale` multiplica la escala nativa del root por
    `(camera.orthographicSize * 2) / 720`. Cuphead usa un encuadre base de 720
    unidades, pero algunos jefes alejan la cámara; sin esta corrección el mismo
    actor se ve mucho más pequeño. Se escala el root completo para conservar la
@@ -134,6 +145,9 @@ ampliar el contrato compartido con una señal explícita de finalización.
   de ese margen, no se despacha ningún artículo.
 - Al pausar o llegar a derrota, los actores existentes permanecen visibles y
   congelados. No se crean actores nuevos ni avanza el generador aleatorio.
+- Perder el foco también puede llevar `CupheadTime.GlobalSpeed` a cero. Mientras
+  el tiempo global no avance, una solicitud permanece pendiente y nunca se
+  crea un actor cuya corrutina vaya a quedar congelada fuera de cámara.
 - `_OnLevelEnd` suspende despachos sin borrar inmediatamente lo que está en
   pantalla. `Level.OnDestroy` realiza la limpieza definitiva de actores y del
   estado activo antes de cambiar de escena. Las solicitudes pendientes se
@@ -181,14 +195,45 @@ velocidad, daño, colisiones y muerte originales.
 Semilla y planta son roots distintos. Un estado compuesto conserva el mismo
 cupo desde la caída hasta la muerte de la planta. La etiqueta permanece
 invisible mientras cae la semilla, se transfiere al nuevo actor y comienza su
-fade de entrada sólo cuando la planta es visible. La escala visual de la planta vive en un wrapper: su
-root nativo mantiene `localScale.x` en `±1`, porque `move_cr` multiplica el
+fade de entrada sólo cuando la planta es visible. La escala visual de la planta
+vive en un wrapper: su root nativo mantiene `localScale.x` en `±1`, porque
+`move_cr` multiplica el
 avance por ese valor. Escalar directamente ese root alteraría su velocidad en
 jefes con cámara alejada. El wrapper escala juntos sprite y `Collider2D` sin
 modificar movimiento ni estadísticas.
 
-Las precargas de escenas de Hilda, La pandilla raíz y Cagney se serializan
-mediante `NativeInteractionPreloadCoordinator`. Todo cache nuevo que retenga una carga
+## Enemigo nativo con seguimiento por fases
+
+`frogs_firefly` reutiliza `FrogsLevelTallFirefly`, el enemigo incendiado que
+expulsa la rana alta durante la primera fase. Su `Create` nativo conserva HP,
+velocidad, daño, invencibilidad inicial, colisiones y muerte de la dificultad
+actual. La corrutina original entra hacia un primer destino, desacelera y luego
+repite indefinidamente la secuencia de espera y avance hacia el jugador.
+
+El template persistente permanece inactivo para no participar en el nivel, pero
+debe activarse sólo alrededor de `FrogsLevelTallFirefly.Create` y restaurarse en
+un `finally`. `AbstractProjectile.Create` copia el estado activo del template e
+`Init` inicia inmediatamente `initialMove_cr`; si se crea desde un template
+inactivo, Unity descarta esa corrutina y deja una luciérnaga válida pero inmóvil
+fuera de cámara, ocupando indefinidamente su lugar en la cola.
+
+Como la rana no existe fuera de su nivel, el punto inicial se coloca detrás del
+borde derecho y el primer destino se sortea entre 78% y 84% del ancho del
+viewport, siempre en la misma altura. Esta franja acorta la entrada respecto al
+antiguo 72%, conserva variación y deja cuerpo y etiqueta dentro del margen
+derecho seguro. La Y se elige entre 20% y 72%, con hasta 24 intentos para
+separarse de actores y jugadores. El margen inicial cubre también el ancho de
+la etiqueta, por lo que cuerpo y nombre empiezan completamente fuera de cámara.
+No se añade TTL: ocupa su cupo hasta morir por daño o colisión, y se limpia al
+terminar el nivel.
+
+La animación nativa fuerza `localScale.x = 1` al comenzar. La normalización de
+cámara vive por ello en un wrapper y el actor conserva su escala local nativa;
+así no pierde la corrección de tamaño ni deforma sprite y `Collider2D` en jefes
+con zoom alejado.
+
+Las precargas de escenas de Hilda, La pandilla raíz, Cagney y Hosco y Tosco se
+serializan mediante `NativeInteractionPreloadCoordinator`. Todo cache nuevo que retenga una carga
 aditiva antes de activarla debe adquirir y liberar ese coordinador, incluso en
 fallo o `Dispose`, para no bloquear la cola asíncrona de escenas de Unity. Sus
 prefixes Harmony deben comprobar además que `__instance` pertenece a la escena
@@ -226,7 +271,9 @@ durante la precarga.
   zepelines usan alturas variadas; la zanahoria debe entrar desde fuera de todo
   el borde superior. La semilla azul también entra desde arriba; en tierra debe
   brotar al tocar piso y en avión debe desaparecer bajo el borde inferior antes
-  de que la planta crezca y regrese persiguiendo al jugador.
+  de que la planta crezca y regrese persiguiendo al jugador. La luciérnaga debe
+  entrar completamente desde la derecha, frenar dentro del encuadre y conservar
+  sus pausas y avances sucesivos hacia el jugador.
 - Comparar al menos un jefe con cámara base y otro con zoom alejado, como Chef
   Saleroso; sprite, colisión, etiqueta y separación deben conservar el mismo
   tamaño aparente.

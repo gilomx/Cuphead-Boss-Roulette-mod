@@ -11,6 +11,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float LabelWidth = 320f;
         private const float LabelHeight = 48f;
         private CreatorToolsDonorLabelFollower follower;
+        private Renderer labelRenderer;
 
         internal void Initialize(string value)
         {
@@ -56,7 +57,8 @@ namespace Gilomx.CupheadBossRoulette
                 var actorRenderer = anchorRenderer == null
                     ? GetComponent<SpriteRenderer>()
                     : anchorRenderer;
-                MatchActorSorting(labelText.GetComponent<Renderer>());
+                labelRenderer = labelText.GetComponent<Renderer>();
+                MatchActorSorting(labelRenderer);
                 labelTransform.localScale = AbsoluteScale(
                     transform.lossyScale);
                 labelTransform.rotation = Quaternion.identity;
@@ -74,6 +76,7 @@ namespace Gilomx.CupheadBossRoulette
                     labelText,
                     FallbackVerticalOffset,
                     VisualGap * scaleFactor);
+                RegisterWithRenderPriority(gameObject);
             }
             catch
             {
@@ -102,6 +105,7 @@ namespace Gilomx.CupheadBossRoulette
                 FallbackVerticalOffset,
                 VisualGap * scaleFactor,
                 dynamicAnchorSeconds);
+            RegisterWithRenderPriority(actor);
             return true;
         }
 
@@ -123,6 +127,16 @@ namespace Gilomx.CupheadBossRoulette
                 Mathf.Abs(value.x),
                 Mathf.Abs(value.y),
                 Mathf.Abs(value.z));
+        }
+
+        private void RegisterWithRenderPriority(GameObject actor)
+        {
+            if (actor == null || labelRenderer == null)
+                return;
+            var priority = actor.GetComponent<
+                CreatorToolsInteractionRenderPriority>();
+            if (priority != null)
+                priority.RegisterLabel(labelRenderer);
         }
 
         private void MatchActorSorting(Renderer donorLabelRenderer)

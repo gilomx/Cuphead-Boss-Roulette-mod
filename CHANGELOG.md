@@ -38,7 +38,8 @@
 - La vista nueva reutiliza los tokens y componentes del panel React. El catálogo
   incluye los mini zepelines verde y morado de Hilda Berg y la zanahoria
   teledirigida de La pandilla raíz, además de la semilla azul de Clavel de
-  Cagney; cada uno usa un frame original como preview local.
+  Cagney y la luciérnaga incendiada de Hosco y Tosco; cada uno usa un frame
+  original como preview local.
 - El servidor expone una cola independiente para pruebas de interacciones. El
   hilo de red sólo encola el ID y el nombre; el controlador ejecuta el efecto
   desde el `Update` principal de Unity.
@@ -83,7 +84,30 @@
 - Las etiquetas normalizan a positivo la escala mundial heredada. Las plantas
   conservan su orientación nativa izquierda/derecha sin volver espejo el nombre
   del donador.
-- Las escenas nativas de Hilda, La pandilla raíz y Cagney se precargan de forma
+- `frogs_firefly` reutiliza `FrogsLevelTallFirefly` con vida, velocidad, daño,
+  colisiones, muerte y seguimiento por fases de la dificultad actual. Nace con
+  cuerpo y etiqueta completamente fuera del borde derecho, elige una altura
+  segura y entra hacia un primer destino antes de repetir sus acercamientos al
+  jugador. No tiene TTL agregado y conserva su cupo hasta morir.
+- Su escala de cámara vive en un wrapper porque la corrutina nativa restablece
+  `localScale.x` al comenzar; así conserva tamaño y colisión sin modificar el
+  movimiento.
+- Su primer destino horizontal ahora varía entre 78% y 84% del viewport. La
+  entrada es más corta que el antiguo 72%, termina más cerca del borde derecho
+  y conserva cuerpo y etiqueta dentro del área segura.
+- La plantilla inactiva de la luciérnaga se activa únicamente alrededor de su
+  `Create` nativo. Esto permite que `Init` conserve `initialMove_cr` y evita que
+  el actor quede fuera de cámara ocupando indefinidamente un lugar de la cola.
+- Creator Tools no despacha solicitudes con `CupheadTime.GlobalSpeed` en cero,
+  incluido el cambio de foco entre el panel y el juego.
+- Actor y etiqueta reafirman `ForegroundEffects` durante el gameplay para quedar
+  delante de las capas de los jefes. Mientras existe una cobertura visible de
+  `PlayerScreenEffectController`, bajan temporalmente a `Enemies` para quedar
+  debajo de oscurecimientos, filtros y transformaciones.
+- Las balas creadas por `FireSingle` y `FireSpreadshot` heredan esa misma
+  prioridad dinámica cuando el zepelín pertenece al catálogo. Los disparos de
+  Hilda y los proyectiles ajenos no se modifican.
+- Las escenas nativas de Hilda, La pandilla raíz, Cagney y Hosco y Tosco se precargan de forma
   aditiva desde el mapa bajo un coordinador único, por lo que nunca quedan dos cargas
   retenidas a la vez. Los lifecycle de cada escena se bloquean sólo durante su
   propia captura y luego se descargan las raíces temporales.

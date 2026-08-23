@@ -52,6 +52,13 @@
         "imageAlt": "Original first frame of Cagney Carnation's blue seed"
       }
     },
+    "frogs": {
+      "type": "Enemy",
+      "firefly": {
+        "title": "Flaming firefly",
+        "imageAlt": "Original frame of Ribby and Croaks' flaming firefly"
+      }
+    },
     "queue": {
       "title": "Redeem queue",
       "description": "Items run up to the configured simultaneous limit. The rest wait in arrival order.",

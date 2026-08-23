@@ -52,6 +52,13 @@
         "imageAlt": "Primer frame original de la semilla azul de Clavel de Cagney"
       }
     },
+    "frogs": {
+      "type": "Enemigo",
+      "firefly": {
+        "title": "Luciérnaga incendiada",
+        "imageAlt": "Frame original de la luciérnaga incendiada de Hosco y Tosco"
+      }
+    },
     "queue": {
       "title": "Cola de canjeos",
       "description": "Los elementos se ejecutan según el máximo simultáneo configurado. Los siguientes esperan en el orden en que llegaron.",

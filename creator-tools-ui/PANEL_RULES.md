@@ -37,10 +37,10 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
   desmontar el shell ni volver a solicitar el documento.
 - Interacciones muestra el catálogo de canjeos. `hilda_purple_zeppelin`,
   `hilda_green_zeppelin`, `rootpack_homing_carrot` y
-  `cagney_homing_plant` están disponibles en cualquier batalla o nivel de
-  plataformas después de preparar los prefabs
+  `cagney_homing_plant` y `frogs_firefly` están disponibles en cualquier
+  batalla o nivel de plataformas después de preparar los prefabs
   originales desde el mapa. La zanahoria aparece como `Proyectil`; los dos
-  zepelines y la semilla aparecen como `Enemigo`. Las tarjetas son un resumen
+  zepelines, la semilla y la luciérnaga aparecen como `Enemigo`. Las tarjetas son un resumen
   vertical
   pequeño con el primer frame nativo arriba y la información debajo; no
   contienen descripciones, controles de prueba ni un estado operativo

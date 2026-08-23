@@ -5,8 +5,10 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal static class CreatorToolsInteractionPresentation
     {
-        // Leave a small range above the actor for its donor label while still
-        // rendering everything through Cuphead's gameplay camera and filters.
+        // ForegroundEffects is Cuphead's last gameplay sorting layer. UI,
+        // loader, top-level fades and achievement overlays remain above it.
+        private const string FrontGameplaySortingLayer = "ForegroundEffects";
+        private const string CoveredGameplaySortingLayer = "Enemies";
         private const int FrontActorSortingOrder = short.MaxValue - 64;
         private const float ReferenceViewportHeight = 720f;
 
@@ -72,29 +74,16 @@ namespace Gilomx.CupheadBossRoulette
             if (renderers == null || renderers.Length == 0)
                 return;
 
-            var highestLayerId = HighestSortingLayerId();
-            var maximumOrder = int.MinValue;
-            for (var i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null)
-                    maximumOrder = Mathf.Max(
-                        maximumOrder, renderers[i].sortingOrder);
-            }
-            if (maximumOrder == int.MinValue)
-                return;
-
-            var shift = FrontActorSortingOrder - maximumOrder;
-            for (var i = 0; i < renderers.Length; i++)
-            {
-                var renderer = renderers[i];
-                if (renderer == null)
-                    continue;
-                renderer.sortingLayerID = highestLayerId;
-                renderer.sortingOrder = Mathf.Clamp(
-                    renderer.sortingOrder + shift,
-                    short.MinValue,
-                    FrontActorSortingOrder);
-            }
+            var priority = actor.GetComponent<
+                CreatorToolsInteractionRenderPriority>();
+            if (priority == null)
+                priority = actor.AddComponent<
+                    CreatorToolsInteractionRenderPriority>();
+            priority.Initialize(
+                renderers,
+                FrontGameplaySortingLayer,
+                CoveredGameplaySortingLayer,
+                FrontActorSortingOrder);
         }
 
         internal static void PrepareActor(
@@ -151,19 +140,6 @@ namespace Gilomx.CupheadBossRoulette
                 logWarning(prefix + exception);
         }
 
-        private static int HighestSortingLayerId()
-        {
-            var layers = SortingLayer.layers;
-            if (layers == null || layers.Length == 0)
-                return 0;
-
-            var highest = layers[0];
-            for (var i = 1; i < layers.Length; i++)
-                if (layers[i].value > highest.value)
-                    highest = layers[i];
-            return highest.id;
-        }
-
         private static Camera FindGameplayCamera()
         {
             var main = Camera.main;
@@ -181,5 +157,114 @@ namespace Gilomx.CupheadBossRoulette
     internal sealed class CreatorToolsInteractionCameraScale : MonoBehaviour
     {
         internal float Factor = 1f;
+    }
+
+    internal sealed class CreatorToolsInteractionRenderPriority : MonoBehaviour
+    {
+        private static int screenCoverFrame = -1;
+        private static bool screenCoverActive;
+
+        private Renderer[] actorRenderers;
+        private int[] relativeOrders;
+        private Renderer labelRenderer;
+        private string frontLayerName;
+        private string coveredLayerName;
+        private int maximumActorOrder;
+
+        internal void Initialize(
+            Renderer[] renderers,
+            string frontLayer,
+            string coveredLayer,
+            int maximumOrder)
+        {
+            actorRenderers = renderers;
+            frontLayerName = frontLayer;
+            coveredLayerName = coveredLayer;
+            maximumActorOrder = maximumOrder;
+
+            var nativeMaximum = int.MinValue;
+            for (var i = 0; i < actorRenderers.Length; i++)
+                if (actorRenderers[i] != null)
+                    nativeMaximum = Mathf.Max(
+                        nativeMaximum,
+                        actorRenderers[i].sortingOrder);
+            if (nativeMaximum == int.MinValue)
+                nativeMaximum = 0;
+
+            relativeOrders = new int[actorRenderers.Length];
+            for (var i = 0; i < actorRenderers.Length; i++)
+                relativeOrders[i] = actorRenderers[i] == null
+                    ? 0
+                    : actorRenderers[i].sortingOrder - nativeMaximum;
+            ApplyPriority();
+        }
+
+        internal void RegisterLabel(Renderer renderer)
+        {
+            labelRenderer = renderer;
+            ApplyPriority();
+        }
+
+        private void LateUpdate()
+        {
+            ApplyPriority();
+        }
+
+        private void ApplyPriority()
+        {
+            if (actorRenderers == null || relativeOrders == null)
+                return;
+            var layerName = IsScreenCoverActive()
+                ? coveredLayerName
+                : frontLayerName;
+            for (var i = 0; i < actorRenderers.Length; i++)
+            {
+                var renderer = actorRenderers[i];
+                if (renderer == null)
+                    continue;
+                renderer.sortingLayerName = layerName;
+                renderer.sortingOrder = Mathf.Clamp(
+                    maximumActorOrder + relativeOrders[i],
+                    short.MinValue,
+                    maximumActorOrder);
+            }
+            if (labelRenderer == null)
+                return;
+            labelRenderer.sortingLayerName = layerName;
+            labelRenderer.sortingOrder = Mathf.Min(
+                short.MaxValue,
+                maximumActorOrder + 1);
+        }
+
+        private static bool IsScreenCoverActive()
+        {
+            if (screenCoverFrame == Time.frameCount)
+                return screenCoverActive;
+            screenCoverFrame = Time.frameCount;
+            screenCoverActive = false;
+
+            var controllers = UnityEngine.Object.FindObjectsOfType<
+                PlayerScreenEffectController>();
+            for (var i = 0; i < controllers.Length; i++)
+            {
+                var controller = controllers[i];
+                if (controller == null ||
+                    !controller.gameObject.activeInHierarchy)
+                    continue;
+                var sprites = controller.GetComponentsInChildren<
+                    SpriteRenderer>(true);
+                for (var j = 0; j < sprites.Length; j++)
+                {
+                    var sprite = sprites[j];
+                    if (sprite == null || !sprite.enabled ||
+                        !sprite.gameObject.activeInHierarchy ||
+                        sprite.sprite == null || sprite.color.a <= 0.01f)
+                        continue;
+                    screenCoverActive = true;
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }

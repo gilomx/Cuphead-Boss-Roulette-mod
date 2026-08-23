@@ -23,8 +23,8 @@ node scripts/mock-server.mjs
 ```
 
 El servidor simulado habilita los mini zepelines verde y morado, la zanahoria
-teledirigida de La pandilla raíz y la semilla azul de Cagney. Conserva los lotes
-mixtos en la cola para
+teledirigida de La pandilla raíz, la semilla azul de Cagney y la luciérnaga
+incendiada de Hosco y Tosco. Conserva los lotes mixtos en la cola para
 revisar el catálogo compacto, la tabla de pruebas y sus estados. Cada artículo
 nuevo debe estar presente tanto en esta tabla como en la prueba aleatoria del
 runtime. En el mod real se preparan los prefabs nativos desde el mapa y se
@@ -32,8 +32,9 @@ habilitan en cualquier batalla o nivel de plataformas; no se usan recreaciones
 portátiles aproximadas. Los previews de los zepelines se regeneran con
 `tools/extract_native_zeppelin_previews.py`; el de la zanahoria, con
 `tools/extract_native_homing_carrot_preview.py`; y el de la semilla, con
-`tools/extract_native_cagney_homing_plant_preview.py`. Todos parten de frames
-nativos.
+`tools/extract_native_cagney_homing_plant_preview.py`. El de la luciérnaga se
+regenera con `tools/extract_native_frogs_firefly_preview.py`. Todos parten de
+frames nativos.
 El build ejecuta `scripts/validate-interaction-catalog.mjs` y falla si la lista
 central del runtime, `interactionItems` y el servidor simulado dejan de coincidir.
 

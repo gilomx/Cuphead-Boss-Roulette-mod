@@ -191,7 +191,7 @@ same registry feeds the random test. The React `interactionItems` collection
 feeds both catalog cards and manual-test rows. Every future item must be added to
 both paths, with no one-off random-test list.
 
-The first four test items use Cuphead's original runtime mapping:
+The first five test items use Cuphead's original runtime mapping:
 `hilda_purple_zeppelin` uses `enemyPrefabA` and its native single shot, while
 `hilda_green_zeppelin` uses `enemyPrefabB` and its native spread attack. In
 Hilda both go through `SummonEnemy()`. On the map, `NativeZeppelinCache`
@@ -264,6 +264,48 @@ scaling the plant root directly changes speed. The wrapper keeps sprite and
 collider proportional without changing HP, damage, rotation or movement. Its
 preview comes from `tools/extract_native_cagney_homing_plant_preview.py`.
 
+`frogs_firefly` uses the native `FrogsLevelTallFirefly` prefab and the current
+difficulty's `LevelProperties.Frogs.CurrentState.tallFireflies` values. It
+starts at a random safe viewport Y with both its sprite and donor label fully
+beyond the right edge, then moves toward an initial viewport X chosen uniformly
+between 0.78 and 0.84. This shortens the former 0.72 entrance, varies where each
+firefly settles and keeps the complete donor label inside the safe right edge.
+After that entrance, its untouched native coroutine repeats the original
+follow-delay and eased approach toward the selected player. Native HP, damage,
+initial invincibility, collision death and death animation remain intact; there
+is no mod TTL, so the queue slot remains active until it dies or the level ends.
+
+`initialMove_cr` forces the firefly's local X scale to one. Camera-size
+normalization therefore lives on a wrapper while the native actor retains its
+own local scale. The handle owns that wrapper and cleanup removes it after the
+actor dies. The preview comes from
+`tools/extract_native_frogs_firefly_preview.py`.
+
+The persistent firefly template stays inactive between spawns. It must be
+temporarily activated immediately around native `Create`, with deactivation in
+a `finally`: `AbstractProjectile.Create` copies the template's active state and
+`Init` starts `initialMove_cr` synchronously. Creating the clone inactive makes
+Unity discard that coroutine and leaves an offscreen actor occupying its queue
+slot forever. Creator Tools also refuses to dispatch while
+`CupheadTime.GlobalSpeed <= 0`, including the focus-loss pause used when moving
+between the browser panel and the game.
+
+`CreatorToolsInteractionRenderPriority` reasserts actor and donor-label sorting
+on every `LateUpdate`. Normal gameplay uses `ForegroundEffects`, ahead of boss
+foreground layers but below UI and global overlays. While a visible
+`PlayerScreenEffectController` cover exists, both temporarily use `Enemies` so
+bomb-transformation darkness and similar filters render above them. Never use
+the globally highest sorting layer for catalog actors.
+
+Zeppelin bullets are unparented roots, so they cannot inherit their shooter's
+render-priority component. Harmony snapshots active
+`FlyingBlimpLevelEnemyProjectile` instances immediately around `FireSingle` and
+`FireSpreadshot`; only new projectiles from an enemy already marked with
+`CreatorToolsInteractionRenderPriority` receive `BringActorToFront`. Native
+Hilda enemies and every unrelated projectile remain untouched. The projectile
+then follows the same normal `ForegroundEffects` and temporary covered
+`Enemies` behavior as its catalog shooter.
+
 `CreatorToolsInteractionPresentation.MatchGameplayCameraScale` preserves visual
 size between bosses by multiplying native root scale by
 `(camera.orthographicSize * 2) / 720`. Cuphead's base camera height is 720, while
@@ -285,8 +327,8 @@ apply their camera factor to the returned projectile root exactly once. Scale
 the complete projectile root so its sprite and collider stay aligned; do not
 mutate shared native prefabs or change damage and speed.
 
-`NativeInteractionPreloadCoordinator` serializes the Hilda, Root Pack and Cagney
-additive scene captures. Never start two native catalog scene loads concurrently
+`NativeInteractionPreloadCoordinator` serializes the Hilda, Root Pack, Cagney
+and Frogs additive scene captures. Never start two native catalog scene loads concurrently
 while either operation is waiting below scene activation; Unity's async scene
 queue can stall. Each cache retains its own narrow Harmony lifecycle guard,
 scoped by `__instance` to only its temporary scene, and releases the shared

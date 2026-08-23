@@ -138,7 +138,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (SceneLoader.CurrentlyLoading ||
                 creatorToolsInteractionLevelInstanceId < 0 ||
-                IsCreatorToolsInteractionPaused())
+                IsCreatorToolsInteractionPaused() ||
+                Mathf.Max(0f, CupheadTime.GlobalSpeed) <= 0f)
                 return false;
             var level = Level.Current;
             if (level == null || level.Ending)
@@ -172,10 +173,16 @@ namespace Gilomx.CupheadBossRoulette
             NativeZeppelinCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+            CreatorToolsZeppelinProjectilePresentation.InstallPatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
             NativeHomingCarrotCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
             NativeCagneyHomingPlantCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
+            NativeFrogsFireflyCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
 
