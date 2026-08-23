@@ -13,8 +13,19 @@ interface AppShellProps {
 export function AppShell({ activeSection, children, onSectionChange }: AppShellProps) {
   const { locale, setLocale, t } = useLocalization();
   const { status } = useConfig();
+  const currentYear = new Date().getFullYear();
+
   return (
     <div className="app-shell">
+      <div className="locale-switch locale-switch--floating" aria-label={t("app.language")}>
+        <button type="button" data-active={locale === "es"} aria-pressed={locale === "es"} onClick={() => setLocale("es")}>
+          ES
+        </button>
+        <button type="button" data-active={locale === "en"} aria-pressed={locale === "en"} onClick={() => setLocale("en")}>
+          EN
+        </button>
+      </div>
+
       <aside className="sidebar">
         <div className="sidebar__brand-block">
           <a className="brand" href="/config" aria-label={t("app.name")}>
@@ -24,7 +35,6 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
         </div>
 
         <nav className="sidebar__nav" aria-label={t("nav.group")}>
-          <p className="sidebar__group">{t("nav.group")}</p>
           <button
             className={`sidebar__item${activeSection === "roulette" ? " sidebar__item--active" : ""}`}
             type="button"
@@ -44,17 +54,12 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
         </nav>
 
         <div className="sidebar__footer">
-          <a className="sidebar__overlay-link" href="/" target="_blank" rel="noreferrer">
-            {t("app.openOverlay")}
-          </a>
-          <div className="locale-switch" aria-label={t("app.language")}>
-            <button type="button" data-active={locale === "es"} aria-pressed={locale === "es"} onClick={() => setLocale("es")}>
-              ES
-            </button>
-            <button type="button" data-active={locale === "en"} aria-pressed={locale === "en"} onClick={() => setLocale("en")}>
-              EN
-            </button>
-          </div>
+          <p>
+            {t("app.footer.madeWith")} <span aria-hidden="true">♡</span>{" "}
+            <a href="https://gilo.mx" target="_blank" rel="noopener noreferrer">gilo.mx</a>{" "}
+            © {currentYear}
+          </p>
+          <p>{t("app.footer.fanartDisclaimer")}</p>
         </div>
       </aside>
       <main className="main-content">{children}</main>

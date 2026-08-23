@@ -114,14 +114,6 @@ input:focus-visible {
   margin-top: 3.4rem;
 }
 
-.sidebar__group {
-  margin: 0 0 0.15rem;
-  font-size: 1.42rem;
-  font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-}
-
 .sidebar__item {
   display: block;
   width: 100%;
@@ -133,7 +125,10 @@ input:focus-visible {
   text-align: left;
   background: transparent;
   cursor: pointer;
-  transition: color var(--transition-fast), transform var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    font-size 240ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    transform var(--transition-fast);
 }
 
 .sidebar__item + .sidebar__item {
@@ -153,25 +148,41 @@ input:focus-visible {
 }
 
 .sidebar__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
   margin-top: auto;
   padding-top: var(--space-6);
-}
-
-.sidebar__overlay-link {
-  color: var(--color-text-soft);
-  font-size: 0.82rem;
+  color: rgb(251 248 252 / 63%);
+  font-size: 0.57rem;
   font-weight: 700;
-  text-decoration: none;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  line-height: 1.55;
+  text-align: center;
+  letter-spacing: 0.025em;
 }
 
-.sidebar__overlay-link:hover {
-  color: var(--color-text);
+.sidebar__footer p {
+  margin: 0;
+}
+
+.sidebar__footer p:first-child {
+  font-size: 0.68rem;
+}
+
+.sidebar__footer p:first-child span {
+  color: #ff00a3;
+}
+
+.sidebar__footer p + p {
+  margin-top: 0.35rem;
+}
+
+.sidebar__footer a {
+  color: inherit;
+  font-weight: 900;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.sidebar__footer a:hover {
+  color: #ff00a3;
 }
 
 .locale-switch {
@@ -180,7 +191,24 @@ input:focus-visible {
   padding: 0.2rem;
   border: 1px solid rgb(255 255 255 / 24%);
   border-radius: 999px;
-  background: rgb(19 0 30 / 22%);
+  background: rgb(19 0 30 / 48%);
+  box-shadow: 0 0.45rem 1.2rem rgb(0 0 0 / 15%);
+  backdrop-filter: blur(0.45rem);
+}
+
+.locale-switch--floating {
+  position: fixed;
+  z-index: 40;
+  top: 1.25rem;
+  right: 1.5rem;
+  opacity: 0.82;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+
+.locale-switch--floating:hover,
+.locale-switch--floating:focus-within {
+  opacity: 1;
+  background: rgb(19 0 30 / 72%);
 }
 
 .locale-switch button {
@@ -208,6 +236,7 @@ input:focus-visible {
 
 .page {
   width: min(100%, var(--content-width));
+  animation: page-enter 280ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .page-header {
@@ -276,7 +305,8 @@ input:focus-visible {
   box-shadow: 0 0 0 0.2rem rgb(244 199 111 / 12%);
 }
 
-.status-badge[data-status="connecting"] .status-badge__dot {
+.status-badge[data-status="connecting"] .status-badge__dot,
+.status-badge[data-status="pending"] .status-badge__dot {
   animation: status-pulse 1.1s ease-in-out infinite;
 }
 
@@ -1035,6 +1065,17 @@ input:focus-visible {
   50% { opacity: 0.35; }
 }
 
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes skeleton {
   to { background-position: -220% 0; }
 }
@@ -1068,18 +1109,19 @@ input:focus-visible {
     letter-spacing: 0.035em;
   }
   .sidebar__nav { display: flex; align-items: baseline; gap: 0.65rem; margin: 0; }
-  .sidebar__group { font-size: 0.95rem; }
   .sidebar__item { width: auto; font-size: 0.88rem; }
   .sidebar__item--active { font-size: 1rem; }
-  .sidebar__footer { margin: 0 0 0 auto; padding: 0; }
-  .sidebar__overlay-link { display: none; }
+  .sidebar__footer { max-width: 19rem; margin: 0 0 0 auto; padding: 0 5.5rem 0 0; font-size: 0.5rem; }
+  .locale-switch--floating { top: 0.85rem; right: 1.2rem; }
   .main-content { margin-left: 0; padding: 3.5rem 1.5rem 4rem; }
   .page-header { flex-direction: column; margin-bottom: 2.5rem; }
   .interaction-catalog { grid-template-columns: repeat(2, minmax(0, 10rem)); }
 }
 
 @media (max-width: 39rem) {
-  .sidebar__group { display: none; }
+  .sidebar { flex-wrap: wrap; }
+  .sidebar__footer { width: 100%; max-width: none; margin: 0; padding: 0; }
+  .sidebar__footer p:first-child { font-size: 0.62rem; }
   .main-content { padding: 2.5rem 1rem 3rem; }
   .page-header h1 { font-size: 2.45rem; }
   .page-header p { font-size: 0.98rem; }

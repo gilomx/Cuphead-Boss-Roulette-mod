@@ -3,7 +3,10 @@
     "name": "La Pichi Ruleta",
     "documentTitle": "La Pichi Ruleta — Configuración",
     "language": "Idioma",
-    "openOverlay": "Abrir overlay"
+    "footer": {
+      "madeWith": "Hecho con",
+      "fanartDisclaimer": "Cuphead™ y © Studio MDHR. Imágenes utilizadas con fines de fanart."
+    }
   },
   "nav": {
     "group": "Creator Tools",
@@ -128,9 +131,9 @@
   },
   "status": {
     "connecting": "Conectando con Cuphead",
-    "saved": "Cambios guardados",
+    "saved": "Sincronizado",
     "saving": "Guardando cambios",
-    "pending": "Esperando confirmación",
+    "pending": "Se aplicará al abrir el juego",
     "error": "Sin conexión con el mod"
   },
   "catalog": {

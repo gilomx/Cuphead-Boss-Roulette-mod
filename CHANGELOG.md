@@ -19,6 +19,14 @@
   configuración antigua inválida se corrige al iniciar.
 - El encabezado principal se alineó aproximadamente con la zona media del logo
   y el área de forzado reserva espacio inferior para desplegar los selects.
+- La navegación lateral elimina el encabezado redundante `Creator Tools` y el
+  acceso a `Abrir overlay`; sus cambios de sección ahora animan el tamaño del
+  elemento activo. El selector ES/EN flota con transparencia en la esquina
+  superior derecha y el pie acredita a gilo.mx con el año actual. Las vistas
+  entran con una transición breve, el crédito principal gana jerarquía y los
+  estados sincronizado y pendiente usan mensajes más claros; el pendiente
+  conserva su color amarillo y ahora parpadea. El corazón del crédito usa rosa
+  y el enlace adopta el mismo color mediante una transición al pasar el cursor.
 - El código fuente vive en `creator-tools-ui`; `assets/creator-tools/config.*`
   conserva las salidas compiladas que sirve el servidor interno.
 
