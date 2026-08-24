@@ -30,6 +30,7 @@ interface ConfigValue {
   applyChallenge: (id: number, enabled: boolean) => void;
   applyInteractionMaxActive: (value: number) => void;
   applyInteractionRandomTest: (enabled: boolean) => void;
+  applyInteractionPhaseTransitionProtection: (enabled: boolean) => void;
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
@@ -44,6 +45,12 @@ interface PendingPeskyChange {
 interface DesiredInteractionRandomTest {
   enabled: boolean;
   baselineRandomTestRevision: number;
+  requestRevision: number;
+}
+
+interface DesiredPhaseTransitionProtection {
+  enabled: boolean;
+  baselineRevision: number;
   requestRevision: number;
 }
 
@@ -98,6 +105,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   >(null);
   const randomTestRequestRevisionRef = useRef(0);
   const randomTestWriteChainRef = useRef<Promise<void>>(Promise.resolve());
+  const desiredPhaseTransitionProtectionRef = useRef<
+    DesiredPhaseTransitionProtection | null
+  >(null);
+  const phaseTransitionProtectionRequestRevisionRef = useRef(0);
+  const phaseTransitionProtectionWriteChainRef = useRef<Promise<void>>(
+    Promise.resolve(),
+  );
   const confirmedPeskyRevisionRef = useRef(0);
   const pendingPeskyChangesRef = useRef<PendingPeskyChange[]>([]);
   const peskyWriteChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -153,6 +167,26 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           };
         }
       }
+      let phaseTransitionProtectionPending = false;
+      const desiredPhaseTransitionProtection =
+        desiredPhaseTransitionProtectionRef.current;
+      if (desiredPhaseTransitionProtection !== null) {
+        const confirmed =
+          nextInteraction.phaseTransitionProtectionRevision >
+            desiredPhaseTransitionProtection.baselineRevision &&
+          nextInteraction.phaseTransitionProtectionEnabled ===
+            desiredPhaseTransitionProtection.enabled;
+        if (confirmed) {
+          desiredPhaseTransitionProtectionRef.current = null;
+        } else {
+          phaseTransitionProtectionPending = true;
+          visibleInteraction = {
+            ...visibleInteraction,
+            phaseTransitionProtectionEnabled:
+              desiredPhaseTransitionProtection.enabled,
+          };
+        }
+      }
       setInteraction(visibleInteraction);
       confirmedPeskyRevisionRef.current = nextPesky.revision;
       const pendingPeskyChanges = pendingPeskyChangesRef.current.filter(
@@ -204,7 +238,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         : next);
       setStatus(
         forcePending || challengePending || interactionPending ||
-          randomTestPending || peskyPending
+          randomTestPending || phaseTransitionProtectionPending ||
+          peskyPending
           ? "pending"
           : "saved",
       );
@@ -415,6 +450,61 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [interaction, pesky, load],
   );
 
+  const applyInteractionPhaseTransitionProtection = useCallback(
+    (enabled: boolean) => {
+      if (!interaction?.ready) return;
+      const requestRevision =
+        phaseTransitionProtectionRequestRevisionRef.current + 1;
+      phaseTransitionProtectionRequestRevisionRef.current = requestRevision;
+      desiredPhaseTransitionProtectionRef.current = {
+        enabled,
+        baselineRevision:
+          interaction.phaseTransitionProtectionRevision,
+        requestRevision,
+      };
+      setInteraction((current) => current
+        ? {
+            ...current,
+            phaseTransitionProtectionEnabled: enabled,
+            feedback: enabled
+              ? "phase_transition_protection_enabled"
+              : "phase_transition_protection_disabled",
+            error: false,
+          }
+        : current);
+      setStatus("saving");
+
+      const query = new URLSearchParams({
+        phaseTransitionProtectionEnabled: enabled ? "1" : "0",
+      });
+      const send = () => fetch(
+        "/api/config/interactions/set?" + query,
+        { cache: "no-store" },
+      )
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (mountedRef.current) setStatus("pending");
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          if (
+            phaseTransitionProtectionRequestRevisionRef.current !==
+              requestRevision ||
+            desiredPhaseTransitionProtectionRef.current?.requestRevision !==
+              requestRevision
+          ) return;
+          desiredPhaseTransitionProtectionRef.current = null;
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        });
+      phaseTransitionProtectionWriteChainRef.current =
+        phaseTransitionProtectionWriteChainRef.current.then(send, send);
+    },
+    [interaction, load],
+  );
+
   const applyPeskyEnabled = useCallback(
     (enabled: boolean) => {
       if (!pesky?.ready) return;
@@ -558,6 +648,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyChallenge,
       applyInteractionMaxActive,
       applyInteractionRandomTest,
+      applyInteractionPhaseTransitionProtection,
       testInteraction,
       applyPeskyEnabled,
       applyPeskyNames,
@@ -575,6 +666,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyChallenge,
       applyInteractionMaxActive,
       applyInteractionRandomTest,
+      applyInteractionPhaseTransitionProtection,
       testInteraction,
       applyPeskyEnabled,
       applyPeskyNames,

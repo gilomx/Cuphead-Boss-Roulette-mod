@@ -113,6 +113,8 @@
       "random_test_disabled_by_pesky": "La prueba aleatoria se desactivó porque Modo Molestoso fue activado.",
       "random_test_enabled": "La prueba aleatoria está activa y esperará a que haya una partida en curso.",
       "random_test_disabled": "La prueba aleatoria fue desactivada.",
+      "phase_transition_protection_enabled": "La protección de transiciones está activa.",
+      "phase_transition_protection_disabled": "La protección de transiciones está inactiva durante esta sesión.",
       "unknown_item": "El mod no reconoce este artículo.",
       "native_assets_loading": "Los recursos nativos del artículo todavía se están preparando.",
       "native_assets_unavailable": "No se pudieron preparar los recursos nativos del artículo.",
@@ -141,9 +143,18 @@
         "confirm": "Sí, activar"
       }
     },
+    "phaseProtection": {
+      "title": "Protección de transiciones",
+      "description": "En el Diablo, el bloqueo comienza 6 s después de la señal del cambio de fase 1 a 2. Para comparar toda la transición, cámbiala antes de la transformación; vuelve a activarse al reiniciar el juego.",
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "enable": "Activar",
+      "disable": "Desactivar"
+    },
     "status": {
       "disabled": "Desactivado",
       "waitingGame": "Esperando batalla",
+      "startingBattle": "Iniciando batalla",
       "waitingInteractions": "Terminando interacciones activas",
       "running": "Molestando ahora"
     },

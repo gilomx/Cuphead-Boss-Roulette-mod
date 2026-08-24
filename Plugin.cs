@@ -1415,6 +1415,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (running || pendingLoad || !resultReady)
                 return;
+            BeginCreatorToolsInteractionGameplayLevelLoad(
+                "roulette play action");
             pendingLoad = true;
             loadAt = Time.realtimeSinceStartup;
         }
@@ -2012,12 +2014,14 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (!PlayerData.Initialized || PlayerData.Data == null)
                 {
+                    CancelCreatorToolsInteractionGameplayLevelLoad();
                     status = RouletteStatus.SaveRequired;
                     Logger.LogWarning("Selecciona primero una partida guardada.");
                     return;
                 }
                 if (SceneLoader.CurrentlyLoading)
                 {
+                    CancelCreatorToolsInteractionGameplayLevelLoad();
                     status = RouletteStatus.SceneLoading;
                     return;
                 }
@@ -2045,6 +2049,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             catch (Exception exception)
             {
+                CancelCreatorToolsInteractionGameplayLevelLoad();
                 if (returnDestinationPrepared &&
                     PlayerData.Initialized && PlayerData.Data != null)
                 {

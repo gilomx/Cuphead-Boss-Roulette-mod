@@ -239,6 +239,7 @@ textarea:focus-visible {
 }
 
 .pesky-status[data-status="waitingInteractions"],
+.pesky-status[data-status="startingBattle"],
 .pesky-status[data-status="waitingGame"] {
   color: #2e2004;
   background: var(--color-warning);
@@ -1203,6 +1204,13 @@ textarea:focus-visible {
     rgb(255 255 255 / 1.8%);
 }
 
+.interaction-phase-protection {
+  margin-top: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  overflow: hidden;
+}
+
 .interaction-random-test--switch {
   display: block;
   height: 5.85rem;
@@ -1486,6 +1494,10 @@ textarea:focus-visible {
     gap: var(--space-2);
   }
   .interaction-random-test--switch { height: 9.25rem; }
+  .interaction-phase-protection {
+    grid-template-columns: 1fr;
+  }
+  .interaction-phase-protection > button { width: 100%; }
   .pesky-toggle { width: 100%; }
   .mode-switch-confirmation__actions { justify-content: flex-start; }
   .pesky-names__footer { align-items: stretch; flex-direction: column; }

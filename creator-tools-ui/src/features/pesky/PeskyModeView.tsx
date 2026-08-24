@@ -24,11 +24,14 @@ export function PeskyModeView() {
     applyPeskyEnabled,
     applyPeskyNames,
     applyPeskyItem,
+    applyInteractionPhaseTransitionProtection,
   } = useConfig();
   const { t } = useLocalization();
   const [namesDraft, setNamesDraft] = useState("");
   const [namesDirty, setNamesDirty] = useState(false);
   const [confirmingPesky, setConfirmingPesky] = useState(false);
+  const phaseTransitionProtectionEnabled =
+    interaction?.phaseTransitionProtectionEnabled ?? true;
 
   useEffect(() => {
     if (!namesDirty && pesky?.names) {
@@ -54,6 +57,8 @@ export function PeskyModeView() {
     ? "waitingInteractions"
     : pesky?.running
       ? "running"
+      : pesky?.enabled && pesky?.startingBattle
+        ? "startingBattle"
       : pesky?.enabled
         ? "waitingGame"
         : "disabled";
@@ -137,6 +142,39 @@ export function PeskyModeView() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section
+        className="interaction-random-test interaction-phase-protection"
+        data-active={phaseTransitionProtectionEnabled}
+        aria-labelledby="pesky-phase-protection-title"
+      >
+        <div className="interaction-random-test__copy">
+          <div className="interaction-random-test__title">
+            <strong id="pesky-phase-protection-title">
+              {t("pesky.phaseProtection.title")}
+            </strong>
+            <span data-active={phaseTransitionProtectionEnabled}>
+              {t(`pesky.phaseProtection.${
+                phaseTransitionProtectionEnabled ? "active" : "inactive"
+              }`)}
+            </span>
+          </div>
+          <p>{t("pesky.phaseProtection.description")}</p>
+        </div>
+        <button
+          type="button"
+          aria-pressed={phaseTransitionProtectionEnabled}
+          data-active={phaseTransitionProtectionEnabled}
+          disabled={!interaction?.ready}
+          onClick={() => applyInteractionPhaseTransitionProtection(
+            !phaseTransitionProtectionEnabled,
+          )}
+        >
+          {t(`pesky.phaseProtection.${
+            phaseTransitionProtectionEnabled ? "disable" : "enable"
+          }`)}
+        </button>
       </section>
 
       <div className="interaction-workspace pesky-workspace">

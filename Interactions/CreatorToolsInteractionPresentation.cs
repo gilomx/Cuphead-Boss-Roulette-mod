@@ -73,6 +73,10 @@ namespace Gilomx.CupheadBossRoulette
             if (actor == null)
                 return;
 
+            if (actor.GetComponent<
+                    CreatorToolsInteractionOwnedObject>() == null)
+                actor.AddComponent<CreatorToolsInteractionOwnedObject>();
+
             var renderers = actor.GetComponentsInChildren<Renderer>(true);
             if (renderers == null || renderers.Length == 0)
                 return;
@@ -198,6 +202,50 @@ namespace Gilomx.CupheadBossRoulette
                 if (snapshots[i] != null)
                     UnityEngine.Object.Destroy(
                         snapshots[i].gameObject);
+        }
+
+        internal static int ClearActiveActorsForPhaseTransition()
+        {
+            var ownedObjects = UnityEngine.Object.FindObjectsOfType<
+                CreatorToolsInteractionOwnedObject>();
+            if (ownedObjects == null || ownedObjects.Length == 0)
+                return 0;
+
+            var roots = new List<GameObject>();
+            for (var i = 0; i < ownedObjects.Length; i++)
+            {
+                var ownedObject = ownedObjects[i];
+                if (ownedObject == null ||
+                    !ownedObject.gameObject.activeInHierarchy ||
+                    HasOwnedObjectAncestor(ownedObject.transform))
+                    continue;
+                roots.Add(ownedObject.gameObject);
+            }
+
+            for (var i = 0; i < roots.Count; i++)
+            {
+                var root = roots[i];
+                if (root == null)
+                    continue;
+                root.SetActive(false);
+                UnityEngine.Object.Destroy(root);
+            }
+            return roots.Count;
+        }
+
+        private static bool HasOwnedObjectAncestor(Transform transform)
+        {
+            var ancestor = transform == null
+                ? null
+                : transform.parent;
+            while (ancestor != null)
+            {
+                if (ancestor.GetComponent<
+                        CreatorToolsInteractionOwnedObject>() != null)
+                    return true;
+                ancestor = ancestor.parent;
+            }
+            return false;
         }
 
         private static bool HasLevelEndSnapshot()
@@ -586,5 +634,9 @@ namespace Gilomx.CupheadBossRoulette
             }
             return false;
         }
+    }
+
+    internal sealed class CreatorToolsInteractionOwnedObject : MonoBehaviour
+    {
     }
 }

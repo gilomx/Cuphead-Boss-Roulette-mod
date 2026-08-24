@@ -87,7 +87,10 @@ namespace Gilomx.CupheadBossRoulette
                 cleanup = null;
                 lifetimeObject = null;
                 if (root != null)
+                {
+                    root.SetActive(false);
                     UnityEngine.Object.Destroy(root);
+                }
                 root = null;
             }
         }

@@ -14,6 +14,8 @@ let interactionQueue = [];
 let interactionMaxActive = 1;
 let interactionRandomTestEnabled = false;
 let interactionRandomTestRevision = 0;
+let phaseTransitionProtectionEnabled = true;
+let phaseTransitionProtectionRevision = 0;
 let peskyEnabled = false;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
@@ -160,6 +162,8 @@ createServer((req, res) => {
       suspendedByPesky: peskyEnabled,
       randomTestEnabled: interactionRandomTestEnabled,
       randomTestRevision: interactionRandomTestRevision,
+      phaseTransitionProtectionEnabled,
+      phaseTransitionProtectionRevision,
       item: "hilda_green_zeppelin",
       items: interactionItems,
       lastItem: interactionLastItem,
@@ -194,6 +198,17 @@ createServer((req, res) => {
         : "random_test_disabled";
       if (interactionRandomTestEnabled) peskyEnabled = false;
     }
+    const phaseTransitionProtectionValue = url.searchParams.get(
+      "phaseTransitionProtectionEnabled",
+    );
+    if (phaseTransitionProtectionValue !== null) {
+      phaseTransitionProtectionEnabled =
+        phaseTransitionProtectionValue === "1";
+      phaseTransitionProtectionRevision += 1;
+      nextFeedback = phaseTransitionProtectionEnabled
+        ? "phase_transition_protection_enabled"
+        : "phase_transition_protection_disabled";
+    }
     refreshInteractionQueue();
     interactionFeedback = nextFeedback;
     interactionRevision += 1;
@@ -206,6 +221,7 @@ createServer((req, res) => {
       available: true,
       enabled: peskyEnabled,
       running: peskyEnabled,
+      startingBattle: false,
       waitingForInteractions: false,
       revision: peskyRevision,
       feedback: peskyFeedback,

@@ -59,6 +59,8 @@ export interface InteractionConfigState {
   suspendedByPesky: boolean;
   randomTestEnabled: boolean;
   randomTestRevision: number;
+  phaseTransitionProtectionEnabled: boolean;
+  phaseTransitionProtectionRevision: number;
   item: string;
   items: string[];
   lastItem: string;
@@ -79,6 +81,7 @@ export interface PeskyModeConfigState {
   available: boolean;
   enabled: boolean;
   running: boolean;
+  startingBattle: boolean;
   waitingForInteractions: boolean;
   revision: number;
   feedback: string;

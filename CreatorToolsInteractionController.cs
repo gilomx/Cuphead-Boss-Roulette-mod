@@ -21,6 +21,10 @@ namespace Gilomx.CupheadBossRoulette
             new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
         private readonly Action<int> setMaximumActive;
+        private readonly Func<bool>
+            getPhaseTransitionProtectionEnabled;
+        private readonly Action<bool>
+            setPhaseTransitionProtectionEnabled;
         private readonly CreatorToolsInteractionQueue interactionQueue =
             new CreatorToolsInteractionQueue();
         private readonly CreatorToolsInteractionQueue peskyQueue =
@@ -35,6 +39,10 @@ namespace Gilomx.CupheadBossRoulette
         private bool peskyFeedbackError;
         private bool randomTestEnabled;
         private int randomTestRevision;
+        private int phaseTransitionProtectionRevision;
+        private bool gameplayLevelActive;
+        private bool gameplayLevelLoadPending;
+        private bool gameplayAvailabilityObserved;
         private float nextPeskyAt = -1f;
         private float nextRandomTestAt = -1f;
         private float nextInteractionDispatchAt = -1f;
@@ -49,6 +57,8 @@ namespace Gilomx.CupheadBossRoulette
             Func<bool> canSpawnInteraction,
             Func<int> getMaximumActive,
             Action<int> setMaximumActive,
+            Func<bool> getPhaseTransitionProtectionEnabled,
+            Action<bool> setPhaseTransitionProtectionEnabled,
             Action<string> logInfo,
             Action<string> logWarning)
         {
@@ -56,6 +66,10 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
             this.setMaximumActive = setMaximumActive;
+            this.getPhaseTransitionProtectionEnabled =
+                getPhaseTransitionProtectionEnabled;
+            this.setPhaseTransitionProtectionEnabled =
+                setPhaseTransitionProtectionEnabled;
             peskySettings = CreatorToolsPeskyModeSettings.Load(
                 pluginConfigPath, logWarning);
             executors.Add(new ZeppelinInteractionExecutor(
@@ -98,6 +112,8 @@ namespace Gilomx.CupheadBossRoulette
                 ProcessPeskyCommand(ParseQuery(query));
 
             var available = AnyItemAvailable();
+            if (gameplayLevelActive && available)
+                gameplayAvailabilityObserved = true;
             var waitingForInteractions =
                 peskySettings.Enabled && interactionQueue.ActiveCount > 0;
             if (peskySettings.Enabled)
@@ -147,6 +163,16 @@ namespace Gilomx.CupheadBossRoulette
             lastPeskyState = null;
         }
 
+        internal bool GameplayLevelLoadPending
+        {
+            get { return gameplayLevelLoadPending; }
+        }
+
+        internal bool GameplayLevelActive
+        {
+            get { return gameplayLevelActive; }
+        }
+
         internal void EndGameplayLevel()
         {
             interactionQueue.ClearActive();
@@ -156,14 +182,66 @@ namespace Gilomx.CupheadBossRoulette
             SuspendGameplayLevel();
         }
 
+        internal void BeginGameplayLevel(bool confirmLoad)
+        {
+            if (confirmLoad)
+                gameplayLevelLoadPending = false;
+            gameplayLevelActive = true;
+            gameplayAvailabilityObserved = false;
+            InvalidateState();
+        }
+
+        internal void ConfirmGameplayLevelStart()
+        {
+            if (!gameplayLevelLoadPending)
+                return;
+            gameplayLevelLoadPending = false;
+            InvalidateState();
+        }
+
+        internal bool BeginGameplayLevelLoad()
+        {
+            if (gameplayLevelLoadPending)
+                return false;
+            gameplayLevelLoadPending = true;
+            InvalidateState();
+            return true;
+        }
+
+        internal void CancelGameplayLevelLoad()
+        {
+            if (!gameplayLevelLoadPending)
+                return;
+            gameplayLevelLoadPending = false;
+            InvalidateState();
+        }
+
         internal void SuspendGameplayLevel()
         {
+            gameplayLevelActive = false;
+            gameplayAvailabilityObserved = false;
             peskyQueue.Clear();
             nextPeskyAt = -1f;
             nextRandomTestAt = -1f;
             nextInteractionDispatchAt = -1f;
             nextPeskyDispatchAt = -1f;
             InvalidateState();
+        }
+
+        internal int ClearActiveForPhaseTransition()
+        {
+            var cleared = CreatorToolsInteractionPresentation
+                .ClearActiveActorsForPhaseTransition();
+            interactionQueue.ClearActive();
+            peskyQueue.Clear();
+            for (var i = 0; i < executors.Count; i++)
+                executors[i].EndGameplayLevel();
+            nextPeskyAt = -1f;
+            nextRandomTestAt = -1f;
+            nextInteractionDispatchAt = -1f;
+            nextPeskyDispatchAt = -1f;
+            InvalidateState();
+            return cleared;
         }
 
         private void ProcessInteractionCommand(
@@ -179,7 +257,36 @@ namespace Gilomx.CupheadBossRoulette
                 SetRandomTestEnabled(values);
                 return;
             }
+            if (values.ContainsKey(
+                "phaseTransitionProtectionEnabled"))
+            {
+                SetPhaseTransitionProtectionEnabled(values);
+                return;
+            }
             EnqueueInteraction(values);
+        }
+
+        private void SetPhaseTransitionProtectionEnabled(
+            Dictionary<string, string> values)
+        {
+            string value;
+            bool enabled;
+            if (!values.TryGetValue(
+                    "phaseTransitionProtectionEnabled", out value) ||
+                !TryParseSwitch(value, out enabled))
+            {
+                SetInteractionFeedback("invalid_setting", true);
+                return;
+            }
+
+            if (setPhaseTransitionProtectionEnabled != null)
+                setPhaseTransitionProtectionEnabled(enabled);
+            phaseTransitionProtectionRevision++;
+            SetInteractionFeedback(
+                enabled
+                    ? "phase_transition_protection_enabled"
+                    : "phase_transition_protection_disabled",
+                false);
         }
 
         private void SetRandomTestEnabled(
@@ -610,6 +717,13 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(randomTestEnabled ? "true" : "false")
                 .Append(",\"randomTestRevision\":")
                 .Append(randomTestRevision)
+                .Append(",\"phaseTransitionProtectionEnabled\":")
+                .Append(getPhaseTransitionProtectionEnabled == null ||
+                    getPhaseTransitionProtectionEnabled()
+                        ? "true"
+                        : "false")
+                .Append(",\"phaseTransitionProtectionRevision\":")
+                .Append(phaseTransitionProtectionRevision)
                 .Append(",\"revision\":").Append(interactionRevision)
                 .Append(",\"queueCount\":").Append(interactionQueue.Count)
                 .Append(",\"activeCount\":").Append(interactionQueue.ActiveCount)
@@ -629,6 +743,12 @@ namespace Gilomx.CupheadBossRoulette
             bool available, bool waitingForInteractions)
         {
             var running = peskySettings.Enabled && available &&
+                !gameplayLevelLoadPending &&
+                !waitingForInteractions;
+            var startingBattle = peskySettings.Enabled &&
+                (gameplayLevelLoadPending ||
+                 (gameplayLevelActive &&
+                  !gameplayAvailabilityObserved)) &&
                 !waitingForInteractions;
             var builder = new StringBuilder(4096);
             builder.Append("{\"ready\":true,\"available\":")
@@ -636,6 +756,8 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"enabled\":")
                 .Append(peskySettings.Enabled ? "true" : "false")
                 .Append(",\"running\":").Append(running ? "true" : "false")
+                .Append(",\"startingBattle\":")
+                .Append(startingBattle ? "true" : "false")
                 .Append(",\"waitingForInteractions\":")
                 .Append(waitingForInteractions ? "true" : "false")
                 .Append(",\"revision\":").Append(peskyRevision)

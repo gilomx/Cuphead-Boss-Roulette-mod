@@ -31,7 +31,8 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const int CreatorToolsDefaultPort = 18081;
         private const int CreatorToolsPortCandidates = 100;
-        private const float CreatorToolsInteractionStartDelay = 2.5f;
+        private const float CreatorToolsDevilPhaseTransitionBlockDelay = 6f;
+        private const float CreatorToolsInteractionPhaseTransitionTimeout = 30f;
 
         private ConfigEntry<bool> creatorToolsEnabledSetting;
         private ConfigEntry<int> creatorToolsResolvedPortSetting;
@@ -61,9 +62,21 @@ namespace Gilomx.CupheadBossRoulette
         private bool creatorToolsLabelRenderFailureLogged;
         private string creatorToolsServerError;
         private bool creatorToolsPortChanged;
+        private bool creatorToolsInteractionLevelStartObserved;
         private int creatorToolsInteractionLevelInstanceId = -1;
         private float creatorToolsInteractionAllowedAt =
             float.PositiveInfinity;
+        private bool creatorToolsInteractionPhaseTransitionBlocked;
+        private bool creatorToolsInteractionPhaseTransitionActivated;
+        private bool creatorToolsInteractionPhaseTransitionProtectionEnabled =
+            true;
+        private bool creatorToolsInteractionPhaseTransitionActorsCleared;
+        private int creatorToolsInteractionPhaseTransitionLevelInstanceId = -1;
+        private float creatorToolsInteractionPhaseTransitionStartedAt =
+            float.PositiveInfinity;
+        private float creatorToolsInteractionPhaseTransitionPlayableElapsed;
+        private int creatorToolsInteractionPhaseTransitionLastPlayableFrame =
+            -1;
 
         private void InitializeCreatorTools()
         {
@@ -110,6 +123,8 @@ namespace Gilomx.CupheadBossRoulette
                 CanSpawnCreatorToolsInteraction,
                 GetCreatorToolsInteractionMaximumActive,
                 SetCreatorToolsInteractionMaximumActive,
+                GetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
+                SetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 delegate(string message) { Logger.LogInfo(message); },
                 delegate(string message) { Logger.LogWarning(message); });
             LevelPauseGUI.OnPauseEvent +=
@@ -157,10 +172,210 @@ namespace Gilomx.CupheadBossRoulette
             Level level;
             if (!TryGetActiveCreatorToolsGameplayLevel(out level))
                 return false;
-            return level.GetInstanceID() ==
-                       creatorToolsInteractionLevelInstanceId &&
-                   Time.realtimeSinceStartup >=
-                       creatorToolsInteractionAllowedAt;
+            var now = Time.realtimeSinceStartup;
+            if (level.GetInstanceID() !=
+                    creatorToolsInteractionLevelInstanceId ||
+                now < creatorToolsInteractionAllowedAt)
+                return false;
+
+            if (IsCreatorToolsInteractionPhaseTransitionBlocked(level))
+                return false;
+            return true;
+        }
+
+        private bool IsCreatorToolsInteractionPhaseTransitionBlocked(
+            Level level)
+        {
+            if (!creatorToolsInteractionPhaseTransitionBlocked)
+                return false;
+            if (!creatorToolsInteractionPhaseTransitionProtectionEnabled)
+            {
+                ResetCreatorToolsInteractionPhaseTransition();
+                return false;
+            }
+            if (level == null ||
+                level.GetInstanceID() !=
+                    creatorToolsInteractionPhaseTransitionLevelInstanceId)
+            {
+                ResetCreatorToolsInteractionPhaseTransition();
+                return false;
+            }
+
+            var elapsed = Mathf.Max(
+                0f,
+                Time.time -
+                    creatorToolsInteractionPhaseTransitionStartedAt);
+            if (creatorToolsInteractionPhaseTransitionLastPlayableFrame !=
+                Time.frameCount)
+            {
+                creatorToolsInteractionPhaseTransitionLastPlayableFrame =
+                    Time.frameCount;
+                creatorToolsInteractionPhaseTransitionPlayableElapsed +=
+                    Mathf.Max(0f, Time.unscaledDeltaTime);
+            }
+            if (!creatorToolsInteractionPhaseTransitionActivated &&
+                creatorToolsInteractionPhaseTransitionPlayableElapsed <
+                    CreatorToolsDevilPhaseTransitionBlockDelay)
+                return false;
+            if (!creatorToolsInteractionPhaseTransitionActivated)
+            {
+                creatorToolsInteractionPhaseTransitionActivated = true;
+                if (creatorToolsInteractions != null)
+                    creatorToolsInteractions.InvalidateState();
+                Logger.LogInfo(
+                    "Creator Tools phase-transition dispatch block " +
+                    "activated after " +
+                    creatorToolsInteractionPhaseTransitionPlayableElapsed
+                        .ToString(
+                            "0.00", CultureInfo.InvariantCulture) + "s.");
+            }
+
+            if (elapsed <=
+                CreatorToolsInteractionPhaseTransitionTimeout)
+                return true;
+
+            Logger.LogWarning(
+                "Creator Tools phase-transition protection timed out; " +
+                "interaction dispatch will resume now.");
+            ResetCreatorToolsInteractionPhaseTransition();
+            return false;
+        }
+
+        private bool GetCreatorToolsInteractionPhaseTransitionProtectionEnabled()
+        {
+            return creatorToolsInteractionPhaseTransitionProtectionEnabled;
+        }
+
+        private void SetCreatorToolsInteractionPhaseTransitionProtectionEnabled(
+            bool enabled)
+        {
+            if (creatorToolsInteractionPhaseTransitionProtectionEnabled ==
+                enabled)
+                return;
+
+            var canceledActiveTransition =
+                creatorToolsInteractionPhaseTransitionBlocked && !enabled;
+            var elapsed = canceledActiveTransition
+                ? Mathf.Max(
+                    0f,
+                    Time.time -
+                        creatorToolsInteractionPhaseTransitionStartedAt)
+                : 0f;
+            creatorToolsInteractionPhaseTransitionProtectionEnabled = enabled;
+            if (!enabled)
+                ResetCreatorToolsInteractionPhaseTransition();
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.InvalidateState();
+
+            Logger.LogInfo(
+                "Creator Tools phase-transition protection " +
+                (enabled ? "enabled." : "disabled for this session.") +
+                (canceledActiveTransition
+                    ? " Active protection canceled after " +
+                        elapsed.ToString(
+                            "0.00", CultureInfo.InvariantCulture) + "s."
+                    : string.Empty));
+        }
+
+        private void BeginCreatorToolsInteractionPhaseTransition(
+            Level level,
+            string transition)
+        {
+            if (!creatorToolsInteractionPhaseTransitionProtectionEnabled ||
+                level == null ||
+                level.GetInstanceID() !=
+                    creatorToolsInteractionLevelInstanceId)
+                return;
+            var instanceId = level.GetInstanceID();
+            if (creatorToolsInteractionPhaseTransitionBlocked &&
+                creatorToolsInteractionPhaseTransitionLevelInstanceId ==
+                    instanceId)
+                return;
+
+            creatorToolsInteractionPhaseTransitionBlocked = true;
+            creatorToolsInteractionPhaseTransitionActivated = false;
+            creatorToolsInteractionPhaseTransitionActorsCleared = false;
+            creatorToolsInteractionPhaseTransitionLevelInstanceId = instanceId;
+            creatorToolsInteractionPhaseTransitionStartedAt = Time.time;
+            creatorToolsInteractionPhaseTransitionPlayableElapsed = 0f;
+            creatorToolsInteractionPhaseTransitionLastPlayableFrame =
+                Time.frameCount;
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.InvalidateState();
+            Logger.LogInfo(
+                "Creator Tools phase-transition protection signaled: " +
+                transition + " at StartTransform; dispatch remains active " +
+                "for " + CreatorToolsDevilPhaseTransitionBlockDelay.ToString(
+                    "0.00", CultureInfo.InvariantCulture) + "s.");
+        }
+
+        private void ClearCreatorToolsInteractionPhaseTransitionActors(
+            Level level,
+            string transition)
+        {
+            if (!creatorToolsInteractionPhaseTransitionBlocked ||
+                creatorToolsInteractionPhaseTransitionActorsCleared ||
+                level == null ||
+                level.GetInstanceID() !=
+                    creatorToolsInteractionPhaseTransitionLevelInstanceId)
+                return;
+
+            if (!creatorToolsInteractionPhaseTransitionActivated)
+            {
+                creatorToolsInteractionPhaseTransitionActivated = true;
+                if (creatorToolsInteractions != null)
+                    creatorToolsInteractions.InvalidateState();
+            }
+            creatorToolsInteractionPhaseTransitionActorsCleared = true;
+            var elapsed = Mathf.Max(
+                0f,
+                Time.time -
+                    creatorToolsInteractionPhaseTransitionStartedAt);
+            var cleared = creatorToolsInteractions == null
+                ? 0
+                : creatorToolsInteractions.ClearActiveForPhaseTransition();
+            Logger.LogInfo(
+                "Creator Tools cleared " + cleared +
+                " active interaction actor(s) for " + transition +
+                " at ZoomOut after " + elapsed.ToString(
+                    "0.00", CultureInfo.InvariantCulture) + "s.");
+        }
+
+        private void EndCreatorToolsInteractionPhaseTransition(
+            Level level,
+            string transition)
+        {
+            if (!creatorToolsInteractionPhaseTransitionBlocked ||
+                level == null ||
+                level.GetInstanceID() !=
+                    creatorToolsInteractionPhaseTransitionLevelInstanceId)
+                return;
+
+            var elapsed = Mathf.Max(
+                0f,
+                Time.time -
+                    creatorToolsInteractionPhaseTransitionStartedAt);
+            ResetCreatorToolsInteractionPhaseTransition();
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.InvalidateState();
+            Logger.LogInfo(
+                "Creator Tools phase-transition protection ended: " +
+                transition + " when disable_input_cr finished after " +
+                elapsed.ToString(
+                    "0.00", CultureInfo.InvariantCulture) +
+                "s; player input is restored.");
+        }
+
+        private void ResetCreatorToolsInteractionPhaseTransition()
+        {
+            creatorToolsInteractionPhaseTransitionBlocked = false;
+            creatorToolsInteractionPhaseTransitionActivated = false;
+            creatorToolsInteractionPhaseTransitionActorsCleared = false;
+            creatorToolsInteractionPhaseTransitionLevelInstanceId = -1;
+            creatorToolsInteractionPhaseTransitionStartedAt =
+                float.PositiveInfinity;
+            creatorToolsInteractionPhaseTransitionPlayableElapsed = 0f;
+            creatorToolsInteractionPhaseTransitionLastPlayableFrame = -1;
         }
 
         private static bool TryGetActiveCreatorToolsGameplayLevel(
@@ -201,7 +416,23 @@ namespace Gilomx.CupheadBossRoulette
             var sameLevel =
                 creatorToolsInteractionLevelInstanceId == instanceId;
             if (sameLevel && !rearmExistingLevel)
+            {
+                if (creatorToolsInteractionLevelStartObserved &&
+                    creatorToolsInteractions != null)
+                {
+                    creatorToolsInteractionLevelStartObserved = false;
+                    creatorToolsInteractions.ConfirmGameplayLevelStart();
+                }
                 return;
+            }
+            if (sameLevel && rearmExistingLevel &&
+                creatorToolsInteractions != null &&
+                creatorToolsInteractions.GameplayLevelActive)
+            {
+                creatorToolsInteractionLevelStartObserved = false;
+                creatorToolsInteractions.ConfirmGameplayLevelStart();
+                return;
+            }
 
             CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
 
@@ -213,11 +444,13 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractions != null)
                 creatorToolsInteractions.EndGameplayLevel();
             creatorToolsInteractionLevelInstanceId = instanceId;
-            creatorToolsInteractionAllowedAt =
-                Time.realtimeSinceStartup +
-                CreatorToolsInteractionStartDelay;
+            creatorToolsInteractionAllowedAt = Time.realtimeSinceStartup;
+            ResetCreatorToolsInteractionPhaseTransition();
             if (creatorToolsInteractions != null)
-                creatorToolsInteractions.InvalidateState();
+                creatorToolsInteractions.BeginGameplayLevel(
+                    rearmExistingLevel ||
+                    creatorToolsInteractionLevelStartObserved);
+            creatorToolsInteractionLevelStartObserved = false;
             Logger.LogInfo(
                 "Creator Tools interactions registered gameplay level " +
                 level.CurrentLevel + ".");
@@ -254,6 +487,8 @@ namespace Gilomx.CupheadBossRoulette
             NativeFrogsFireflyCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+            InstallCreatorToolsGameplayLoadPatch();
+            InstallCreatorToolsPhaseTransitionPatches();
 
             var levelStarted = HarmonyLib.AccessTools.Method(
                 typeof(Level), "_OnLevelStart");
@@ -298,6 +533,156 @@ namespace Gilomx.CupheadBossRoulette
                     "Could not install the Creator Tools interaction scene cleanup.");
         }
 
+        private void InstallCreatorToolsGameplayLoadPatch()
+        {
+            var loadLevel = HarmonyLib.AccessTools.Method(
+                typeof(SceneLoader),
+                "LoadLevel",
+                new[]
+                {
+                    typeof(Levels),
+                    typeof(SceneLoader.Transition),
+                    typeof(SceneLoader.Icon),
+                    typeof(SceneLoader.Context)
+                });
+            var loadLevelPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsGameplayLevelLoadPrefix");
+            if (loadLevel == null || loadLevelPrefix == null)
+            {
+                Logger.LogWarning(
+                    "Could not install the Creator Tools gameplay-load " +
+                    "status hook.");
+                return;
+            }
+            harmony.Patch(
+                loadLevel,
+                prefix: new HarmonyLib.HarmonyMethod(loadLevelPrefix));
+        }
+
+        private static void CreatorToolsGameplayLevelLoadPrefix()
+        {
+            var plugin = activeInstance;
+            if (plugin != null)
+                plugin.BeginCreatorToolsInteractionGameplayLevelLoad(
+                    "SceneLoader.LoadLevel");
+        }
+
+        private void BeginCreatorToolsInteractionGameplayLevelLoad(
+            string source)
+        {
+            if (creatorToolsInteractions == null ||
+                !creatorToolsInteractions.BeginGameplayLevelLoad())
+                return;
+            creatorToolsInteractionLevelStartObserved = false;
+            Logger.LogInfo(
+                "Creator Tools interactions are starting a battle from " +
+                source + ".");
+        }
+
+        private void CancelCreatorToolsInteractionGameplayLevelLoad()
+        {
+            creatorToolsInteractionLevelStartObserved = false;
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.CancelGameplayLevelLoad();
+        }
+
+        private void InstallCreatorToolsPhaseTransitionPatches()
+        {
+            var devilTransitionStart = HarmonyLib.AccessTools.Method(
+                typeof(DevilLevelSittingDevil), "StartTransform");
+            var devilTransitionCommit = HarmonyLib.AccessTools.Method(
+                typeof(DevilLevel), "ZoomOut");
+            var devilInputRestoreIterator = HarmonyLib.AccessTools.Inner(
+                typeof(DevilLevel), "<disable_input_cr>c__Iterator3");
+            var devilTransitionEnd = devilInputRestoreIterator == null
+                ? null
+                : HarmonyLib.AccessTools.Method(
+                    devilInputRestoreIterator, "MoveNext");
+            var startPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsDevilTransitionStartPrefix");
+            var commitPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsDevilTransitionCommitPrefix");
+            var endPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsDevilInputRestorePostfix");
+
+            if (devilTransitionStart == null ||
+                devilTransitionCommit == null ||
+                devilTransitionEnd == null ||
+                startPrefix == null || commitPrefix == null ||
+                endPostfix == null)
+            {
+                Logger.LogWarning(
+                    "Could not install the Creator Tools Devil phase " +
+                    "transition protection.");
+                return;
+            }
+
+            harmony.Patch(
+                devilTransitionStart,
+                prefix: new HarmonyLib.HarmonyMethod(startPrefix));
+            harmony.Patch(
+                devilTransitionCommit,
+                prefix: new HarmonyLib.HarmonyMethod(commitPrefix));
+            harmony.Patch(
+                devilTransitionEnd,
+                postfix: new HarmonyLib.HarmonyMethod(endPostfix));
+        }
+
+        private static void CreatorToolsDevilTransitionStartPrefix()
+        {
+            var plugin = activeInstance;
+            DevilLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsDevilLevel(out level))
+                return;
+            plugin.BeginCreatorToolsInteractionPhaseTransition(
+                level, "Devil phase 1 to 2");
+        }
+
+        private static void CreatorToolsDevilTransitionCommitPrefix(
+            DevilLevel __instance)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null)
+                return;
+            plugin.ClearCreatorToolsInteractionPhaseTransitionActors(
+                __instance, "Devil phase 1 to 2");
+        }
+
+        private static void CreatorToolsDevilInputRestorePostfix(
+            bool __result)
+        {
+            if (__result)
+                return;
+            var plugin = activeInstance;
+            DevilLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsDevilLevel(out level))
+                return;
+            plugin.EndCreatorToolsInteractionPhaseTransition(
+                level, "Devil phase 1 to 2");
+        }
+
+        private static bool TryGetCurrentCreatorToolsDevilLevel(
+            out DevilLevel level)
+        {
+            level = null;
+            try
+            {
+                level = Level.Current as DevilLevel;
+                return level != null;
+            }
+            catch
+            {
+                level = null;
+                return false;
+            }
+        }
+
         private static void CreatorToolsInteractionLevelStartedPostfix(
             Level __instance)
         {
@@ -307,6 +692,7 @@ namespace Gilomx.CupheadBossRoulette
             if (__instance.LevelType != Level.Type.Battle &&
                 __instance.LevelType != Level.Type.Platforming)
                 return;
+            plugin.creatorToolsInteractionLevelStartObserved = true;
 
             Level current;
             try { current = Level.Current; }
@@ -329,6 +715,8 @@ namespace Gilomx.CupheadBossRoulette
 
             plugin.creatorToolsInteractionAllowedAt =
                 float.PositiveInfinity;
+            plugin.creatorToolsInteractionLevelStartObserved = false;
+            plugin.ResetCreatorToolsInteractionPhaseTransition();
             CreatorToolsInteractionPresentation.FreezeActorsForLevelEnd(
                 __instance,
                 delegate(string message)
@@ -351,6 +739,8 @@ namespace Gilomx.CupheadBossRoulette
             plugin.creatorToolsInteractionLevelInstanceId = -1;
             plugin.creatorToolsInteractionAllowedAt =
                 float.PositiveInfinity;
+            plugin.creatorToolsInteractionLevelStartObserved = false;
+            plugin.ResetCreatorToolsInteractionPhaseTransition();
             if (plugin.creatorToolsInteractions != null)
                 plugin.creatorToolsInteractions.EndGameplayLevel();
         }

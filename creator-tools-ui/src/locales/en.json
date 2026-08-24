@@ -113,6 +113,8 @@
       "random_test_disabled_by_pesky": "The random test was disabled because Pesky Mode was enabled.",
       "random_test_enabled": "The random test is active and will wait for a match to be in progress.",
       "random_test_disabled": "The random test was disabled.",
+      "phase_transition_protection_enabled": "Transition protection is active.",
+      "phase_transition_protection_disabled": "Transition protection is inactive for this session.",
       "unknown_item": "The mod does not recognize this item.",
       "native_assets_loading": "The item's native assets are still being prepared.",
       "native_assets_unavailable": "The item's native assets could not be prepared.",
@@ -141,9 +143,18 @@
         "confirm": "Yes, enable"
       }
     },
+    "phaseProtection": {
+      "title": "Transition protection",
+      "description": "For the Devil, blocking starts 6 seconds after the phase 1 to 2 signal. For a full comparison, change it before the transformation; it turns back on when the game restarts.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "enable": "Enable",
+      "disable": "Disable"
+    },
     "status": {
       "disabled": "Disabled",
       "waitingGame": "Waiting for a level",
+      "startingBattle": "Starting battle",
       "waitingInteractions": "Finishing active interactions",
       "running": "Being pesky now"
     },
