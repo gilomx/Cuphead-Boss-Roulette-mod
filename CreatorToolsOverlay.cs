@@ -32,6 +32,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int CreatorToolsDefaultPort = 18081;
         private const int CreatorToolsPortCandidates = 100;
         private const float CreatorToolsDevilPhaseTransitionBlockDelay = 6f;
+        private const float CreatorToolsSaltbakerPhaseOneBlockDelay = 2.5f;
         private const float CreatorToolsInteractionPhaseTransitionTimeout = 30f;
 
         private ConfigEntry<bool> creatorToolsEnabledSetting;
@@ -74,6 +75,7 @@ namespace Gilomx.CupheadBossRoulette
         private int creatorToolsInteractionPhaseTransitionLevelInstanceId = -1;
         private float creatorToolsInteractionPhaseTransitionStartedAt =
             float.PositiveInfinity;
+        private float creatorToolsInteractionPhaseTransitionBlockDelay;
         private float creatorToolsInteractionPhaseTransitionPlayableElapsed;
         private int creatorToolsInteractionPhaseTransitionLastPlayableFrame =
             -1;
@@ -215,7 +217,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (!creatorToolsInteractionPhaseTransitionActivated &&
                 creatorToolsInteractionPhaseTransitionPlayableElapsed <
-                    CreatorToolsDevilPhaseTransitionBlockDelay)
+                    creatorToolsInteractionPhaseTransitionBlockDelay)
                 return false;
             if (!creatorToolsInteractionPhaseTransitionActivated)
             {
@@ -279,7 +281,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void BeginCreatorToolsInteractionPhaseTransition(
             Level level,
-            string transition)
+            string transition,
+            string signal,
+            float blockDelay)
         {
             if (!creatorToolsInteractionPhaseTransitionProtectionEnabled ||
                 level == null ||
@@ -297,6 +301,8 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractionPhaseTransitionActorsCleared = false;
             creatorToolsInteractionPhaseTransitionLevelInstanceId = instanceId;
             creatorToolsInteractionPhaseTransitionStartedAt = Time.time;
+            creatorToolsInteractionPhaseTransitionBlockDelay =
+                Mathf.Max(0f, blockDelay);
             creatorToolsInteractionPhaseTransitionPlayableElapsed = 0f;
             creatorToolsInteractionPhaseTransitionLastPlayableFrame =
                 Time.frameCount;
@@ -304,8 +310,9 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractions.InvalidateState();
             Logger.LogInfo(
                 "Creator Tools phase-transition protection signaled: " +
-                transition + " at StartTransform; dispatch remains active " +
-                "for " + CreatorToolsDevilPhaseTransitionBlockDelay.ToString(
+                transition + " at " + signal +
+                "; dispatch remains active for " +
+                creatorToolsInteractionPhaseTransitionBlockDelay.ToString(
                     "0.00", CultureInfo.InvariantCulture) + "s.");
         }
 
@@ -343,7 +350,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void EndCreatorToolsInteractionPhaseTransition(
             Level level,
-            string transition)
+            string transition,
+            string signal)
         {
             if (!creatorToolsInteractionPhaseTransitionBlocked ||
                 level == null ||
@@ -360,10 +368,10 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractions.InvalidateState();
             Logger.LogInfo(
                 "Creator Tools phase-transition protection ended: " +
-                transition + " when disable_input_cr finished after " +
+                transition + " at " + signal + " after " +
                 elapsed.ToString(
                     "0.00", CultureInfo.InvariantCulture) +
-                "s; player input is restored.");
+                "s.");
         }
 
         private void ResetCreatorToolsInteractionPhaseTransition()
@@ -374,6 +382,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractionPhaseTransitionLevelInstanceId = -1;
             creatorToolsInteractionPhaseTransitionStartedAt =
                 float.PositiveInfinity;
+            creatorToolsInteractionPhaseTransitionBlockDelay = 0f;
             creatorToolsInteractionPhaseTransitionPlayableElapsed = 0f;
             creatorToolsInteractionPhaseTransitionLastPlayableFrame = -1;
         }
@@ -599,6 +608,10 @@ namespace Gilomx.CupheadBossRoulette
                 ? null
                 : HarmonyLib.AccessTools.Method(
                     devilInputRestoreIterator, "MoveNext");
+            var saltbakerPhaseOneStart = HarmonyLib.AccessTools.Method(
+                typeof(SaltbakerLevelSaltbaker), "phase_one_to_two_cr");
+            var saltbakerPhaseOneEnd = HarmonyLib.AccessTools.Method(
+                typeof(SaltbakerLevelSaltbaker), "AniEvent_RestorePlayers");
             var startPrefix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsDevilTransitionStartPrefix");
@@ -608,6 +621,12 @@ namespace Gilomx.CupheadBossRoulette
             var endPostfix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsDevilInputRestorePostfix");
+            var saltbakerStartPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsSaltbakerPhaseOneStartPrefix");
+            var saltbakerEndPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsSaltbakerPhaseOneEndPostfix");
 
             if (devilTransitionStart == null ||
                 devilTransitionCommit == null ||
@@ -630,6 +649,26 @@ namespace Gilomx.CupheadBossRoulette
             harmony.Patch(
                 devilTransitionEnd,
                 postfix: new HarmonyLib.HarmonyMethod(endPostfix));
+
+            if (saltbakerPhaseOneStart == null ||
+                saltbakerPhaseOneEnd == null ||
+                saltbakerStartPrefix == null ||
+                saltbakerEndPostfix == null)
+            {
+                Logger.LogWarning(
+                    "Could not install the Creator Tools Saltbaker phase " +
+                    "1 to 2 transition protection.");
+                return;
+            }
+
+            harmony.Patch(
+                saltbakerPhaseOneStart,
+                prefix: new HarmonyLib.HarmonyMethod(
+                    saltbakerStartPrefix));
+            harmony.Patch(
+                saltbakerPhaseOneEnd,
+                postfix: new HarmonyLib.HarmonyMethod(
+                    saltbakerEndPostfix));
         }
 
         private static void CreatorToolsDevilTransitionStartPrefix()
@@ -640,7 +679,10 @@ namespace Gilomx.CupheadBossRoulette
                 !TryGetCurrentCreatorToolsDevilLevel(out level))
                 return;
             plugin.BeginCreatorToolsInteractionPhaseTransition(
-                level, "Devil phase 1 to 2");
+                level,
+                "Devil phase 1 to 2",
+                "StartTransform",
+                CreatorToolsDevilPhaseTransitionBlockDelay);
         }
 
         private static void CreatorToolsDevilTransitionCommitPrefix(
@@ -664,7 +706,52 @@ namespace Gilomx.CupheadBossRoulette
                 !TryGetCurrentCreatorToolsDevilLevel(out level))
                 return;
             plugin.EndCreatorToolsInteractionPhaseTransition(
-                level, "Devil phase 1 to 2");
+                level,
+                "Devil phase 1 to 2",
+                "disable_input_cr completion");
+        }
+
+        private static void CreatorToolsSaltbakerPhaseOneStartPrefix()
+        {
+            var plugin = activeInstance;
+            SaltbakerLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsSaltbakerLevel(out level))
+                return;
+            plugin.BeginCreatorToolsInteractionPhaseTransition(
+                level,
+                "Saltbaker phase 1 to 2",
+                "phase_one_to_two_cr",
+                CreatorToolsSaltbakerPhaseOneBlockDelay);
+        }
+
+        private static void CreatorToolsSaltbakerPhaseOneEndPostfix()
+        {
+            var plugin = activeInstance;
+            SaltbakerLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsSaltbakerLevel(out level))
+                return;
+            plugin.EndCreatorToolsInteractionPhaseTransition(
+                level,
+                "Saltbaker phase 1 to 2",
+                "AniEvent_RestorePlayers");
+        }
+
+        private static bool TryGetCurrentCreatorToolsSaltbakerLevel(
+            out SaltbakerLevel level)
+        {
+            level = null;
+            try
+            {
+                level = Level.Current as SaltbakerLevel;
+                return level != null;
+            }
+            catch
+            {
+                level = null;
+                return false;
+            }
         }
 
         private static bool TryGetCurrentCreatorToolsDevilLevel(

@@ -8,6 +8,38 @@ mod assets, one plugin DLL and the 18-file BepInEx core. Its SHA-256 is
 Rejected generated audio, configs, logs, caches, PDBs and unrelated plugins are
 not included.
 
+## Creator Tools: phase-transition handoff (2026-08-24)
+
+The current work on `codex/creator-tools-config-panel` deliberately avoids a
+generic player-input guard. Phase protection is session-only, defaults to on,
+and can be disabled from Modo Molestoso for A/B testing. It affects manual
+interaction tests, random test mode, and Pesky Mode through the shared dispatch
+guard.
+
+- Devil phase 1→2: `DevilLevelSittingDevil.StartTransform` signals the
+  transition. Dispatch remains active for 6 seconds of playable time, then
+  blocks. `DevilLevel.ZoomOut` forces activation if necessary and clears active
+  catalog actors. The postfix on
+  `DevilLevel/<disable_input_cr>c__Iterator3.MoveNext` ends protection when the
+  iterator returns false.
+- Saltbaker phase 1→2 only: the prefix on
+  `SaltbakerLevelSaltbaker.phase_one_to_two_cr` starts a 2.5-second playable
+  delay. New dispatches are blocked after that delay, but active actors are not
+  cleared. The postfix on `AniEvent_RestorePlayers` ends protection when weapon,
+  super, and player control have been restored.
+- Saltbaker phases 2→3 and 3→4 are intentionally untouched. The user will review
+  them separately and identify exact visual/native boundaries before code is
+  added. Do not infer protection points or reuse the Devil delay.
+
+The general battle-entry delay has been removed. `Iniciando batalla` is a
+visual load-intent state driven by `SceneLoader.LoadLevel`/roulette play and
+`_OnLevelStart`; it must not pause, rearm, or alter actor scheduling. A duplicate
+level-start registration must not clear the first actor.
+
+Latest verification: Release build completed with 0 errors and 0 warnings. The
+compiled and installed DLLs match at SHA-256
+`AC3835257391AD60D779DA4089B1A1F4ED180F12FEBF9F81959ACCCDB5BD5022`.
+
 ## Cierre publicado para el siguiente agente (2026-08-19)
 
 - `main` y `origin/main` quedaron sincronizados en `be9f388` (`Release La

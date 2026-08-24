@@ -35,8 +35,8 @@
 - Las interacciones ya no dependen del tiempo adicional que daba abrir y girar
   la ruleta. Una entrada nativa a cualquier batalla o plataformas se registra
   tanto desde `_OnLevelStart` como mediante un respaldo sobre `Level.Current`;
-  después del margen seguro de 2.5 segundos puede completar las precargas que
-  hayan quedado pendientes y despachar la cola. Carga, pausa, derrota,
+  puede completar las precargas pendientes y despachar la cola en cuanto el
+  nivel esté disponible, sin una espera inicial fija. Carga, pausa, derrota,
   resultados y mapas continúan bloqueando apariciones.
 - Una precarga pendiente nunca abre una segunda copia del mismo nivel que el
   jugador está usando. Hilda, La pandilla raíz, Cagney y Hosco y Tosco capturan
@@ -172,15 +172,34 @@
   crean como roots independientes todavía conservan su escala mundial nativa y
   quedan registradas como ajuste pendiente para cámaras alejadas.
 - Ninguna interacción se despacha durante carga, pausa, derrota o cierre del
-  nivel, ni durante los primeros 2.5 segundos de una partida. Los actores que
-  ya estaban en pantalla permanecen congelados al perder y se limpian al
-  destruirse la escena.
+  nivel. Los actores que ya estaban en pantalla permanecen congelados al perder
+  y se limpian al destruirse la escena.
 - Se retiró el prototipo portátil que aproximaba el enemigo con una imagen y
   movimiento manual. Los actores jugables se construyen en memoria desde la
   instalación local; los PNG extraídos se usan únicamente como previews web.
 - La coordinación vive en `CreatorToolsInteractionController.cs`; el ejecutor
   y la etiqueta del donador están separados bajo `Interactions`. No se añadió
   lógica de canje específica a `Plugin.cs`.
+
+### Protección específica de cambios de fase
+
+- No existe una protección genérica basada en el bloqueo de input del jugador:
+  cada jefe se integra mediante señales propias para evitar falsos positivos.
+  El interruptor temporal vive en Modo Molestoso, se activa al iniciar el mod y
+  permite comparar una sesión con y sin estas protecciones.
+- En el Diablo, sólo la transición 1→2 está cubierta. `StartTransform` abre la
+  ventana, las apariciones continúan durante 6 segundos jugables y después se
+  bloquean. `ZoomOut` activa el bloqueo inmediatamente si aún no ocurrió y
+  limpia los actores activos; el despacho se reanuda cuando termina
+  `disable_input_cr` y el juego devuelve el control.
+- En Chef Saleroso, sólo la transición 1→2 está cubierta por ahora.
+  `phase_one_to_two_cr` inicia la ventana; durante 2.5 segundos jugables siguen
+  saliendo actores y después se bloquean únicamente las nuevas apariciones. Los
+  actores ya presentes no se destruyen. El despacho se reanuda en
+  `AniEvent_RestorePlayers`, cuando Cuphead restaura arma, súper y control.
+- Las transiciones 2→3 y 3→4 de Chef Saleroso permanecen intactas y pendientes
+  de observación manual. Cualquier ajuste futuro debe conservarlas sin cambios
+  hasta que se definan señales concretas de inicio, bloqueo y reanudación.
 
 ## 0.6.0 — La Pichi Ruleta (2026-08-18)
 
