@@ -105,6 +105,7 @@ namespace Gilomx.CupheadBossRoulette
 
             creatorToolsInteractions = new CreatorToolsInteractionController(
                 this,
+                Config.ConfigFilePath,
                 CanPreloadNativeInteractionAssets,
                 CanSpawnCreatorToolsInteraction,
                 GetCreatorToolsInteractionMaximumActive,
@@ -201,6 +202,8 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractionLevelInstanceId == instanceId;
             if (sameLevel && !rearmExistingLevel)
                 return;
+
+            CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
 
             var shouldClearPreviousAttempt =
                 (!sameLevel &&
@@ -326,6 +329,12 @@ namespace Gilomx.CupheadBossRoulette
 
             plugin.creatorToolsInteractionAllowedAt =
                 float.PositiveInfinity;
+            CreatorToolsInteractionPresentation.FreezeActorsForLevelEnd(
+                __instance,
+                delegate(string message)
+                {
+                    plugin.Logger.LogWarning(message);
+                });
             if (plugin.creatorToolsInteractions != null)
                 plugin.creatorToolsInteractions.SuspendGameplayLevel();
         }
@@ -514,6 +523,7 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractions.Dispose();
                 creatorToolsInteractions = null;
             }
+            CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
             if (creatorToolsServer == null)
                 return;
             creatorToolsServer.Dispose();

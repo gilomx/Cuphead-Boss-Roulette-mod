@@ -11,7 +11,8 @@
   "nav": {
     "group": "Creator Tools",
     "roulette": "Ruleta",
-    "interactions": "Interacciones"
+    "interactions": "Interacciones",
+    "pesky": "Modo Molestoso"
   },
   "interactions": {
     "title": "Interacciones",
@@ -60,7 +61,7 @@
       }
     },
     "queue": {
-      "title": "Cola de canjeos",
+      "title": "Canjeos pendientes",
       "description": "Los elementos se ejecutan según el máximo simultáneo configurado. Los siguientes esperan en el orden en que llegaron.",
       "countLabel": "Elementos en la cola",
       "emptyTitle": "La cola está vacía",
@@ -85,17 +86,30 @@
       "delayLabel": "Espera (s)",
       "action": "Agregar a cola",
       "testing": "Agregando",
+      "suspended": {
+        "title": "Interacciones en pausa",
+        "description": "Modo Molestoso está activo. Los canjeos nuevos conservarán su lugar, pero no entrarán al juego hasta que lo desactives."
+      },
       "random": {
         "title": "Prueba aleatoria",
         "description": "Lanza elementos del catálogo y nombres al azar con pausas cortas y variables, sólo mientras una partida está activa.",
         "active": "Activa",
         "inactive": "Inactiva",
         "enable": "Activar",
-        "disable": "Desactivar"
+        "disable": "Desactivar",
+        "switch": {
+          "title": "Modo Molestoso está activo",
+          "description": "¿Quieres desactivarlo y activar la Prueba aleatoria?",
+          "cancel": "Cancelar",
+          "confirm": "Sí, activar"
+        }
       }
     },
     "feedback": {
       "ready": "La prueba está lista.",
+      "random_test_enabled": "La prueba aleatoria está activa.",
+      "random_test_disabled": "La prueba aleatoria está inactiva.",
+      "random_test_disabled_by_pesky": "La prueba aleatoria se desactivó porque Modo Molestoso fue activado.",
       "random_test_enabled": "La prueba aleatoria está activa y esperará a que haya una partida en curso.",
       "random_test_disabled": "La prueba aleatoria fue desactivada.",
       "unknown_item": "El mod no reconoce este artículo.",
@@ -104,11 +118,78 @@
       "requires_gameplay_level": "Inicia cualquier nivel jugable para enviar el canjeo.",
       "waiting_game": "La solicitud ya está visible y espera a que el juego la confirme.",
       "queued": "Los canjeos fueron agregados a la cola.",
+      "queued_paused": "Los canjeos fueron guardados en su cola y esperarán mientras Modo Molestoso esté activo.",
       "settings_saved": "La configuración de interacciones fue guardada.",
       "invalid_setting": "El valor de configuración no es válido.",
       "queue_full": "La cola alcanzó su límite temporal.",
       "sent": "El elemento fue enviado al combate.",
       "spawn_failed": "No se pudo crear el elemento. Revisa el estado del combate."
+    }
+  },
+  "pesky": {
+    "title": "Modo Molestoso",
+    "description": "Mete ataques aleatorios del catálogo de interacciones durante cualquier pelea, ya sea normal o por ruleta. También puedes configurar nombres para que aparezcan aleatoriamente con los ataques.",
+    "control": {
+      "title": "Control del modo",
+      "enable": "Activar modo",
+      "disable": "Desactivar modo",
+      "switch": {
+        "title": "La Prueba aleatoria está activa",
+        "description": "¿Quieres desactivarla y activar Modo Molestoso?",
+        "cancel": "Cancelar",
+        "confirm": "Sí, activar"
+      }
+    },
+    "status": {
+      "disabled": "Desactivado",
+      "waitingGame": "Esperando batalla",
+      "waitingInteractions": "Terminando interacciones activas",
+      "running": "Molestando ahora"
+    },
+    "queue": {
+      "title": "Molestias pendientes",
+      "description": "Los ataques aparecen según el máximo simultáneo configurado. Los siguientes esperan en el orden en que fueron generados.",
+      "countLabel": "Ataques en la cola",
+      "emptyTitle": "La cola está vacía",
+      "emptyDescription": "Activa Modo Molestoso y entra a un nivel jugable para ver aquí los ataques generados.",
+      "position": "Orden",
+      "item": "Ataque",
+      "name": "Nombre",
+      "status": "Estado",
+      "active": "Ejecutándose",
+      "queued": "En cola",
+      "scheduled": "Esperando tiempo",
+      "waiting_game": "Esperando al juego"
+    },
+    "names": {
+      "title": "Nombres aleatorios",
+      "description": "Escribe un nombre por línea. Se eliminan líneas vacías y duplicados; cada nombre admite hasta 32 caracteres.",
+      "placeholder": "Claudia\nYeiAndPelos\nYerrisito",
+      "hint": "Un nombre se elige al azar para cada ataque.",
+      "required": "Necesitas al menos un nombre para activar el modo.",
+      "save": "Guardar nombres"
+    },
+    "attacks": {
+      "title": "Ataques disponibles",
+      "description": "Marca los elementos que podrán aparecer. Los artículos nuevos se activarán automáticamente.",
+      "required": "Activa al menos un ataque para poder iniciar el modo."
+    },
+    "feedback": {
+      "ready": "La configuración está lista.",
+      "enabled": "Modo Molestoso está activado.",
+      "disabled": "Modo Molestoso está desactivado.",
+      "disabled_by_random_test": "Modo Molestoso se desactivó porque la Prueba aleatoria fue activada.",
+      "names_saved": "Los nombres fueron guardados.",
+      "items_saved": "La selección de ataques fue guardada.",
+      "names_required": "Agrega y guarda al menos un nombre antes de activar el modo.",
+      "items_required": "Activa al menos un ataque antes de activar el modo.",
+      "disabled_invalid_config": "El modo se desactivó porque necesita nombres y al menos un ataque.",
+      "invalid_setting": "La configuración enviada no es válida.",
+      "unknown_item": "El mod no reconoce este ataque.",
+      "native_assets_loading": "Los recursos del ataque todavía se están preparando.",
+      "native_assets_unavailable": "No se pudieron preparar los recursos del ataque.",
+      "requires_gameplay_level": "El modo espera a que inicie un nivel jugable.",
+      "spawn_failed": "No se pudo crear el ataque en este momento."
     }
   },
   "roulette": {

@@ -13,6 +13,7 @@ import type {
   ForceDraft,
   InteractionConfigState,
   InteractionQueueEntry,
+  PeskyModeConfigState,
   RouletteConfigState,
   RouletteSelection,
 } from "../model";
@@ -21,6 +22,7 @@ interface ConfigValue {
   config: RouletteConfigState | null;
   draft: ForceDraft | null;
   interaction: InteractionConfigState | null;
+  pesky: PeskyModeConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
   status: ConnectionStatus;
@@ -28,7 +30,15 @@ interface ConfigValue {
   applyChallenge: (id: number, enabled: boolean) => void;
   applyInteractionMaxActive: (value: number) => void;
   applyInteractionRandomTest: (enabled: boolean) => void;
+  applyPeskyEnabled: (enabled: boolean) => void;
+  applyPeskyNames: (names: string) => void;
+  applyPeskyItem: (item: string, enabled: boolean) => void;
   testInteraction: (item: string, donor: string, quantity: number, delay: number) => void;
+}
+
+interface PendingPeskyChange {
+  targetRevision: number;
+  apply: (state: PeskyModeConfigState) => PeskyModeConfigState;
 }
 
 interface DesiredInteractionRandomTest {
@@ -71,6 +81,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<RouletteConfigState | null>(null);
   const [draft, setDraft] = useState<ForceDraft | null>(null);
   const [interaction, setInteraction] = useState<InteractionConfigState | null>(null);
+  const [pesky, setPesky] = useState<PeskyModeConfigState | null>(null);
   const [optimisticInteractionQueue, setOptimisticInteractionQueue] = useState<
     InteractionQueueEntry[]
   >([]);
@@ -78,29 +89,35 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const desiredForceRef = useRef<ForceDraft | null>(null);
   const desiredChallengesRef = useRef(new Map<number, boolean>());
+  const loadRequestRevisionRef = useRef(0);
+  const lastAppliedLoadRevisionRef = useRef(0);
+  const interactionRevisionRef = useRef<number | null>(null);
+  const nextOptimisticInteractionIdRef = useRef(-1);
   const desiredInteractionRandomTestRef = useRef<
     DesiredInteractionRandomTest | null
   >(null);
   const randomTestRequestRevisionRef = useRef(0);
   const randomTestWriteChainRef = useRef<Promise<void>>(Promise.resolve());
-  const loadRequestRevisionRef = useRef(0);
-  const lastAppliedLoadRevisionRef = useRef(0);
-  const interactionRevisionRef = useRef<number | null>(null);
-  const nextOptimisticInteractionIdRef = useRef(-1);
+  const confirmedPeskyRevisionRef = useRef(0);
+  const pendingPeskyChangesRef = useRef<PendingPeskyChange[]>([]);
+  const peskyWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
 
   const load = useCallback(async () => {
     const loadRevision = loadRequestRevisionRef.current + 1;
     loadRequestRevisionRef.current = loadRevision;
     try {
-      const [configResponse, interactionResponse] = await Promise.all([
+      const [configResponse, interactionResponse, peskyResponse] = await Promise.all([
         fetch("/api/config", { cache: "no-store" }),
         fetch("/api/config/interactions", { cache: "no-store" }),
+        fetch("/api/config/pesky", { cache: "no-store" }),
       ]);
       if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
       if (!interactionResponse.ok) throw new Error(`HTTP ${interactionResponse.status}`);
+      if (!peskyResponse.ok) throw new Error(`HTTP ${peskyResponse.status}`);
       const next = (await configResponse.json()) as RouletteConfigState;
       const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
+      const nextPesky = (await peskyResponse.json()) as PeskyModeConfigState;
       if (
         !mountedRef.current ||
         loadRevision < lastAppliedLoadRevisionRef.current
@@ -137,7 +154,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         }
       }
       setInteraction(visibleInteraction);
-      if (!next.ready || !nextInteraction.ready) {
+      confirmedPeskyRevisionRef.current = nextPesky.revision;
+      const pendingPeskyChanges = pendingPeskyChangesRef.current.filter(
+        (change) => change.targetRevision > nextPesky.revision,
+      );
+      pendingPeskyChangesRef.current = pendingPeskyChanges;
+      const visiblePesky = pendingPeskyChanges.reduce(
+        (state, change) => change.apply(state),
+        nextPesky,
+      );
+      setPesky(visiblePesky);
+      const peskyPending = pendingPeskyChanges.length > 0;
+      if (!next.ready || !nextInteraction.ready || !nextPesky.ready) {
         setStatus("connecting");
         return;
       }
@@ -175,7 +203,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           }
         : next);
       setStatus(
-        forcePending || challengePending || interactionPending || randomTestPending
+        forcePending || challengePending || interactionPending ||
+          randomTestPending || peskyPending
           ? "pending"
           : "saved",
       );
@@ -271,6 +300,45 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [interaction, load],
   );
 
+  const sendPeskyUpdate = useCallback(
+    (
+      query: URLSearchParams,
+      apply: (state: PeskyModeConfigState) => PeskyModeConfigState,
+    ) => {
+      const pending = pendingPeskyChangesRef.current;
+      const previousTarget = pending.length > 0
+        ? pending[pending.length - 1].targetRevision
+        : confirmedPeskyRevisionRef.current;
+      pending.push({
+        targetRevision: Math.max(
+          confirmedPeskyRevisionRef.current,
+          previousTarget,
+        ) + 1,
+        apply,
+      });
+      setPesky((current) => current ? apply(current) : current);
+      setStatus("saving");
+      const send = () => fetch(
+        "/api/config/pesky/set?" + query,
+        { cache: "no-store" },
+      )
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (mountedRef.current) setStatus("pending");
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          pendingPeskyChangesRef.current = [];
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        });
+      peskyWriteChainRef.current = peskyWriteChainRef.current.then(send, send);
+    },
+    [load],
+  );
+
   const applyInteractionRandomTest = useCallback(
     (enabled: boolean) => {
       if (!interaction?.ready) return;
@@ -282,8 +350,39 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         requestRevision,
       };
       setInteraction((current) => current
-        ? { ...current, randomTestEnabled: enabled }
+        ? {
+            ...current,
+            randomTestEnabled: enabled,
+            feedback: enabled
+              ? "random_test_enabled"
+              : "random_test_disabled",
+            error: false,
+          }
         : current);
+      if (enabled && pesky?.enabled) {
+        const pending = pendingPeskyChangesRef.current;
+        const previousTarget = pending.length > 0
+          ? pending[pending.length - 1].targetRevision
+          : confirmedPeskyRevisionRef.current;
+        const applyPeskySwitch = (state: PeskyModeConfigState) => ({
+          ...state,
+          enabled: false,
+          running: false,
+          waitingForInteractions: false,
+          feedback: "disabled_by_random_test",
+          error: false,
+        });
+        pending.push({
+          targetRevision: Math.max(
+            confirmedPeskyRevisionRef.current,
+            previousTarget,
+          ) + 1,
+          apply: applyPeskySwitch,
+        });
+        setPesky((current) => current
+          ? applyPeskySwitch(current)
+          : current);
+      }
       setStatus("saving");
 
       const query = new URLSearchParams({
@@ -295,6 +394,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       )
         .then((response) => {
           if (!response.ok) throw new Error("HTTP " + response.status);
+          if (mountedRef.current) setStatus("pending");
           window.setTimeout(() => void load(), 160);
         })
         .catch(() => {
@@ -312,7 +412,82 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       randomTestWriteChainRef.current =
         randomTestWriteChainRef.current.then(send, send);
     },
-    [interaction, load],
+    [interaction, pesky, load],
+  );
+
+  const applyPeskyEnabled = useCallback(
+    (enabled: boolean) => {
+      if (!pesky?.ready) return;
+      if (enabled && interaction?.randomTestEnabled) {
+        const requestRevision = randomTestRequestRevisionRef.current + 1;
+        randomTestRequestRevisionRef.current = requestRevision;
+        desiredInteractionRandomTestRef.current = {
+          enabled: false,
+          baselineRandomTestRevision: interaction.randomTestRevision,
+          requestRevision,
+        };
+        setInteraction((current) => current
+          ? {
+              ...current,
+              randomTestEnabled: false,
+              feedback: "random_test_disabled_by_pesky",
+              error: false,
+            }
+          : current);
+      }
+      sendPeskyUpdate(
+        new URLSearchParams({ enabled: enabled ? "1" : "0" }),
+        (state) => ({
+          ...state,
+          enabled,
+          feedback: enabled ? "enabled" : "disabled",
+          error: false,
+          running: enabled ? state.running : false,
+          waitingForInteractions: enabled
+            ? state.waitingForInteractions
+            : false,
+        }),
+      );
+    },
+    [interaction, pesky, sendPeskyUpdate],
+  );
+
+  const applyPeskyNames = useCallback(
+    (names: string) => {
+      const nextNames = names.split(/\r?\n|\r/).filter(Boolean);
+      sendPeskyUpdate(
+        new URLSearchParams({ names }),
+        (state) => ({
+          ...state,
+          names: nextNames,
+          feedback: "names_saved",
+          error: false,
+        }),
+      );
+    },
+    [sendPeskyUpdate],
+  );
+
+  const applyPeskyItem = useCallback(
+    (item: string, enabled: boolean) => {
+      sendPeskyUpdate(
+        new URLSearchParams({
+          item,
+          itemEnabled: enabled ? "1" : "0",
+        }),
+        (state) => ({
+            ...state,
+            feedback: "items_saved",
+            error: false,
+            disabledItems: enabled
+              ? state.disabledItems.filter((candidate) => candidate !== item)
+              : state.disabledItems.includes(item)
+                ? state.disabledItems
+                : [...state.disabledItems, item],
+          }),
+      );
+    },
+    [sendPeskyUpdate],
   );
 
   const testInteraction = useCallback(
@@ -375,27 +550,35 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       config,
       draft,
       interaction,
+      pesky,
       optimisticInteractionQueue,
       interactionTesting,
       status,
       applyDraft,
       applyChallenge,
       applyInteractionMaxActive,
-      testInteraction,
       applyInteractionRandomTest,
+      testInteraction,
+      applyPeskyEnabled,
+      applyPeskyNames,
+      applyPeskyItem,
     }),
     [
       config,
       draft,
       interaction,
+      pesky,
       optimisticInteractionQueue,
       interactionTesting,
       status,
       applyDraft,
       applyChallenge,
       applyInteractionMaxActive,
-      testInteraction,
       applyInteractionRandomTest,
+      testInteraction,
+      applyPeskyEnabled,
+      applyPeskyNames,
+      applyPeskyItem,
     ],
   );
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;

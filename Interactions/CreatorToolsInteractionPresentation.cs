@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Gilomx.CupheadBossRoulette
 {
@@ -131,6 +134,283 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal static void FreezeActorsForLevelEnd(
+            Level level,
+            Action<string> logWarning)
+        {
+            if (level == null || HasLevelEndSnapshot())
+                return;
+
+            GameObject snapshotRoot = null;
+            try
+            {
+                snapshotRoot = new GameObject(
+                    "CreatorTools_InteractionLevelEndSnapshot");
+                snapshotRoot.AddComponent<
+                    CreatorToolsInteractionLevelEndSnapshot>();
+
+                var gameplayScene = level.gameObject.scene;
+                if (gameplayScene.IsValid() && gameplayScene.isLoaded)
+                    SceneManager.MoveGameObjectToScene(
+                        snapshotRoot, gameplayScene);
+
+                var capturedCount = 0;
+                var priorities = UnityEngine.Object.FindObjectsOfType<
+                    CreatorToolsInteractionRenderPriority>();
+                for (var i = 0; i < priorities.Length; i++)
+                {
+                    var priority = priorities[i];
+                    if (priority == null ||
+                        !priority.gameObject.activeInHierarchy ||
+                        HasPriorityAncestor(priority.transform))
+                        continue;
+                    capturedCount += CreateFrozenActor(
+                        priority.gameObject,
+                        snapshotRoot.transform);
+                }
+
+                var labels = UnityEngine.Object.FindObjectsOfType<
+                    CreatorToolsDonorLabel>();
+                for (var i = 0; i < labels.Length; i++)
+                    if (labels[i] != null &&
+                        labels[i].CreateLevelEndSnapshot(
+                            snapshotRoot.transform))
+                        capturedCount++;
+
+                if (capturedCount == 0)
+                    UnityEngine.Object.Destroy(snapshotRoot);
+            }
+            catch (Exception exception)
+            {
+                if (snapshotRoot != null)
+                    UnityEngine.Object.Destroy(snapshotRoot);
+                Warn(logWarning,
+                    "Could not freeze the catalog actors at level end: ",
+                    exception);
+            }
+        }
+
+        internal static void ClearLevelEndSnapshots()
+        {
+            var snapshots = Resources.FindObjectsOfTypeAll<
+                CreatorToolsInteractionLevelEndSnapshot>();
+            for (var i = 0; i < snapshots.Length; i++)
+                if (snapshots[i] != null)
+                    UnityEngine.Object.Destroy(
+                        snapshots[i].gameObject);
+        }
+
+        private static bool HasLevelEndSnapshot()
+        {
+            var snapshots = Resources.FindObjectsOfTypeAll<
+                CreatorToolsInteractionLevelEndSnapshot>();
+            return snapshots != null && snapshots.Length > 0;
+        }
+
+        private static bool HasPriorityAncestor(Transform transform)
+        {
+            var ancestor = transform == null
+                ? null
+                : transform.parent;
+            while (ancestor != null)
+            {
+                if (ancestor.GetComponent<
+                        CreatorToolsInteractionRenderPriority>() != null)
+                    return true;
+                ancestor = ancestor.parent;
+            }
+            return false;
+        }
+
+        private static int CreateFrozenActor(
+            GameObject source,
+            Transform parent)
+        {
+            if (source == null || parent == null)
+                return 0;
+
+            var animators = new List<FrozenAnimatorPair>();
+            var rendererCount = 0;
+            var frozen = CloneAnimatedVisualHierarchy(
+                source.transform,
+                parent,
+                true,
+                animators,
+                ref rendererCount);
+            if (frozen == null || rendererCount == 0)
+            {
+                if (frozen != null)
+                    UnityEngine.Object.Destroy(frozen.gameObject);
+                return 0;
+            }
+
+            InitializeFrozenAnimators(animators);
+            var anchor = frozen.gameObject.AddComponent<
+                CreatorToolsFrozenAnimationAnchor>();
+            anchor.Initialize(source.transform.position);
+            return rendererCount;
+        }
+
+        private static Transform CloneAnimatedVisualHierarchy(
+            Transform source,
+            Transform parent,
+            bool root,
+            List<FrozenAnimatorPair> animators,
+            ref int rendererCount)
+        {
+            if (source == null)
+                return null;
+
+            var frozenObject = new GameObject(
+                root ? source.gameObject.name + "_Frozen" : source.name);
+            frozenObject.layer = source.gameObject.layer;
+            var frozen = frozenObject.transform;
+            frozen.SetParent(parent, false);
+            if (root)
+            {
+                frozen.position = source.position;
+                frozen.rotation = source.rotation;
+                frozen.localScale = source.lossyScale;
+            }
+            else
+            {
+                frozen.localPosition = source.localPosition;
+                frozen.localRotation = source.localRotation;
+                frozen.localScale = source.localScale;
+            }
+
+            var sourceRenderer = source.GetComponent<SpriteRenderer>();
+            if (sourceRenderer != null)
+            {
+                CopySpriteRenderer(sourceRenderer, frozenObject);
+                if (sourceRenderer.enabled)
+                    sourceRenderer.enabled = false;
+                rendererCount++;
+            }
+
+            var sourceAnimator = source.GetComponent<Animator>();
+            if (sourceAnimator != null &&
+                sourceAnimator.runtimeAnimatorController != null)
+            {
+                var frozenAnimator = frozenObject.AddComponent<Animator>();
+                frozenAnimator.enabled = false;
+                animators.Add(new FrozenAnimatorPair
+                {
+                    Source = sourceAnimator,
+                    Frozen = frozenAnimator
+                });
+            }
+
+            for (var i = 0; i < source.childCount; i++)
+                CloneAnimatedVisualHierarchy(
+                    source.GetChild(i),
+                    frozen,
+                    false,
+                    animators,
+                    ref rendererCount);
+
+            frozenObject.SetActive(source.gameObject.activeSelf);
+            return frozen;
+        }
+
+        private static void CopySpriteRenderer(
+            SpriteRenderer source,
+            GameObject targetObject)
+        {
+            var renderer = targetObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = source.sprite;
+            renderer.sharedMaterial = source.sharedMaterial;
+            renderer.color = source.color;
+            renderer.flipX = source.flipX;
+            renderer.flipY = source.flipY;
+            renderer.sortingLayerID = source.sortingLayerID;
+            renderer.sortingOrder = source.sortingOrder;
+            renderer.enabled = source.enabled;
+
+            var properties = new MaterialPropertyBlock();
+            source.GetPropertyBlock(properties);
+            renderer.SetPropertyBlock(properties);
+        }
+
+        private static void InitializeFrozenAnimators(
+            List<FrozenAnimatorPair> animators)
+        {
+            for (var i = 0; i < animators.Count; i++)
+            {
+                var pair = animators[i];
+                if (pair == null || pair.Source == null ||
+                    pair.Frozen == null)
+                    continue;
+                try
+                {
+                    pair.Frozen.runtimeAnimatorController =
+                        pair.Source.runtimeAnimatorController;
+                    pair.Frozen.applyRootMotion = false;
+                    pair.Frozen.updateMode = pair.Source.updateMode;
+                    pair.Frozen.cullingMode =
+                        AnimatorCullingMode.AlwaysAnimate;
+                    pair.Frozen.speed = Mathf.Approximately(
+                            pair.Source.speed, 0f)
+                        ? 1f
+                        : pair.Source.speed;
+                    pair.Frozen.Rebind();
+                    CopyAnimatorParameters(pair.Source, pair.Frozen);
+                    var layers = Math.Min(
+                        pair.Source.layerCount,
+                        pair.Frozen.layerCount);
+                    for (var layer = 0; layer < layers; layer++)
+                    {
+                        var state = pair.Source.
+                            GetCurrentAnimatorStateInfo(layer);
+                        if (state.fullPathHash != 0)
+                            pair.Frozen.Play(
+                                state.fullPathHash,
+                                layer,
+                                state.normalizedTime);
+                    }
+                    pair.Frozen.enabled = pair.Source.enabled;
+                    if (pair.Frozen.enabled &&
+                        pair.Frozen.gameObject.activeInHierarchy)
+                        pair.Frozen.Update(0f);
+                }
+                catch
+                {
+                    pair.Frozen.enabled = false;
+                }
+            }
+        }
+
+        private static void CopyAnimatorParameters(
+            Animator source,
+            Animator target)
+        {
+            var parameters = source.parameters;
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var parameter = parameters[i];
+                if (parameter.type == AnimatorControllerParameterType.Bool)
+                    target.SetBool(
+                        parameter.nameHash,
+                        source.GetBool(parameter.nameHash));
+                else if (parameter.type ==
+                         AnimatorControllerParameterType.Int)
+                    target.SetInteger(
+                        parameter.nameHash,
+                        source.GetInteger(parameter.nameHash));
+                else if (parameter.type ==
+                         AnimatorControllerParameterType.Float)
+                    target.SetFloat(
+                        parameter.nameHash,
+                        source.GetFloat(parameter.nameHash));
+            }
+        }
+
+        private sealed class FrozenAnimatorPair
+        {
+            internal Animator Source;
+            internal Animator Frozen;
+        }
+
         private static void Warn(
             Action<string> logWarning,
             string prefix,
@@ -157,6 +437,27 @@ namespace Gilomx.CupheadBossRoulette
     internal sealed class CreatorToolsInteractionCameraScale : MonoBehaviour
     {
         internal float Factor = 1f;
+    }
+
+    internal sealed class CreatorToolsInteractionLevelEndSnapshot :
+        MonoBehaviour
+    {
+    }
+
+    internal sealed class CreatorToolsFrozenAnimationAnchor : MonoBehaviour
+    {
+        private Vector3 worldPosition;
+
+        internal void Initialize(Vector3 position)
+        {
+            worldPosition = position;
+            transform.position = worldPosition;
+        }
+
+        private void LateUpdate()
+        {
+            transform.position = worldPosition;
+        }
     }
 
     internal sealed class CreatorToolsInteractionRenderPriority : MonoBehaviour

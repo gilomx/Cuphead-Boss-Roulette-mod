@@ -2358,6 +2358,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static void PreserveRouletteWinCharacterPrefix()
         {
+            CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
             var plugin = activeInstance;
             if (plugin == null || !plugin.rouletteWinCharacterPending)
                 return;

@@ -55,7 +55,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -66,9 +67,336 @@ a {
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: 0.18rem solid var(--color-focus);
   outline-offset: 0.18rem;
+}
+
+.page.page--pesky {
+  width: min(100%, 78rem);
+}
+
+.pesky-page-header {
+  margin-bottom: var(--space-5);
+}
+
+.pesky-hero {
+  position: relative;
+  display: block;
+  height: 8.3rem;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background:
+    radial-gradient(circle at 87% 30%, rgb(196 138 233 / 15%), transparent 18rem),
+    var(--color-background-raised);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 15%);
+}
+
+.mode-switch-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mode-switch-pane {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  will-change: opacity, transform;
+}
+
+.mode-switch-pane--primary {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.mode-switch-pane--confirmation {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(2rem);
+}
+
+.mode-switch-shell[data-step="confirm"] .mode-switch-pane--primary {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-2rem);
+}
+
+.mode-switch-shell[data-step="confirm"] .mode-switch-pane--confirmation {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.pesky-hero__pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  padding: 1.45rem 1.6rem;
+}
+
+.pesky-hero[data-active="true"] {
+  border-color: var(--color-focus);
+}
+
+.pesky-hero__copy {
+  min-width: 0;
+}
+
+.pesky-hero h2 {
+  margin: 0.55rem 0 0;
+  font-size: 1.55rem;
+}
+
+.pesky-hero .pesky-feedback {
+  margin-top: 0.35rem;
+}
+
+.mode-switch-confirmation__copy {
+  min-width: 0;
+}
+
+.mode-switch-confirmation__copy strong {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.pesky-hero .mode-switch-confirmation__copy strong {
+  font-size: 1.2rem;
+}
+
+.mode-switch-confirmation__copy p {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.pesky-hero .mode-switch-confirmation__copy p {
+  font-size: 0.82rem;
+}
+
+.mode-switch-confirmation__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.mode-switch-action {
+  min-height: 2.55rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    filter var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.mode-switch-action--cancel {
+  border-color: rgb(255 255 255 / 12%);
+  background: var(--color-control);
+}
+
+.mode-switch-action--confirm {
+  color: #10281d;
+  background: var(--color-success);
+}
+
+.mode-switch-action:hover {
+  filter: brightness(1.1);
+  transform: translateY(-0.06rem);
+}
+
+.pesky-status {
+  display: inline-flex;
+  padding: 0.34rem 0.58rem;
+  border-radius: 999px;
+  color: var(--color-text-soft);
+  font-size: 0.63rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  background: var(--color-control);
+}
+
+.pesky-status[data-status="running"] {
+  color: #0c2c1d;
+  background: var(--color-success);
+}
+
+.pesky-status[data-status="waitingInteractions"],
+.pesky-status[data-status="waitingGame"] {
+  color: #2e2004;
+  background: var(--color-warning);
+}
+
+.pesky-toggle,
+.pesky-names button {
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  font-weight: 900;
+  white-space: nowrap;
+  background: var(--color-control-active);
+  cursor: pointer;
+}
+
+.pesky-toggle {
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    filter var(--transition-fast),
+    transform var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.pesky-toggle[data-active="true"] {
+  border-color: rgb(255 255 255 / 14%);
+  color: #fff;
+  background: var(--color-danger);
+}
+
+.pesky-toggle:disabled,
+.pesky-names button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pesky-workspace {
+  margin-top: var(--space-5);
+}
+
+.pesky-names__body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.pesky-names textarea {
+  width: 100%;
+  min-height: 13.5rem;
+  resize: vertical;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  line-height: 1.45;
+  background: var(--color-control);
+}
+
+.pesky-names__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pesky-names__footer span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.pesky-names__footer span[data-error="true"],
+.pesky-attacks__required,
+.pesky-feedback[data-error="true"] {
+  color: var(--color-danger);
+}
+
+.pesky-names__save-slot {
+  flex: 0 0 auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.35rem);
+  transition:
+    opacity 160ms ease,
+    visibility 160ms ease,
+    transform 160ms ease;
+}
+
+.pesky-names__save-slot[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.pesky-attack-list {
+  display: grid;
+  gap: 1px;
+  background: rgb(255 255 255 / 7%);
+}
+
+.pesky-attack {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.65rem 0.85rem;
+  background: var(--color-background-raised);
+  cursor: pointer;
+}
+
+.pesky-attack[data-enabled="false"] {
+  opacity: 0.48;
+}
+
+.pesky-attack img {
+  width: 3rem;
+  height: 2.5rem;
+  object-fit: contain;
+}
+
+.pesky-attack span {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.pesky-attack strong {
+  font-size: 0.86rem;
+}
+
+.pesky-attack small {
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pesky-attack input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-focus);
+}
+
+.pesky-attacks__required {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.72rem;
+}
+
+.pesky-feedback {
+  min-height: 1.2rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
 
 .app-shell {
@@ -879,6 +1207,21 @@ input:focus-visible {
     rgb(255 255 255 / 1.8%);
 }
 
+.interaction-random-test--switch {
+  display: block;
+  height: 5.85rem;
+  padding: 0;
+  overflow: hidden;
+}
+
+.interaction-random-test__pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
 .interaction-random-test__copy {
   min-width: 0;
 }
@@ -918,7 +1261,8 @@ input:focus-visible {
   line-height: 1.35;
 }
 
-.interaction-random-test > button {
+.interaction-random-test > button,
+.interaction-random-test__toggle {
   min-height: 2.55rem;
   padding: 0.55rem 0.85rem;
   border: 1px solid transparent;
@@ -928,20 +1272,30 @@ input:focus-visible {
   font-weight: 900;
   background: var(--color-control-active);
   cursor: pointer;
-  transition: filter var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    filter var(--transition-fast),
+    transform var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
-.interaction-random-test > button[data-active="true"] {
+.interaction-random-test > button[data-active="true"],
+.interaction-random-test__toggle[data-active="true"] {
   border-color: rgb(255 255 255 / 14%);
-  background: var(--color-control);
+  color: #fff;
+  background: var(--color-danger);
 }
 
-.interaction-random-test > button:hover:not(:disabled) {
+.interaction-random-test > button:hover:not(:disabled),
+.interaction-random-test__toggle:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-0.06rem);
 }
 
-.interaction-random-test > button:disabled {
+.interaction-random-test > button:disabled,
+.interaction-random-test__toggle:disabled {
   cursor: not-allowed;
   opacity: 0.62;
 }
@@ -1128,6 +1482,28 @@ input:focus-visible {
   .section + .section { margin-top: 3.5rem; }
   .challenge-icon { width: 4.45rem; height: 4.45rem; }
   .interaction-card__visual { min-height: 5rem; }
+  .pesky-hero { height: 11rem; }
+  .pesky-hero__pane,
+  .interaction-random-test__pane {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: var(--space-2);
+  }
+  .interaction-random-test--switch { height: 9.25rem; }
+  .pesky-toggle { width: 100%; }
+  .mode-switch-confirmation__actions { justify-content: flex-start; }
+  .pesky-names__footer { align-items: stretch; flex-direction: column; }
+  .pesky-names__save-slot {
+    max-height: 0;
+    overflow: hidden;
+    transition:
+      max-height 160ms ease,
+      opacity 160ms ease,
+      visibility 160ms ease,
+      transform 160ms ease;
+  }
+  .pesky-names__save-slot[data-visible="true"] { max-height: 3rem; }
+  .pesky-names__save-slot button { width: 100%; }
   .interaction-panel__heading { padding: var(--space-3); }
   .interaction-table th,
   .interaction-table td { padding-inline: 0.7rem; }

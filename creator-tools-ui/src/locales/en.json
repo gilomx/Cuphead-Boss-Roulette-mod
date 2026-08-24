@@ -11,7 +11,8 @@
   "nav": {
     "group": "Creator Tools",
     "roulette": "Roulette",
-    "interactions": "Interactions"
+    "interactions": "Interactions",
+    "pesky": "Pesky Mode"
   },
   "interactions": {
     "title": "Interactions",
@@ -85,17 +86,30 @@
       "delayLabel": "Wait (s)",
       "action": "Add to queue",
       "testing": "Adding",
+      "suspended": {
+        "title": "Interactions paused",
+        "description": "Pesky Mode is active. New redeems keep their place, but will not enter the game until you disable it."
+      },
       "random": {
         "title": "Random test",
         "description": "Sends random catalog items and names at short, varying intervals, only while a match is active.",
         "active": "Active",
         "inactive": "Inactive",
         "enable": "Enable",
-        "disable": "Disable"
+        "disable": "Disable",
+        "switch": {
+          "title": "Pesky Mode is active right now",
+          "description": "To use Random Test, I will disable Pesky Mode.",
+          "cancel": "Cancel",
+          "confirm": "Yes, enable"
+        }
       }
     },
     "feedback": {
       "ready": "The test is ready.",
+      "random_test_enabled": "Random Test is active.",
+      "random_test_disabled": "Random Test is inactive.",
+      "random_test_disabled_by_pesky": "The random test was disabled because Pesky Mode was enabled.",
       "random_test_enabled": "The random test is active and will wait for a match to be in progress.",
       "random_test_disabled": "The random test was disabled.",
       "unknown_item": "The mod does not recognize this item.",
@@ -104,11 +118,78 @@
       "requires_gameplay_level": "Start any gameplay level to send the redeem.",
       "waiting_game": "The request is already visible and is waiting for the game to confirm it.",
       "queued": "The redeems were added to the queue.",
+      "queued_paused": "The redeems were preserved in their queue and will wait while Pesky Mode is active.",
       "settings_saved": "The interaction settings were saved.",
       "invalid_setting": "The setting value is invalid.",
       "queue_full": "The queue reached its temporary limit.",
       "sent": "The item was sent into the fight.",
       "spawn_failed": "The item could not be created. Check the fight state."
+    }
+  },
+  "pesky": {
+    "title": "Pesky Mode",
+    "description": "Adds random attacks from the interaction catalog during any fight, whether entered normally or through the roulette. You can also configure names to appear randomly with the attacks.",
+    "control": {
+      "title": "Mode control",
+      "enable": "Enable mode",
+      "disable": "Disable mode",
+      "switch": {
+        "title": "Random Test is active right now",
+        "description": "To use Pesky Mode, I will disable Random Test.",
+        "cancel": "Cancel",
+        "confirm": "Yes, enable"
+      }
+    },
+    "status": {
+      "disabled": "Disabled",
+      "waitingGame": "Waiting for a level",
+      "waitingInteractions": "Finishing active interactions",
+      "running": "Being pesky now"
+    },
+    "queue": {
+      "title": "Mode queue",
+      "description": "Attacks appear up to the configured simultaneous limit. The rest wait in the order they were generated.",
+      "countLabel": "Attacks in queue",
+      "emptyTitle": "The queue is empty",
+      "emptyDescription": "Enable Pesky Mode and enter a gameplay level to see generated attacks here.",
+      "position": "Order",
+      "item": "Attack",
+      "name": "Name",
+      "status": "Status",
+      "active": "Running",
+      "queued": "Queued",
+      "scheduled": "Waiting for time",
+      "waiting_game": "Waiting for game"
+    },
+    "names": {
+      "title": "Random names",
+      "description": "Enter one name per line. Blank lines and duplicates are removed; each name may contain up to 32 characters.",
+      "placeholder": "Claudia\nYeiAndPelos\nYerrisito",
+      "hint": "One name is selected randomly for each attack.",
+      "required": "You need at least one name to enable the mode.",
+      "save": "Save names"
+    },
+    "attacks": {
+      "title": "Available attacks",
+      "description": "Check the items that may appear. New catalog items will be enabled automatically.",
+      "required": "Enable at least one attack before starting the mode."
+    },
+    "feedback": {
+      "ready": "The configuration is ready.",
+      "enabled": "Pesky Mode is enabled.",
+      "disabled": "Pesky Mode is disabled.",
+      "disabled_by_random_test": "Pesky Mode was disabled because Random Test was enabled.",
+      "names_saved": "The names were saved.",
+      "items_saved": "The attack selection was saved.",
+      "names_required": "Add and save at least one name before enabling the mode.",
+      "items_required": "Enable at least one attack before enabling the mode.",
+      "disabled_invalid_config": "The mode was disabled because it needs names and at least one attack.",
+      "invalid_setting": "The submitted configuration is invalid.",
+      "unknown_item": "The mod does not recognize this attack.",
+      "native_assets_loading": "The attack's assets are still being prepared.",
+      "native_assets_unavailable": "The attack's assets could not be prepared.",
+      "requires_gameplay_level": "The mode is waiting for a gameplay level.",
+      "spawn_failed": "The attack could not be created right now."
     }
   },
   "roulette": {

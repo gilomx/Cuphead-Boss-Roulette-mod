@@ -1,52 +1,12 @@
 import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
-
-const interactionItems = [
-  {
-    id: "hilda_green_zeppelin",
-    titleKey: "interactions.zeppelin.green.title",
-    imageAltKey: "interactions.zeppelin.green.imageAlt",
-    typeKey: "interactions.zeppelin.type",
-    image: "/assets/creator-tools/interactions/green-zeppelin.png",
-  },
-  {
-    id: "hilda_purple_zeppelin",
-    titleKey: "interactions.zeppelin.purple.title",
-    imageAltKey: "interactions.zeppelin.purple.imageAlt",
-    typeKey: "interactions.zeppelin.type",
-    image: "/assets/creator-tools/interactions/purple-zeppelin.png",
-  },
-  {
-    id: "rootpack_homing_carrot",
-    titleKey: "interactions.rootpack.homingCarrot.title",
-    imageAltKey: "interactions.rootpack.homingCarrot.imageAlt",
-    typeKey: "interactions.rootpack.type",
-    image: "/assets/creator-tools/interactions/homing-carrot.png",
-  },
-  {
-    id: "cagney_homing_plant",
-    titleKey: "interactions.cagney.homingPlant.title",
-    imageAltKey: "interactions.cagney.homingPlant.imageAlt",
-    typeKey: "interactions.cagney.type",
-    image: "/assets/creator-tools/interactions/cagney-homing-plant.png",
-  },
-  {
-    id: "frogs_firefly",
-    titleKey: "interactions.frogs.firefly.title",
-    imageAltKey: "interactions.frogs.firefly.imageAlt",
-    typeKey: "interactions.frogs.type",
-    image: "/assets/creator-tools/interactions/frogs-firefly.png",
-  },
-] as const;
-
-function interactionItemFor(item: string) {
-  return interactionItems.find((catalogItem) => catalogItem.id === item);
-}
+import { interactionItemFor, interactionItems } from "./interactionCatalog";
 
 export function InteractionsView() {
   const {
     interaction,
+    pesky,
     optimisticInteractionQueue,
     interactionTesting,
     applyInteractionMaxActive,
@@ -59,7 +19,9 @@ export function InteractionsView() {
   const [delays, setDelays] = useState<Record<string, number>>({});
   const [maxActiveDraft, setMaxActiveDraft] = useState(1);
   const [testingItem, setTestingItem] = useState<string | null>(null);
+  const [confirmingRandomTest, setConfirmingRandomTest] = useState(false);
   const available = interaction?.available ?? false;
+  const suspendedByPesky = interaction?.suspendedByPesky ?? false;
   const randomTestEnabled = interaction?.randomTestEnabled ?? false;
   const queue = [
     ...(interaction?.queue ?? []),
@@ -77,6 +39,12 @@ export function InteractionsView() {
       setMaxActiveDraft(interaction.maxActive);
     }
   }, [interaction?.maxActive]);
+
+  useEffect(() => {
+    if (confirmingRandomTest && !pesky?.enabled) {
+      setConfirmingRandomTest(false);
+    }
+  }, [confirmingRandomTest, pesky?.enabled]);
 
   return (
     <div className="page page--interactions">
@@ -218,25 +186,87 @@ export function InteractionsView() {
             </div>
           </div>
 
-          <div className="interaction-random-test" data-active={randomTestEnabled}>
-            <div className="interaction-random-test__copy">
-              <div className="interaction-random-test__title">
-                <strong>{t("interactions.test.random.title")}</strong>
-                <span data-active={randomTestEnabled}>
-                  {t(`interactions.test.random.${randomTestEnabled ? "active" : "inactive"}`)}
-                </span>
+          {suspendedByPesky ? (
+            <div className="interaction-random-test" data-active="true">
+              <div className="interaction-random-test__copy">
+                <div className="interaction-random-test__title">
+                  <strong>{t("interactions.test.suspended.title")}</strong>
+                </div>
+                <p>{t("interactions.test.suspended.description")}</p>
               </div>
-              <p>{t("interactions.test.random.description")}</p>
             </div>
-            <button
-              type="button"
-              aria-pressed={randomTestEnabled}
-              data-active={randomTestEnabled}
-              disabled={!interaction?.ready}
-              onClick={() => applyInteractionRandomTest(!randomTestEnabled)}
-            >
-              {t(`interactions.test.random.${randomTestEnabled ? "disable" : "enable"}`)}
-            </button>
+          ) : null}
+
+          <div
+            className="interaction-random-test interaction-random-test--switch mode-switch-shell"
+            data-active={randomTestEnabled}
+            data-step={confirmingRandomTest ? "confirm" : "control"}
+          >
+            <div className="mode-switch-stage">
+              <div
+                className="mode-switch-pane mode-switch-pane--primary interaction-random-test__pane"
+                aria-hidden={confirmingRandomTest}
+              >
+                <div className="interaction-random-test__copy">
+                  <div className="interaction-random-test__title">
+                    <strong>{t("interactions.test.random.title")}</strong>
+                    <span data-active={randomTestEnabled}>
+                      {t(`interactions.test.random.${randomTestEnabled ? "active" : "inactive"}`)}
+                    </span>
+                  </div>
+                  <p>{t("interactions.test.random.description")}</p>
+                </div>
+                <button
+                  className="interaction-random-test__toggle"
+                  type="button"
+                  tabIndex={confirmingRandomTest ? -1 : 0}
+                  aria-pressed={randomTestEnabled}
+                  data-active={randomTestEnabled}
+                  disabled={!interaction?.ready}
+                  onClick={() => {
+                    if (randomTestEnabled) {
+                      applyInteractionRandomTest(false);
+                    } else if (pesky?.enabled) {
+                      setConfirmingRandomTest(true);
+                    } else {
+                      applyInteractionRandomTest(true);
+                    }
+                  }}
+                >
+                  {t(`interactions.test.random.${randomTestEnabled ? "disable" : "enable"}`)}
+                </button>
+              </div>
+              <div
+                className="mode-switch-pane mode-switch-pane--confirmation interaction-random-test__pane"
+                aria-hidden={!confirmingRandomTest}
+              >
+                <div className="mode-switch-confirmation__copy">
+                  <strong>{t("interactions.test.random.switch.title")}</strong>
+                  <p>{t("interactions.test.random.switch.description")}</p>
+                </div>
+                <div className="mode-switch-confirmation__actions">
+                  <button
+                    type="button"
+                    className="mode-switch-action mode-switch-action--cancel"
+                    tabIndex={confirmingRandomTest ? 0 : -1}
+                    onClick={() => setConfirmingRandomTest(false)}
+                  >
+                    {t("interactions.test.random.switch.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="mode-switch-action mode-switch-action--confirm"
+                    tabIndex={confirmingRandomTest ? 0 : -1}
+                    onClick={() => {
+                      setConfirmingRandomTest(false);
+                      applyInteractionRandomTest(true);
+                    }}
+                  >
+                    {t("interactions.test.random.switch.confirm")}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="interaction-table-wrap">
@@ -252,7 +282,8 @@ export function InteractionsView() {
                   const donor = donors[item.id] ?? "";
                   const quantity = quantities[item.id] ?? 1;
                   const delay = delays[item.id] ?? 0;
-                  const canQueue = (interaction?.ready ?? false) && donor.trim().length > 0;
+                  const canQueue = (interaction?.ready ?? false) &&
+                    !suspendedByPesky && donor.trim().length > 0;
                   return (
                     <tr key={item.id}>
                       <td>

@@ -96,6 +96,12 @@ namespace Gilomx.CupheadBossRoulette
             active.Clear();
         }
 
+        internal void Clear()
+        {
+            ClearActive();
+            pending.Clear();
+        }
+
         private static bool IsFinished(Entry entry)
         {
             if (entry == null || entry.Handle == null)
@@ -165,15 +171,24 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var character = value[i];
                 if (character == '\\' || character == '"')
-                    builder.Append('\\');
-                builder.Append(character);
+                    builder.Append('\\').Append(character);
+                else if (character == '\n')
+                    builder.Append("\\n");
+                else if (character == '\r')
+                    builder.Append("\\r");
+                else if (character == '\t')
+                    builder.Append("\\t");
+                else if (character < 32)
+                    builder.Append("\\u")
+                        .Append(((int)character).ToString("x4"));
+                else
+                    builder.Append(character);
             }
         }
 
         public void Dispose()
         {
-            ClearActive();
-            pending.Clear();
+            Clear();
         }
 
         internal sealed class Entry

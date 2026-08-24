@@ -136,6 +136,55 @@ namespace Gilomx.CupheadBossRoulette
                 follower.FadeInWhenActorVisible(duration);
         }
 
+        internal bool CreateLevelEndSnapshot(Transform parent)
+        {
+            if (parent == null || labelRenderer == null)
+                return false;
+            var source = labelRenderer.GetComponent<TextMeshPro>();
+            if (source == null || !source.enabled ||
+                !source.gameObject.activeInHierarchy ||
+                source.color.a <= 0.01f)
+                return false;
+
+            var frozenObject = new GameObject(
+                source.gameObject.name + "_Frozen");
+            frozenObject.layer = source.gameObject.layer;
+            var frozen = frozenObject.AddComponent<TextMeshPro>();
+            frozen.text = source.text;
+            frozen.font = source.font;
+            frozen.fontSharedMaterial = source.fontSharedMaterial;
+            frozen.fontSize = source.fontSize;
+            frozen.fontStyle = source.fontStyle;
+            frozen.alignment = source.alignment;
+            frozen.enableWordWrapping = source.enableWordWrapping;
+            frozen.richText = source.richText;
+            frozen.isOrthographic = source.isOrthographic;
+            frozen.color = source.color;
+            frozen.outlineColor = source.outlineColor;
+            frozen.outlineWidth = source.outlineWidth;
+            frozen.rectTransform.sizeDelta =
+                source.rectTransform.sizeDelta;
+            frozen.rectTransform.pivot = source.rectTransform.pivot;
+            frozen.rectTransform.SetParent(parent, false);
+            frozen.rectTransform.position =
+                source.rectTransform.position;
+            frozen.rectTransform.rotation =
+                source.rectTransform.rotation;
+            frozen.rectTransform.localScale =
+                source.rectTransform.lossyScale;
+
+            var frozenRenderer = frozen.GetComponent<Renderer>();
+            if (frozenRenderer != null)
+            {
+                frozenRenderer.sortingLayerID =
+                    labelRenderer.sortingLayerID;
+                frozenRenderer.sortingOrder =
+                    labelRenderer.sortingOrder;
+            }
+            source.enabled = false;
+            return true;
+        }
+
         private static Vector3 AbsoluteScale(Vector3 value)
         {
             return new Vector3(

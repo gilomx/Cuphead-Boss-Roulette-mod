@@ -10,7 +10,7 @@ const contracts = readFileSync(
   "utf8",
 );
 const view = readFileSync(
-  resolve(uiRoot, "src", "features", "interactions", "InteractionsView.tsx"),
+  resolve(uiRoot, "src", "features", "interactions", "interactionCatalog.ts"),
   "utf8",
 );
 const mockServer = readFileSync(resolve(uiRoot, "scripts", "mock-server.mjs"), "utf8");

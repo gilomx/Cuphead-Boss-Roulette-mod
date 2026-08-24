@@ -14,6 +14,19 @@ let interactionQueue = [];
 let interactionMaxActive = 1;
 let interactionRandomTestEnabled = false;
 let interactionRandomTestRevision = 0;
+let peskyEnabled = false;
+let peskyRevision = 0;
+let peskyFeedback = "ready";
+let peskyNames = ["Claudia", "YeiAndPelos", "Yerrisito", "Malono", "Suches", "Elver_hijas"];
+let peskyDisabledItems = [];
+
+const interactionItems = [
+  "hilda_green_zeppelin",
+  "hilda_purple_zeppelin",
+  "rootpack_homing_carrot",
+  "cagney_homing_plant",
+  "frogs_firefly",
+];
 
 const bosses = [
   { id: 0, name: "Hosco y Tosco", plane: false },
@@ -69,6 +82,7 @@ function refreshInteractionQueue() {
       entry.status = "queued";
     }
   }
+  if (peskyEnabled) return;
   let active = interactionQueue.filter((entry) => entry.status === "active").length;
   for (const entry of interactionQueue) {
     if (active >= interactionMaxActive) break;
@@ -143,16 +157,11 @@ createServer((req, res) => {
     json(res, {
       ready: true,
       available: true,
+      suspendedByPesky: peskyEnabled,
       randomTestEnabled: interactionRandomTestEnabled,
       randomTestRevision: interactionRandomTestRevision,
       item: "hilda_green_zeppelin",
-      items: [
-        "hilda_green_zeppelin",
-        "hilda_purple_zeppelin",
-        "rootpack_homing_carrot",
-        "cagney_homing_plant",
-        "frogs_firefly",
-      ],
+      items: interactionItems,
       lastItem: interactionLastItem,
       feedback: interactionFeedback,
       error: false,
@@ -183,10 +192,61 @@ createServer((req, res) => {
       nextFeedback = interactionRandomTestEnabled
         ? "random_test_enabled"
         : "random_test_disabled";
+      if (interactionRandomTestEnabled) peskyEnabled = false;
     }
     refreshInteractionQueue();
     interactionFeedback = nextFeedback;
     interactionRevision += 1;
+    json(res, { ok: true }, 202);
+    return;
+  }
+  if (url.pathname === "/api/config/pesky") {
+    json(res, {
+      ready: true,
+      available: true,
+      enabled: peskyEnabled,
+      running: peskyEnabled,
+      waitingForInteractions: false,
+      revision: peskyRevision,
+      feedback: peskyFeedback,
+      error: false,
+      minimumInterval: 1.25,
+      maximumInterval: 3.25,
+      names: peskyNames,
+      items: interactionItems,
+      disabledItems: peskyDisabledItems,
+      queueCount: 0,
+      activeCount: 0,
+      pausedInteractionCount: interactionQueue.length,
+      pausedInteractionActiveCount: interactionQueue.filter((entry) => entry.status === "active").length,
+      maxActive: interactionMaxActive,
+      queue: [],
+    });
+    return;
+  }
+  if (url.pathname === "/api/config/pesky/set") {
+    const enabledValue = url.searchParams.get("enabled");
+    const namesValue = url.searchParams.get("names");
+    const itemValue = url.searchParams.get("item");
+    if (enabledValue !== null) {
+      peskyEnabled = enabledValue === "1";
+      if (peskyEnabled) {
+        interactionRandomTestEnabled = false;
+        interactionRandomTestRevision += 1;
+      }
+      peskyFeedback = peskyEnabled ? "enabled" : "disabled";
+    } else if (namesValue !== null) {
+      peskyNames = [...new Set(namesValue.split(/\r?\n|\r/).map((name) => name.trim()).filter(Boolean))];
+      peskyFeedback = "names_saved";
+    } else if (itemValue !== null && interactionItems.includes(itemValue)) {
+      if (url.searchParams.get("itemEnabled") === "1") {
+        peskyDisabledItems = peskyDisabledItems.filter((item) => item !== itemValue);
+      } else if (!peskyDisabledItems.includes(itemValue)) {
+        peskyDisabledItems.push(itemValue);
+      }
+      peskyFeedback = "items_saved";
+    }
+    peskyRevision += 1;
     json(res, { ok: true }, 202);
     return;
   }

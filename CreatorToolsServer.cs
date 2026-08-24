@@ -13,7 +13,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const string WebSocketMagic =
             "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-        private const int MaximumHeaderBytes = 16384;
+        private const int MaximumHeaderBytes = 65536;
         private const int MaximumClientPayloadBytes = 1024 * 1024;
 
         private readonly string assetsDirectory;
@@ -26,6 +26,12 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object interactionsLock = new object();
         private readonly Queue<string> interactionCommands =
             new Queue<string>();
+        private readonly object peskyLock = new object();
+        private readonly Queue<string> peskyCommands =
+            new Queue<string>();
+        private readonly object modeCommandsLock = new object();
+        private readonly Queue<ModeCommand> modeCommands =
+            new Queue<ModeCommand>();
         private readonly object clientsLock = new object();
         private readonly List<WebSocketClient> clients =
             new List<WebSocketClient>();
@@ -44,6 +50,8 @@ namespace Gilomx.CupheadBossRoulette
             "{\"enabled\":false,\"ready\":false}";
         private string latestInteractionsState =
             "{\"ready\":false,\"available\":false}";
+        private string latestPeskyState =
+            "{\"ready\":false,\"available\":false,\"enabled\":false}";
 
         internal int Port { get; private set; }
 
@@ -188,6 +196,46 @@ namespace Gilomx.CupheadBossRoulette
                     return false;
                 }
                 command = interactionCommands.Dequeue();
+                return true;
+            }
+        }
+
+        internal void SetPeskyState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (peskyLock)
+                latestPeskyState = json;
+        }
+
+        internal bool TryTakePeskyCommand(out string command)
+        {
+            lock (peskyLock)
+            {
+                if (peskyCommands.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = peskyCommands.Dequeue();
+                return true;
+            }
+        }
+
+        internal bool TryTakeModeCommand(
+            out bool pesky, out string command)
+        {
+            lock (modeCommandsLock)
+            {
+                if (modeCommands.Count == 0)
+                {
+                    pesky = false;
+                    command = null;
+                    return false;
+                }
+                var entry = modeCommands.Dequeue();
+                pesky = entry.Pesky;
+                command = entry.Query;
                 return true;
             }
         }
@@ -504,7 +552,10 @@ namespace Gilomx.CupheadBossRoulette
                 path == "/config/roulette.html" ||
                 path == "/config/interactions" ||
                 path == "/config/interactions/" ||
-                path == "/config/interactions.html")
+                path == "/config/interactions.html" ||
+                path == "/config/pesky" ||
+                path == "/config/pesky/" ||
+                path == "/config/pesky.html")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.html"),
@@ -555,11 +606,56 @@ namespace Gilomx.CupheadBossRoulette
                     Encoding.UTF8.GetBytes(json), false);
                 return;
             }
-            if (path == "/api/config/interactions/test" ||
-                path == "/api/config/interactions/set")
+            if (path == "/api/config/interactions/test")
             {
                 lock (interactionsLock)
                     interactionCommands.Enqueue(request.Query ?? string.Empty);
+                WriteResponse(stream, 202, "Accepted",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                return;
+            }
+            if (path == "/api/config/interactions/set")
+            {
+                var query = request.Query ?? string.Empty;
+                if (QueryHasKey(query, "randomTestEnabled"))
+                {
+                    lock (modeCommandsLock)
+                        modeCommands.Enqueue(new ModeCommand(false, query));
+                }
+                else
+                {
+                    lock (interactionsLock)
+                        interactionCommands.Enqueue(query);
+                }
+                WriteResponse(stream, 202, "Accepted",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                return;
+            }
+            if (path == "/api/config/pesky")
+            {
+                string json;
+                lock (peskyLock)
+                    json = latestPeskyState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/config/pesky/set")
+            {
+                var query = request.Query ?? string.Empty;
+                if (QueryHasKey(query, "enabled"))
+                {
+                    lock (modeCommandsLock)
+                        modeCommands.Enqueue(new ModeCommand(true, query));
+                }
+                else
+                {
+                    lock (peskyLock)
+                        peskyCommands.Enqueue(query);
+                }
                 WriteResponse(stream, 202, "Accepted",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
@@ -772,6 +868,41 @@ namespace Gilomx.CupheadBossRoulette
                 offset += read;
             }
             return result;
+        }
+
+        private static bool QueryHasKey(string query, string expectedKey)
+        {
+            if (string.IsNullOrEmpty(query))
+                return false;
+            var pairs = query.Split('&');
+            for (var i = 0; i < pairs.Length; i++)
+            {
+                var separator = pairs[i].IndexOf('=');
+                var key = separator < 0
+                    ? pairs[i]
+                    : pairs[i].Substring(0, separator);
+                try
+                {
+                    key = Uri.UnescapeDataString(key.Replace('+', ' '));
+                }
+                catch { }
+                if (string.Equals(key, expectedKey,
+                    StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private sealed class ModeCommand
+        {
+            internal readonly bool Pesky;
+            internal readonly string Query;
+
+            internal ModeCommand(bool pesky, string query)
+            {
+                Pesky = pesky;
+                Query = query;
+            }
         }
 
         private sealed class HttpRequest

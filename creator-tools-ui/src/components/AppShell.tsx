@@ -51,6 +51,14 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
           >
             {t("nav.interactions")}
           </button>
+          <button
+            className={`sidebar__item${activeSection === "pesky" ? " sidebar__item--active" : ""}`}
+            type="button"
+            aria-current={activeSection === "pesky" ? "page" : undefined}
+            onClick={() => onSectionChange("pesky")}
+          >
+            {t("nav.pesky")}
+          </button>
         </nav>
 
         <div className="sidebar__footer">

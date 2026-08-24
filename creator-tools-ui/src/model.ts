@@ -56,6 +56,7 @@ export interface RouletteConfigState {
 export interface InteractionConfigState {
   ready: boolean;
   available: boolean;
+  suspendedByPesky: boolean;
   randomTestEnabled: boolean;
   randomTestRevision: number;
   item: string;
@@ -70,6 +71,28 @@ export interface InteractionConfigState {
   maxActiveLimit: number;
   maxBatch: number;
   maxDelay: number;
+  queue: InteractionQueueEntry[];
+}
+
+export interface PeskyModeConfigState {
+  ready: boolean;
+  available: boolean;
+  enabled: boolean;
+  running: boolean;
+  waitingForInteractions: boolean;
+  revision: number;
+  feedback: string;
+  error: boolean;
+  minimumInterval: number;
+  maximumInterval: number;
+  names: string[];
+  items: string[];
+  disabledItems: string[];
+  queueCount: number;
+  activeCount: number;
+  pausedInteractionCount: number;
+  pausedInteractionActiveCount: number;
+  maxActive: number;
   queue: InteractionQueueEntry[];
 }
 
