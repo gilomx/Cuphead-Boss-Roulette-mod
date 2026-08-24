@@ -126,6 +126,7 @@ FEATURES
 • Works with or without The Delicious Last Course DLC
 • Supports all 12 languages available in Cuphead
 • Local OBS overlay with live Creator Tools settings
+• Creator Tools catalog interactions work in roulette and normally entered gameplay levels
 • Automatically restores your previous equipment after the fight
 
 FEEDBACK
@@ -268,6 +269,7 @@ CARACTERÍSTICAS
 • Funciona con o sin el DLC The Delicious Last Course
 • Compatible con los 12 idiomas disponibles en Cuphead
 • Overlay local para OBS con ajustes en vivo desde Creator Tools
+• Interacciones del catálogo en la ruleta y en niveles iniciados normalmente
 • Restaura automáticamente tu equipamiento anterior después de la batalla
 
 FEEDBACK

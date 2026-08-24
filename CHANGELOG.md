@@ -32,6 +32,20 @@
 
 ### Primeros artículos del catálogo de interacciones
 
+- Las interacciones ya no dependen del tiempo adicional que daba abrir y girar
+  la ruleta. Una entrada nativa a cualquier batalla o plataformas se registra
+  tanto desde `_OnLevelStart` como mediante un respaldo sobre `Level.Current`;
+  después del margen seguro de 2.5 segundos puede completar las precargas que
+  hayan quedado pendientes y despachar la cola. Carga, pausa, derrota,
+  resultados y mapas continúan bloqueando apariciones.
+- Una precarga pendiente nunca abre una segunda copia del mismo nivel que el
+  jugador está usando. Hilda, La pandilla raíz, Cagney y Hosco y Tosco capturan
+  sus prefabs de la pelea real cuando corresponde; las demás capturas aditivas
+  permanecen serializadas y protegidas por escena.
+- La presentación compartida de nombres ya contiene dos colores de texto: el
+  crema existente y un negro cálido alternativo `#181411`. La tabla de niveles
+  alternativos queda vacía hasta aprobar qué jefes lo necesitan, por lo que
+  este cambio no altera todavía ninguna pelea.
 - La misma SPA sirve `/config`, `/config/roulette` y `/config/interactions`.
   El shell, sus proveedores, el indicador global y el selector ES/EN permanecen
   montados al cambiar entre Ruleta e Interacciones.
@@ -84,6 +98,14 @@
 - Las etiquetas normalizan a positivo la escala mundial heredada. Las plantas
   conservan su orientación nativa izquierda/derecha sin volver espejo el nombre
   del donador.
+- La planta de Cagney desplaza su etiqueta 10 px hacia arriba respecto a la
+  posición compartida; su separación final queda en 24 px. La luciérnaga la
+  desplaza 70 px hacia abajo y queda en -56 px. Ambos ajustes se expresan en
+  píxeles de referencia y conservan el mismo tamaño aparente con cualquier zoom.
+- Las precargas de escenas nativas ya bloquean también los lifecycle temporales
+  de audio, pausa, HUD, jugadores, input y cámara. Así una captura de prefab no
+  puede sustituir singletons de la pelea real ni alterar sonido, controles,
+  disparos o pausa al entrar a un jefe de forma normal.
 - `frogs_firefly` reutiliza `FrogsLevelTallFirefly` con vida, velocidad, daño,
   colisiones, muerte y seguimiento por fases de la dificultad actual. Nace con
   cuerpo y etiqueta completamente fuera del borde derecho, elige una altura
@@ -104,6 +126,10 @@
   delante de las capas de los jefes. Mientras existe una cobertura visible de
   `PlayerScreenEffectController`, bajan temporalmente a `Enemies` para quedar
   debajo de oscurecimientos, filtros y transformaciones.
+- La tinta nativa de Barbasalada también activa esa prioridad cubierta durante
+  todo su ciclo visible. Actor, etiqueta y proyectiles marcados quedan detrás
+  desde la primera salpicadura hasta terminar el fundido y después recuperan
+  `ForegroundEffects` automáticamente.
 - Las balas creadas por `FireSingle` y `FireSpreadshot` heredan esa misma
   prioridad dinámica cuando el zepelín pertenece al catálogo. Los disparos de
   Hilda y los proyectiles ajenos no se modifican.
@@ -146,7 +172,7 @@
   crean como roots independientes todavía conservan su escala mundial nativa y
   quedan registradas como ajuste pendiente para cámaras alejadas.
 - Ninguna interacción se despacha durante carga, pausa, derrota o cierre del
-  nivel, ni durante los primeros tres segundos de una partida. Los actores que
+  nivel, ni durante los primeros 2.5 segundos de una partida. Los actores que
   ya estaban en pantalla permanecen congelados al perder y se limpian al
   destruirse la escena.
 - Se retiró el prototipo portátil que aproximaba el enemigo con una imagen y

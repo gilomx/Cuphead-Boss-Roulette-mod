@@ -80,7 +80,9 @@ namespace Gilomx.CupheadBossRoulette
             if (!AllReady)
                 CaptureFromLoadedHilda();
             if (AllReady || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload))
+                coroutineHost == null || !Evaluate(canPreload) ||
+                NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(HildaSceneName))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
@@ -176,6 +178,11 @@ namespace Gilomx.CupheadBossRoulette
             var prefix = AccessTools.Method(
                 typeof(NativeZeppelinCache),
                 "AllowPreloadedSceneLifecycle");
+            NativeInteractionPreloadCoordinator.InstallGlobalLifecycleGuards(
+                harmony,
+                prefix,
+                logWarning,
+                "Hilda Berg");
             var methods = new[]
             {
                 AccessTools.Method(typeof(Level), "Awake"),

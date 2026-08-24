@@ -38,8 +38,9 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
 - Interacciones muestra el catálogo de canjeos. `hilda_purple_zeppelin`,
   `hilda_green_zeppelin`, `rootpack_homing_carrot` y
   `cagney_homing_plant` y `frogs_firefly` están disponibles en cualquier
-  batalla o nivel de plataformas después de preparar los prefabs
-  originales desde el mapa. La zanahoria aparece como `Proyectil`; los dos
+  batalla o nivel de plataformas, entre por la ruleta o por una puerta normal.
+  El mapa es la ventana preferida para preparar los prefabs originales y el
+  gameplay estable puede terminar los que sigan pendientes. La zanahoria aparece como `Proyectil`; los dos
   zepelines, la semilla y la luciérnaga aparecen como `Enemigo`. Las tarjetas son un resumen
   vertical
   pequeño con el primer frame nativo arriba y la información debajo; no
@@ -99,7 +100,7 @@ React. El contrato completo para artículos futuros está en
 [INTERACTION_CATALOG.md](../INTERACTION_CATALOG.md).
 
 El mod bloquea despachos durante carga, pausa, derrota, cierre del nivel y los
-primeros tres segundos de una partida. Los actores ya presentes permanecen
+primeros 2.5 segundos de una partida. Los actores ya presentes permanecen
 congelados al perder; la limpieza definitiva ocurre al destruirse la escena.
 
 La validación importante siempre se repite en C#. React puede impedir una

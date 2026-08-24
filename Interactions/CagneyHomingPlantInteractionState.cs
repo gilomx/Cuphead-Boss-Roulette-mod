@@ -9,6 +9,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float VirtualGroundMargin = 16f;
         private const float GrowingLabelFollowSeconds = 0.55f;
         private const float DonorLabelFadeInSeconds = 0.45f;
+        private const float DonorLabelVerticalOffsetPixels = 10f;
 
         private static readonly System.Reflection.FieldInfo FallingSpeedField =
             AccessTools.Field(typeof(FlowerLevelEnemySeed), "fallingSpeed");
@@ -158,8 +159,12 @@ namespace Gilomx.CupheadBossRoulette
                         activeLabel.Hide();
                 }
                 if (activeLabel != null)
+                {
+                    activeLabel.SetVerticalOffsetPixels(
+                        DonorLabelVerticalOffsetPixels);
                     activeLabel.FadeInWhenActorVisible(
                         DonorLabelFadeInSeconds);
+                }
             }
             catch (Exception exception)
             {

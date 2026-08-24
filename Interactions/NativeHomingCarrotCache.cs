@@ -73,7 +73,9 @@ namespace Gilomx.CupheadBossRoulette
             if (!Ready)
                 CaptureFromLoadedVeggies();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload))
+                coroutineHost == null || !Evaluate(canPreload) ||
+                NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(VeggiesSceneName))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
@@ -186,6 +188,11 @@ namespace Gilomx.CupheadBossRoulette
             var prefix = AccessTools.Method(
                 typeof(NativeHomingCarrotCache),
                 "AllowPreloadedSceneLifecycle");
+            NativeInteractionPreloadCoordinator.InstallGlobalLifecycleGuards(
+                harmony,
+                prefix,
+                logWarning,
+                "Root Pack");
             var methods = new[]
             {
                 AccessTools.Method(typeof(Level), "Awake"),

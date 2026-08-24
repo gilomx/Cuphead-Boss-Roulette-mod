@@ -31,7 +31,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const int CreatorToolsDefaultPort = 18081;
         private const int CreatorToolsPortCandidates = 100;
-        private const float CreatorToolsInteractionStartDelay = 3f;
+        private const float CreatorToolsInteractionStartDelay = 2.5f;
 
         private ConfigEntry<bool> creatorToolsEnabledSetting;
         private ConfigEntry<int> creatorToolsResolvedPortSetting;
@@ -128,10 +128,22 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool CanPreloadNativeInteractionAssets()
         {
-            return creatorToolsEnabledSetting != null &&
-                   creatorToolsEnabledSetting.Value &&
-                   !SceneLoader.CurrentlyLoading &&
-                   CanUseRouletteOnMap();
+            if (creatorToolsEnabledSetting == null ||
+                !creatorToolsEnabledSetting.Value ||
+                SceneLoader.CurrentlyLoading)
+                return false;
+
+            // The map remains the preferred preload window, but a player may
+            // enter a native boss before the serialized cache queue finishes
+            // or enable Creator Tools after the fight has already begun.
+            // Scoped lifecycle guards make those remaining additive captures
+            // safe without requiring a roulette-started session.
+            if (CanUseRouletteOnMap())
+                return true;
+            // Inside gameplay, wait for the same stable, unpaused start gate
+            // used by dispatch. This avoids additive scene I/O during the
+            // intro, pause, defeat and result transitions.
+            return CanSpawnCreatorToolsInteraction();
         }
 
         private bool CanSpawnCreatorToolsInteraction()
@@ -141,17 +153,71 @@ namespace Gilomx.CupheadBossRoulette
                 IsCreatorToolsInteractionPaused() ||
                 Mathf.Max(0f, CupheadTime.GlobalSpeed) <= 0f)
                 return false;
-            var level = Level.Current;
-            if (level == null || level.Ending)
+            Level level;
+            if (!TryGetActiveCreatorToolsGameplayLevel(out level))
                 return false;
-            var gameplayLevel =
-                level.LevelType == Level.Type.Battle ||
-                level.LevelType == Level.Type.Platforming;
-            return gameplayLevel &&
-                   level.GetInstanceID() ==
+            return level.GetInstanceID() ==
                        creatorToolsInteractionLevelInstanceId &&
                    Time.realtimeSinceStartup >=
                        creatorToolsInteractionAllowedAt;
+        }
+
+        private static bool TryGetActiveCreatorToolsGameplayLevel(
+            out Level level)
+        {
+            level = null;
+            if (SceneLoader.CurrentlyLoading)
+                return false;
+            try
+            {
+                level = Level.Current;
+                return level != null && !level.Ending &&
+                    (level.LevelType == Level.Type.Battle ||
+                     level.LevelType == Level.Type.Platforming);
+            }
+            catch
+            {
+                level = null;
+                return false;
+            }
+        }
+
+        private void RefreshCreatorToolsInteractionGameplayLevel()
+        {
+            Level level;
+            if (!TryGetActiveCreatorToolsGameplayLevel(out level))
+                return;
+            RegisterCreatorToolsInteractionGameplayLevel(level, false);
+        }
+
+        private void RegisterCreatorToolsInteractionGameplayLevel(
+            Level level,
+            bool rearmExistingLevel)
+        {
+            if (level == null)
+                return;
+            var instanceId = level.GetInstanceID();
+            var sameLevel =
+                creatorToolsInteractionLevelInstanceId == instanceId;
+            if (sameLevel && !rearmExistingLevel)
+                return;
+
+            var shouldClearPreviousAttempt =
+                (!sameLevel &&
+                 creatorToolsInteractionLevelInstanceId >= 0) ||
+                (sameLevel && rearmExistingLevel);
+            if (shouldClearPreviousAttempt &&
+                creatorToolsInteractions != null)
+                creatorToolsInteractions.EndGameplayLevel();
+            creatorToolsInteractionLevelInstanceId = instanceId;
+            creatorToolsInteractionAllowedAt =
+                Time.realtimeSinceStartup +
+                CreatorToolsInteractionStartDelay;
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.InvalidateState();
+            Logger.LogInfo(
+                "Creator Tools interactions registered gameplay level " +
+                level.CurrentLevel + ".");
         }
 
         private static bool IsCreatorToolsInteractionPaused()
@@ -245,18 +311,8 @@ namespace Gilomx.CupheadBossRoulette
             if (current == null || current != __instance)
                 return;
 
-            if (plugin.creatorToolsInteractionLevelInstanceId >= 0 &&
-                plugin.creatorToolsInteractionLevelInstanceId !=
-                    __instance.GetInstanceID() &&
-                plugin.creatorToolsInteractions != null)
-                plugin.creatorToolsInteractions.EndGameplayLevel();
-            plugin.creatorToolsInteractionLevelInstanceId =
-                __instance.GetInstanceID();
-            plugin.creatorToolsInteractionAllowedAt =
-                Time.realtimeSinceStartup +
-                CreatorToolsInteractionStartDelay;
-            if (plugin.creatorToolsInteractions != null)
-                plugin.creatorToolsInteractions.InvalidateState();
+            plugin.RegisterCreatorToolsInteractionGameplayLevel(
+                __instance, true);
         }
 
         private static void CreatorToolsInteractionLevelEndedPrefix(
@@ -438,7 +494,13 @@ namespace Gilomx.CupheadBossRoulette
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
             if (creatorToolsInteractions != null)
+            {
+                // `_OnLevelStart` can precede a stable `Level.Current` on
+                // native entry paths. Polling the authoritative current level
+                // makes normal boss entrances as reliable as roulette loads.
+                RefreshCreatorToolsInteractionGameplayLevel();
                 creatorToolsInteractions.Update(creatorToolsServer);
+            }
         }
 
         private void DisposeCreatorTools()

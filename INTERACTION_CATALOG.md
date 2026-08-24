@@ -42,6 +42,10 @@ reutilizarlos mediante `PrepareActor`.
 2. El texto usa `TextMeshPro`, la fuente Memphis del juego, mayúsculas, tamaño
    22, color crema y contorno oscuro. Si Memphis no se puede resolver, se busca
    otro asset Memphis cargado y finalmente se usa la fuente predeterminada.
+   La paleta compartida también define un texto alternativo casi negro
+   (`#181411`). `AlternateTextColorLevels` es la única tabla que debe decidir
+   qué jefes lo usan; mientras permanezca vacía conserva crema en todos los
+   niveles. No se deben repartir condiciones de color entre los ejecutores.
 3. En esta versión de Unity, `AddComponent<TextMeshPro>()` sustituye el
    `Transform` del objeto por un `RectTransform`. Siempre hay que obtener
    `labelText.rectTransform` después de añadir el componente; conservar una
@@ -54,10 +58,14 @@ reutilizarlos mediante `PrepareActor`.
    `LateUpdate` la capa `ForegroundEffects`, conservando el orden relativo del
    actor y colocando la etiqueta justo después. Esto evita que `Start`, un
    `Animator` o un jefe vuelvan a dejar el elemento detrás de sus capas.
-6. Cuando un `PlayerScreenEffectController` muestra un sprite de cobertura,
-   actor y etiqueta bajan temporalmente a `Enemies`. Así el oscurecimiento de
-   transformaciones, pausas y filtros permanece por delante; al desaparecer la
-   cobertura ambos regresan a `ForegroundEffects`. No se debe usar la capa
+6. Cuando un `PlayerScreenEffectController` muestra un sprite de cobertura, o
+   cuando se habilita el `SpriteRenderer` de
+   `PirateLevelSquidInkOverlay.Current` durante la tinta de Barbasalada, actor y
+   etiqueta bajan temporalmente a `Enemies`. Así el oscurecimiento de
+   transformaciones, pausas, filtros y tinta permanece por delante; al
+   desaparecer la cobertura ambos regresan a `ForegroundEffects`. En el caso
+   de la tinta se usa el estado `enabled`, no sólo su alfa, para cubrir también
+   el primer fotograma del impacto y todo el fundido. No se debe usar la capa
    global más alta, porque también supera UI, filtros y transiciones.
    `FireSingle` y `FireSpreadshot` requieren el mismo tratamiento para cada
    proyectil nuevo: se comparan los `FlyingBlimpLevelEnemyProjectile` antes y
@@ -101,6 +109,16 @@ no modificar velocidad, daño ni los prefabs nativos compartidos.
 - Si el renderer todavía no está listo se usa temporalmente un desplazamiento
   vertical de 350 unidades. Cuando aparece un sprite válido se captura el ancla
   definitiva una sola vez.
+- Estas magnitudes usan el espacio mundial de referencia de Cuphead. Con la
+  cámara base de 720 unidades de alto, una unidad corresponde aproximadamente
+  a un píxel del encuadre de referencia: el hueco de 14 se percibe como unos 14
+  píxeles. El factor de cámara escala ese hueco para conservar su tamaño visual
+  cuando un jefe acerca o aleja el encuadre.
+- `SetVerticalOffsetPixels` permite un ajuste vertical por artículo después del
+  ancla compartida y aplica el mismo factor de cámara. La planta de Cagney usa
+  `+10`, por lo que su separación vertical final es 24 px; la luciérnaga usa
+  `-70`, con una separación final de -56 px. Los dos zepelines y la zanahoria
+  conservan el hueco base de 14 px.
 - Nunca se debe crear un seguidor paralelo ni calcular una posición de pantalla
   para resolver una geometría distinta.
 - La escala mundial copiada a la etiqueta siempre usa valores absolutos. Un
@@ -140,9 +158,14 @@ ampliar el contrato compartido con una señal explícita de finalización.
 
 ## Ciclo de partida, pausas y cola
 
-- Un nivel de batalla o plataformas habilita interacciones tres segundos
+- Un nivel de batalla o plataformas habilita interacciones 2.5 segundos
   después de `_OnLevelStart`. Durante carga, pausa real, final del nivel o antes
   de ese margen, no se despacha ningún artículo.
+- La entrada puede proceder de la ruleta o de cualquier puerta nativa. El hook
+  de `_OnLevelStart` es la autoridad principal y una reconciliación por
+  `Level.Current` registra una instancia jugable que el hook haya observado
+  antes de que el singleton quedara estable. Esa reconciliación compara el ID
+  de instancia y nunca reinicia el margen cada frame.
 - Al pausar o llegar a derrota, los actores existentes permanecen visibles y
   congelados. No se crean actores nuevos ni avanza el generador aleatorio.
 - Perder el foco también puede llevar `CupheadTime.GlobalSpeed` a cero. Mientras
@@ -152,6 +175,9 @@ ampliar el contrato compartido con una señal explícita de finalización.
   pantalla. `Level.OnDestroy` realiza la limpieza definitiva de actores y del
   estado activo antes de cambiar de escena. Las solicitudes pendientes se
   conservan para el siguiente nivel válido.
+- Si un reintento reutiliza la misma instancia de `Level`, el siguiente
+  `_OnLevelStart` también limpia los actores del intento anterior antes de
+  rearmar el margen. El polling no hace esa limpieza: sólo reconcilia IDs nuevos.
 - El máximo simultáneo es persistente y configurable de 1 a 20. La cola sigue
   siendo la autoridad y retira un registro activo cuando su handle termina.
 - Las pruebas manuales aceptan una espera de 0 a 3600 segundos. Incluso con
@@ -240,6 +266,14 @@ prefixes Harmony deben comprobar además que `__instance` pertenece a la escena
 temporal concreta; nunca deben suprimir el lifecycle de otro nivel que empiece
 durante la precarga.
 
+El mapa es la ventana preferida, pero una entrada normal no debe dejar el resto
+de la cola bloqueado en `native_assets_loading`. Después del mismo margen de
+2.5 segundos, y sólo con gameplay estable, sin pausa ni transición, los caches
+pendientes pueden continuar serialmente. Antes de iniciar una carga, cada cache
+comprueba si su escena fuente es la pelea actual: en ese caso debe capturar el
+prefab de los objetos ya cargados y jamás abrir una segunda copia aditiva del
+mismo jefe.
+
 ## Pasos para añadir un artículo
 
 1. Crear un ID estable en `CreatorToolsInteractionIds.All`, su tarjeta de
@@ -291,3 +325,8 @@ durante la precarga.
   llegar otros. Al abandonar o reiniciar la escena no deben quedar residuos.
 - Activar la prueba aleatoria desde el panel mientras el juego está pausado,
   comprobar el cambio de estado inmediato y después iniciar una partida.
+- Con caches fríos, entrar inmediatamente por una puerta normal sin abrir la
+  ruleta. Encolar primero el último artículo de la serie de precarga y confirmar
+  que pasa de espera a activo dentro de esa misma pelea. Repetir con reintento,
+  victoria, salida al mapa y un jefe que sea fuente de prefab para comprobar que
+  nunca se duplica ni descarga su escena real.

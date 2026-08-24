@@ -294,8 +294,13 @@ between the browser panel and the game.
 on every `LateUpdate`. Normal gameplay uses `ForegroundEffects`, ahead of boss
 foreground layers but below UI and global overlays. While a visible
 `PlayerScreenEffectController` cover exists, both temporarily use `Enemies` so
-bomb-transformation darkness and similar filters render above them. Never use
-the globally highest sorting layer for catalog actors.
+bomb-transformation darkness and similar filters render above them. Captain
+Brineybeard's ink is a separate `PirateLevelSquidInkOverlay`, so the same check
+also treats its root `SpriteRenderer.enabled` lifetime as a cover. That native
+renderer lives on `Foreground`; moving catalog content to `Enemies` therefore
+keeps the ink above actor, donor label and marked zeppelin bullets from the
+first splat through the complete fade. Never use the globally highest sorting
+layer for catalog actors.
 
 Zeppelin bullets are unparented roots, so they cannot inherit their shooter's
 render-priority component. Harmony snapshots active
@@ -316,6 +321,22 @@ The renderer gap multiplies explicitly; the local fallback passes through
 `TransformPoint`, which already applies actor scale and must not be multiplied
 again.
 
+Per-item donor-label adjustments use reference pixels and are scaled by the
+same camera factor as the shared 14-pixel gap. Cagney's homing plant adds `+10`
+for a final vertical gap of 24 pixels. The Frogs firefly adds `-70` for a final
+vertical gap of -56 pixels. Zeppelin variants and the homing carrot remain at
+zero. `SetVerticalOffsetPixels` applies the adjustment after `PrepareActor` or
+`RebindTo`, keeping the seed-to-plant transfer and zoom correction shared.
+
+Native scene preloads must suppress global scene lifecycle components in
+addition to each boss-specific `Level` implementation. The four source scenes
+contain temporary `AudioManagerComponent`, pause GUI, HUD, player manager,
+player input and gameplay camera instances. Letting their `Awake`, `Start`,
+enable/disable or destroy callbacks run can replace live singletons and corrupt
+audio, controls, pause and camera state. `InstallGlobalLifecycleGuards` patches
+those callbacks with each cache's scene-scoped preload prefix. Keep this guard
+when adding a new native source scene.
+
 Known limitation: the normalization currently covers the catalog actor root,
 not independent objects spawned later. `FlyingBlimpLevelEnemy.FireSingle` and
 `FireSpreadshot` call `BasicProjectile.Create`, whose `AbstractProjectile.Create`
@@ -334,6 +355,18 @@ queue can stall. Each cache retains its own narrow Harmony lifecycle guard,
 scoped by `__instance` to only its temporary scene, and releases the shared
 preload slot after unload or disposal. Never replace that prefix with a global
 boolean-only suppression: a real fight may begin while a prefab is loading.
+
+Normal door entry and roulette entry now share the same interaction lifecycle.
+`_OnLevelStart` remains the primary registration point, with an instance-ID
+poll of the stable `Level.Current` as a fallback for native paths whose singleton
+settles after the hook. Both paths retain the 2.5-second start guard. The map
+is still the preferred preload window; after that guard, a stable unpaused
+Battle/Platforming level may finish serialized caches that did not start before
+the player entered. Every cache first captures its source from the real loaded
+fight and refuses to additively load a second copy when that source scene is the
+current gameplay scene. Loading, pause, defeat, results and maps never dispatch.
+If a retry reuses the same `Level` instance, the next `_OnLevelStart` clears the
+previous attempt's active actors before rearming; pending queue entries survive.
 
 `CreatorToolsInteractionQueue` is the authoritative runtime queue. Test calls
 accept `item`, `donor`, `quantity`, and `delay`; mixed batches append in arrival

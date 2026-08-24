@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -10,6 +11,14 @@ namespace Gilomx.CupheadBossRoulette
         private const float VisualGap = 14f;
         private const float LabelWidth = 320f;
         private const float LabelHeight = 48f;
+        private static readonly Color32 DefaultTextColor =
+            new Color32(255, 240, 194, 255);
+        private static readonly Color32 AlternateTextColor =
+            new Color32(24, 20, 17, 255);
+        // Add Levels values here after the alternate-color boss list is
+        // approved. An empty set deliberately preserves today's presentation.
+        private static readonly HashSet<Levels> AlternateTextColorLevels =
+            new HashSet<Levels>();
         private CreatorToolsDonorLabelFollower follower;
         private Renderer labelRenderer;
 
@@ -47,7 +56,7 @@ namespace Gilomx.CupheadBossRoulette
                 labelText.enableWordWrapping = false;
                 labelText.richText = false;
                 labelText.isOrthographic = true;
-                labelText.color = new Color(1f, 0.94f, 0.76f, 1f);
+                labelText.color = ResolveTextColor();
                 labelText.outlineColor = new Color32(20, 15, 10, 235);
                 labelText.outlineWidth = 0.18f;
                 labelText.rectTransform.sizeDelta = new Vector2(
@@ -109,6 +118,12 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
+        internal void SetVerticalOffsetPixels(float offsetPixels)
+        {
+            if (follower != null)
+                follower.SetVerticalOffsetPixels(offsetPixels);
+        }
+
         internal void Hide()
         {
             if (follower != null)
@@ -127,6 +142,15 @@ namespace Gilomx.CupheadBossRoulette
                 Mathf.Abs(value.x),
                 Mathf.Abs(value.y),
                 Mathf.Abs(value.z));
+        }
+
+        private static Color ResolveTextColor()
+        {
+            var level = Level.Current;
+            return level != null &&
+                AlternateTextColorLevels.Contains(level.CurrentLevel)
+                    ? AlternateTextColor
+                    : DefaultTextColor;
         }
 
         private void RegisterWithRenderPriority(GameObject actor)
@@ -197,6 +221,7 @@ namespace Gilomx.CupheadBossRoulette
         private TextMeshPro text;
         private float fallbackVerticalOffset;
         private float visualGap;
+        private float additionalVerticalOffset;
         private float fadeElapsed;
         private Color originalColor;
         private Color32 originalOutlineColor;
@@ -243,6 +268,7 @@ namespace Gilomx.CupheadBossRoulette
             actorRenderer = newActorRenderer;
             fallbackVerticalOffset = newFallbackVerticalOffset;
             visualGap = newVisualGap;
+            additionalVerticalOffset = 0f;
             actorOffset = Vector3.zero;
             positioned = false;
             rendererAnchorCaptured = false;
@@ -256,6 +282,23 @@ namespace Gilomx.CupheadBossRoulette
                     Mathf.Abs(actorTransform.lossyScale.y),
                     Mathf.Abs(actorTransform.lossyScale.z));
             UpdatePosition();
+        }
+
+        internal void SetVerticalOffsetPixels(float offsetPixels)
+        {
+            var cameraScale = actorTransform == null
+                ? null
+                : actorTransform.GetComponent<
+                    CreatorToolsInteractionCameraScale>();
+            var scaleFactor = cameraScale == null
+                ? 1f
+                : Mathf.Max(0.01f, cameraScale.Factor);
+            var scaledOffset = offsetPixels * scaleFactor;
+            if (positioned)
+                actorOffset.y +=
+                    scaledOffset - additionalVerticalOffset;
+            additionalVerticalOffset = scaledOffset;
+            rendererAnchorCaptured = false;
         }
 
         internal void Hide()
@@ -299,7 +342,8 @@ namespace Gilomx.CupheadBossRoulette
                 var bounds = actorRenderer.bounds;
                 var anchor = new Vector3(
                     bounds.center.x,
-                    bounds.max.y + visualGap,
+                    bounds.max.y + visualGap +
+                        additionalVerticalOffset,
                     bounds.center.z);
                 actorOffset = anchor - actorTransform.position;
                 positioned = true;
@@ -310,6 +354,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var anchor = actorTransform.TransformPoint(
                     new Vector3(0f, fallbackVerticalOffset, 0f));
+                anchor.y += additionalVerticalOffset;
                 actorOffset = anchor - actorTransform.position;
                 positioned = true;
             }

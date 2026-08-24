@@ -243,6 +243,25 @@ namespace Gilomx.CupheadBossRoulette
             screenCoverFrame = Time.frameCount;
             screenCoverActive = false;
 
+            // Brineybeard's native squid ink is not implemented through a
+            // PlayerScreenEffectController. Its renderer is enabled for the
+            // complete hit/fade cycle and disabled again when the ink clears.
+            // Treat the enabled state as the cover boundary so catalog actors
+            // cannot flash over the first splat while its alpha ramps up.
+            var pirateInkOverlay = PirateLevelSquidInkOverlay.Current;
+            if (pirateInkOverlay != null)
+            {
+                var pirateInkRenderer = pirateInkOverlay.GetComponent<
+                    SpriteRenderer>();
+                if (pirateInkRenderer != null &&
+                    pirateInkRenderer.enabled &&
+                    pirateInkRenderer.gameObject.activeInHierarchy)
+                {
+                    screenCoverActive = true;
+                    return true;
+                }
+            }
+
             var controllers = UnityEngine.Object.FindObjectsOfType<
                 PlayerScreenEffectController>();
             for (var i = 0; i < controllers.Length; i++)

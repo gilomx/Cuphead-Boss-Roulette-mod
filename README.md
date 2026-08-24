@@ -100,6 +100,12 @@ siguen girando visualmente, pero no pueden ser elegidos; siempre debe quedar al
 menos uno activo en Avión, Tierra y Ambos. Su comportamiento y reglas de
 desarrollo están documentados en [Reglas del panel](creator-tools-ui/PANEL_RULES.md).
 
+La sección `Interacciones` puede enviar los enemigos y proyectiles de su
+catálogo tanto a una pelea elegida por la ruleta como a cualquier batalla o
+nivel de plataformas iniciado normalmente. No es necesario abrir ni girar la
+ruleta; las solicitudes esperan durante carga, pausa y los primeros tres
+segundos de la partida.
+
 ## Instalación
 
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su

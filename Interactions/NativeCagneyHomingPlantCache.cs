@@ -69,7 +69,9 @@ namespace Gilomx.CupheadBossRoulette
             if (!Ready)
                 CaptureFromLoadedFlower();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload))
+                coroutineHost == null || !Evaluate(canPreload) ||
+                NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(FlowerSceneName))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
@@ -194,6 +196,11 @@ namespace Gilomx.CupheadBossRoulette
             var lifecyclePrefix = AccessTools.Method(
                 typeof(NativeCagneyHomingPlantCache),
                 "AllowPreloadedSceneLifecycle");
+            NativeInteractionPreloadCoordinator.InstallGlobalLifecycleGuards(
+                harmony,
+                lifecyclePrefix,
+                logWarning,
+                "Cagney Carnation");
             var lifecycleMethods = new[]
             {
                 AccessTools.Method(typeof(Level), "Awake"),

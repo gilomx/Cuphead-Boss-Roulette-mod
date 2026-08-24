@@ -17,6 +17,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const string FrogsSceneName = "scene_level_frogs";
         private const float OffscreenLabelMargin = 180f;
+        private const float DonorLabelVerticalOffsetPixels = -70f;
 
         private static readonly System.Reflection.FieldInfo FireflyPrefabField =
             AccessTools.Field(typeof(FrogsLevelTall), "fireflyPrefab");
@@ -74,7 +75,9 @@ namespace Gilomx.CupheadBossRoulette
             if (!Ready)
                 CaptureFromLoadedFrogs();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload))
+                coroutineHost == null || !Evaluate(canPreload) ||
+                NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(FrogsSceneName))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
@@ -181,6 +184,11 @@ namespace Gilomx.CupheadBossRoulette
                     FindLabelAnchor(actor.gameObject),
                     donor,
                     logWarning);
+                var donorLabel = actor.gameObject.GetComponent<
+                    CreatorToolsDonorLabel>();
+                if (donorLabel != null)
+                    donorLabel.SetVerticalOffsetPixels(
+                        DonorLabelVerticalOffsetPixels);
 
                 spawned = new NativeFrogsFireflySpawn
                 {
@@ -218,6 +226,11 @@ namespace Gilomx.CupheadBossRoulette
             var prefix = AccessTools.Method(
                 typeof(NativeFrogsFireflyCache),
                 "AllowPreloadedSceneLifecycle");
+            NativeInteractionPreloadCoordinator.InstallGlobalLifecycleGuards(
+                harmony,
+                prefix,
+                logWarning,
+                "Ribby and Croaks");
             var methods = new[]
             {
                 AccessTools.Method(typeof(Level), "Awake"),
