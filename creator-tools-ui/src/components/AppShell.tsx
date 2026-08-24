@@ -67,7 +67,11 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
             <a href="https://gilo.mx" target="_blank" rel="noopener noreferrer">gilo.mx</a>{" "}
             © {currentYear}
           </p>
-          <p>{t("app.footer.fanartDisclaimer")}</p>
+          <p>
+            {t("app.footer.message")}
+            <br />
+            {t("app.footer.messageSecondLine")}
+          </p>
         </div>
       </aside>
       <main className="main-content">{children}</main>

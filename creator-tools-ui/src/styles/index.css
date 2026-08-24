@@ -498,19 +498,15 @@ textarea:focus-visible {
   color: #ff00a3;
 }
 
-.sidebar__footer p + p {
-  margin-top: 0.35rem;
-}
-
 .sidebar__footer a {
-  color: inherit;
+  color: #ff00a3;
   font-weight: 900;
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 .sidebar__footer a:hover {
-  color: #ff00a3;
+  color: var(--color-success);
 }
 
 .locale-switch {

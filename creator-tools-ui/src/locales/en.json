@@ -5,7 +5,8 @@
     "language": "Language",
     "footer": {
       "madeWith": "Made with",
-      "fanartDisclaimer": "Cuphead™ and © Studio MDHR. Images used for fanart purposes."
+      "message": "Made with love by a fan, for the",
+      "messageSecondLine": "Cuphead community."
     }
   },
   "nav": {
