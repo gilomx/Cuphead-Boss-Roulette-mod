@@ -614,6 +614,14 @@ namespace Gilomx.CupheadBossRoulette
                 ? null
                 : HarmonyLib.AccessTools.Method(
                     saltbakerPhaseTwoEndIterator, "MoveNext");
+            var oldManPhaseThreeStart = HarmonyLib.AccessTools.Method(
+                typeof(OldManLevelSockPuppetHandler), "OnPhase3");
+            var oldManPhaseThreeEndIterator = HarmonyLib.AccessTools.Inner(
+                typeof(OldManLevel), "<phase_3_trans_cr>c__Iterator9");
+            var oldManPhaseThreeEnd = oldManPhaseThreeEndIterator == null
+                ? null
+                : HarmonyLib.AccessTools.Method(
+                    oldManPhaseThreeEndIterator, "MoveNext");
             var startPrefix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsDevilTransitionStartPrefix");
@@ -638,6 +646,12 @@ namespace Gilomx.CupheadBossRoulette
             var saltbakerPhaseTwoEndPostfix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsSaltbakerPhaseTwoEndPostfix");
+            var oldManPhaseThreeStartPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsOldManPhaseThreeStartPrefix");
+            var oldManPhaseThreeEndPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsOldManPhaseThreeEndPostfix");
 
             if (devilTransitionStart == null ||
                 devilTransitionCommit == null ||
@@ -706,6 +720,26 @@ namespace Gilomx.CupheadBossRoulette
                 saltbakerPhaseTwoEnd,
                 postfix: new HarmonyLib.HarmonyMethod(
                     saltbakerPhaseTwoEndPostfix));
+
+            if (oldManPhaseThreeStart == null ||
+                oldManPhaseThreeEnd == null ||
+                oldManPhaseThreeStartPrefix == null ||
+                oldManPhaseThreeEndPostfix == null)
+            {
+                Logger.LogWarning(
+                    "Could not install the Creator Tools Glumstone phase " +
+                    "2 to 3 transition protection.");
+                return;
+            }
+
+            harmony.Patch(
+                oldManPhaseThreeStart,
+                prefix: new HarmonyLib.HarmonyMethod(
+                    oldManPhaseThreeStartPrefix));
+            harmony.Patch(
+                oldManPhaseThreeEnd,
+                postfix: new HarmonyLib.HarmonyMethod(
+                    oldManPhaseThreeEndPostfix));
         }
 
         private static void CreatorToolsDevilTransitionStartPrefix()
@@ -820,6 +854,56 @@ namespace Gilomx.CupheadBossRoulette
                 level,
                 "Saltbaker phase 2 to 3",
                 "phase_two_to_three_cr completion");
+        }
+
+        private static void CreatorToolsOldManPhaseThreeStartPrefix()
+        {
+            var plugin = activeInstance;
+            OldManLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsOldManLevel(out level))
+                return;
+            plugin.BeginCreatorToolsInteractionPhaseTransition(
+                level,
+                "Glumstone phase 2 to 3",
+                "SockPuppetHandler.OnPhase3",
+                0f);
+            plugin.ClearCreatorToolsInteractionPhaseTransitionActors(
+                level,
+                "Glumstone phase 2 to 3",
+                "SockPuppetHandler.OnPhase3");
+        }
+
+        private static void CreatorToolsOldManPhaseThreeEndPostfix(
+            bool __result)
+        {
+            if (__result)
+                return;
+            var plugin = activeInstance;
+            OldManLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsOldManLevel(out level))
+                return;
+            plugin.EndCreatorToolsInteractionPhaseTransition(
+                level,
+                "Glumstone phase 2 to 3",
+                "phase_3_trans_cr completion");
+        }
+
+        private static bool TryGetCurrentCreatorToolsOldManLevel(
+            out OldManLevel level)
+        {
+            level = null;
+            try
+            {
+                level = Level.Current as OldManLevel;
+                return level != null;
+            }
+            catch
+            {
+                level = null;
+                return false;
+            }
         }
 
         private static bool TryGetCurrentCreatorToolsSaltbakerLevel(

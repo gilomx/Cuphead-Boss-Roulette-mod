@@ -215,6 +215,11 @@
   normal decide el siguiente intervalo.
 - La transición 3→4 de Chef Saleroso permanece intacta y pendiente de
   observación manual.
+- En Granitoviejo, `OldManLevelSockPuppetHandler.OnPhase3` limpia los actores
+  activos y bloquea nuevas apariciones en el mismo punto donde comienza la
+  destrucción de las marionetas y los elementos de la fase 2. El despacho se
+  reanuda sin una espera adicional cuando termina `phase_3_trans_cr`, después
+  del iris, al devolver el control e iniciar los ataques de la fase 3.
 
 ## 0.6.0 — La Pichi Ruleta (2026-08-18)
 

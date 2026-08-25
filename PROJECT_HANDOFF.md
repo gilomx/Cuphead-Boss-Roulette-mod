@@ -36,6 +36,13 @@ guard.
   after the white fader is hidden and the phase-three bouncer is active. The
   normal scheduler chooses the next automatic interval after resuming.
 - Saltbaker phase 3→4 is intentionally untouched pending manual review.
+- Glumstone phase 2→3: the prefix on
+  `OldManLevelSockPuppetHandler.OnPhase3` immediately blocks dispatch and
+  clears active interaction actors when the native puppet destruction begins.
+  The postfix on `OldManLevel/<phase_3_trans_cr>c__Iterator9.MoveNext` ends
+  protection when the iterator returns false, after the iris transition,
+  player-input restore, and phase-three scuba-gnome startup. No fixed delay is
+  added; the shared scheduler chooses the next automatic interval.
 
 The general battle-entry delay has been removed. `Iniciando batalla` is a
 visual load-intent state driven by `SceneLoader.LoadLevel`/roulette play and
