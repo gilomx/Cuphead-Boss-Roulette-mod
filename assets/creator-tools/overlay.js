@@ -75,9 +75,14 @@
     const battleActive = Boolean(state.battleActive);
     applySettings(settings);
     pendingState = state;
-    targetView = state.active && state.visible
+    if (!state.active) {
+      hideOverlayImmediately();
+      receivedState = true;
+      return;
+    }
+    targetView = state.visible
       ? "hud"
-      : state.active && !battleActive && settings.logo ? "logo" : "hidden";
+      : !battleActive && settings.logo ? "logo" : "hidden";
     transitionToTarget();
     receivedState = true;
   }

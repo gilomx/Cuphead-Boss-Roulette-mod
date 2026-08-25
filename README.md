@@ -76,10 +76,12 @@ automáticamente al salir. Tamaño, orden, alineación, opacidad y logo se
 actualizan en vivo. El menú está localizado en los doce idiomas de Cuphead y
 conserva el formato nativo `ETIQUETA: VALOR`.
 
-El servidor escucha únicamente en `127.0.0.1`: no necesita internet ni una
-cuenta. Su puerto preferido es `18081`; si ya está ocupado, el mod elige y
-guarda otro automáticamente. Por eso conviene usar siempre `COPIAR URL` en vez
-de escribir la dirección manualmente.
+El servidor escucha únicamente en `127.0.0.1:18081`: no necesita internet ni
+una cuenta y nunca cambia de puerto. Si otra aplicación ya está usando `18081`,
+`PANEL DE CONTROL` abre una página local con instrucciones; después de liberar
+el puerto, selecciona la misma opción otra vez para reintentar. El servidor
+permanece disponible para `/config` aunque `ESTADO` esté desactivado; ese ajuste
+solo oculta o muestra el contenido de la fuente de OBS.
 
 `AL REINTENTAR` ofrece dos comportamientos; `REAPARECER` es el predeterminado:
 

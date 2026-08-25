@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
@@ -32,6 +33,8 @@ namespace Gilomx.CupheadBossRoulette
             AccessTools.Field(typeof(LevelPauseGUI), "options");
         private static readonly MethodInfo LevelPauseOpenOptionsMethod =
             AccessTools.Method(typeof(LevelPauseGUI), "Options");
+        private static readonly MethodInfo PauseUnpauseMethod =
+            AccessTools.Method(typeof(AbstractPauseGUI), "Unpause");
         private static readonly FieldInfo OptionsMainObjectField =
             AccessTools.Field(typeof(OptionsGUI), "mainObject");
         private static readonly FieldInfo OptionsMainButtonsField =
@@ -1320,7 +1323,7 @@ namespace Gilomx.CupheadBossRoulette
                     if (OptionsMenuSelectSoundMethod != null)
                         OptionsMenuSelectSoundMethod.Invoke(
                             creatorToolsNativeOptions, null);
-                    OpenCreatorToolsConfig();
+                    OpenCreatorToolsConfigFromPauseMenu();
                     return;
                 }
                 CloseCreatorToolsMenu(true);
@@ -1635,7 +1638,7 @@ namespace Gilomx.CupheadBossRoulette
                     CreatorToolsMenuPage.RouletteOverlay);
             else if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub &&
                      creatorToolsMenuSelection == 1)
-                OpenCreatorToolsConfig();
+                OpenCreatorToolsConfigFromPauseMenu();
             else if (creatorToolsMenuSelection ==
                      CreatorToolsMenuItemCount - 1)
             {
@@ -1726,7 +1729,73 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OpenCreatorToolsConfig()
         {
+            if (creatorToolsServer == null ||
+                !creatorToolsServer.IsRunning)
+            {
+                StartCreatorToolsServer();
+                if (creatorToolsServer == null ||
+                    !creatorToolsServer.IsRunning)
+                {
+                    OpenCreatorToolsPortOccupiedPage();
+                    return;
+                }
+            }
             Application.OpenURL(CreatorToolsUrl + "config");
+        }
+
+        private void OpenCreatorToolsConfigFromPauseMenu()
+        {
+            var pause = creatorToolsPauseOwner;
+            CloseCreatorToolsMenu(true);
+
+            if (pause == null || PauseUnpauseMethod == null)
+            {
+                OpenCreatorToolsConfig();
+                return;
+            }
+
+            try
+            {
+                PauseUnpauseMethod.Invoke(pause, null);
+                StartCoroutine(
+                    OpenCreatorToolsConfigAfterPauseCloses(pause));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(
+                    "Creator Tools could not close Cuphead's pause menu: " +
+                    ex.Message);
+                OpenCreatorToolsConfig();
+            }
+        }
+
+        private IEnumerator OpenCreatorToolsConfigAfterPauseCloses(
+            MapPauseUI pause)
+        {
+            var timeout = Time.realtimeSinceStartup + 2f;
+            while (pause != null && Convert.ToInt32(pause.state) != 0 &&
+                   Time.realtimeSinceStartup < timeout)
+                yield return null;
+
+            OpenCreatorToolsConfig();
+        }
+
+        private void OpenCreatorToolsPortOccupiedPage()
+        {
+            var path = Path.Combine(
+                AssetsDirectory,
+                Path.Combine("creator-tools", "port-occupied.html"));
+            if (!File.Exists(path))
+            {
+                Logger.LogWarning(
+                    "Creator Tools port warning page is missing: " + path);
+                return;
+            }
+
+            var url = new Uri(Path.GetFullPath(path)).AbsoluteUri;
+            if (!CreatorToolsSpanish)
+                url += "#en";
+            Application.OpenURL(url);
         }
 
         private void DrawCreatorToolsMenu()
@@ -1783,7 +1852,7 @@ namespace Gilomx.CupheadBossRoulette
                             CreatorToolsMenuPage.RouletteOverlay);
                     else if (creatorToolsMenuPage ==
                                  CreatorToolsMenuPage.Hub && i == 1)
-                        OpenCreatorToolsConfig();
+                        OpenCreatorToolsConfigFromPauseMenu();
                     else if (i == CreatorToolsMenuItemCount - 1)
                     {
                         if (creatorToolsMenuPage ==
@@ -1994,20 +2063,15 @@ namespace Gilomx.CupheadBossRoulette
             if (!string.IsNullOrEmpty(creatorToolsServerError))
                 return CreatorToolsSpanish
                     ? "ERROR: " + creatorToolsServerError
-                    : "ERROR: NO LOCAL PORT AVAILABLE";
+                    : "ERROR: PORT 18081 IS ALREADY IN USE";
             if (creatorToolsServer == null ||
                 !creatorToolsServer.IsRunning)
                 return CreatorToolsSpanish
                     ? "SERVIDOR DESACTIVADO"
                     : "SERVER DISABLED";
             var clients = creatorToolsServer.ClientCount;
-            var status = CreatorToolsUrl + "  ·  " + clients +
-                         (clients == 1 ? " CLIENT" : " CLIENTS");
-            if (creatorToolsPortChanged)
-                status += CreatorToolsSpanish
-                    ? "  ·  PUERTO ACTUALIZADO"
-                    : "  ·  PORT UPDATED";
-            return status;
+            return CreatorToolsUrl + "  ·  " + clients +
+                   (clients == 1 ? " CLIENT" : " CLIENTS");
         }
 
         private bool CreatorToolsSpanish

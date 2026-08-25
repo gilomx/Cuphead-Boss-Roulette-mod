@@ -2,8 +2,14 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El servidor local usa exclusivamente `127.0.0.1:18081` para conservar las
+  fuentes de OBS existentes y ya no cambia a otro puerto. Si está ocupado,
+  `PANEL DE CONTROL` abre una página local con instrucciones para liberarlo y
+  reintentar. El servidor permanece activo aunque el overlay esté desactivado;
+  `ESTADO` controla únicamente si la fuente de OBS muestra contenido.
 - El menú nativo `LA PICHI RULETA` añade `PANEL DE CONTROL` entre
-  `STREAM OVERLAY` y `VOLVER`; al seleccionarlo abre `/config` en el navegador.
+  `STREAM OVERLAY` y `VOLVER`; al seleccionarlo cierra la pausa, regresa al
+  mapa y después abre `/config` en el navegador.
 - `/config` ahora es una SPA en React con una estructura persistente preparada
   para añadir nuevas secciones sin detener conexiones o servicios globales.
 - El panel está localizado exclusivamente en español e inglés y muestra un

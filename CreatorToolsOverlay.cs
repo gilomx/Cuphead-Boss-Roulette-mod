@@ -30,13 +30,11 @@ namespace Gilomx.CupheadBossRoulette
     public sealed partial class Plugin
     {
         private const int CreatorToolsDefaultPort = 18081;
-        private const int CreatorToolsPortCandidates = 100;
         private const float CreatorToolsDevilPhaseTransitionBlockDelay = 6f;
         private const float CreatorToolsSaltbakerPhaseOneBlockDelay = 2.5f;
         private const float CreatorToolsInteractionPhaseTransitionTimeout = 30f;
 
         private ConfigEntry<bool> creatorToolsEnabledSetting;
-        private ConfigEntry<int> creatorToolsResolvedPortSetting;
         private ConfigEntry<float> creatorToolsScaleSetting;
         private ConfigEntry<CreatorToolsOrder> creatorToolsOrderSetting;
         private ConfigEntry<CreatorToolsAlignment>
@@ -62,7 +60,6 @@ namespace Gilomx.CupheadBossRoulette
         private int creatorToolsLabelRevision;
         private bool creatorToolsLabelRenderFailureLogged;
         private string creatorToolsServerError;
-        private bool creatorToolsPortChanged;
         private bool creatorToolsInteractionLevelStartObserved;
         private int creatorToolsInteractionLevelInstanceId = -1;
         private float creatorToolsInteractionAllowedAt =
@@ -84,11 +81,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             creatorToolsEnabledSetting = Config.Bind(
                 "Creator Tools", "Activado", false,
-                "Activa el overlay local para OBS.");
-            creatorToolsResolvedPortSetting = Config.Bind(
-                "Creator Tools", "PuertoResuelto",
-                CreatorToolsDefaultPort,
-                "Puerto local resuelto automaticamente. No necesita editarse.");
+                "Muestra u oculta el overlay local para OBS.");
             creatorToolsScaleSetting = Config.Bind(
                 "Creator Tools", "Tamano", 1f,
                 "Escala del overlay: 1, 1.5 o 2.");
@@ -140,15 +133,12 @@ namespace Gilomx.CupheadBossRoulette
             // settings screen was still open.
             if (creatorToolsPreviewSetting.Value)
                 creatorToolsPreviewSetting.Value = false;
-            if (creatorToolsEnabledSetting.Value)
-                StartCreatorToolsServer();
+            StartCreatorToolsServer();
         }
 
         private bool CanPreloadNativeInteractionAssets()
         {
-            if (creatorToolsEnabledSetting == null ||
-                !creatorToolsEnabledSetting.Value ||
-                SceneLoader.CurrentlyLoading)
+            if (SceneLoader.CurrentlyLoading)
                 return false;
 
             // The map remains the preferred preload window, but a player may
@@ -854,10 +844,6 @@ namespace Gilomx.CupheadBossRoulette
             opacity = Mathf.Clamp(opacity, 25, 100);
             opacity = Mathf.RoundToInt(opacity / 5f) * 5;
             creatorToolsOpacitySetting.Value = opacity;
-            var port = creatorToolsResolvedPortSetting.Value;
-            if (port < 1024 || port > 65535)
-                creatorToolsResolvedPortSetting.Value =
-                    CreatorToolsDefaultPort;
             SetCreatorToolsInteractionMaximumActive(
                 GetCreatorToolsInteractionMaximumActive());
         }
@@ -889,7 +875,6 @@ namespace Gilomx.CupheadBossRoulette
         private bool StartCreatorToolsServer()
         {
             creatorToolsServerError = null;
-            creatorToolsPortChanged = false;
             if (creatorToolsServer == null)
             {
                 creatorToolsServer = new CreatorToolsServer(
@@ -900,23 +885,17 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsServer.IsRunning)
                 return true;
 
-            var preferredPort = creatorToolsResolvedPortSetting.Value;
-            if (!creatorToolsServer.Start(
-                preferredPort, CreatorToolsPortCandidates))
+            if (!creatorToolsServer.Start(CreatorToolsDefaultPort))
             {
                 creatorToolsServerError =
-                    "NO HAY UN PUERTO DISPONIBLE";
+                    "EL PUERTO 18081 ESTÁ OCUPADO";
                 Logger.LogWarning(
-                    "Creator Tools could not find an available local port.");
+                    "Creator Tools requires fixed port 18081, but it is " +
+                    "already in use. Close the application using the port " +
+                    "and try again.");
                 return false;
             }
 
-            if (creatorToolsServer.Port != preferredPort)
-            {
-                creatorToolsPortChanged = true;
-                creatorToolsResolvedPortSetting.Value =
-                    creatorToolsServer.Port;
-            }
             PublishCreatorToolsState(true);
             PublishCreatorToolsForceConfig(true);
             return true;
@@ -933,26 +912,24 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (creatorToolsEnabledSetting.Value != enabled)
                 creatorToolsEnabledSetting.Value = enabled;
-            if (enabled)
-            {
-                if (!StartCreatorToolsServer())
-                    creatorToolsEnabledSetting.Value = false;
-            }
-            else
-                StopCreatorToolsServer();
+            if (creatorToolsServer == null ||
+                !creatorToolsServer.IsRunning)
+                StartCreatorToolsServer();
+            PublishCreatorToolsState(true);
         }
 
         private bool SetCreatorToolsPreview(bool enabled)
         {
-            // Preview needs the local HTTP/WebSocket server. Turning it on
-            // from the menu should never leave the row enabled while doing
-            // nothing, so start Creator Tools automatically when necessary.
-            if (enabled && (creatorToolsServer == null ||
-                            !creatorToolsServer.IsRunning))
+            // Preview is visual overlay output, so enabling it also enables
+            // the overlay. The local server itself remains independent.
+            if (enabled)
             {
-                SetCreatorToolsEnabled(true);
-                if (!creatorToolsEnabledSetting.Value ||
-                    creatorToolsServer == null ||
+                if (!creatorToolsEnabledSetting.Value)
+                    SetCreatorToolsEnabled(true);
+                else if (creatorToolsServer == null ||
+                         !creatorToolsServer.IsRunning)
+                    StartCreatorToolsServer();
+                if (creatorToolsServer == null ||
                     !creatorToolsServer.IsRunning)
                     enabled = false;
             }
@@ -967,15 +944,10 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsEnabledSetting == null)
                 return;
 
-            if (creatorToolsEnabledSetting.Value)
-            {
-                if (creatorToolsServer == null ||
-                    !creatorToolsServer.IsRunning)
-                    StartCreatorToolsServer();
-            }
-            else if (creatorToolsServer != null &&
-                     creatorToolsServer.IsRunning)
-                StopCreatorToolsServer();
+            if ((creatorToolsServer == null ||
+                 !creatorToolsServer.IsRunning) &&
+                string.IsNullOrEmpty(creatorToolsServerError))
+                StartCreatorToolsServer();
 
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
@@ -1011,13 +983,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             get
             {
-                var port = creatorToolsServer != null &&
-                           creatorToolsServer.IsRunning
-                    ? creatorToolsServer.Port
-                    : creatorToolsResolvedPortSetting == null
-                        ? CreatorToolsDefaultPort
-                        : creatorToolsResolvedPortSetting.Value;
-                return "http://127.0.0.1:" + port + "/";
+                return "http://127.0.0.1:" +
+                    CreatorToolsDefaultPort + "/";
             }
         }
 
@@ -1152,9 +1119,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private string BuildCreatorToolsStateJson()
         {
-            var preview = !creatorToolsBattleSessionActive &&
+            var enabled = creatorToolsEnabledSetting != null &&
+                          creatorToolsEnabledSetting.Value;
+            var preview = enabled &&
+                          !creatorToolsBattleSessionActive &&
                           creatorToolsPreviewSetting.Value;
-            var visible = creatorToolsBattleSessionActive
+            var visible = enabled && creatorToolsBattleSessionActive
                 ? creatorToolsBattleVisible && !creatorToolsBattleCompleted
                 : preview;
             var icons = preview
@@ -1187,7 +1157,8 @@ namespace Gilomx.CupheadBossRoulette
                                 !BattleHudUsesPlaneLoadout();
 
             var builder = new StringBuilder(512);
-            builder.Append("{\"type\":\"state\",\"active\":true");
+            builder.Append("{\"type\":\"state\",\"active\":")
+                .Append(enabled ? "true" : "false");
             builder.Append(",\"battleActive\":").Append(
                 battleActive ? "true" : "false");
             builder.Append(",\"fastRetryExit\":").Append(

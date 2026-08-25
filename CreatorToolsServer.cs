@@ -80,41 +80,33 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
         }
 
-        internal bool Start(int preferredPort, int candidateCount)
+        internal bool Start(int port)
         {
             if (running)
                 return true;
 
-            var firstPort = Math.Max(1024, Math.Min(65535, preferredPort));
-            var attempts = Math.Max(1, Math.Min(100, candidateCount));
-            for (var i = 0; i < attempts; i++)
+            port = Math.Max(1024, Math.Min(65535, port));
+            TcpListener candidateListener = null;
+            try
             {
-                var candidate = firstPort + i;
-                if (candidate > 65535)
-                    break;
-
-                TcpListener candidateListener = null;
-                try
-                {
-                    candidateListener = new TcpListener(
-                        IPAddress.Loopback, candidate);
-                    candidateListener.Start();
-                    listener = candidateListener;
-                    Port = candidate;
-                    break;
-                }
-                catch (SocketException)
-                {
-                    if (candidateListener != null)
-                    {
-                        try { candidateListener.Stop(); }
-                        catch { }
-                    }
-                }
+                candidateListener = new TcpListener(
+                    IPAddress.Loopback, port);
+                candidateListener.Start();
+                listener = candidateListener;
+                Port = port;
             }
-
-            if (listener == null)
+            catch (SocketException ex)
+            {
+                if (candidateListener != null)
+                {
+                    try { candidateListener.Stop(); }
+                    catch { }
+                }
+                if (logWarning != null)
+                    logWarning("Creator Tools could not bind fixed port " +
+                        port + ": " + ex.SocketErrorCode + ".");
                 return false;
+            }
 
             running = true;
             acceptThread = new Thread(AcceptLoop);
