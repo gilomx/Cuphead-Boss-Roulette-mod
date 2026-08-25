@@ -15,6 +15,8 @@ namespace Gilomx.CupheadBossRoulette
             "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         private const int MaximumHeaderBytes = 65536;
         private const int MaximumClientPayloadBytes = 1024 * 1024;
+        private const int MaximumDashboardCommands = 1024;
+        private const int MaximumDashboardQueryLength = 4096;
 
         private readonly string assetsDirectory;
         private readonly Action<string> logInfo;
@@ -25,6 +27,9 @@ namespace Gilomx.CupheadBossRoulette
             new Queue<string>();
         private readonly object interactionsLock = new object();
         private readonly Queue<string> interactionCommands =
+            new Queue<string>();
+        private readonly object dashboardLock = new object();
+        private readonly Queue<string> dashboardCommands =
             new Queue<string>();
         private readonly object peskyLock = new object();
         private readonly Queue<string> peskyCommands =
@@ -50,6 +55,13 @@ namespace Gilomx.CupheadBossRoulette
             "{\"enabled\":false,\"ready\":false}";
         private string latestInteractionsState =
             "{\"ready\":false,\"available\":false}";
+        private string latestDashboardState =
+            "{\"ready\":false,\"schemaVersion\":1,\"revision\":0," +
+            "\"engineStatus\":\"starting\",\"connections\":[]," +
+            "\"counters\":{\"received\":0,\"matched\":0," +
+            "\"queued\":0,\"ignored\":0,\"gifts\":0," +
+            "\"valued\":0,\"likes\":0,\"follows\":0," +
+            "\"subscriptions\":0},\"events\":[]}";
         private string latestPeskyState =
             "{\"ready\":false,\"available\":false,\"enabled\":false}";
 
@@ -188,6 +200,28 @@ namespace Gilomx.CupheadBossRoulette
                     return false;
                 }
                 command = interactionCommands.Dequeue();
+                return true;
+            }
+        }
+
+        internal void SetDashboardState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (dashboardLock)
+                latestDashboardState = json;
+        }
+
+        internal bool TryTakeDashboardCommand(out string command)
+        {
+            lock (dashboardLock)
+            {
+                if (dashboardCommands.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = dashboardCommands.Dequeue();
                 return true;
             }
         }
@@ -547,7 +581,10 @@ namespace Gilomx.CupheadBossRoulette
                 path == "/config/interactions.html" ||
                 path == "/config/pesky" ||
                 path == "/config/pesky/" ||
-                path == "/config/pesky.html")
+                path == "/config/pesky.html" ||
+                path == "/dashboard" ||
+                path == "/dashboard/" ||
+                path == "/dashboard.html")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.html"),
@@ -623,6 +660,42 @@ namespace Gilomx.CupheadBossRoulette
                 WriteResponse(stream, 202, "Accepted",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                return;
+            }
+            if (path == "/api/dashboard")
+            {
+                string json;
+                lock (dashboardLock)
+                    json = latestDashboardState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/dashboard/simulate")
+            {
+                var accepted = false;
+                lock (dashboardLock)
+                {
+                    if (dashboardCommands.Count < MaximumDashboardCommands)
+                    {
+                        var query = request.Query ?? string.Empty;
+                        if (query.Length > MaximumDashboardQueryLength)
+                            query = query.Substring(
+                                0, MaximumDashboardQueryLength);
+                        dashboardCommands.Enqueue(query);
+                        accepted = true;
+                    }
+                }
+                WriteResponse(stream,
+                    accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true,\"queued\":true}"
+                        : "{\"ok\":false,\"error\":" +
+                          "\"simulation_queue_full\"}"),
+                    false);
                 return;
             }
             if (path == "/api/config/pesky")

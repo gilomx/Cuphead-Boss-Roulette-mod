@@ -2,6 +2,15 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- La SPA añade `/dashboard`, una vista operativa bilingüe con estado del motor,
+  tarjetas de TikFinity/TikTok, Twitch y YouTube, resumen global, feed de
+  eventos recientes y un simulador local. En esta primera etapa las tres
+  conexiones aparecen como simuladas: todavía no inicia sesión en plataformas
+  ni ejecuta reglas o interacciones reales.
+- El mod incorpora el contrato normalizado v1 para eventos de streaming y un
+  historial circular en memoria de 500 entradas. Las solicitudes del simulador
+  se limitan y sólo se procesan desde `Update` de Unity; el hilo HTTP nunca toca
+  objetos del juego.
 - El servidor local usa exclusivamente `127.0.0.1:18081` para conservar las
   fuentes de OBS existentes y ya no cambia a otro puerto. Si está ocupado,
   `PANEL DE CONTROL` abre una página local con instrucciones para liberarlo y
@@ -14,8 +23,9 @@
 - El menú nativo `LA PICHI RULETA` añade `PANEL DE CONTROL` entre
   `STREAM OVERLAY` y `VOLVER`; al seleccionarlo cierra la pausa, regresa al
   mapa y después abre `/config` en el navegador.
-- `/config` ahora es una SPA en React con una estructura persistente preparada
-  para añadir nuevas secciones sin detener conexiones o servicios globales.
+- `/config` y `/dashboard` comparten una SPA en React con una estructura
+  persistente preparada para añadir nuevas secciones sin detener conexiones o
+  servicios globales.
 - El panel está localizado exclusivamente en español e inglés y muestra un
   indicador global bajo el logo para conexión, guardado, confirmación y error.
 - La herramienta de forzado usa selects compartidos, inicia cada campo en su

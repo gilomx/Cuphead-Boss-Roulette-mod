@@ -3,9 +3,10 @@
 Panel web local de La Pichi Ruleta. React se compila a los tres archivos que el
 servidor interno ya publica: `config.html`, `config.css` y `config.js`.
 
-Las rutas `/config`, `/config/roulette` y `/config/interactions` entregan ese
-mismo documento. La SPA conserva el shell y cambia únicamente la vista central;
-`/config` abre Ruleta como sección inicial.
+Las rutas `/config`, `/config/roulette`, `/config/interactions`,
+`/config/pesky` y `/dashboard` entregan ese mismo documento. La SPA conserva el
+shell y cambia únicamente la vista central; `/config` abre Ruleta como sección
+inicial y `/dashboard` abre el monitor operativo de eventos multistream.
 
 ## Desarrollo
 
@@ -39,6 +40,16 @@ regenera con `tools/extract_native_frogs_firefly_preview.py`. Todos parten de
 frames nativos.
 El build ejecuta `scripts/validate-interaction-catalog.mjs` y falla si la lista
 central del runtime, `interactionItems` y el servidor simulado dejan de coincidir.
+
+El mismo servidor de desarrollo expone `GET /api/dashboard` y
+`GET /api/dashboard/simulate`. Permite generar regalos, monedas, likes,
+follows, suscripciones y canjeos normalizados para TikTok, Twitch o YouTube sin
+conectar una cuenta real. Esta etapa sólo valida recepción, historial y UI; no
+evalúa reglas ni envía interacciones al juego.
+
+Después de `npm run build`, hay que instalar juntos `config.html`, `config.css`
+y `config.js` desde `assets/creator-tools`; copiar únicamente el DLL deja una
+versión anterior del panel en la instalación de Cuphead.
 
 ## Reglas permanentes
 

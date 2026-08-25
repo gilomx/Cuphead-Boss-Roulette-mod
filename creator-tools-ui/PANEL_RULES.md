@@ -1,7 +1,8 @@
 # Panel de configuración: comportamiento y reglas
 
 Este documento es el contrato de producto y desarrollo del panel React servido
-en `/config`. Complementa el README técnico de `creator-tools-ui`.
+en `/config` y `/dashboard`. Complementa el README técnico de
+`creator-tools-ui`.
 
 ## Comportamiento actual
 
@@ -32,9 +33,14 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
   catálogo ni de las herramientas de grabación.
 - El encabezado principal comienza aproximadamente a media altura del logo para
   conservar la relación visual entre navegación y contenido.
-- `/config`, `/config/roulette` y `/config/interactions` cargan la misma SPA.
-  La ruta base abre Ruleta; el historial del navegador cambia de vista sin
-  desmontar el shell ni volver a solicitar el documento.
+- `/config`, `/config/roulette`, `/config/interactions` y `/dashboard` cargan la
+  misma SPA. La ruta base abre Ruleta; el historial del navegador cambia de
+  vista sin desmontar el shell ni volver a solicitar el documento.
+- Dashboard consulta su propio estado operativo y no depende de que el catálogo
+  de Ruleta ya esté disponible en el mapa. Muestra el estado del motor y de cada
+  conexión por separado, además de contadores y hasta 500 eventos recientes.
+  Su simulador sólo crea entradas normalizadas; no decide una interacción ni
+  inventa una regla coincidente.
 - Interacciones muestra el catálogo de canjeos. `hilda_purple_zeppelin`,
   `hilda_green_zeppelin`, `rootpack_homing_carrot` y
   `cagney_homing_plant` y `frogs_firefly` están disponibles en cualquier
@@ -67,6 +73,24 @@ en `/config`. Complementa el README técnico de `creator-tools-ui`.
   UI nunca ejecuta el efecto ni lo confirma por sí misma.
 
 ## Contrato con el mod
+
+`GET /api/dashboard` entrega un snapshot con `schemaVersion`, `revision`,
+estado del motor, conexiones, contadores y eventos ordenados del más reciente al
+más antiguo. `GET /api/dashboard/simulate` acepta `platform`, `type`, `user`,
+`userId`, `amount`, `unit`, `currency`, `count` e `itemName` y responde 202 al
+encolarlo o 429 si la cola temporal está llena. `user`, `userId`, `unit` y
+`currency` pueden quedar vacíos para eventos que no los tengan. El procesamiento
+real ocurre en el hilo principal de Unity. Este GET mutable existe sólo como
+laboratorio local de la primera etapa;
+los conectores reales deberán usar una entrada autenticada y acotada sin
+acoplar sus payloads específicos a React o a los objetos de Unity.
+
+El contrato v1 separa `platform`, `connector` y `connectionId`, y asigna
+`eventId`, `idempotencyKey`, `streamSessionId` y una `sequence` local. Todavía
+no hay conectores reales, persistencia, evaluación de reglas ni acciones de
+gameplay: un evento válido queda como `received` y los contadores `matched` y
+`queued` permanecen en cero. El contador `valued` registra cuántos eventos
+traían valor; no suma Coins, Bits o monedas ISO incompatibles entre sí.
 
 `GET /api/config` entrega el catálogo disponible, el resultado forzado y, para
 cada reto, los campos `enabled` y `canDisable`. El panel realiza cambios con

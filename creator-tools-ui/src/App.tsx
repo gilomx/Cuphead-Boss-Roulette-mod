@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
+import { DashboardView } from "./features/dashboard/DashboardView";
 import { InteractionsView } from "./features/interactions/InteractionsView";
 import { PeskyModeView } from "./features/pesky/PeskyModeView";
 import { RouletteView } from "./features/roulette/RouletteView";
+import { useLocalization } from "./i18n/LocalizationContext";
 
-export type ConfigSection = "roulette" | "interactions" | "pesky";
+export type ConfigSection = "dashboard" | "roulette" | "interactions" | "pesky";
 
 function sectionFromPath(): ConfigSection {
+  if (window.location.pathname.startsWith("/dashboard")) return "dashboard";
   if (window.location.pathname.startsWith("/config/interactions")) return "interactions";
   if (window.location.pathname.startsWith("/config/pesky")) return "pesky";
   return "roulette";
@@ -14,6 +17,7 @@ function sectionFromPath(): ConfigSection {
 
 export default function App() {
   const [section, setSection] = useState<ConfigSection>(sectionFromPath);
+  const { t } = useLocalization();
 
   useEffect(() => {
     const handlePopState = () => setSection(sectionFromPath());
@@ -21,15 +25,21 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    document.title = t(section === "dashboard" ? "dashboard.documentTitle" : "app.documentTitle");
+  }, [section, t]);
+
   const navigate = (next: ConfigSection) => {
     if (next === section) return;
-    window.history.pushState(null, "", `/config/${next}`);
+    window.history.pushState(null, "", next === "dashboard" ? "/dashboard" : `/config/${next}`);
     setSection(next);
   };
 
   return (
     <AppShell activeSection={section} onSectionChange={navigate}>
-      {section === "interactions"
+      {section === "dashboard"
+        ? <DashboardView />
+        : section === "interactions"
         ? <InteractionsView />
         : section === "pesky"
           ? <PeskyModeView />

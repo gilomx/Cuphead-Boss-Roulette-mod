@@ -60,8 +60,7 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = t("app.documentTitle");
-  }, [locale, t]);
+  }, [locale]);
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
   return <LocalizationContext.Provider value={value}>{children}</LocalizationContext.Provider>;

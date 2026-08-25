@@ -8,6 +8,43 @@ mod assets, one plugin DLL and the 18-file BepInEx core. Its SHA-256 is
 Rejected generated audio, configs, logs, caches, PDBs and unrelated plugins are
 not included.
 
+## Continuación inmediata: motor de streaming
+
+El estado actual, las decisiones aprobadas y el orden de implementación para
+TikFinity/TikTok, Twitch y YouTube están documentados en
+`CREATOR_TOOLS_STREAMING_HANDOFF.md`. El siguiente agente debe leer ese archivo
+antes de modificar el contrato normalizado, `/dashboard` o la vista de
+Interacciones.
+
+## Creator Tools: streaming dashboard foundation (2026-08-25)
+
+The first provider-agnostic streaming slice is implemented locally. `/dashboard`
+serves the same React SPA as `/config`, preserves the shared shell while moving
+between sections, and polls an independent `GET /api/dashboard` snapshot. It
+shows engine health, simulated TikFinity/TikTok, Twitch and YouTube connections,
+session counters, a recent-event feed and a bilingual event simulator. Its
+document title changes independently from the configuration routes.
+
+`CreatorToolsDashboardController.cs` owns schema version 1 and an in-memory
+circular history capped at 500 normalized events. Every event has a local
+monotonic sequence, event/idempotency/session/connection identifiers, platform,
+connector, type, optional stable user ID, value with unit/currency, count,
+receive time and status. Values from unlike units are never added together: the
+`valued` summary counts events carrying value while each event retains its own
+amount and unit. The HTTP endpoint
+`GET /api/dashboard/simulate` only adds a bounded command to the server queue;
+normalization and state mutation occur later in Unity `Update`, with at most 64
+commands processed per frame. The pending HTTP queue is capped at 1024 and
+returns 429 when full.
+
+This slice is deliberately a laboratory, not a live connector. No TikTok,
+Twitch or YouTube account is opened, no OAuth/token is stored, no rule is
+matched and no gameplay action is dispatched yet; consequently `matched` and
+`queued` stay at zero. The future companion/connectors must enter through the
+same normalized boundary and must not reuse the overlay WebSocket. Configuration
+for mappings belongs under `/config/interactions`; connection health and event
+operations belong under `/dashboard`.
+
 ## Creator Tools: phase-transition handoff (2026-08-24)
 
 The current work on `codex/creator-tools-config-panel` deliberately avoids a

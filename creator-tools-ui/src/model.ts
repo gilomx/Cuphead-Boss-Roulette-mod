@@ -107,6 +107,78 @@ export interface InteractionQueueEntry {
   status: "active" | "queued" | "scheduled" | "waiting_game";
 }
 
+export type StreamPlatform = "tiktok" | "twitch" | "youtube";
+
+export type StreamEventType =
+  | "gift"
+  | "currency"
+  | "like"
+  | "follow"
+  | "subscription"
+  | "redemption";
+
+export interface DashboardConnection {
+  id: string;
+  platform: string;
+  connector: string;
+  label: string;
+  status: string;
+  account?: string;
+  message?: string;
+  messageCode?: string;
+  lastEventAt?: string | null;
+}
+
+export interface DashboardCounters {
+  received: number;
+  matched: number;
+  queued: number;
+  ignored: number;
+  gifts: number;
+  valued: number;
+  likes: number;
+  follows: number;
+  subscriptions: number;
+}
+
+export interface DashboardEvent {
+  schemaVersion?: number;
+  sequence?: number;
+  id: string;
+  eventId?: string;
+  idempotencyKey?: string;
+  connectionId?: string;
+  streamSessionId?: string;
+  receivedAt: string;
+  platform: string;
+  connector: string;
+  type: string;
+  user?: string;
+  userId?: string | null;
+  summary?: string;
+  message?: string;
+  messageCode?: string;
+  status: string;
+  rule?: string;
+  action?: string;
+  amount?: number;
+  unit?: string;
+  currency?: string | null;
+  count?: number;
+  itemName?: string;
+  simulated?: boolean;
+}
+
+export interface DashboardState {
+  schemaVersion?: number;
+  ready: boolean;
+  revision: number;
+  engineStatus: string;
+  connections: DashboardConnection[];
+  counters: DashboardCounters;
+  events: DashboardEvent[];
+}
+
 export type ConnectionStatus =
   | "connecting"
   | "saved"

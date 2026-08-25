@@ -21,6 +21,26 @@ let peskyRevision = 0;
 let peskyFeedback = "ready";
 let peskyNames = ["Claudia", "YeiAndPelos", "Yerrisito", "Malono", "Suches", "Elver_hijas"];
 let peskyDisabledItems = [];
+let dashboardRevision = 1;
+let dashboardNextSequence = 1;
+const dashboardSessionId = "mock-session";
+const dashboardConnections = [
+  { id: "tikfinity", platform: "tiktok", connector: "tikfinity", label: "TikTok / TikFinity", status: "simulated", account: "", message: "", lastEventAt: null },
+  { id: "twitch", platform: "twitch", connector: "twitch-eventsub", label: "Twitch", status: "simulated", account: "", message: "", lastEventAt: null },
+  { id: "youtube", platform: "youtube", connector: "youtube-live-chat", label: "YouTube", status: "simulated", account: "", message: "", lastEventAt: null },
+];
+const dashboardCounters = {
+  received: 0,
+  matched: 0,
+  queued: 0,
+  ignored: 0,
+  gifts: 0,
+  valued: 0,
+  likes: 0,
+  follows: 0,
+  subscriptions: 0,
+};
+let dashboardEvents = [];
 
 const interactionItems = [
   "hilda_green_zeppelin",
@@ -123,6 +143,99 @@ function serveAsset(pathname, res) {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
+  if (url.pathname === "/api/dashboard") {
+    json(res, {
+      ready: true,
+      schemaVersion: 1,
+      revision: dashboardRevision,
+      engineStatus: "simulated",
+      connections: dashboardConnections,
+      counters: dashboardCounters,
+      events: dashboardEvents,
+    });
+    return;
+  }
+  if (url.pathname === "/api/dashboard/simulate") {
+    const allowedPlatforms = new Set(["tiktok", "twitch", "youtube"]);
+    const allowedTypes = new Set([
+      "gift",
+      "currency",
+      "like",
+      "follow",
+      "subscription",
+      "redemption",
+    ]);
+    const platform = (url.searchParams.get("platform") ?? "").trim().toLowerCase().slice(0, 24);
+    const type = (url.searchParams.get("type") ?? "").trim().toLowerCase().slice(0, 24);
+    const connection = dashboardConnections.find((entry) => entry.platform === platform);
+    const validPlatform = allowedPlatforms.has(platform) && Boolean(connection);
+    const validType = allowedTypes.has(type);
+    const valid = validPlatform && validType;
+    const sequence = dashboardNextSequence;
+    dashboardNextSequence += 1;
+    const eventId = `sim-${String(sequence).padStart(10, "0")}`;
+    const receivedAt = new Date().toISOString();
+    const count = Math.max(1, Math.min(
+      1_000_000,
+      Math.floor(Number(url.searchParams.get("count"))) || 1,
+    ));
+    const amount = Math.max(0, Math.min(1_000_000_000, Number(url.searchParams.get("amount")) || 0));
+    const defaultUnit = !valid || amount <= 0 || !["gift", "currency"].includes(type)
+      ? null
+      : platform === "tiktok"
+        ? "coin"
+        : platform === "twitch"
+          ? "bit"
+          : platform === "youtube"
+            ? "money"
+            : null;
+    const requestedUnit = (url.searchParams.get("unit") ?? "").trim().toLowerCase().slice(0, 24);
+    const requestedCurrency = (url.searchParams.get("currency") ?? "").trim().toUpperCase();
+    const event = {
+      schemaVersion: 1,
+      id: eventId,
+      eventId,
+      idempotencyKey: `${dashboardSessionId}:${eventId}`,
+      sequence,
+      connectionId: validPlatform ? connection.id : "simulator",
+      streamSessionId: dashboardSessionId,
+      platform: validPlatform ? platform : platform || "unknown",
+      connector: validPlatform ? connection.connector : "simulator",
+      type: validType ? type : type || "unknown",
+      user: (url.searchParams.get("user") ?? "").trim().slice(0, 80),
+      userId: (url.searchParams.get("userId") ?? "").trim().slice(0, 80) || null,
+      amount,
+      unit: requestedUnit || defaultUnit,
+      currency: /^[A-Z]{3}$/.test(requestedCurrency) ? requestedCurrency : null,
+      count,
+      itemName: (url.searchParams.get("itemName") ?? "").trim().slice(0, 80),
+      status: valid ? "received" : "ignored",
+      messageCode: valid
+        ? "simulation_received"
+        : !validPlatform && !validType
+          ? "unsupported_platform_and_type"
+          : !validPlatform
+            ? "unsupported_platform"
+            : "unsupported_event_type",
+      receivedAt,
+      simulated: true,
+    };
+    dashboardCounters.received += 1;
+    if (valid) {
+      connection.lastEventAt = receivedAt;
+      if (type === "gift") {
+        dashboardCounters.gifts += count;
+      }
+      if (["gift", "currency"].includes(type) && amount > 0) dashboardCounters.valued += 1;
+      if (type === "like") dashboardCounters.likes += count;
+      else if (type === "follow") dashboardCounters.follows += count;
+      else if (type === "subscription") dashboardCounters.subscriptions += count;
+    } else dashboardCounters.ignored += 1;
+    dashboardEvents = [event, ...dashboardEvents].slice(0, 500);
+    dashboardRevision += 1;
+    json(res, { ok: true, sequence }, 202);
+    return;
+  }
   if (url.pathname === "/api/config") {
     json(res, { ready: true, enabled, selection, bosses, weapons, supers, charms, modifiers: modifiersForResponse() });
     return;

@@ -11,9 +11,117 @@
   },
   "nav": {
     "group": "Creator Tools",
+    "dashboard": "Dashboard",
     "roulette": "Ruleta",
     "interactions": "Interacciones",
     "pesky": "Modo Molestoso"
+  },
+  "dashboard": {
+    "documentTitle": "La Pichi Ruleta — Dashboard",
+    "title": "Dashboard",
+    "description": "Observa las conexiones, eventos y canjeos de todas tus plataformas en un solo lugar.",
+    "engine": {
+      "connecting": "Conectando con el motor",
+      "simulated": "Motor de simulación activo",
+      "ready": "Motor listo",
+      "running": "Motor activo",
+      "idle": "Motor en espera",
+      "degraded": "Motor con advertencias",
+      "error": "Motor con error",
+      "unreachable": "Sin conexión con el motor"
+    },
+    "summary": {
+      "eyebrow": "Actividad",
+      "title": "Resumen global",
+      "session": "Sesión actual"
+    },
+    "counters": {
+      "received": "Recibidos",
+      "matched": "Con regla",
+      "queued": "En cola",
+      "ignored": "Ignorados",
+      "gifts": "Regalos",
+      "valued": "Con valor",
+      "likes": "Likes",
+      "follows": "Follows",
+      "subscriptions": "Suscripciones"
+    },
+    "connections": {
+      "eyebrow": "Fuentes",
+      "title": "Conexiones",
+      "notConfigured": "Listo para configurar",
+      "lastEvent": "Último evento"
+    },
+    "connectionStatus": {
+      "pending": "Pendiente",
+      "simulated": "Simulada",
+      "connecting": "Conectando",
+      "connected": "Conectada",
+      "live": "En vivo",
+      "waiting": "Esperando LIVE",
+      "reconnecting": "Reconectando",
+      "disconnected": "Desconectada",
+      "error": "Error"
+    },
+    "platforms": {
+      "tiktok": "TikTok",
+      "twitch": "Twitch",
+      "youtube": "YouTube"
+    },
+    "events": {
+      "eyebrow": "Tiempo real",
+      "title": "Eventos recientes",
+      "updatesActive": "Actualización activa",
+      "emptyTitle": "Todavía no hay eventos",
+      "emptyDescription": "Usa el simulador para comprobar cómo aparecerán los eventos de cada plataforma.",
+      "community": "Comunidad",
+      "value": "valor",
+      "rule": "Regla",
+      "action": "Acción"
+    },
+    "eventTypes": {
+      "gift": "Regalo",
+      "currency": "Monedas",
+      "like": "Likes",
+      "follow": "Follow",
+      "subscription": "Suscripción",
+      "redemption": "Canje"
+    },
+    "eventStatus": {
+      "received": "Recibido",
+      "matched": "Con regla",
+      "queued": "En cola",
+      "active": "Activo",
+      "completed": "Completado",
+      "ignored": "Ignorado",
+      "error": "Error"
+    },
+    "units": {
+      "coin": "monedas",
+      "bit": "Bits",
+      "money": "valor"
+    },
+    "simulator": {
+      "eyebrow": "Laboratorio",
+      "title": "Simular evento",
+      "description": "Envía un evento normalizado para validar el flujo sin iniciar una transmisión.",
+      "platform": "Plataforma",
+      "type": "Tipo de evento",
+      "user": "Usuario",
+      "userPlaceholder": "Donador de prueba",
+      "itemName": "Regalo o canje",
+      "itemNamePlaceholder": "Rosa",
+      "amount": "Valor / monedas",
+      "count": "Cantidad",
+      "submit": "Enviar evento",
+      "sending": "Enviando…",
+      "sent": "El evento llegó al motor.",
+      "error": "No se pudo enviar el evento.",
+      "hint": "El resultado aparecerá en el feed de esta sesión."
+    },
+    "time": {
+      "never": "Sin eventos"
+    }
   },
   "interactions": {
     "title": "Interacciones",

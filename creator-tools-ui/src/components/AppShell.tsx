@@ -36,6 +36,14 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
 
         <nav className="sidebar__nav" aria-label={t("nav.group")}>
           <button
+            className={`sidebar__item${activeSection === "dashboard" ? " sidebar__item--active" : ""}`}
+            type="button"
+            aria-current={activeSection === "dashboard" ? "page" : undefined}
+            onClick={() => onSectionChange("dashboard")}
+          >
+            {t("nav.dashboard")}
+          </button>
+          <button
             className={`sidebar__item${activeSection === "roulette" ? " sidebar__item--active" : ""}`}
             type="button"
             aria-current={activeSection === "roulette" ? "page" : undefined}

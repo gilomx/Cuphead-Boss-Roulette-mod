@@ -11,9 +11,117 @@
   },
   "nav": {
     "group": "Creator Tools",
+    "dashboard": "Dashboard",
     "roulette": "Roulette",
     "interactions": "Interactions",
     "pesky": "Pesky Mode"
+  },
+  "dashboard": {
+    "documentTitle": "La Pichi Ruleta — Dashboard",
+    "title": "Dashboard",
+    "description": "Monitor connections, events, and redeems from every platform in one place.",
+    "engine": {
+      "connecting": "Connecting to the engine",
+      "simulated": "Simulation engine active",
+      "ready": "Engine ready",
+      "running": "Engine running",
+      "idle": "Engine waiting",
+      "degraded": "Engine has warnings",
+      "error": "Engine error",
+      "unreachable": "Cannot reach the engine"
+    },
+    "summary": {
+      "eyebrow": "Activity",
+      "title": "Global summary",
+      "session": "Current session"
+    },
+    "counters": {
+      "received": "Received",
+      "matched": "Matched",
+      "queued": "Queued",
+      "ignored": "Ignored",
+      "gifts": "Gifts",
+      "valued": "With value",
+      "likes": "Likes",
+      "follows": "Follows",
+      "subscriptions": "Subscriptions"
+    },
+    "connections": {
+      "eyebrow": "Sources",
+      "title": "Connections",
+      "notConfigured": "Ready to configure",
+      "lastEvent": "Last event"
+    },
+    "connectionStatus": {
+      "pending": "Pending",
+      "simulated": "Simulated",
+      "connecting": "Connecting",
+      "connected": "Connected",
+      "live": "Live",
+      "waiting": "Waiting for LIVE",
+      "reconnecting": "Reconnecting",
+      "disconnected": "Disconnected",
+      "error": "Error"
+    },
+    "platforms": {
+      "tiktok": "TikTok",
+      "twitch": "Twitch",
+      "youtube": "YouTube"
+    },
+    "events": {
+      "eyebrow": "Real time",
+      "title": "Recent events",
+      "updatesActive": "Updates active",
+      "emptyTitle": "No events yet",
+      "emptyDescription": "Use the simulator to preview how events from each platform will appear here.",
+      "community": "Community",
+      "value": "value",
+      "rule": "Rule",
+      "action": "Action"
+    },
+    "eventTypes": {
+      "gift": "Gift",
+      "currency": "Currency",
+      "like": "Likes",
+      "follow": "Follow",
+      "subscription": "Subscription",
+      "redemption": "Redemption"
+    },
+    "eventStatus": {
+      "received": "Received",
+      "matched": "Matched",
+      "queued": "Queued",
+      "active": "Active",
+      "completed": "Completed",
+      "ignored": "Ignored",
+      "error": "Error"
+    },
+    "units": {
+      "coin": "coins",
+      "bit": "Bits",
+      "money": "value"
+    },
+    "simulator": {
+      "eyebrow": "Lab",
+      "title": "Simulate event",
+      "description": "Send a normalized event to validate the flow without starting a live stream.",
+      "platform": "Platform",
+      "type": "Event type",
+      "user": "User",
+      "userPlaceholder": "Test donor",
+      "itemName": "Gift or redemption",
+      "itemNamePlaceholder": "Rose",
+      "amount": "Value / currency",
+      "count": "Count",
+      "submit": "Send event",
+      "sending": "Sending…",
+      "sent": "The event reached the engine.",
+      "error": "The event could not be sent.",
+      "hint": "The result will appear in this session's feed."
+    },
+    "time": {
+      "never": "No events"
+    }
   },
   "interactions": {
     "title": "Interactions",

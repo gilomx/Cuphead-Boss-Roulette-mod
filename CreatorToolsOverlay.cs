@@ -49,6 +49,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private CreatorToolsServer creatorToolsServer;
         private CreatorToolsInteractionController creatorToolsInteractions;
+        private CreatorToolsDashboardController creatorToolsDashboard;
         private bool creatorToolsBattleSessionActive;
         private bool creatorToolsBattleCompleted;
         private bool creatorToolsBattleVisible;
@@ -111,6 +112,7 @@ namespace Gilomx.CupheadBossRoulette
                 1,
                 "Cantidad maxima de interacciones visibles al mismo tiempo.");
 
+            creatorToolsDashboard = new CreatorToolsDashboardController();
             creatorToolsInteractions = new CreatorToolsInteractionController(
                 this,
                 Config.ConfigFilePath,
@@ -1129,6 +1131,8 @@ namespace Gilomx.CupheadBossRoulette
 
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
+            if (creatorToolsDashboard != null)
+                creatorToolsDashboard.Update(creatorToolsServer);
             if (creatorToolsInteractions != null)
             {
                 // `_OnLevelStart` can precede a stable `Level.Current` on
@@ -1145,6 +1149,7 @@ namespace Gilomx.CupheadBossRoulette
                 OnCreatorToolsInteractionPaused;
             LevelPauseGUI.OnUnpauseEvent -=
                 OnCreatorToolsInteractionUnpaused;
+            creatorToolsDashboard = null;
             if (creatorToolsInteractions != null)
             {
                 creatorToolsInteractions.Dispose();
