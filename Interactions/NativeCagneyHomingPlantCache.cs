@@ -242,6 +242,14 @@ namespace Gilomx.CupheadBossRoulette
                 "AfterCatalogPlantSpawn",
                 logWarning,
                 "Cagney seed transition tracker");
+            Patch(
+                harmony,
+                AccessTools.Method(
+                    typeof(FlowerLevelEnemySeed), "KillSeed"),
+                null,
+                "AfterCatalogSeedDisappears",
+                logWarning,
+                "Cagney seed disappearance tracker");
         }
 
         private static void Patch(
@@ -280,14 +288,19 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private static bool AllowCatalogSeedGround(
-            FlowerLevelEnemySeed __instance)
+            FlowerLevelEnemySeed __instance,
+            GameObject hit)
         {
             if (__instance == null)
                 return true;
             var marker = __instance.GetComponent<
                 CreatorToolsCagneySeedMarker>();
-            return marker == null || marker.State == null ||
-                !marker.State.SuppressNativeGround;
+            if (marker == null || marker.State == null)
+                return true;
+            var allow = !marker.State.SuppressNativeGround;
+            if (allow)
+                marker.State.CaptureLandingSurface(hit);
+            return allow;
         }
 
         private static void BeforeCatalogPlantSpawn(
@@ -303,6 +316,17 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < plants.Length; i++)
                 if (plants[i] != null)
                     __state.Add(plants[i].GetInstanceID());
+        }
+
+        private static void AfterCatalogSeedDisappears(
+            FlowerLevelEnemySeed __instance)
+        {
+            if (__instance == null)
+                return;
+            var marker = __instance.GetComponent<
+                CreatorToolsCagneySeedMarker>();
+            if (marker != null && marker.State != null)
+                marker.State.ReleaseLandingSurface();
         }
 
         private static void AfterCatalogPlantSpawn(

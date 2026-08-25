@@ -103,6 +103,11 @@
   oculta durante la caída, se transfiere a la planta y aparece con un fade de
   0.45 segundos cuando ésta entra a pantalla. Acompaña sus primeros 0.55 segundos
   de crecimiento antes de fijar la separación.
+- Si la semilla azul aterriza sobre una plataforma móvil, la semilla y la
+  planta que brota del suelo siguen el punto de impacto durante el crecimiento.
+  La mordelona queda libre desde que nace y conserva su persecución nativa. El
+  anclaje de la planta de crecimiento se conserva hasta el evento que la hace
+  desaparecer, sin heredar escala o rotación de la plataforma.
 - Las etiquetas normalizan a positivo la escala mundial heredada. Las plantas
   conservan su orientación nativa izquierda/derecha sin volver espejo el nombre
   del donador.

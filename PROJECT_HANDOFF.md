@@ -299,6 +299,18 @@ one queue slot remains active until the resulting plant dies. A scoped Harmony
 postfix identifies the Venus instance created by this catalog seed. The same
 donor label is created hidden while the seed falls, rebinds to the plant and
 starts a 0.45-second fade only after the plant renderer intersects the viewport.
+For real ground collisions, the state records the hit transform and follows the
+seed's impact point in that surface's local coordinates while its ground-growth
+animation remains visible.
+Only the seed root, which owns the visible ground-growth animation, follows that
+anchor. The spawned Venus remains independent from its first frame and keeps its
+native movement; its external scale wrapper is never platform-anchored. The
+iterator's initial animation wait ends before
+the full growth is visibly complete, so it is not used as the release signal.
+The anchor now remains active until the native seed animation calls `KillSeed`,
+which marks the landing growth's visible disappearance. The Venus has already
+been moving independently throughout that overlap. Destroyed surfaces release
+safely at the last world position; virtual offscreen landings remain unanchored.
 It tracks changing bounds for only 0.55 seconds of growth before locking its
 offset again; never create a second label for this transition. Donor-label world
 scale always uses absolute components so a native negative X orientation cannot

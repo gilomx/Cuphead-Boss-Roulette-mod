@@ -20,11 +20,14 @@ namespace Gilomx.CupheadBossRoulette
         private FlowerLevelVenusSpawn plant;
         private GameObject plantScaleRoot;
         private CreatorToolsDonorLabel seedLabel;
+        private Transform landingSurface;
+        private Vector3 landingSurfaceLocalSeedAnchor;
         private Action<string> logWarning;
         private string donor;
         private float cameraScale = 1f;
         private bool virtualLandingTriggered;
         private bool plantWasAttached;
+        private bool followLandingSurface;
         private bool cleaningUp;
 
         internal bool SuppressNativeGround
@@ -124,6 +127,34 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private void LateUpdate()
+        {
+            if (!followLandingSurface)
+                return;
+            if (landingSurface == null)
+            {
+                ReleaseLandingSurface();
+                return;
+            }
+
+            if (seed != null)
+                seed.transform.position = landingSurface.TransformPoint(
+                    landingSurfaceLocalSeedAnchor);
+        }
+
+        internal void CaptureLandingSurface(GameObject surface)
+        {
+            if (surface == null || seed == null || plantWasAttached ||
+                followLandingSurface)
+                return;
+            landingSurface = surface.transform;
+            if (landingSurface == null)
+                return;
+            landingSurfaceLocalSeedAnchor =
+                landingSurface.InverseTransformPoint(seed.transform.position);
+            followLandingSurface = true;
+        }
+
         internal void AttachPlant(FlowerLevelVenusSpawn spawnedPlant)
         {
             if (spawnedPlant == null || plantWasAttached)
@@ -172,6 +203,12 @@ namespace Gilomx.CupheadBossRoulette
                     exception);
                 Destroy(gameObject);
             }
+        }
+
+        internal void ReleaseLandingSurface()
+        {
+            followLandingSurface = false;
+            landingSurface = null;
         }
 
         private void WrapPlantScaleWithoutChangingNativeMovement()
@@ -282,6 +319,8 @@ namespace Gilomx.CupheadBossRoulette
             plant = null;
             plantScaleRoot = null;
             seedLabel = null;
+            landingSurface = null;
+            followLandingSurface = false;
         }
     }
 

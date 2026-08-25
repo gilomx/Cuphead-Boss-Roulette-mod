@@ -228,6 +228,14 @@ avance por ese valor. Escalar directamente ese root alteraría su velocidad en
 jefes con cámara alejada. El wrapper escala juntos sprite y `Collider2D` sin
 modificar movimiento ni estadísticas.
 
+Cuando la semilla cae sobre una plataforma, el estado conserva el punto de
+impacto en coordenadas locales. La semilla y su dibujo de crecimiento siguen la
+traslación de esa superficie incluso después de crear la mordelona. El anclaje
+se libera en `FlowerLevelEnemySeed.KillSeed`, el evento de la animación que hace
+desaparecer ese crecimiento. `FlowerLevelVenusSpawn` nunca se ancla a la
+plataforma: desde que nace usa exclusivamente su persecución original y no
+hereda escala ni rotación de la superficie.
+
 ## Enemigo nativo con seguimiento por fases
 
 `frogs_firefly` reutiliza `FrogsLevelTallFirefly`, el enemigo incendiado que
