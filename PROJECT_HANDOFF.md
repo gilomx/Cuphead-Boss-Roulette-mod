@@ -24,12 +24,18 @@ guard.
   iterator returns false.
 - Saltbaker phase 1→2 only: the prefix on
   `SaltbakerLevelSaltbaker.phase_one_to_two_cr` starts a 2.5-second playable
-  delay. New dispatches are blocked after that delay, but active actors are not
-  cleared. The postfix on `AniEvent_RestorePlayers` ends protection when weapon,
-  super, and player control have been restored.
-- Saltbaker phases 2→3 and 3→4 are intentionally untouched. The user will review
-  them separately and identify exact visual/native boundaries before code is
-  added. Do not infer protection points or reuse the Devil delay.
+  delay. New dispatches are blocked after that delay. The postfix on
+  `AniEvent_HandsClosed` clears active interaction actors in the same frame as
+  Saltbaker clears native phase-one objects and fires, while the hands cover
+  the camera. The postfix on `AniEvent_RestorePlayers` ends protection when
+  weapon, super, and player control have been restored.
+- Saltbaker phase 2→3: the prefix on `SaltbakerLevelSaltbaker.OnPhaseThree`
+  runs immediately after the native `KillFires` call. It blocks dispatch with
+  no extra delay and clears active interaction actors. Protection ends when
+  `SaltbakerLevel/<phase_two_to_three_cr>c__Iterator0.MoveNext` returns false,
+  after the white fader is hidden and the phase-three bouncer is active. The
+  normal scheduler chooses the next automatic interval after resuming.
+- Saltbaker phase 3→4 is intentionally untouched pending manual review.
 
 The general battle-entry delay has been removed. `Iniciando batalla` is a
 visual load-intent state driven by `SceneLoader.LoadLevel`/roulette play and

@@ -202,12 +202,19 @@
   `disable_input_cr` y el juego devuelve el control.
 - En Chef Saleroso, sólo la transición 1→2 está cubierta por ahora.
   `phase_one_to_two_cr` inicia la ventana; durante 2.5 segundos jugables siguen
-  saliendo actores y después se bloquean únicamente las nuevas apariciones. Los
-  actores ya presentes no se destruyen. El despacho se reanuda en
-  `AniEvent_RestorePlayers`, cuando Cuphead restaura arma, súper y control.
-- Las transiciones 2→3 y 3→4 de Chef Saleroso permanecen intactas y pendientes
-  de observación manual. Cualquier ajuste futuro debe conservarlas sin cambios
-  hasta que se definan señales concretas de inicio, bloqueo y reanudación.
+  saliendo actores y después se bloquean nuevas apariciones. Cuando las manos
+  cierran y cubren la cámara, `AniEvent_HandsClosed` limpia los objetos nativos
+  de la fase y ahora también los actores activos de las interacciones. El
+  despacho se reanuda en `AniEvent_RestorePlayers`, cuando Cuphead restaura
+  arma, súper y control.
+- En la transición 2→3 de Chef Saleroso, `OnPhaseThree` se ejecuta justo
+  después de que el juego elimina los fuegos: en ese punto se limpian los
+  actores activos y se bloquean nuevas apariciones sin agregar una espera
+  artificial. El despacho se reanuda cuando termina `phase_two_to_three_cr`,
+  después de retirar el fundido y activar el salero saltarín; el programador
+  normal decide el siguiente intervalo.
+- La transición 3→4 de Chef Saleroso permanece intacta y pendiente de
+  observación manual.
 
 ## 0.6.0 — La Pichi Ruleta (2026-08-18)
 

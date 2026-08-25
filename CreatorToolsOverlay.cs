@@ -308,7 +308,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ClearCreatorToolsInteractionPhaseTransitionActors(
             Level level,
-            string transition)
+            string transition,
+            string signal)
         {
             if (!creatorToolsInteractionPhaseTransitionBlocked ||
                 creatorToolsInteractionPhaseTransitionActorsCleared ||
@@ -334,7 +335,7 @@ namespace Gilomx.CupheadBossRoulette
             Logger.LogInfo(
                 "Creator Tools cleared " + cleared +
                 " active interaction actor(s) for " + transition +
-                " at ZoomOut after " + elapsed.ToString(
+                " at " + signal + " after " + elapsed.ToString(
                     "0.00", CultureInfo.InvariantCulture) + "s.");
         }
 
@@ -600,8 +601,19 @@ namespace Gilomx.CupheadBossRoulette
                     devilInputRestoreIterator, "MoveNext");
             var saltbakerPhaseOneStart = HarmonyLib.AccessTools.Method(
                 typeof(SaltbakerLevelSaltbaker), "phase_one_to_two_cr");
+            var saltbakerPhaseOneCommit = HarmonyLib.AccessTools.Method(
+                typeof(SaltbakerLevelSaltbaker), "AniEvent_HandsClosed");
             var saltbakerPhaseOneEnd = HarmonyLib.AccessTools.Method(
                 typeof(SaltbakerLevelSaltbaker), "AniEvent_RestorePlayers");
+            var saltbakerPhaseTwoStart = HarmonyLib.AccessTools.Method(
+                typeof(SaltbakerLevelSaltbaker), "OnPhaseThree");
+            var saltbakerPhaseTwoEndIterator = HarmonyLib.AccessTools.Inner(
+                typeof(SaltbakerLevel),
+                "<phase_two_to_three_cr>c__Iterator0");
+            var saltbakerPhaseTwoEnd = saltbakerPhaseTwoEndIterator == null
+                ? null
+                : HarmonyLib.AccessTools.Method(
+                    saltbakerPhaseTwoEndIterator, "MoveNext");
             var startPrefix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsDevilTransitionStartPrefix");
@@ -614,9 +626,18 @@ namespace Gilomx.CupheadBossRoulette
             var saltbakerStartPrefix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsSaltbakerPhaseOneStartPrefix");
+            var saltbakerCommitPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsSaltbakerPhaseOneCommitPostfix");
             var saltbakerEndPostfix = HarmonyLib.AccessTools.Method(
                 typeof(Plugin),
                 "CreatorToolsSaltbakerPhaseOneEndPostfix");
+            var saltbakerPhaseTwoStartPrefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsSaltbakerPhaseTwoStartPrefix");
+            var saltbakerPhaseTwoEndPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "CreatorToolsSaltbakerPhaseTwoEndPostfix");
 
             if (devilTransitionStart == null ||
                 devilTransitionCommit == null ||
@@ -641,8 +662,10 @@ namespace Gilomx.CupheadBossRoulette
                 postfix: new HarmonyLib.HarmonyMethod(endPostfix));
 
             if (saltbakerPhaseOneStart == null ||
+                saltbakerPhaseOneCommit == null ||
                 saltbakerPhaseOneEnd == null ||
                 saltbakerStartPrefix == null ||
+                saltbakerCommitPostfix == null ||
                 saltbakerEndPostfix == null)
             {
                 Logger.LogWarning(
@@ -656,9 +679,33 @@ namespace Gilomx.CupheadBossRoulette
                 prefix: new HarmonyLib.HarmonyMethod(
                     saltbakerStartPrefix));
             harmony.Patch(
+                saltbakerPhaseOneCommit,
+                postfix: new HarmonyLib.HarmonyMethod(
+                    saltbakerCommitPostfix));
+            harmony.Patch(
                 saltbakerPhaseOneEnd,
                 postfix: new HarmonyLib.HarmonyMethod(
                     saltbakerEndPostfix));
+
+            if (saltbakerPhaseTwoStart == null ||
+                saltbakerPhaseTwoEnd == null ||
+                saltbakerPhaseTwoStartPrefix == null ||
+                saltbakerPhaseTwoEndPostfix == null)
+            {
+                Logger.LogWarning(
+                    "Could not install the Creator Tools Saltbaker phase " +
+                    "2 to 3 transition protection.");
+                return;
+            }
+
+            harmony.Patch(
+                saltbakerPhaseTwoStart,
+                prefix: new HarmonyLib.HarmonyMethod(
+                    saltbakerPhaseTwoStartPrefix));
+            harmony.Patch(
+                saltbakerPhaseTwoEnd,
+                postfix: new HarmonyLib.HarmonyMethod(
+                    saltbakerPhaseTwoEndPostfix));
         }
 
         private static void CreatorToolsDevilTransitionStartPrefix()
@@ -682,7 +729,7 @@ namespace Gilomx.CupheadBossRoulette
             if (plugin == null || __instance == null)
                 return;
             plugin.ClearCreatorToolsInteractionPhaseTransitionActors(
-                __instance, "Devil phase 1 to 2");
+                __instance, "Devil phase 1 to 2", "ZoomOut");
         }
 
         private static void CreatorToolsDevilInputRestorePostfix(
@@ -715,6 +762,19 @@ namespace Gilomx.CupheadBossRoulette
                 CreatorToolsSaltbakerPhaseOneBlockDelay);
         }
 
+        private static void CreatorToolsSaltbakerPhaseOneCommitPostfix()
+        {
+            var plugin = activeInstance;
+            SaltbakerLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsSaltbakerLevel(out level))
+                return;
+            plugin.ClearCreatorToolsInteractionPhaseTransitionActors(
+                level,
+                "Saltbaker phase 1 to 2",
+                "AniEvent_HandsClosed");
+        }
+
         private static void CreatorToolsSaltbakerPhaseOneEndPostfix()
         {
             var plugin = activeInstance;
@@ -726,6 +786,40 @@ namespace Gilomx.CupheadBossRoulette
                 level,
                 "Saltbaker phase 1 to 2",
                 "AniEvent_RestorePlayers");
+        }
+
+        private static void CreatorToolsSaltbakerPhaseTwoStartPrefix()
+        {
+            var plugin = activeInstance;
+            SaltbakerLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsSaltbakerLevel(out level))
+                return;
+            plugin.BeginCreatorToolsInteractionPhaseTransition(
+                level,
+                "Saltbaker phase 2 to 3",
+                "OnPhaseThree after KillFires",
+                0f);
+            plugin.ClearCreatorToolsInteractionPhaseTransitionActors(
+                level,
+                "Saltbaker phase 2 to 3",
+                "OnPhaseThree after KillFires");
+        }
+
+        private static void CreatorToolsSaltbakerPhaseTwoEndPostfix(
+            bool __result)
+        {
+            if (__result)
+                return;
+            var plugin = activeInstance;
+            SaltbakerLevel level;
+            if (plugin == null ||
+                !TryGetCurrentCreatorToolsSaltbakerLevel(out level))
+                return;
+            plugin.EndCreatorToolsInteractionPhaseTransition(
+                level,
+                "Saltbaker phase 2 to 3",
+                "phase_two_to_three_cr completion");
         }
 
         private static bool TryGetCurrentCreatorToolsSaltbakerLevel(
