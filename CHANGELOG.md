@@ -7,6 +7,10 @@
   `PANEL DE CONTROL` abre una página local con instrucciones para liberarlo y
   reintentar. El servidor permanece activo aunque el overlay esté desactivado;
   `ESTADO` controla únicamente si la fuente de OBS muestra contenido.
+- Modo Molestoso ya no muestra el control para activar o desactivar la
+  protección de transiciones. La protección permanece activa y la interfaz se
+  conserva comentada en el código fuente para una futura herramienta de
+  diagnóstico.
 - El menú nativo `LA PICHI RULETA` añade `PANEL DE CONTROL` entre
   `STREAM OVERLAY` y `VOLVER`; al seleccionarlo cierra la pausa, regresa al
   mapa y después abre `/config` en el navegador.

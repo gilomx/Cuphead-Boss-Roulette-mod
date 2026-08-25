@@ -24,14 +24,16 @@ export function PeskyModeView() {
     applyPeskyEnabled,
     applyPeskyNames,
     applyPeskyItem,
-    applyInteractionPhaseTransitionProtection,
+    // applyInteractionPhaseTransitionProtection,
   } = useConfig();
   const { t } = useLocalization();
   const [namesDraft, setNamesDraft] = useState("");
   const [namesDirty, setNamesDirty] = useState(false);
   const [confirmingPesky, setConfirmingPesky] = useState(false);
-  const phaseTransitionProtectionEnabled =
-    interaction?.phaseTransitionProtectionEnabled ?? true;
+  // Preserved for a future diagnostics build. Transition protection remains
+  // enabled by default, but its public panel control is intentionally hidden.
+  // const phaseTransitionProtectionEnabled =
+  //   interaction?.phaseTransitionProtectionEnabled ?? true;
 
   useEffect(() => {
     if (!namesDirty && pesky?.names) {
@@ -144,6 +146,7 @@ export function PeskyModeView() {
         </div>
       </section>
 
+      {/* Preserved for future transition-protection diagnostics.
       <section
         className="interaction-random-test interaction-phase-protection"
         data-active={phaseTransitionProtectionEnabled}
@@ -176,6 +179,7 @@ export function PeskyModeView() {
           }`)}
         </button>
       </section>
+      */}
 
       <div className="interaction-workspace pesky-workspace">
         <section className="interaction-panel interaction-queue" aria-labelledby="pesky-queue-title">

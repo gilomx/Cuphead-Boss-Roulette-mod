@@ -12,7 +12,9 @@ not included.
 
 The current work on `codex/creator-tools-config-panel` deliberately avoids a
 generic player-input guard. Phase protection is session-only, defaults to on,
-and can be disabled from Modo Molestoso for A/B testing. It affects manual
+and its former Modo Molestoso on/off control is hidden from the public panel.
+The JSX, client request path and server implementation remain preserved for a
+future diagnostics build, but normal users cannot disable it. It affects manual
 interaction tests, random test mode, and Pesky Mode through the shared dispatch
 guard.
 
