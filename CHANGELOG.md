@@ -2,6 +2,8 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El menú nativo `LA PICHI RULETA` añade `PANEL DE CONTROL` entre
+  `STREAM OVERLAY` y `VOLVER`; al seleccionarlo abre `/config` en el navegador.
 - `/config` ahora es una SPA en React con una estructura persistente preparada
   para añadir nuevas secciones sin detener conexiones o servicios globales.
 - El panel está localizado exclusivamente en español e inglés y muestra un

@@ -56,6 +56,7 @@ namespace Gilomx.CupheadBossRoulette
         CharmCursedRelic,
         CharmDivineRelic,
         CreatorMenuRouletteOverlay,
+        CreatorMenuControlPanel,
         CreatorMenuStatus,
         CreatorMenuRetry,
         CreatorMenuPreview,

@@ -12,7 +12,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const int CreatorToolsPauseMenuIndex = 4;
         private const int CreatorToolsOverlayMenuItemCount = 10;
-        private const int CreatorToolsHubMenuItemCount = 2;
+        private const int CreatorToolsHubMenuItemCount = 3;
         private const string CreatorToolsPauseRowName =
             "Gilomx La Pichi Ruleta Pause Row";
 
@@ -1315,6 +1315,14 @@ namespace Gilomx.CupheadBossRoulette
                         CreatorToolsMenuPage.RouletteOverlay);
                     return;
                 }
+                if (index == 1)
+                {
+                    if (OptionsMenuSelectSoundMethod != null)
+                        OptionsMenuSelectSoundMethod.Invoke(
+                            creatorToolsNativeOptions, null);
+                    OpenCreatorToolsConfig();
+                    return;
+                }
                 CloseCreatorToolsMenu(true);
                 return;
             }
@@ -1606,8 +1614,9 @@ namespace Gilomx.CupheadBossRoulette
             else if (Input.GetKeyDown(KeyCode.RightArrow) ||
                      IsControllerMenuButtonDown(CupheadButton.MenuRight))
                 direction = 1;
-            if (direction != 0 && creatorToolsMenuSelection <
-                CreatorToolsMenuItemCount - 2)
+            if (direction != 0 && creatorToolsMenuPage ==
+                    CreatorToolsMenuPage.RouletteOverlay &&
+                creatorToolsMenuSelection < CreatorToolsMenuItemCount - 2)
             {
                 ChangeCreatorToolsMenuSetting(
                     creatorToolsMenuSelection, direction);
@@ -1624,6 +1633,9 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsMenuSelection == 0)
                 SwitchCreatorToolsMenuPage(
                     CreatorToolsMenuPage.RouletteOverlay);
+            else if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub &&
+                     creatorToolsMenuSelection == 1)
+                OpenCreatorToolsConfig();
             else if (creatorToolsMenuSelection ==
                      CreatorToolsMenuItemCount - 1)
             {
@@ -1712,6 +1724,11 @@ namespace Gilomx.CupheadBossRoulette
                 Time.realtimeSinceStartup + 2.5f;
         }
 
+        private void OpenCreatorToolsConfig()
+        {
+            Application.OpenURL(CreatorToolsUrl + "config");
+        }
+
         private void DrawCreatorToolsMenu()
         {
             GUI.color = new Color(0f, 0f, 0f, 0.52f);
@@ -1764,6 +1781,9 @@ namespace Gilomx.CupheadBossRoulette
                             CreatorToolsMenuPage.Hub && i == 0)
                         SwitchCreatorToolsMenuPage(
                             CreatorToolsMenuPage.RouletteOverlay);
+                    else if (creatorToolsMenuPage ==
+                                 CreatorToolsMenuPage.Hub && i == 1)
+                        OpenCreatorToolsConfig();
                     else if (i == CreatorToolsMenuItemCount - 1)
                     {
                         if (creatorToolsMenuPage ==
@@ -1801,11 +1821,17 @@ namespace Gilomx.CupheadBossRoulette
         private string CreatorToolsMenuLabel(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-                return index == 0
-                    ? CreatorToolsText(
+            {
+                if (index == 0)
+                    return CreatorToolsText(
                         ModText.CreatorMenuRouletteOverlay,
-                        "STREAM OVERLAY")
-                    : string.Empty;
+                        "STREAM OVERLAY");
+                if (index == 1)
+                    return CreatorToolsText(
+                        ModText.CreatorMenuControlPanel,
+                        "CONTROL PANEL");
+                return string.Empty;
+            }
 
             switch (index)
             {
@@ -1844,10 +1870,10 @@ namespace Gilomx.CupheadBossRoulette
         private string CreatorToolsMenuValue(int index)
         {
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
-                return index == 0
-                    ? string.Empty
-                    : CreatorToolsText(
-                        ModText.CreatorActionBack, "BACK");
+                return index == CreatorToolsMenuItemCount - 1
+                    ? CreatorToolsText(
+                        ModText.CreatorActionBack, "BACK")
+                    : string.Empty;
 
             switch (index)
             {
