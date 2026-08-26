@@ -126,6 +126,76 @@
   "interactions": {
     "title": "Interacciones",
     "description": "Administra los canjeos que entran al juego y prueba su orden de ejecución.",
+    "sections": {
+      "label": "Secciones de interacciones",
+      "catalog": "Catálogo y pruebas",
+      "rules": "Reglas de stream"
+    },
+    "rules": {
+      "coins": "monedas",
+      "notice": {
+        "eyebrow": "Primera etapa",
+        "title": "Configuración conectada al catálogo de TikTok",
+        "description": "Estas reglas ya se guardan dentro del mod. La recepción de eventos reales y su envío a la cola se conectarán en la siguiente etapa.",
+        "catalog": "{count} regalos · catálogo {version}",
+        "catalogLoading": "Cargando catálogo…",
+        "catalogError": "No se pudo cargar el catálogo instalado."
+      },
+      "list": {
+        "title": "Reglas configuradas",
+        "description": "Cada regalo se identifica por su giftId, aunque TikTok cambie su nombre visible.",
+        "create": "Nueva regla",
+        "emptyTitle": "Todavía no hay reglas",
+        "emptyDescription": "Crea la primera para relacionar un regalo de TikTok con una interacción del juego.",
+        "enabled": "Activa",
+        "disabled": "Inactiva",
+        "every": "cada {count} unidades"
+      },
+      "editor": {
+        "createTitle": "Nueva regla",
+        "editTitle": "Editar regla",
+        "description": "Elige el regalo exacto y qué elemento del catálogo deberá producir.",
+        "emptyTitle": "Selecciona o crea una regla",
+        "emptyDescription": "El editor aparecerá aquí sin cambiar de página.",
+        "name": "Nombre de la regla",
+        "platform": "Plataforma",
+        "connection": "Conexión",
+        "allConnections": "Todas las conexiones",
+        "event": "Evento",
+        "gift": "Regalo exacto",
+        "selectGift": "Regalo de TikTok",
+        "searchGift": "Buscar por nombre, giftId o monedas",
+        "every": "Cada cuántas unidades",
+        "everyHint": "1 ejecuta la regla con cada unidad recibida.",
+        "interaction": "Interacción destino",
+        "quantity": "Cantidad a enviar",
+        "enabled": "Guardar la regla activa"
+      },
+      "actions": {
+        "edit": "Editar",
+        "duplicate": "Duplicar",
+        "delete": "Eliminar",
+        "deleteConfirm": "¿Quieres eliminar esta regla?",
+        "cancel": "Cancelar",
+        "save": "Guardar regla"
+      },
+      "feedback": {
+        "ready": "La configuración de reglas está lista.",
+        "created": "La regla fue creada.",
+        "updated": "La regla fue actualizada.",
+        "enabled": "La regla fue activada.",
+        "disabled": "La regla fue desactivada.",
+        "duplicated": "La regla fue duplicada.",
+        "deleted": "La regla fue eliminada.",
+        "catalog_unavailable": "El mod no pudo validar el catálogo de regalos.",
+        "rules_limit": "Se alcanzó el límite de reglas.",
+        "invalid_rule": "La regla contiene datos no válidos.",
+        "rule_not_found": "La regla ya no existe.",
+        "invalid_action": "La acción solicitada no es válida.",
+        "save_failed": "No se pudo guardar la configuración de reglas."
+      }
+    },
+
     "catalog": {
       "title": "Catálogo de canjeos"
     },

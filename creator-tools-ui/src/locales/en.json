@@ -126,6 +126,76 @@
   "interactions": {
     "title": "Interactions",
     "description": "Manage the redeems entering the game and test their execution order.",
+    "sections": {
+      "label": "Interaction sections",
+      "catalog": "Catalog and tests",
+      "rules": "Stream rules"
+    },
+    "rules": {
+      "coins": "coins",
+      "notice": {
+        "eyebrow": "First stage",
+        "title": "Configuration connected to the TikTok catalog",
+        "description": "These rules are now stored by the mod. Receiving real events and dispatching them to the queue will be connected in the next stage.",
+        "catalog": "{count} gifts · catalog {version}",
+        "catalogLoading": "Loading catalog…",
+        "catalogError": "The installed catalog could not be loaded."
+      },
+      "list": {
+        "title": "Configured rules",
+        "description": "Each gift is identified by giftId, even if TikTok changes its visible name.",
+        "create": "New rule",
+        "emptyTitle": "No rules yet",
+        "emptyDescription": "Create the first one to link a TikTok gift to an in-game interaction.",
+        "enabled": "Active",
+        "disabled": "Inactive",
+        "every": "every {count} units"
+      },
+      "editor": {
+        "createTitle": "New rule",
+        "editTitle": "Edit rule",
+        "description": "Choose the exact gift and the catalog item it should produce.",
+        "emptyTitle": "Select or create a rule",
+        "emptyDescription": "The editor will appear here without leaving the page.",
+        "name": "Rule name",
+        "platform": "Platform",
+        "connection": "Connection",
+        "allConnections": "All connections",
+        "event": "Event",
+        "gift": "Exact gift",
+        "selectGift": "TikTok gift",
+        "searchGift": "Search by name, giftId, or coins",
+        "every": "Every how many units",
+        "everyHint": "1 runs the rule for each received unit.",
+        "interaction": "Target interaction",
+        "quantity": "Quantity to send",
+        "enabled": "Save rule as active"
+      },
+      "actions": {
+        "edit": "Edit",
+        "duplicate": "Duplicate",
+        "delete": "Delete",
+        "deleteConfirm": "Do you want to delete this rule?",
+        "cancel": "Cancel",
+        "save": "Save rule"
+      },
+      "feedback": {
+        "ready": "Rule configuration is ready.",
+        "created": "The rule was created.",
+        "updated": "The rule was updated.",
+        "enabled": "The rule was enabled.",
+        "disabled": "The rule was disabled.",
+        "duplicated": "The rule was duplicated.",
+        "deleted": "The rule was deleted.",
+        "catalog_unavailable": "The mod could not validate the gift catalog.",
+        "rules_limit": "The rule limit was reached.",
+        "invalid_rule": "The rule contains invalid data.",
+        "rule_not_found": "The rule no longer exists.",
+        "invalid_action": "The requested action is invalid.",
+        "save_failed": "The rule configuration could not be saved."
+      }
+    },
+
     "catalog": {
       "title": "Redeem catalog"
     },

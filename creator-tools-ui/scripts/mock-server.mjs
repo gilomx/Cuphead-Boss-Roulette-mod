@@ -1,9 +1,14 @@
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 
 const port = 18081;
 const assetsRoot = resolve(process.cwd(), "../assets") + sep;
+const giftCatalog = JSON.parse(readFileSync(
+  resolve(assetsRoot, "creator-tools/gifts/catalog.json"),
+  "utf8",
+));
+const giftsById = new Map(giftCatalog.gifts.map((gift) => [gift.giftId, gift]));
 const selection = { boss: 0, weapon1: 0, weapon2: 1, super: 0, charm: 0, modifier: 0 };
 let enabled = false;
 let interactionRevision = 0;
@@ -16,6 +21,11 @@ let interactionRandomTestEnabled = false;
 let interactionRandomTestRevision = 0;
 let phaseTransitionProtectionEnabled = true;
 let phaseTransitionProtectionRevision = 0;
+let streamRulesRevision = 0;
+let streamRulesNextId = 1;
+let streamRulesFeedback = "ready";
+let streamRulesError = false;
+let streamRules = [];
 let peskyEnabled = false;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
@@ -136,7 +146,12 @@ function serveAsset(pathname, res) {
     res.writeHead(404).end();
     return;
   }
-  const type = extname(file) === ".png" ? "image/png" : "application/octet-stream";
+  const extension = extname(file);
+  const type = extension === ".png"
+    ? "image/png"
+    : extension === ".json"
+      ? "application/json; charset=utf-8"
+      : "application/octet-stream";
   res.writeHead(200, { "Content-Type": type, "Cache-Control": "no-store" });
   createReadStream(file).pipe(res);
 }
@@ -291,6 +306,89 @@ createServer((req, res) => {
       maxDelay: 3600,
       queue: publicInteractionQueue(),
     });
+    return;
+  }
+  if (url.pathname === "/api/config/interactions/rules") {
+    json(res, {
+      ready: true,
+      schemaVersion: 1,
+      revision: streamRulesRevision,
+      engineActive: false,
+      catalogVersion: giftCatalog.catalogVersion,
+      feedback: streamRulesFeedback,
+      error: streamRulesError,
+      maxRules: 100,
+      maxEvery: 1000000,
+      maxQuantity: 50,
+      rules: streamRules.map((rule) => {
+        const gift = giftsById.get(rule.giftId);
+        return {
+          ...rule,
+          platform: "tiktok",
+          connectionId: "all",
+          eventType: "gift",
+          giftName: gift?.name ?? rule.giftId,
+          coinsPerUnit: gift?.coinsPerUnit ?? 0,
+        };
+      }),
+    });
+    return;
+  }
+  if (url.pathname === "/api/config/interactions/rules/set") {
+    const action = (url.searchParams.get("action") ?? "").toLowerCase();
+    const id = Number(url.searchParams.get("id"));
+    const index = streamRules.findIndex((rule) => rule.id === id);
+    streamRulesError = false;
+    if (action === "delete" && index >= 0) {
+      streamRules.splice(index, 1);
+      streamRulesFeedback = "deleted";
+    } else if (action === "duplicate" && index >= 0) {
+      streamRules.splice(index + 1, 0, {
+        ...streamRules[index],
+        id: streamRulesNextId,
+        name: (streamRules[index].name + " (copia)").slice(0, 64),
+      });
+      streamRulesNextId += 1;
+      streamRulesFeedback = "duplicated";
+    } else if (action === "toggle" && index >= 0) {
+      streamRules[index].enabled = url.searchParams.get("enabled") === "1";
+      streamRulesFeedback = streamRules[index].enabled ? "enabled" : "disabled";
+    } else if (action === "create" || (action === "update" && index >= 0)) {
+      const giftId = url.searchParams.get("giftId") ?? "";
+      const interaction = url.searchParams.get("interaction") ?? "";
+      const every = Number(url.searchParams.get("every"));
+      const quantity = Number(url.searchParams.get("quantity"));
+      const name = (url.searchParams.get("name") ?? "").trim().slice(0, 64);
+      if (!name || !giftsById.has(giftId) || !interactionItems.includes(interaction) ||
+          !Number.isInteger(every) || every < 1 ||
+          !Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
+        streamRulesFeedback = "invalid_rule";
+        streamRulesError = true;
+      } else {
+        const rule = {
+          id: action === "create" ? streamRulesNextId : id,
+          name,
+          enabled: url.searchParams.get("enabled") !== "0",
+          giftId,
+          every,
+          interaction,
+          quantity,
+        };
+        if (action === "create") {
+          streamRules.push(rule);
+          streamRulesNextId += 1;
+          streamRulesFeedback = "created";
+        } else {
+          streamRules[index] = rule;
+          streamRulesFeedback = "updated";
+        }
+      }
+    } else {
+      streamRulesFeedback = index < 0 ? "rule_not_found" : "invalid_action";
+      streamRulesError = true;
+    }
+    streamRulesRevision += 1;
+    json(res, { ok: true }, 202);
     return;
   }
   if (url.pathname === "/api/config/interactions/set") {

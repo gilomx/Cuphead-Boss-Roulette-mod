@@ -25,9 +25,15 @@ en `PROJECT_HANDOFF.md`.
 - El backend simulado todavía crea una sola conexión por plataforma y
   `/api/dashboard/simulate` no recibe `connectionId`; el enrutamiento
   multiconexión se implementa junto con los adaptadores reales.
-- Todo continúa siendo simulado. No hay conexión real, OAuth, reglas,
+- Todo evento continúa siendo simulado. Ya existe configuración persistente de
+  reglas exactas de regalo, pero no hay conexión real, OAuth, evaluación,
   acumuladores ni despacho hacia el juego; por eso `matched` y `queued`
   permanecen en cero.
+- `assets/creator-tools/gifts/catalog.json` contiene el snapshot base offline
+  `2026-08-26.1`: 43 regalos de TikTok con `giftId` textual, nombre, Coins por
+  unidad, tipo fuente, URL de origen, primera observación e imagen local. El
+  registro `198895`, cuyo nombre estaba en otro idioma, fue excluido junto con
+  su PNG. El build valida el catálogo antes de compilar la SPA.
 
 El contrato normalizado v1 ya contiene `eventId`, `idempotencyKey`, secuencia,
 sesión, conexión, plataforma, conector, tipo, usuario opcional, `userId`
@@ -56,9 +62,24 @@ Coins, Bits y dinero permanecen separados.
 - Las reglas se guardan en el mod; no deben depender de que el navegador siga
   abierto.
 
-## Orden recomendado de implementación
+## Estado y orden recomendado de implementación
 
-### 1. Cerrar el contrato de regalos antes de crear reglas persistentes
+### 1. Editor persistente de regalos exactos — implementado
+
+Interacciones ya ofrece `Catálogo y pruebas` y `Reglas de stream`. El CRUD
+inicial crea, edita, duplica, activa/desactiva y elimina reglas TikTok de
+regalo exacto. Cada regla guarda `giftId`, copia del nombre conocido, umbral de
+unidades, interacción destino y cantidad en
+`mx.gilomx.cuphead.bossroulette.stream-rules.json`, junto al config principal;
+la escritura mantiene `.bak` y el mod recupera ese respaldo si hace falta.
+
+El backend valida `giftId` contra el snapshot instalado y la interacción contra
+el catálogo interno. React sólo presenta y solicita cambios; la autoridad y la
+persistencia viven en C#. Las rutas locales son
+`GET /api/config/interactions/rules` y
+`GET /api/config/interactions/rules/set`.
+
+### 2. Cerrar el contrato de eventos antes de evaluar reglas
 
 El v1 sólo tiene `itemName`. Un regalo exacto necesita, como mínimo, campos
 opcionales para `itemId` e imagen. Antes de aceptar eventos reales también hay
@@ -74,12 +95,12 @@ tamaño del ID no indica el precio. Las rachas no deben disparar una regla por
 cada actualización y otra vez al finalizar. Si este cambio rompe el contrato,
 incrementar `schemaVersion` en lugar de alterar silenciosamente el v1.
 
-### 2. Añadir el editor de reglas dentro de Interacciones
+### 3. Ampliar el editor a las demás condiciones
 
-La propuesta aprobada usa dos vistas internas:
+Las dos vistas internas ya existen:
 
 - `Catálogo y pruebas`: conserva la interfaz actual.
-- `Reglas de stream`: CRUD de las reglas nuevas.
+- `Reglas de stream`: CRUD persistente de regalo exacto.
 
 Cada regla necesita nombre, estado, plataforma/conexión, tipo de evento,
 condición, interacción de destino y cantidad de interacciones. Debe permitir
@@ -89,15 +110,15 @@ La interfaz y C# deben compartir una matriz de capacidades validada por el
 backend. Los controles incompatibles se ocultan; una regla existente que deje
 de ser compatible se marca como incompatible y no se elimina.
 
-Condiciones iniciales:
+El regalo concreto por `giftId`, con cada N unidades opcional, ya está cubierto.
+El resto de las condiciones aprobadas debe incorporarse sobre el mismo contrato:
 
-- regalo concreto por `giftId`, con cada N unidades opcional;
 - Coins o Bits cada N;
 - likes cada N;
 - follow o suscripción cada N, con 1 como valor inicial;
 - canje por ID/nombre únicamente en plataformas que lo ofrezcan.
 
-### 3. Implementar evaluación, acumuladores y despacho
+### 4. Implementar evaluación, acumuladores y despacho
 
 - Deduplicar por conexión/sesión antes de modificar contadores.
 - Evaluar todas las reglas compatibles; no detenerse en la primera.
@@ -110,7 +131,7 @@ Condiciones iniciales:
 - Definir antes de publicar si los acumuladores sobreviven al reinicio del
   juego o sólo a la sesión del LIVE; esta decisión sigue abierta.
 
-### 4. Conectar TikFinity
+### 5. Conectar TikFinity
 
 - Consumir el WebSocket local de TikFinity en `ws://127.0.0.1:21213/` mediante
   un componente acompañante apropiado para WebSocket/JSON si el runtime de
@@ -123,7 +144,7 @@ Condiciones iniciales:
 - Tratar el Event Simulator de TikFinity como prueba; verificar primero si sus
   regalos simulados también aparecen en el puerto 21213.
 
-### 5. Añadir Twitch y YouTube
+### 6. Añadir Twitch y YouTube
 
 Implementarlos como adaptadores separados después de estabilizar una regla de
 punta a punta con TikFinity. Investigar documentación oficial para autenticación,
@@ -132,8 +153,11 @@ el estado JSON ni en logs.
 
 ## Catálogo de regalos de TikTok
 
-El usuario continuará este trabajo con otro agente en una herramienta separada
-del mod. Los usuarios finales **no deben farmear el catálogo**.
+Ya existe una primera copia base dentro del mod, importada desde el ZIP de
+mantenimiento `catalogo-regalos-2026-08-26.zip`. El importador reproducible vive
+en `tools/import_tiktok_gift_catalog.mjs` y el contrato del snapshot se explica
+en `assets/creator-tools/gifts/README.md`. Los usuarios finales **no deben
+farmear el catálogo**.
 
 La arquitectura acordada es:
 
@@ -170,13 +194,21 @@ coincida.
 
 - `CreatorToolsDashboardController.cs`: contrato, historial, simulación y
   snapshot del Dashboard.
+- `CreatorToolsStreamRulesController.cs`: validación, CRUD, snapshots HTTP y
+  persistencia con respaldo de reglas exactas de regalo.
 - `CreatorToolsServer.cs`: rutas y colas HTTP.
 - `CreatorToolsOverlay.cs`: ciclo de vida y llamada desde Unity `Update`.
 - `creator-tools-ui/src/features/dashboard/DashboardView.tsx`: Dashboard.
-- `creator-tools-ui/src/features/interactions/InteractionsView.tsx`: catálogo y
-  pruebas actuales; aquí comienza el editor de reglas.
+- `creator-tools-ui/src/features/interactions/InteractionsView.tsx`: navegación
+  interna entre catálogo/pruebas y reglas.
+- `creator-tools-ui/src/features/interactions/StreamRulesView.tsx`: lista y
+  editor visual conectado al catálogo de regalos.
 - `creator-tools-ui/src/model.ts`: contratos TypeScript.
 - `creator-tools-ui/scripts/mock-server.mjs`: entorno de desarrollo sin juego.
+- `assets/creator-tools/gifts/catalog.json`: catálogo base offline de TikTok.
+- `creator-tools-ui/scripts/validate-gift-catalog.mjs`: validación del catálogo
+  y de sus PNG durante el build.
+- `tools/import_tiktok_gift_catalog.mjs`: importador de exports revisados.
 - `creator-tools-ui/PANEL_RULES.md`: invariantes visuales y de arquitectura.
 
 ## Invariantes del panel y del servidor

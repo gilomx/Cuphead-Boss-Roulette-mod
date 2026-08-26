@@ -45,6 +45,49 @@ same normalized boundary and must not reuse the overlay WebSocket. Configuration
 for mappings belongs under `/config/interactions`; connection health and event
 operations belong under `/dashboard`.
 
+The mod now includes the first reviewed offline TikTok gift snapshot at
+`assets/creator-tools/gifts/catalog.json`. Catalog version `2026-08-26.1`
+contains 43 textual gift IDs with local PNGs and unit prices imported from the
+maintenance export's `diamondCount`. Gift `198895` was excluded with its image
+because its name was in another language. The panel build validates catalog
+structure, unique IDs, prices, image paths, and PNG signatures. This does not
+close the event-contract work: real events still need `giftId`, streak and
+deduplication fields before saved rules can be evaluated or dispatched.
+
+## Creator Tools: persistent TikTok gift rules (2026-08-25)
+
+`/config/interactions` now has two internal views: the existing `Catálogo y
+pruebas` and `Reglas de stream`. The new view reads all 43 local gifts, presents
+their PNGs and unit prices, and supports create, edit, duplicate, enable/disable
+and delete for exact TikTok gift mappings. The initial condition maps a stable
+`giftId` plus optional every-N-unit threshold to one of the five gameplay
+interactions and a bounded output quantity. Platform, event type and connection
+scope are currently fixed to TikTok, exact gift and all connections.
+
+`CreatorToolsStreamRulesController.cs` is authoritative. It revalidates gift
+IDs against the installed catalog and interaction IDs against the gameplay
+catalog, processes bounded HTTP commands from Unity `Update`, and persists
+rules beside the BepInEx config in
+`mx.gilomx.cuphead.bossroulette.stream-rules.json`. Writes are atomic where the
+runtime supports `File.Replace`, retain `.bak`, and recover that backup if the
+main file becomes invalid. React does not own durable rule state. The local API
+is `GET /api/config/interactions/rules` plus the bounded mutable
+`GET /api/config/interactions/rules/set` queue.
+
+This slice configures rules only. It deliberately reports `engineActive:false`:
+real provider events are not matched and no rule is dispatched to the redeem
+queue yet. The normalized event contract must gain gift identity, streak and
+deduplication semantics before that next stage.
+
+Latest verification passed `validate:interactions`, `validate:gifts`, the React
+production build, all three relevant Node syntax checks, a browser CRUD flow and
+the Release C# build with 0 errors and 0 warnings. The compiled and installed
+DLLs match at SHA-256
+`AA6605047D5FBF82F9009D9222CEFA6436B01460D74592960683334882EDB2B5`.
+The installed catalog matches SHA-256
+`27A9291343E0D519865D62BCBB1F21B239768B9AE65DA48E64A6E3DB52680E0E`;
+all 43 installed PNGs match their sources and `198895.png` is absent.
+
 ## Creator Tools: phase-transition handoff (2026-08-24)
 
 The current work on `codex/creator-tools-config-panel` deliberately avoids a

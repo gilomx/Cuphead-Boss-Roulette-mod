@@ -16,6 +16,8 @@ import type {
   PeskyModeConfigState,
   RouletteConfigState,
   RouletteSelection,
+  StreamRuleDraft,
+  StreamRulesConfigState,
 } from "../model";
 
 interface ConfigValue {
@@ -23,6 +25,7 @@ interface ConfigValue {
   draft: ForceDraft | null;
   interaction: InteractionConfigState | null;
   pesky: PeskyModeConfigState | null;
+  streamRules: StreamRulesConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
   status: ConnectionStatus;
@@ -34,6 +37,10 @@ interface ConfigValue {
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
+  saveStreamRule: (draft: StreamRuleDraft) => void;
+  deleteStreamRule: (id: number) => void;
+  duplicateStreamRule: (id: number) => void;
+  toggleStreamRule: (id: number, enabled: boolean) => void;
   testInteraction: (item: string, donor: string, quantity: number, delay: number) => void;
 }
 
@@ -89,6 +96,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<ForceDraft | null>(null);
   const [interaction, setInteraction] = useState<InteractionConfigState | null>(null);
   const [pesky, setPesky] = useState<PeskyModeConfigState | null>(null);
+  const [streamRules, setStreamRules] = useState<StreamRulesConfigState | null>(null);
   const [optimisticInteractionQueue, setOptimisticInteractionQueue] = useState<
     InteractionQueueEntry[]
   >([]);
@@ -115,23 +123,33 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const confirmedPeskyRevisionRef = useRef(0);
   const pendingPeskyChangesRef = useRef<PendingPeskyChange[]>([]);
   const peskyWriteChainRef = useRef<Promise<void>>(Promise.resolve());
+  const streamRulesRevisionRef = useRef<number | null>(null);
+  const streamRulesWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
 
   const load = useCallback(async () => {
     const loadRevision = loadRequestRevisionRef.current + 1;
     loadRequestRevisionRef.current = loadRevision;
     try {
-      const [configResponse, interactionResponse, peskyResponse] = await Promise.all([
+      const [
+        configResponse,
+        interactionResponse,
+        peskyResponse,
+        streamRulesResponse,
+      ] = await Promise.all([
         fetch("/api/config", { cache: "no-store" }),
         fetch("/api/config/interactions", { cache: "no-store" }),
         fetch("/api/config/pesky", { cache: "no-store" }),
+        fetch("/api/config/interactions/rules", { cache: "no-store" }),
       ]);
       if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
       if (!interactionResponse.ok) throw new Error(`HTTP ${interactionResponse.status}`);
       if (!peskyResponse.ok) throw new Error(`HTTP ${peskyResponse.status}`);
+      if (!streamRulesResponse.ok) throw new Error(`HTTP ${streamRulesResponse.status}`);
       const next = (await configResponse.json()) as RouletteConfigState;
       const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
       const nextPesky = (await peskyResponse.json()) as PeskyModeConfigState;
+      const nextStreamRules = (await streamRulesResponse.json()) as StreamRulesConfigState;
       if (
         !mountedRef.current ||
         loadRevision < lastAppliedLoadRevisionRef.current
@@ -199,7 +217,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       );
       setPesky(visiblePesky);
       const peskyPending = pendingPeskyChanges.length > 0;
-      if (!next.ready || !nextInteraction.ready || !nextPesky.ready) {
+      let streamRulesPending = false;
+      const streamRulesRevision = streamRulesRevisionRef.current;
+      if (streamRulesRevision !== null) {
+        if (nextStreamRules.revision === streamRulesRevision) {
+          streamRulesPending = true;
+        } else {
+          streamRulesRevisionRef.current = null;
+        }
+      }
+      setStreamRules(nextStreamRules);
+      if (!next.ready || !nextInteraction.ready || !nextPesky.ready ||
+          !nextStreamRules.ready) {
         setStatus("connecting");
         return;
       }
@@ -239,7 +268,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       setStatus(
         forcePending || challengePending || interactionPending ||
           randomTestPending || phaseTransitionProtectionPending ||
-          peskyPending
+          peskyPending || streamRulesPending
           ? "pending"
           : "saved",
       );
@@ -635,12 +664,82 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [interaction, load],
   );
 
+  const sendStreamRuleUpdate = useCallback(
+    (query: URLSearchParams) => {
+      if (!streamRules?.ready) return;
+      streamRulesRevisionRef.current = streamRules.revision;
+      setStatus("saving");
+      const send = () => fetch(
+        "/api/config/interactions/rules/set?" + query,
+        { cache: "no-store" },
+      )
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (mountedRef.current) setStatus("pending");
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          streamRulesRevisionRef.current = null;
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        });
+      streamRulesWriteChainRef.current =
+        streamRulesWriteChainRef.current.then(send, send);
+    },
+    [load, streamRules],
+  );
+
+  const saveStreamRule = useCallback(
+    (draft: StreamRuleDraft) => {
+      const query = new URLSearchParams({
+        action: draft.id === undefined ? "create" : "update",
+        name: draft.name.trim(),
+        enabled: draft.enabled ? "1" : "0",
+        giftId: draft.giftId,
+        every: String(draft.every),
+        interaction: draft.interaction,
+        quantity: String(draft.quantity),
+      });
+      if (draft.id !== undefined) query.set("id", String(draft.id));
+      sendStreamRuleUpdate(query);
+    },
+    [sendStreamRuleUpdate],
+  );
+
+  const deleteStreamRule = useCallback(
+    (id: number) => sendStreamRuleUpdate(new URLSearchParams({
+      action: "delete",
+      id: String(id),
+    })),
+    [sendStreamRuleUpdate],
+  );
+
+  const duplicateStreamRule = useCallback(
+    (id: number) => sendStreamRuleUpdate(new URLSearchParams({
+      action: "duplicate",
+      id: String(id),
+    })),
+    [sendStreamRuleUpdate],
+  );
+
+  const toggleStreamRule = useCallback(
+    (id: number, enabled: boolean) => sendStreamRuleUpdate(new URLSearchParams({
+      action: "toggle",
+      id: String(id),
+      enabled: enabled ? "1" : "0",
+    })),
+    [sendStreamRuleUpdate],
+  );
+
   const value = useMemo(
     () => ({
       config,
       draft,
       interaction,
       pesky,
+      streamRules,
       optimisticInteractionQueue,
       interactionTesting,
       status,
@@ -653,12 +752,17 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      saveStreamRule,
+      deleteStreamRule,
+      duplicateStreamRule,
+      toggleStreamRule,
     }),
     [
       config,
       draft,
       interaction,
       pesky,
+      streamRules,
       optimisticInteractionQueue,
       interactionTesting,
       status,
@@ -671,6 +775,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      saveStreamRule,
+      deleteStreamRule,
+      duplicateStreamRule,
+      toggleStreamRule,
     ],
   );
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;

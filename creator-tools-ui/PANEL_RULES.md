@@ -87,10 +87,25 @@ acoplar sus payloads específicos a React o a los objetos de Unity.
 
 El contrato v1 separa `platform`, `connector` y `connectionId`, y asigna
 `eventId`, `idempotencyKey`, `streamSessionId` y una `sequence` local. Todavía
-no hay conectores reales, persistencia, evaluación de reglas ni acciones de
-gameplay: un evento válido queda como `received` y los contadores `matched` y
-`queued` permanecen en cero. El contador `valued` registra cuántos eventos
+no hay conectores reales, evaluación de reglas ni acciones de gameplay: un
+evento válido queda como `received` y los contadores `matched` y `queued`
+permanecen en cero. El contador `valued` registra cuántos eventos
 traían valor; no suma Coins, Bits o monedas ISO incompatibles entre sí.
+
+La copia base de regalos vive en
+`/assets/creator-tools/gifts/catalog.json`. `schemaVersion` describe su
+estructura y `catalogVersion` sus actualizaciones de datos; la identidad de un
+regalo es siempre `giftId`, no su nombre visible. Cada entrada referencia un PNG
+local y el build valida el catálogo antes de compilar la SPA. `Reglas de stream`
+ya usa ese snapshot para configurar reglas exactas y el backend vuelve a validar
+el `giftId`; todavía no las evalúa contra eventos porque primero el contrato
+normalizado debe transportar `giftId` y la semántica de rachas/deduplicación.
+
+`GET /api/config/interactions/rules` entrega el CRUD autoritativo de reglas.
+`GET /api/config/interactions/rules/set` acepta `create`, `update`, `toggle`,
+`duplicate` y `delete`. C# valida regalo, interacción y límites, y persiste el
+resultado con respaldo junto al config de BepInEx; React nunca es la fuente de
+verdad de esas reglas.
 
 `GET /api/config` entrega el catálogo disponible, el resultado forzado y, para
 cada reto, los campos `enabled` y `canDisable`. El panel realiza cambios con

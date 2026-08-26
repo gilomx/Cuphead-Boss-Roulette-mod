@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { interactionItemFor, interactionItems } from "./interactionCatalog";
+import { StreamRulesView } from "./StreamRulesView";
 
 export function InteractionsView() {
   const {
@@ -20,6 +21,7 @@ export function InteractionsView() {
   const [maxActiveDraft, setMaxActiveDraft] = useState(1);
   const [testingItem, setTestingItem] = useState<string | null>(null);
   const [confirmingRandomTest, setConfirmingRandomTest] = useState(false);
+  const [activeSection, setActiveSection] = useState<"catalog" | "rules">("catalog");
   const available = interaction?.available ?? false;
   const suspendedByPesky = interaction?.suspendedByPesky ?? false;
   const randomTestEnabled = interaction?.randomTestEnabled ?? false;
@@ -54,6 +56,27 @@ export function InteractionsView() {
           <p>{t("interactions.description")}</p>
         </div>
       </header>
+
+      <nav className="interaction-section-tabs" aria-label={t("interactions.sections.label")}>
+        <button
+          type="button"
+          data-active={activeSection === "catalog"}
+          aria-current={activeSection === "catalog" ? "page" : undefined}
+          onClick={() => setActiveSection("catalog")}
+        >
+          {t("interactions.sections.catalog")}
+        </button>
+        <button
+          type="button"
+          data-active={activeSection === "rules"}
+          aria-current={activeSection === "rules" ? "page" : undefined}
+          onClick={() => setActiveSection("rules")}
+        >
+          {t("interactions.sections.rules")}
+        </button>
+      </nav>
+
+      {activeSection === "rules" ? <StreamRulesView /> : <>
 
       <section className="section interaction-catalog-section" aria-labelledby="interaction-catalog-title">
         <div className="section__heading interaction-section-heading">
@@ -378,6 +401,7 @@ export function InteractionsView() {
         </section>
         </div>
       </div>
+      </>}
     </div>
   );
 }

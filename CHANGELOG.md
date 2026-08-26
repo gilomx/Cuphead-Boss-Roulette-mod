@@ -11,6 +11,17 @@
   historial circular en memoria de 500 entradas. Las solicitudes del simulador
   se limitan y sólo se procesan desde `Update` de Unity; el hilo HTTP nunca toca
   objetos del juego.
+- Se añadió el catálogo base offline de TikTok `2026-08-26.1` con 43 regalos,
+  IDs estables como texto, costo por unidad, metadatos de origen y sus imágenes
+  locales. El único registro con nombre en otro idioma (`giftId 198895`) quedó
+  fuera junto con su imagen. El build valida unicidad, precios, rutas y firmas
+  PNG antes de compilar el panel.
+- Interacciones ahora separa `Catálogo y pruebas` de `Reglas de stream`. El
+  editor permite crear, editar, duplicar, activar y eliminar reglas de regalo
+  exacto por `giftId`, con umbral de unidades, interacción destino y cantidad.
+  El mod valida los regalos y las interacciones, guarda las reglas en un JSON
+  con respaldo y las conserva aunque se cierre el navegador. Esta etapa aún no
+  recibe eventos reales ni despacha las reglas a la cola de canjeos.
 - El servidor local usa exclusivamente `127.0.0.1:18081` para conservar las
   fuentes de OBS existentes y ya no cambia a otro puerto. Si está ocupado,
   `PANEL DE CONTROL` abre una página local con instrucciones para liberarlo y

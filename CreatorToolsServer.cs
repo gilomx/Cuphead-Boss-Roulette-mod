@@ -17,6 +17,8 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumClientPayloadBytes = 1024 * 1024;
         private const int MaximumDashboardCommands = 1024;
         private const int MaximumDashboardQueryLength = 4096;
+        private const int MaximumStreamRuleCommands = 256;
+        private const int MaximumStreamRuleQueryLength = 4096;
 
         private readonly string assetsDirectory;
         private readonly Action<string> logInfo;
@@ -33,6 +35,9 @@ namespace Gilomx.CupheadBossRoulette
             new Queue<string>();
         private readonly object peskyLock = new object();
         private readonly Queue<string> peskyCommands =
+            new Queue<string>();
+        private readonly object streamRulesLock = new object();
+        private readonly Queue<string> streamRuleCommands =
             new Queue<string>();
         private readonly object modeCommandsLock = new object();
         private readonly Queue<ModeCommand> modeCommands =
@@ -64,6 +69,9 @@ namespace Gilomx.CupheadBossRoulette
             "\"subscriptions\":0},\"events\":[]}";
         private string latestPeskyState =
             "{\"ready\":false,\"available\":false,\"enabled\":false}";
+        private string latestStreamRulesState =
+            "{\"ready\":false,\"schemaVersion\":1,\"revision\":0," +
+            "\"engineActive\":false,\"rules\":[]}";
 
         internal int Port { get; private set; }
 
@@ -244,6 +252,28 @@ namespace Gilomx.CupheadBossRoulette
                     return false;
                 }
                 command = peskyCommands.Dequeue();
+                return true;
+            }
+        }
+
+        internal void SetStreamRulesState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (streamRulesLock)
+                latestStreamRulesState = json;
+        }
+
+        internal bool TryTakeStreamRuleCommand(out string command)
+        {
+            lock (streamRulesLock)
+            {
+                if (streamRuleCommands.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = streamRuleCommands.Dequeue();
                 return true;
             }
         }
@@ -662,6 +692,42 @@ namespace Gilomx.CupheadBossRoulette
                     Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
                 return;
             }
+            if (path == "/api/config/interactions/rules")
+            {
+                string json;
+                lock (streamRulesLock)
+                    json = latestStreamRulesState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/config/interactions/rules/set")
+            {
+                var accepted = false;
+                lock (streamRulesLock)
+                {
+                    if (streamRuleCommands.Count < MaximumStreamRuleCommands)
+                    {
+                        var query = request.Query ?? string.Empty;
+                        if (query.Length > MaximumStreamRuleQueryLength)
+                            query = query.Substring(
+                                0, MaximumStreamRuleQueryLength);
+                        streamRuleCommands.Enqueue(query);
+                        accepted = true;
+                    }
+                }
+                WriteResponse(stream,
+                    accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}" :
+                          "{\"ok\":false,\"error\":" +
+                          "\"rules_queue_full\"}"),
+                    false);
+                return;
+            }
             if (path == "/api/dashboard")
             {
                 string json;
@@ -853,6 +919,8 @@ namespace Gilomx.CupheadBossRoulette
                 return "text/css; charset=utf-8";
             if (extension == ".js")
                 return "application/javascript; charset=utf-8";
+            if (extension == ".json")
+                return "application/json; charset=utf-8";
             if (extension == ".html")
                 return "text/html; charset=utf-8";
             return "application/octet-stream";

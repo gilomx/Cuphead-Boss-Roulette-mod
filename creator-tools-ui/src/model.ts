@@ -107,6 +107,63 @@ export interface InteractionQueueEntry {
   status: "active" | "queued" | "scheduled" | "waiting_game";
 }
 
+export interface TikTokGift {
+  giftId: string;
+  name: string;
+  aliases: string[];
+  coinsPerUnit: number;
+  sourceGiftType: number;
+  imagePath: string;
+}
+
+export interface TikTokGiftCatalog {
+  schemaVersion: number;
+  catalogVersion: string;
+  platform: "tiktok";
+  locale: string;
+  giftCount: number;
+  gifts: TikTokGift[];
+}
+
+export interface StreamRule {
+  id: number;
+  name: string;
+  enabled: boolean;
+  platform: "tiktok";
+  connectionId: "all";
+  eventType: "gift";
+  giftId: string;
+  giftName: string;
+  coinsPerUnit: number;
+  every: number;
+  interaction: string;
+  quantity: number;
+}
+
+export interface StreamRuleDraft {
+  id?: number;
+  name: string;
+  enabled: boolean;
+  giftId: string;
+  every: number;
+  interaction: string;
+  quantity: number;
+}
+
+export interface StreamRulesConfigState {
+  ready: boolean;
+  schemaVersion: number;
+  revision: number;
+  engineActive: boolean;
+  catalogVersion: string;
+  feedback: string;
+  error: boolean;
+  maxRules: number;
+  maxEvery: number;
+  maxQuantity: number;
+  rules: StreamRule[];
+}
+
 export type StreamPlatform = "tiktok" | "twitch" | "youtube";
 
 export type StreamEventType =

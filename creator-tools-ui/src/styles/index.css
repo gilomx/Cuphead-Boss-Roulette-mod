@@ -907,6 +907,433 @@ textarea:focus-visible {
   margin-bottom: var(--space-5);
 }
 
+.interaction-section-tabs {
+  display: inline-flex;
+  gap: 0.28rem;
+  margin: 0 0 var(--space-5);
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-background-raised);
+}
+
+.interaction-section-tabs button {
+  min-height: 2.5rem;
+  padding: 0.55rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.interaction-section-tabs button:hover {
+  color: var(--color-text);
+}
+
+.interaction-section-tabs button[data-active="true"] {
+  color: white;
+  background: var(--color-control-active);
+}
+
+.stream-rules {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.stream-rules__notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgb(64 224 154 / 30%);
+  border-radius: var(--radius-medium);
+  background: rgb(64 224 154 / 7%);
+}
+
+.stream-rules__notice > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.stream-rules__notice span,
+.stream-rule-fixed-fields span,
+.stream-rule-form label > span,
+.stream-gift-picker legend {
+  color: var(--color-text-muted);
+  font-size: 0.63rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.065em;
+}
+
+.stream-rules__notice strong {
+  font-size: 1rem;
+}
+
+.stream-rules__notice p {
+  max-width: 52rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.stream-rules__notice small {
+  flex: 0 0 auto;
+  color: var(--color-success);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.stream-rules__notice[data-error="true"] {
+  border-color: rgb(255 92 110 / 35%);
+  background: rgb(255 92 110 / 7%);
+}
+
+.stream-rules__notice[data-error="true"] small {
+  color: var(--color-danger);
+}
+
+.stream-rules__workspace {
+  display: grid;
+  grid-template-columns: minmax(22rem, 0.9fr) minmax(30rem, 1.25fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.stream-rules-list__heading button,
+.stream-rule-editor__empty button,
+.stream-rule-form__actions button {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 900;
+  background: var(--color-control-active);
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.stream-rules-list__heading button:disabled,
+.stream-rule-editor__empty button:disabled,
+.stream-rule-form__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.stream-rules-list__empty,
+.stream-rule-editor__empty {
+  display: grid;
+  min-height: 18rem;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.stream-rules-list__empty strong,
+.stream-rule-editor__empty strong {
+  color: var(--color-text-soft);
+}
+
+.stream-rule-editor__empty span {
+  max-width: 24rem;
+  font-size: 0.8rem;
+}
+
+.stream-rule-editor__empty button {
+  margin-top: var(--space-2);
+}
+
+.stream-rule-cards {
+  display: grid;
+}
+
+.stream-rule-card {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid rgb(255 255 255 / 7%);
+}
+
+.stream-rule-card:first-child {
+  border-top: 0;
+}
+
+.stream-rule-card[data-enabled="false"] {
+  opacity: 0.62;
+}
+
+.stream-rule-card__visual {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border-radius: var(--radius-small);
+  background: var(--color-control);
+}
+
+.stream-rule-card__visual img {
+  width: 3rem;
+  height: 3rem;
+  object-fit: contain;
+}
+
+.stream-rule-card__copy {
+  min-width: 0;
+}
+
+.stream-rule-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stream-rule-card__title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stream-rule-card__copy p,
+.stream-rule-card__copy > span {
+  margin: 0.2rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.stream-rule-card__copy > span {
+  display: block;
+  color: var(--color-text-soft);
+  font-weight: 800;
+}
+
+.stream-rule-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.stream-rule-toggle input {
+  accent-color: var(--color-success);
+}
+
+.stream-rule-card__actions {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.stream-rule-card__actions button {
+  padding: 0.25rem 0.4rem;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-align: right;
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.stream-rule-card__actions button:hover {
+  color: var(--color-text);
+}
+
+.stream-rule-card__actions .stream-rule-card__delete:hover {
+  color: var(--color-danger);
+}
+
+.stream-rule-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.stream-rule-form__wide {
+  grid-column: 1 / -1;
+}
+
+.stream-rule-form label {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.stream-rule-form input,
+.stream-rule-form select,
+.stream-gift-picker > input {
+  min-width: 0;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.68rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  background: var(--color-control);
+  outline: none;
+}
+
+.stream-rule-form input:focus,
+.stream-rule-form select:focus,
+.stream-gift-picker > input:focus {
+  border-color: var(--color-focus);
+}
+
+.stream-rule-form select {
+  color-scheme: dark;
+}
+
+.stream-rule-form label small {
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+}
+
+.stream-rule-fixed-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.stream-rule-fixed-fields div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-small);
+  background: rgb(255 255 255 / 3%);
+}
+
+.stream-rule-fixed-fields strong {
+  font-size: 0.78rem;
+}
+
+.stream-gift-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.stream-gift-picker legend {
+  margin-bottom: 0.35rem;
+}
+
+.stream-gift-picker > input {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
+.stream-gift-picker__grid {
+  display: grid;
+  max-height: 18rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.stream-gift-picker__grid button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  text-align: left;
+  background: rgb(255 255 255 / 2.5%);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.stream-gift-picker__grid button:hover,
+.stream-gift-picker__grid button[data-selected="true"] {
+  border-color: var(--color-focus);
+  background: rgb(106 40 154 / 22%);
+}
+
+.stream-gift-picker__grid img {
+  width: 2.5rem;
+  height: 2.5rem;
+  grid-row: 1 / 3;
+  object-fit: contain;
+}
+
+.stream-gift-picker__grid span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stream-gift-picker__grid small {
+  color: var(--color-text-muted);
+  font-size: 0.6rem;
+}
+
+.stream-rule-form__enabled {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  min-height: 2.55rem;
+  grid-column: 2;
+  grid-row: 5;
+  grid-auto-flow: column;
+  justify-content: start;
+}
+
+.stream-rule-form__enabled input {
+  min-height: auto;
+  accent-color: var(--color-success);
+}
+
+.stream-rule-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.stream-rule-form__actions button:first-child {
+  color: var(--color-text-soft);
+  background: var(--color-control);
+}
+
+.stream-rule-feedback {
+  margin: 0;
+  padding: 0.75rem var(--space-4);
+  border-top: 1px solid rgb(255 255 255 / 7%);
+  color: var(--color-success);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.stream-rule-feedback[data-error="true"] {
+  color: var(--color-danger);
+}
+
 .interaction-catalog-section .interaction-section-heading {
   margin-bottom: var(--space-3);
 }
@@ -2011,6 +2438,7 @@ textarea:focus-visible {
   .sidebar { padding-inline: 1.5rem; }
   .main-content { padding-inline: 3.5rem; }
   .interaction-workspace { grid-template-columns: 1fr; }
+  .stream-rules__workspace { grid-template-columns: 1fr; }
   .dashboard-counter-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .dashboard-workspace { grid-template-columns: 1fr; }
   .form-grid,
@@ -2044,6 +2472,8 @@ textarea:focus-visible {
   .main-content { margin-left: 0; padding: 3.5rem 1.5rem 4rem; }
   .page-header { flex-direction: column; margin-bottom: 2.5rem; }
   .interaction-catalog { grid-template-columns: repeat(2, minmax(0, 10rem)); }
+  .stream-rules__notice { align-items: flex-start; flex-direction: column; }
+  .stream-gift-picker__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-connection-grid { grid-template-columns: 1fr; }
   .dashboard-connection-card__copy { min-height: auto; }
 }
@@ -2063,6 +2493,17 @@ textarea:focus-visible {
   .section + .section { margin-top: 3.5rem; }
   .challenge-icon { width: 4.45rem; height: 4.45rem; }
   .interaction-card__visual { min-height: 5rem; }
+  .interaction-section-tabs { display: flex; }
+  .interaction-section-tabs button { flex: 1; }
+  .stream-rule-card { grid-template-columns: 3.4rem minmax(0, 1fr); }
+  .stream-rule-card__visual { width: 3.4rem; height: 3.4rem; }
+  .stream-rule-card__actions { grid-column: 2; display: flex; }
+  .stream-rule-card__actions button { text-align: left; }
+  .stream-rule-form { grid-template-columns: 1fr; padding: var(--space-3); }
+  .stream-rule-form__wide,
+  .stream-rule-form__enabled { grid-column: 1; grid-row: auto; }
+  .stream-rule-fixed-fields { grid-template-columns: 1fr; }
+  .stream-gift-picker__grid { grid-template-columns: 1fr; }
   .pesky-hero { height: 11rem; }
   .pesky-hero__pane,
   .interaction-random-test__pane {
