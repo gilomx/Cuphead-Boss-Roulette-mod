@@ -60,6 +60,7 @@ namespace Gilomx.CupheadBossRoulette
         public bool TrySpawn(
             string item,
             string donor,
+            string giftImagePath,
             out ICreatorToolsInteractionHandle handle,
             out string feedbackCode,
             out string error)
@@ -81,6 +82,10 @@ namespace Gilomx.CupheadBossRoulette
                 out feedbackCode,
                 out error))
                 return false;
+            CreatorToolsInteractionPresentation.SetGiftImage(
+                spawned.gameObject,
+                giftImagePath,
+                logWarning);
             handle = new CreatorToolsUnityObjectInteractionHandle(spawned);
             return true;
         }

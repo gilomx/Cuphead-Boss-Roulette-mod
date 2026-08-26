@@ -108,6 +108,19 @@ nivel de plataformas iniciado normalmente. No es necesario abrir ni girar la
 ruleta; las solicitudes esperan durante carga, pausa y los primeros tres
 segundos de la partida.
 
+`Reglas de stream` permite vincular un regalo exacto de TikTok con cualquiera
+de esas interacciones. Sus reglas aparecen directamente debajo del catálogo,
+sin una pestaña adicional; el Dashboard muestra `Canjeos en curso` antes del
+feed de tiempo real. Con TikFinity abierto en el mismo equipo, el mod inicia
+su acompañante local de forma invisible, se reconecta automáticamente y muestra
+en el Dashboard si la API local está conectada. El usuario no tiene que abrir
+ni configurar el acompañante por separado. Las actualizaciones provisionales
+de una racha se muestran sin canjear; sólo el cierre definitivo ejecuta reglas.
+Crear o editar una regla se guarda aunque Cuphead esté desenfocado, sin mantener
+la partida avanzando en segundo plano. Cuando un regalo genera una interacción,
+su imagen local aparece dentro del juego junto al nombre del donador con 80 % de
+transparencia; no se descarga durante el combate.
+
 ## Instalación
 
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su
@@ -119,9 +132,12 @@ Para una instalación manual:
 
 1. Instala BepInEx 5 x64 en la carpeta de Cuphead y ejecuta el juego una vez.
 2. Compila el proyecto o descarga una versión publicada.
-3. Coloca la DLL y la carpeta `assets` juntas en:
+3. Coloca la DLL, la carpeta `assets` y la carpeta `companion` juntas en:
 
    `Cuphead\BepInEx\plugins\GilomxBossRoulette`
+
+   `companion` debe contener `LaPichiRuleta.TikFinity.exe`. La versión
+   publicada es autocontenida: no requiere instalar .NET.
 
 4. Inicia una partida guardada, entra al mapa y pulsa `F6`.
 
@@ -154,6 +170,14 @@ Para otra instalación:
 
 ```powershell
 dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
+```
+
+El acompañante de TikFinity se prueba y publica por separado como un único EXE
+autocontenido:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\TikFinityCompanion\scripts\test.ps1
+powershell -ExecutionPolicy Bypass -File .\TikFinityCompanion\scripts\publish-win-x64.ps1
 ```
 
 ## Notas

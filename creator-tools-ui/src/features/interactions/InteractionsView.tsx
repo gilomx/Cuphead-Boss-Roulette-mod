@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import { interactionItemFor, interactionItems } from "./interactionCatalog";
+import { interactionItems } from "./interactionCatalog";
 import { StreamRulesView } from "./StreamRulesView";
 
 export function InteractionsView() {
@@ -21,14 +21,8 @@ export function InteractionsView() {
   const [maxActiveDraft, setMaxActiveDraft] = useState(1);
   const [testingItem, setTestingItem] = useState<string | null>(null);
   const [confirmingRandomTest, setConfirmingRandomTest] = useState(false);
-  const [activeSection, setActiveSection] = useState<"catalog" | "rules">("catalog");
-  const available = interaction?.available ?? false;
   const suspendedByPesky = interaction?.suspendedByPesky ?? false;
   const randomTestEnabled = interaction?.randomTestEnabled ?? false;
-  const queue = [
-    ...(interaction?.queue ?? []),
-    ...optimisticInteractionQueue,
-  ];
   const maxBatch = interaction?.maxBatch ?? 50;
   const maxDelay = interaction?.maxDelay ?? 3600;
 
@@ -57,27 +51,6 @@ export function InteractionsView() {
         </div>
       </header>
 
-      <nav className="interaction-section-tabs" aria-label={t("interactions.sections.label")}>
-        <button
-          type="button"
-          data-active={activeSection === "catalog"}
-          aria-current={activeSection === "catalog" ? "page" : undefined}
-          onClick={() => setActiveSection("catalog")}
-        >
-          {t("interactions.sections.catalog")}
-        </button>
-        <button
-          type="button"
-          data-active={activeSection === "rules"}
-          aria-current={activeSection === "rules" ? "page" : undefined}
-          onClick={() => setActiveSection("rules")}
-        >
-          {t("interactions.sections.rules")}
-        </button>
-      </nav>
-
-      {activeSection === "rules" ? <StreamRulesView /> : <>
-
       <section className="section interaction-catalog-section" aria-labelledby="interaction-catalog-title">
         <div className="section__heading interaction-section-heading">
           <h2 id="interaction-catalog-title">{t("interactions.catalog.title")}</h2>
@@ -102,66 +75,7 @@ export function InteractionsView() {
       </section>
 
       <div className="interaction-workspace">
-        <section className="interaction-panel interaction-queue" aria-labelledby="interaction-queue-title">
-          <div className="interaction-panel__heading">
-            <div>
-              <h2 id="interaction-queue-title">{t("interactions.queue.title")}</h2>
-              <p>{t("interactions.queue.description")}</p>
-            </div>
-            <span className="interaction-count" aria-label={t("interactions.queue.countLabel")}>
-              {queue.length}
-            </span>
-          </div>
-
-          {queue.length === 0 ? (
-            <div className="interaction-queue__empty">
-              <strong>{t("interactions.queue.emptyTitle")}</strong>
-              <span>{t("interactions.queue.emptyDescription")}</span>
-            </div>
-          ) : (
-            <div className="interaction-table-wrap">
-              <table className="interaction-table queue-table">
-                <thead>
-                  <tr>
-                    <th scope="col">{t("interactions.queue.position")}</th>
-                    <th scope="col">{t("interactions.queue.item")}</th>
-                    <th scope="col">{t("interactions.queue.donor")}</th>
-                    <th scope="col">{t("interactions.queue.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {queue.map((entry, index) => {
-                    const item = interactionItemFor(entry.item);
-                    const displayStatus = entry.status === "queued" && !available
-                      ? "waiting_game"
-                      : entry.status;
-                    return (
-                      <tr key={entry.id}>
-                        <td className="queue-table__position">{index + 1}</td>
-                        <td>
-                          <div className="interaction-item-label">
-                            {item ? <img src={item.image} alt="" /> : null}
-                            <span>
-                              {item
-                                ? t(item.titleKey)
-                                : entry.item}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="queue-table__donor">{entry.donor}</td>
-                        <td>
-                          <span className="queue-status" data-status={displayStatus}>
-                            {t(`interactions.queue.${displayStatus}`)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <StreamRulesView />
 
         <div className="interaction-workspace__tools">
           <section
@@ -401,7 +315,6 @@ export function InteractionsView() {
         </section>
         </div>
       </div>
-      </>}
     </div>
   );
 }

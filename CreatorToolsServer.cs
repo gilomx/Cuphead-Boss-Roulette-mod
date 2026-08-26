@@ -15,7 +15,6 @@ namespace Gilomx.CupheadBossRoulette
             "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         private const int MaximumHeaderBytes = 65536;
         private const int MaximumClientPayloadBytes = 1024 * 1024;
-        private const int MaximumDashboardCommands = 1024;
         private const int MaximumDashboardQueryLength = 4096;
         private const int MaximumStreamRuleCommands = 256;
         private const int MaximumStreamRuleQueryLength = 4096;
@@ -31,12 +30,11 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Queue<string> interactionCommands =
             new Queue<string>();
         private readonly object dashboardLock = new object();
-        private readonly Queue<string> dashboardCommands =
-            new Queue<string>();
         private readonly object peskyLock = new object();
         private readonly Queue<string> peskyCommands =
             new Queue<string>();
         private readonly object streamRulesLock = new object();
+        private readonly object streamRulesProcessingLock = new object();
         private readonly Queue<string> streamRuleCommands =
             new Queue<string>();
         private readonly object modeCommandsLock = new object();
@@ -52,6 +50,8 @@ namespace Gilomx.CupheadBossRoulette
         private Thread acceptThread;
         private Thread broadcastThread;
         private volatile bool running;
+        private Func<string, string> streamRuleCommandHandler;
+        private Func<string, string> dashboardSimulationHandler;
         private string latestMessage = "{\"type\":\"state\",\"active\":false}";
         private long latestRevision;
         private byte[] challengeLabelPng;
@@ -61,7 +61,7 @@ namespace Gilomx.CupheadBossRoulette
         private string latestInteractionsState =
             "{\"ready\":false,\"available\":false}";
         private string latestDashboardState =
-            "{\"ready\":false,\"schemaVersion\":1,\"revision\":0," +
+            "{\"ready\":false,\"schemaVersion\":2,\"revision\":0," +
             "\"engineStatus\":\"starting\",\"connections\":[]," +
             "\"counters\":{\"received\":0,\"matched\":0," +
             "\"queued\":0,\"ignored\":0,\"gifts\":0," +
@@ -220,18 +220,15 @@ namespace Gilomx.CupheadBossRoulette
                 latestDashboardState = json;
         }
 
-        internal bool TryTakeDashboardCommand(out string command)
+        /// <summary>
+        /// Registers a background-safe scheduler. The handler may validate
+        /// catalog data and record a due time, but never touches Unity state.
+        /// </summary>
+        internal void SetDashboardSimulationHandler(
+            Func<string, string> handler)
         {
             lock (dashboardLock)
-            {
-                if (dashboardCommands.Count == 0)
-                {
-                    command = null;
-                    return false;
-                }
-                command = dashboardCommands.Dequeue();
-                return true;
-            }
+                dashboardSimulationHandler = handler;
         }
 
         internal void SetPeskyState(string json)
@@ -262,6 +259,18 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             lock (streamRulesLock)
                 latestStreamRulesState = json;
+        }
+
+        /// <summary>
+        /// Registers the background-safe persistent rule handler. Gameplay
+        /// dispatch remains on Unity's main thread; only CRUD and JSON state
+        /// publication run on the HTTP worker so browser focus is irrelevant.
+        /// </summary>
+        internal void SetStreamRuleCommandHandler(
+            Func<string, string> handler)
+        {
+            lock (streamRulesLock)
+                streamRuleCommandHandler = handler;
         }
 
         internal bool TryTakeStreamRuleCommand(out string command)
@@ -704,15 +713,57 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (path == "/api/config/interactions/rules/set")
             {
+                var query = request.Query ?? string.Empty;
+                if (query.Length > MaximumStreamRuleQueryLength)
+                    query = query.Substring(0, MaximumStreamRuleQueryLength);
+
+                Func<string, string> handler;
+                lock (streamRulesLock)
+                    handler = streamRuleCommandHandler;
+
+                if (handler != null)
+                {
+                    try
+                    {
+                        string state;
+                        lock (streamRulesProcessingLock)
+                        {
+                            state = handler(query);
+                            if (string.IsNullOrEmpty(state))
+                                throw new InvalidOperationException(
+                                    "The stream-rule handler returned no " +
+                                    "state.");
+                            // Publish under the same serialization gate as
+                            // persistence so concurrent HTTP clients cannot
+                            // overwrite a newer snapshot with an older one.
+                            SetStreamRulesState(state);
+                        }
+                        WriteResponse(stream, 200, "OK",
+                            "application/json; charset=utf-8",
+                            Encoding.UTF8.GetBytes(state),
+                            false);
+                    }
+                    catch (Exception exception)
+                    {
+                        if (logWarning != null)
+                            logWarning("Creator Tools could not process a " +
+                                "stream-rule command: " +
+                                exception.Message);
+                        WriteResponse(stream, 500,
+                            "Internal Server Error",
+                            "application/json; charset=utf-8",
+                            Encoding.UTF8.GetBytes(
+                                "{\"ok\":false,\"error\":" +
+                                "\"rules_processing_failed\"}"), false);
+                    }
+                    return;
+                }
+
                 var accepted = false;
                 lock (streamRulesLock)
                 {
                     if (streamRuleCommands.Count < MaximumStreamRuleCommands)
                     {
-                        var query = request.Query ?? string.Empty;
-                        if (query.Length > MaximumStreamRuleQueryLength)
-                            query = query.Substring(
-                                0, MaximumStreamRuleQueryLength);
                         streamRuleCommands.Enqueue(query);
                         accepted = true;
                     }
@@ -740,28 +791,51 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (path == "/api/dashboard/simulate")
             {
-                var accepted = false;
+                var query = request.Query ?? string.Empty;
+                if (query.Length > MaximumDashboardQueryLength)
+                    query = query.Substring(0, MaximumDashboardQueryLength);
+
+                Func<string, string> handler;
                 lock (dashboardLock)
+                    handler = dashboardSimulationHandler;
+                if (handler == null)
                 {
-                    if (dashboardCommands.Count < MaximumDashboardCommands)
-                    {
-                        var query = request.Query ?? string.Empty;
-                        if (query.Length > MaximumDashboardQueryLength)
-                            query = query.Substring(
-                                0, MaximumDashboardQueryLength);
-                        dashboardCommands.Enqueue(query);
-                        accepted = true;
-                    }
+                    WriteResponse(stream, 503, "Service Unavailable",
+                        "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes(
+                            "{\"ok\":false,\"error\":" +
+                            "\"simulation_unavailable\"}"), false);
+                    return;
                 }
-                WriteResponse(stream,
-                    accepted ? 202 : 429,
-                    accepted ? "Accepted" : "Too Many Requests",
-                    "application/json; charset=utf-8",
-                    Encoding.UTF8.GetBytes(accepted
-                        ? "{\"ok\":true,\"queued\":true}"
-                        : "{\"ok\":false,\"error\":" +
-                          "\"simulation_queue_full\"}"),
-                    false);
+
+                try
+                {
+                    var error = handler(query) ?? string.Empty;
+                    var accepted = error.Length == 0;
+                    var queueFull = error == "simulation_queue_full";
+                    WriteResponse(stream,
+                        accepted ? 202 : queueFull ? 429 : 400,
+                        accepted ? "Accepted" : queueFull
+                            ? "Too Many Requests"
+                            : "Bad Request",
+                        "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes(accepted
+                            ? "{\"ok\":true,\"queued\":true}"
+                            : "{\"ok\":false,\"error\":\"" +
+                              error + "\"}"), false);
+                }
+                catch (Exception exception)
+                {
+                    if (logWarning != null)
+                        logWarning("Creator Tools could not schedule a " +
+                            "dashboard simulation: " + exception.Message);
+                    WriteResponse(stream, 500,
+                        "Internal Server Error",
+                        "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes(
+                            "{\"ok\":false,\"error\":" +
+                            "\"simulation_scheduling_failed\"}"), false);
+                }
                 return;
             }
             if (path == "/api/config/pesky")

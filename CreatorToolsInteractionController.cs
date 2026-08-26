@@ -163,6 +163,54 @@ namespace Gilomx.CupheadBossRoulette
             lastPeskyState = null;
         }
 
+        internal int StreamQueueAvailableCapacity
+        {
+            get { return interactionQueue.AvailableCapacity; }
+        }
+
+        /// <summary>
+        /// Main-thread entry point for evaluated stream rules. Network and
+        /// companion threads never call the gameplay queue directly.
+        /// </summary>
+        internal int EnqueueStreamInteraction(
+            string item,
+            string donor,
+            string giftImagePath,
+            int quantity,
+            out string feedbackCode)
+        {
+            var executor = FindExecutor(item);
+            if (executor == null)
+            {
+                lastItem = item ?? string.Empty;
+                feedbackCode = "unknown_item";
+                SetInteractionFeedback(feedbackCode, true);
+                return 0;
+            }
+
+            donor = NormalizeDonor(donor);
+            var added = interactionQueue.Enqueue(
+                item, donor, giftImagePath, quantity, 0f);
+            lastItem = item ?? string.Empty;
+            if (added <= 0)
+            {
+                feedbackCode = "queue_full";
+                SetInteractionFeedback(feedbackCode, true);
+                return 0;
+            }
+
+            feedbackCode = peskySettings.Enabled
+                ? "queued_paused"
+                : "queued";
+            SetInteractionFeedback(feedbackCode, false);
+            InvalidateState();
+            if (logInfo != null)
+                logInfo(added + " canje(s) de " + item +
+                    " agregados desde una regla de stream para " +
+                    donor + ".");
+            return added;
+        }
+
         internal bool GameplayLevelLoadPending
         {
             get { return gameplayLevelLoadPending; }
@@ -460,7 +508,8 @@ namespace Gilomx.CupheadBossRoulette
                 0, availableItems.Count)];
             var name = peskySettings.Names[UnityEngine.Random.Range(
                 0, peskySettings.Names.Count)];
-            if (peskyQueue.Enqueue(item, name, 1, 0f) <= 0)
+            if (peskyQueue.Enqueue(
+                    item, name, string.Empty, 1, 0f) <= 0)
                 return;
 
             lastItem = item;
@@ -509,7 +558,7 @@ namespace Gilomx.CupheadBossRoulette
             var item = availableItems[UnityEngine.Random.Range(
                 0, availableItems.Count)];
             if (interactionQueue.Enqueue(
-                item, RandomTestDonor, 1, 0f) <= 0)
+                item, RandomTestDonor, string.Empty, 1, 0f) <= 0)
                 return;
 
             lastItem = item;
@@ -561,7 +610,11 @@ namespace Gilomx.CupheadBossRoulette
             values.TryGetValue("donor", out donor);
             donor = NormalizeDonor(donor);
             var added = interactionQueue.Enqueue(
-                item, donor, ParseQuantity(values), ParseDelaySeconds(values));
+                item,
+                donor,
+                string.Empty,
+                ParseQuantity(values),
+                ParseDelaySeconds(values));
             if (added > 0)
             {
                 SetInteractionFeedback(
@@ -626,7 +679,11 @@ namespace Gilomx.CupheadBossRoulette
             ICreatorToolsInteractionHandle handle;
             string feedbackCode;
             string error;
-            if (executor.TrySpawn(entry.Item, entry.Donor, out handle,
+            if (executor.TrySpawn(
+                entry.Item,
+                entry.Donor,
+                entry.GiftImagePath,
+                out handle,
                 out feedbackCode, out error))
             {
                 queue.ActivateFirst(handle);
@@ -953,6 +1010,7 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < executors.Count; i++)
                 executors[i].Dispose();
             executors.Clear();
+            CreatorToolsGiftImageCache.Clear();
             nextPeskyAt = -1f;
             nextRandomTestAt = -1f;
             nextInteractionDispatchAt = -1f;

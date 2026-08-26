@@ -183,6 +183,7 @@ export interface DashboardConnection {
   account?: string;
   message?: string;
   messageCode?: string;
+  retryAttempt?: number;
   lastEventAt?: string | null;
 }
 
@@ -219,10 +220,17 @@ export interface DashboardEvent {
   rule?: string;
   action?: string;
   amount?: number;
+  unitValue?: number;
+  totalValue?: number;
   unit?: string;
   currency?: string | null;
   count?: number;
   itemName?: string;
+  itemId?: string | null;
+  itemImageUrl?: string | null;
+  streakId?: string | null;
+  streakState?: "none" | "progress" | "final";
+  rawEventType?: string | null;
   simulated?: boolean;
 }
 
@@ -231,6 +239,7 @@ export interface DashboardState {
   ready: boolean;
   revision: number;
   engineStatus: string;
+  streamSessionId?: string;
   connections: DashboardConnection[];
   counters: DashboardCounters;
   events: DashboardEvent[];

@@ -1,6 +1,6 @@
 # Creator Tools: continuación del motor de streaming
 
-Fecha del traspaso: **2026-08-25**
+Fecha del traspaso: **2026-08-26**
 
 Rama: `codex/creator-tools-config-panel`
 
@@ -14,32 +14,68 @@ en `PROJECT_HANDOFF.md`.
   `/config`, sin desmontar el shell, el estado compartido ni la localización.
 - `GET /api/dashboard` publica estado del motor, conexiones, contadores y los
   eventos recientes.
-- `GET /api/dashboard/simulate` encola eventos de prueba para TikTok, Twitch y
-  YouTube. El hilo HTTP no modifica Unity: `Update` procesa como máximo 64
-  comandos por frame.
-- La cola HTTP está limitada a 1024 comandos y el historial circular conserva
-  los últimos 500 eventos.
+- `GET /api/dashboard/simulate` valida el regalo y registra su vencimiento en
+  el hilo HTTP; nunca modifica Unity. La agenda monotónica admite hasta 1024
+  pruebas y `Update` ejecuta como máximo 64 eventos vencidos por frame. El
+  historial circular conserva los últimos 500 eventos.
 - El Dashboard tiene tarjetas de conexión, feed, contadores y simulador en
-  español e inglés. Conserva varias conexiones reales de una misma plataforma
-  cuando éstas se incorporen.
+  español e inglés. TikFinity publica ahora su estado real de API local;
+  Twitch y YouTube permanecen marcados como pendientes.
 - El backend simulado todavía crea una sola conexión por plataforma y
   `/api/dashboard/simulate` no recibe `connectionId`; el enrutamiento
   multiconexión se implementa junto con los adaptadores reales.
-- Todo evento continúa siendo simulado. Ya existe configuración persistente de
-  reglas exactas de regalo, pero no hay conexión real, OAuth, evaluación,
-  acumuladores ni despacho hacia el juego; por eso `matched` y `queued`
-  permanecen en cero.
+- TikFinity ya es una conexión real. El mod inicia de forma invisible el EXE
+  autocontenido de `companion`, consume su NDJSON y lo termina con Cuphead. El
+  usuario sólo necesita mantener abierta la aplicación normal de TikFinity.
+- La primera vertical funciona de punta a punta: regalo exacto -> deduplicación
+  -> cierre de racha -> reglas -> acumuladores por regla/conexión -> cola de
+  interacciones. `matched` y `queued` reflejan actividad real y simulada.
+- Los umbrales consumidos que no caben en la cola de 200 se conservan en un
+  backlog de despacho y se reintentan desde `Update`; editar o eliminar una
+  regla no borra deuda ya ganada. Cada deuda mantiene la interacción que estaba
+  configurada al recibir el regalo.
+- El CRUD persiste una instantánea candidata antes de reemplazar las reglas
+  activas. Un `save_failed` deja intacto tanto el motor como sus acumuladores.
+- El endpoint de reglas ejecuta ese CRUD .NET/filesystem de forma serializada
+  en su propio hilo HTTP y responde con el estado confirmado aunque Cuphead no
+  tenga foco. El juego conserva su comportamiento nativo: al perder el foco se
+  congela. Ningún endpoint debe bloquear ni descartar solicitudes por ello; el
+  trabajo que necesita Unity espera y se aplica desde `Update` cuando el usuario
+  vuelve al juego.
+- La cola de mensajes del acompañante preserva regalos finales frente a ráfagas
+  de likes/estados, coalesce estados redundantes y reporta de forma agregada
+  cualquier descarte por presión.
+- `Reglas de stream` usa una tabla estilo cola. Crear o editar reemplaza el
+  contenido del mismo panel por un formulario completo animado; al guardar
+  regresa a la tabla y resalta la fila confirmada. La vista está separada en
+  componentes de tabla, fila, formulario, selector y catálogo. Ya no está
+  detrás de una pestaña: ocupa el primer panel del workspace de Interacciones.
+  Las imágenes de esa tabla permanecen a opacidad normal.
+- Cuando una regla crea una interacción, la ruta del PNG local del regalo viaja
+  por el backlog y la cola hasta el actor. `CreatorToolsDonorLabel` lo muestra a
+  la izquierda del nombre del donador con alpha base `0.8`, lo incluye en sus
+  fades y snapshot de fin de nivel y respeta la misma prioridad de render.
+  Manual, Random Test y Modo Molestoso no muestran icono.
+- La antigua cola de `Canjeos pendientes` es ahora el componente compartido
+  `InteractionQueuePanel`, se llama `Canjeos en curso` y vive en el Dashboard
+  justo antes de `Tiempo real`. Mantiene la cola confirmada y la optimista.
+- El simulador usa un dropdown buscable que abre los 43 regalos al enfocarse y
+  filtra por nombre o alias sin exigir IDs. Para TikTok/regalo envía únicamente
+  `giftId`, usuario, cantidad y `delaySeconds`: el mod deriva nombre, imagen y
+  Coins desde el catálogo instalado. `Retraso (segundos)` acepta 0 como envío
+  inmediato y sobrevive a cerrar o recargar el navegador (no a cerrar Cuphead).
+  Las pruebas se limitan a 1000 unidades.
 - `assets/creator-tools/gifts/catalog.json` contiene el snapshot base offline
   `2026-08-26.1`: 43 regalos de TikTok con `giftId` textual, nombre, Coins por
   unidad, tipo fuente, URL de origen, primera observación e imagen local. El
   registro `198895`, cuyo nombre estaba en otro idioma, fue excluido junto con
   su PNG. El build valida el catálogo antes de compilar la SPA.
 
-El contrato normalizado v1 ya contiene `eventId`, `idempotencyKey`, secuencia,
-sesión, conexión, plataforma, conector, tipo, usuario opcional, `userId`
-opcional, cantidad, unidad, moneda, conteo, nombre de artículo, estado, fecha de
-recepción y marca de simulación. Las unidades incompatibles nunca se suman:
-Coins, Bits y dinero permanecen separados.
+El contrato del Dashboard es ahora `schemaVersion: 2` y añade `itemId`, imagen,
+valor unitario/total, ID y estado de racha, además de conservar `amount` como
+alias temporal de compatibilidad. El protocolo plano acompañante/mod es v1.
+Las unidades incompatibles nunca se suman: Coins, Bits y dinero permanecen
+separados.
 
 ## Decisiones aprobadas con el usuario
 
@@ -66,8 +102,9 @@ Coins, Bits y dinero permanecen separados.
 
 ### 1. Editor persistente de regalos exactos — implementado
 
-Interacciones ya ofrece `Catálogo y pruebas` y `Reglas de stream`. El CRUD
-inicial crea, edita, duplica, activa/desactiva y elimina reglas TikTok de
+Interacciones ya presenta el catálogo, las pruebas y `Reglas de stream` en un
+solo recorrido visible, sin pestañas. El CRUD inicial crea, edita, duplica,
+activa/desactiva y elimina reglas TikTok de
 regalo exacto. Cada regla guarda `giftId`, copia del nombre conocido, umbral de
 unidades, interacción destino y cantidad en
 `mx.gilomx.cuphead.bossroulette.stream-rules.json`, junto al config principal;
@@ -79,28 +116,23 @@ persistencia viven en C#. Las rutas locales son
 `GET /api/config/interactions/rules` y
 `GET /api/config/interactions/rules/set`.
 
-### 2. Cerrar el contrato de eventos antes de evaluar reglas
+### 2. Cerrar el contrato de eventos antes de evaluar reglas — implementado
 
-El v1 sólo tiene `itemName`. Un regalo exacto necesita, como mínimo, campos
-opcionales para `itemId` e imagen. Antes de aceptar eventos reales también hay
-que definir explícitamente:
+El contrato v2 define explícitamente:
 
 - valor unitario frente a valor total;
 - identificador de racha/transacción;
 - evento provisional de racha frente a evento final;
 - deduplicación de reintentos del proveedor.
 
-En TikTok el ID es la identidad de la regla y el nombre es presentación. El
-tamaño del ID no indica el precio. Las rachas no deben disparar una regla por
-cada actualización y otra vez al finalizar. Si este cambio rompe el contrato,
-incrementar `schemaVersion` en lugar de alterar silenciosamente el v1.
+En TikTok el ID es la identidad de la regla y el nombre es presentación. Las
+rachas `progress` se muestran como ignoradas y sólo `final` o `none` llegan a
+las reglas. La deduplicación se hace antes de contadores y acumuladores.
 
 ### 3. Ampliar el editor a las demás condiciones
 
-Las dos vistas internas ya existen:
-
-- `Catálogo y pruebas`: conserva la interfaz actual.
-- `Reglas de stream`: CRUD persistente de regalo exacto.
+El workspace visible ya contiene el catálogo y las pruebas, además del CRUD
+persistente de regalo exacto en `Reglas de stream`.
 
 Cada regla necesita nombre, estado, plataforma/conexión, tipo de evento,
 condición, interacción de destino y cantidad de interacciones. Debe permitir
@@ -118,31 +150,30 @@ El resto de las condiciones aprobadas debe incorporarse sobre el mismo contrato:
 - follow o suscripción cada N, con 1 como valor inicial;
 - canje por ID/nombre únicamente en plataformas que lo ofrezcan.
 
-### 4. Implementar evaluación, acumuladores y despacho
+### 4. Implementar evaluación, acumuladores y despacho — primera vertical implementada
 
-- Deduplicar por conexión/sesión antes de modificar contadores.
-- Evaluar todas las reglas compatibles; no detenerse en la primera.
-- Mantener acumulador y sobrante por regla y por conexión.
-- Convertir coincidencias en solicitudes de la cola de interacciones existente,
-  nunca invocar actores directamente desde un hilo de red.
-- Respetar pausa, carga, derrota y la protección de transiciones existente.
-- Reflejar el ciclo completo en Dashboard: recibido, coincidente, encolado,
-  ejecutado, ignorado o rechazado.
-- Definir antes de publicar si los acumuladores sobreviven al reinicio del
-  juego o sólo a la sesión del LIVE; esta decisión sigue abierta.
+- Se deduplica por conexión antes de modificar contadores.
+- Todas las reglas exactas compatibles se evalúan independientemente.
+- Cada regla/conexión conserva su sobrante de `cada N` durante la sesión actual.
+- Las coincidencias entran a la cola existente desde el hilo principal de
+  Unity; por ello heredan pausa, carga, derrota y protecciones de transición.
+- Dashboard refleja `received`, `matched`, `queued` e `ignored`. Registrar el
+  resultado posterior `executed`/`rejected` sigue pendiente para una fase de
+  telemetría de la cola.
 
-### 5. Conectar TikFinity
+### 5. Conectar TikFinity — primera vertical implementada
 
-- Consumir el WebSocket local de TikFinity en `ws://127.0.0.1:21213/` mediante
-  un componente acompañante apropiado para WebSocket/JSON si el runtime de
-  Unity no resulta fiable.
-- Añadir reconexión con espera progresiva, estado real de conexión y una vista
-  diagnóstica del payload recibido.
-- Normalizar regalos, Coins, likes, follows y suscripciones al mismo límite que
-  usa el simulador.
-- No reutilizar el WebSocket del Stream Overlay.
-- Tratar el Event Simulator de TikFinity como prueba; verificar primero si sus
-  regalos simulados también aparecen en el puerto 21213.
+- `LaPichiRuleta.TikFinity.exe` consume el endpoint oficial
+  `ws://localhost:21213/`, sin autenticación ni suscripción adicional.
+- Se reconecta con espera 1, 2, 4, 8, 16 y 30 segundos, publica estados NDJSON
+  y termina al morir el PID de Cuphead o cerrarse su pipe de salida.
+- Acepta esquemas planos y anidados y normaliza regalos, Coins, likes, follows
+  y suscripciones. Chat, share y roomUser se descartan en el adaptador.
+- El socket `connected` sólo significa **API local de TikFinity conectada**; no
+  demuestra que el LIVE esté activo porque la API oficial no expone esa señal.
+- Pruebas autocontenidas cubren normalización, rachas, deduplicación, contrato,
+  reconexión y ciclo de vida. Aún conviene validar capturas reales y el Event
+  Simulator de TikFinity antes de considerar estable toda deriva de payload.
 
 ### 6. Añadir Twitch y YouTube
 
@@ -198,11 +229,19 @@ coincida.
   persistencia con respaldo de reglas exactas de regalo.
 - `CreatorToolsServer.cs`: rutas y colas HTTP.
 - `CreatorToolsOverlay.cs`: ciclo de vida y llamada desde Unity `Update`.
+- `Streaming/CreatorToolsStreamEvent.cs`: límite neutral de eventos y resultados.
+- `Streaming/TikFinityCompanionHost.cs`: proceso hijo, cola acotada y reinicio.
+- `Streaming/TikFinityCompanionProtocol.cs`: parser NDJSON plano compatible con
+  .NET 3.5.
+- `TikFinityCompanion/`: cliente WebSocket moderno, normalizador, pruebas y
+  publicación single-file.
 - `creator-tools-ui/src/features/dashboard/DashboardView.tsx`: Dashboard.
 - `creator-tools-ui/src/features/interactions/InteractionsView.tsx`: navegación
   interna entre catálogo/pruebas y reglas.
-- `creator-tools-ui/src/features/interactions/StreamRulesView.tsx`: lista y
-  editor visual conectado al catálogo de regalos.
+- `creator-tools-ui/src/features/interactions/StreamRulesView.tsx`: orquestador
+  de la tabla y el formulario de reglas.
+- `StreamRulesTable.tsx`, `StreamRuleRow.tsx`, `StreamRuleForm.tsx` y
+  `TikTokGiftPicker.tsx`: componentes visuales del flujo de reglas.
 - `creator-tools-ui/src/model.ts`: contratos TypeScript.
 - `creator-tools-ui/scripts/mock-server.mjs`: entorno de desarrollo sin juego.
 - `assets/creator-tools/gifts/catalog.json`: catálogo base offline de TikTok.
@@ -223,6 +262,11 @@ coincida.
   oculto.
 - React no debe conservar reglas o conexiones que necesiten sobrevivir al
   cierre del navegador.
+- El acompañante nunca se abre manualmente: el mod posee su ciclo de vida y su
+  ruta instalada fija es `companion\LaPichiRuleta.TikFinity.exe`.
+- La subcarpeta `TikFinityCompanion` debe permanecer en `DefaultItemExcludes`
+  del proyecto net35; de otro modo sus DLL modernas contaminan las referencias
+  de Unity durante el build.
 - Todo texto visible debe existir en los locales `es` y `en`.
 - Después de cambiar la UI se instalan juntos `config.html`, `config.css` y
   `config.js`; copiar sólo el DLL deja el panel anterior.
@@ -235,6 +279,9 @@ Comandos mínimos:
 npm.cmd run build --prefix creator-tools-ui
 dotnet build CupheadBossRoulette.csproj -c Release --no-restore
 node --check creator-tools-ui/scripts/mock-server.mjs
+powershell -ExecutionPolicy Bypass -File TikFinityCompanion/scripts/test.ps1
+powershell -ExecutionPolicy Bypass -File TikFinityCompanion/scripts/publish-win-x64.ps1
+powershell -ExecutionPolicy Bypass -File TikFinityCompanion/scripts/smoke-test.ps1
 git diff --check
 ```
 
@@ -242,14 +289,15 @@ Preferencias permanentes del usuario para esta línea de trabajo:
 
 - después de cambiar código, compilar e instalar;
 - si Cuphead está abierto, cerrarlo antes de instalar;
-- instalar el DLL y los tres assets compilados del panel;
+- instalar el DLL, los tres assets compilados del panel y el EXE de
+  `companion`;
 - hacer commit solamente cuando el usuario lo pida explícitamente.
 
 ## Decisiones todavía abiertas
 
-- Persistencia o reinicio de los acumuladores entre sesiones/LIVEs.
 - Matriz exacta de Twitch y YouTube.
 - Método de autenticación y almacenamiento local de secretos.
 - Hospedaje, firma, frecuencia y política de actualización del catálogo.
-- Si el acompañante multistream vive como proceso propio o dentro de otro
-  componente instalable.
+- Señal fiable de sesión/LIVE para decidir cuándo reiniciar acumuladores sin
+  depender solamente del reinicio de Cuphead.
+- Telemetría de ejecución/rechazo posterior a la entrada en cola.

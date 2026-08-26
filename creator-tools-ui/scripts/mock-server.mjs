@@ -26,6 +26,41 @@ let streamRulesNextId = 1;
 let streamRulesFeedback = "ready";
 let streamRulesError = false;
 let streamRules = [];
+const streamRuleAccumulators = new Map();
+
+function streamRulesState() {
+  return {
+    ready: true,
+    schemaVersion: 1,
+    revision: streamRulesRevision,
+    engineActive: true,
+    catalogVersion: giftCatalog.catalogVersion,
+    feedback: streamRulesFeedback,
+    error: streamRulesError,
+    maxRules: 100,
+    maxEvery: 1000000,
+    maxQuantity: 50,
+    rules: streamRules.map((rule) => {
+      const gift = giftsById.get(rule.giftId);
+      return {
+        ...rule,
+        platform: "tiktok",
+        connectionId: "all",
+        eventType: "gift",
+        giftName: gift?.name ?? rule.giftId,
+        coinsPerUnit: gift?.coinsPerUnit ?? 0,
+      };
+    }),
+  };
+}
+
+function resetStreamRuleAccumulators(ruleId) {
+  const prefix = `${ruleId}:`;
+  for (const key of streamRuleAccumulators.keys()) {
+    if (key.startsWith(prefix)) streamRuleAccumulators.delete(key);
+  }
+}
+
 let peskyEnabled = false;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
@@ -35,9 +70,9 @@ let dashboardRevision = 1;
 let dashboardNextSequence = 1;
 const dashboardSessionId = "mock-session";
 const dashboardConnections = [
-  { id: "tikfinity", platform: "tiktok", connector: "tikfinity", label: "TikTok / TikFinity", status: "simulated", account: "", message: "", lastEventAt: null },
-  { id: "twitch", platform: "twitch", connector: "twitch-eventsub", label: "Twitch", status: "simulated", account: "", message: "", lastEventAt: null },
-  { id: "youtube", platform: "youtube", connector: "youtube-live-chat", label: "YouTube", status: "simulated", account: "", message: "", lastEventAt: null },
+  { id: "tikfinity-local", platform: "tiktok", connector: "tikfinity", label: "TikTok / TikFinity", status: "connected", account: "", message: "Mock WebSocket connected", lastEventAt: null },
+  { id: "twitch", platform: "twitch", connector: "twitch-eventsub", label: "Twitch", status: "pending", account: "", message: "", lastEventAt: null },
+  { id: "youtube", platform: "youtube", connector: "youtube-live-chat", label: "YouTube", status: "pending", account: "", message: "", lastEventAt: null },
 ];
 const dashboardCounters = {
   received: 0,
@@ -51,6 +86,9 @@ const dashboardCounters = {
   subscriptions: 0,
 };
 let dashboardEvents = [];
+let dashboardNextScheduleId = 1;
+const dashboardScheduledTimers = new Map();
+const dashboardMaximumScheduled = 1024;
 
 const interactionItems = [
   "hilda_green_zeppelin",
@@ -129,6 +167,195 @@ function publicInteractionQueue() {
   return interactionQueue.map(({ readyAt: _readyAt, ...entry }) => entry);
 }
 
+function parseDashboardSimulation(searchParams) {
+  const allowedPlatforms = new Set(["tiktok", "twitch", "youtube"]);
+  const allowedTypes = new Set([
+    "gift",
+    "currency",
+    "like",
+    "follow",
+    "subscription",
+    "redemption",
+  ]);
+  const platform = (searchParams.get("platform") ?? "").trim().toLowerCase().slice(0, 24);
+  const type = (searchParams.get("type") ?? "").trim().toLowerCase().slice(0, 24);
+  const connection = dashboardConnections.find((entry) => entry.platform === platform);
+  const validPlatform = allowedPlatforms.has(platform) && Boolean(connection);
+  const validType = allowedTypes.has(type);
+  const rawCount = (searchParams.get("count") ?? "").trim();
+  const parsedCount = /^[+-]?\d+$/.test(rawCount) ? Number(rawCount) : 1;
+  const count = Math.max(1, Math.min(1_000, parsedCount || 1));
+  const giftId = (
+    (searchParams.get("giftId") ?? "").trim() ||
+    (searchParams.get("itemId") ?? "").trim()
+  ).slice(0, 160);
+  const gift = platform === "tiktok" && type === "gift"
+    ? giftsById.get(giftId)
+    : null;
+  if (platform === "tiktok" && type === "gift" && !gift) {
+    return { error: "unknown_gift" };
+  }
+
+  const requestedAmount = Math.max(
+    0,
+    Math.min(1_000_000_000, Number(searchParams.get("amount")) || 0),
+  );
+  const amount = gift
+    ? Math.min(1_000_000_000, gift.coinsPerUnit * count)
+    : requestedAmount;
+  const defaultUnit = amount <= 0 || !["gift", "currency"].includes(type)
+    ? null
+    : platform === "tiktok"
+      ? "coin"
+      : platform === "twitch"
+        ? "bit"
+        : platform === "youtube"
+          ? "money"
+          : null;
+  const requestedUnit = (searchParams.get("unit") ?? "").trim().toLowerCase().slice(0, 24);
+  const requestedCurrency = (searchParams.get("currency") ?? "").trim().toUpperCase();
+  const rawDelay = Number(searchParams.get("delaySeconds"));
+  const delaySeconds = Number.isFinite(rawDelay)
+    ? Math.max(0, Math.min(3600, rawDelay))
+    : 0;
+
+  return {
+    error: "",
+    delaySeconds,
+    command: {
+      platform,
+      type,
+      connection,
+      validPlatform,
+      validType,
+      count,
+      amount,
+      user: (searchParams.get("user") ?? "").trim().slice(0, 80),
+      userId: (searchParams.get("userId") ?? "").trim().slice(0, 80),
+      itemId: gift?.giftId ?? null,
+      itemName: gift?.name ?? "",
+      itemImageUrl: gift?.imagePath ?? null,
+      unitValue: gift ? gift.coinsPerUnit : count > 0 ? amount / count : amount,
+      unit: gift ? "coin" : requestedUnit || defaultUnit,
+      currency: gift
+        ? null
+        : /^[A-Z]{3}$/.test(requestedCurrency)
+          ? requestedCurrency
+          : null,
+    },
+  };
+}
+
+function executeDashboardSimulation(command) {
+  const sequence = dashboardNextSequence;
+  dashboardNextSequence += 1;
+  const eventId = `sim-${String(sequence).padStart(10, "0")}`;
+  const receivedAt = new Date().toISOString();
+  const valid = command.validPlatform && command.validType;
+  const event = {
+    schemaVersion: 2,
+    id: eventId,
+    eventId,
+    idempotencyKey: `${dashboardSessionId}:${eventId}`,
+    sequence,
+    connectionId: command.validPlatform ? `simulator-${command.platform}` : "simulator",
+    streamSessionId: dashboardSessionId,
+    platform: command.validPlatform ? command.platform : command.platform || "unknown",
+    connector: "simulator",
+    type: command.validType ? command.type : command.type || "unknown",
+    user: command.user,
+    userId: command.userId || null,
+    amount: command.amount,
+    unitValue: command.unitValue,
+    totalValue: command.amount,
+    unit: command.unit,
+    currency: command.currency,
+    count: command.count,
+    itemId: command.itemId,
+    itemName: command.itemName,
+    itemImageUrl: command.itemImageUrl,
+    streakId: null,
+    streakState: "none",
+    rawEventType: "dashboard_simulation",
+    status: valid ? "received" : "ignored",
+    messageCode: valid
+      ? "simulation_received"
+      : !command.validPlatform && !command.validType
+        ? "unsupported_platform_and_type"
+        : !command.validPlatform
+          ? "unsupported_platform"
+          : "unsupported_event_type",
+    receivedAt,
+    simulated: true,
+  };
+
+  dashboardCounters.received += 1;
+  if (valid) {
+    if (command.type === "gift") dashboardCounters.gifts += command.count;
+    if (["gift", "currency"].includes(command.type) && command.amount > 0) {
+      dashboardCounters.valued += 1;
+    }
+    if (command.type === "like") dashboardCounters.likes += command.count;
+    else if (command.type === "follow") dashboardCounters.follows += command.count;
+    else if (command.type === "subscription") dashboardCounters.subscriptions += command.count;
+    if (command.platform === "tiktok" && command.type === "gift" && command.itemId) {
+      const matchedRules = [];
+      const queuedActions = [];
+      let interactionQueueChanged = false;
+      for (const rule of streamRules.filter(
+        (candidate) => candidate.enabled && candidate.giftId === command.itemId,
+      )) {
+        const accumulatorKey = `${rule.id}:simulator-tiktok`;
+        const total = (streamRuleAccumulators.get(accumulatorKey) ?? 0) + command.count;
+        const triggers = Math.floor(total / rule.every);
+        streamRuleAccumulators.set(accumulatorKey, total % rule.every);
+        if (triggers <= 0) continue;
+        matchedRules.push(rule.name);
+        queuedActions.push(rule.interaction);
+        const requested = triggers * rule.quantity;
+        const accepted = Math.max(0, Math.min(
+          requested,
+          50,
+          200 - interactionQueue.length,
+        ));
+        for (let index = 0; index < accepted; index += 1) {
+          interactionQueue.push({
+            id: interactionNextId,
+            item: rule.interaction,
+            donor: command.user,
+            delaySeconds: 0,
+            readyAt: Date.now(),
+            status: "queued",
+          });
+          interactionNextId += 1;
+        }
+        dashboardCounters.queued += accepted;
+        interactionQueueChanged ||= accepted > 0;
+      }
+      if (interactionQueueChanged) {
+        refreshInteractionQueue();
+        interactionFeedback = "queued";
+        interactionRevision += 1;
+      }
+      if (matchedRules.length > 0) {
+        dashboardCounters.matched += 1;
+        event.status = "queued";
+        event.messageCode = "rules_queued";
+        event.rule = matchedRules.join(", ");
+        event.action = queuedActions.join(", ");
+      } else if (streamRules.some(
+        (candidate) => candidate.enabled && candidate.giftId === command.itemId,
+      )) {
+        event.messageCode = "threshold_pending";
+      }
+    }
+  } else {
+    dashboardCounters.ignored += 1;
+  }
+  dashboardEvents = [event, ...dashboardEvents].slice(0, 500);
+  dashboardRevision += 1;
+}
+
 function json(res, body, status = 200) {
   const value = Buffer.from(JSON.stringify(body));
   res.writeHead(status, {
@@ -161,9 +388,10 @@ createServer((req, res) => {
   if (url.pathname === "/api/dashboard") {
     json(res, {
       ready: true,
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: dashboardRevision,
-      engineStatus: "simulated",
+      engineStatus: "running",
+      streamSessionId: dashboardSessionId,
       connections: dashboardConnections,
       counters: dashboardCounters,
       events: dashboardEvents,
@@ -171,84 +399,29 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === "/api/dashboard/simulate") {
-    const allowedPlatforms = new Set(["tiktok", "twitch", "youtube"]);
-    const allowedTypes = new Set([
-      "gift",
-      "currency",
-      "like",
-      "follow",
-      "subscription",
-      "redemption",
-    ]);
-    const platform = (url.searchParams.get("platform") ?? "").trim().toLowerCase().slice(0, 24);
-    const type = (url.searchParams.get("type") ?? "").trim().toLowerCase().slice(0, 24);
-    const connection = dashboardConnections.find((entry) => entry.platform === platform);
-    const validPlatform = allowedPlatforms.has(platform) && Boolean(connection);
-    const validType = allowedTypes.has(type);
-    const valid = validPlatform && validType;
-    const sequence = dashboardNextSequence;
-    dashboardNextSequence += 1;
-    const eventId = `sim-${String(sequence).padStart(10, "0")}`;
-    const receivedAt = new Date().toISOString();
-    const count = Math.max(1, Math.min(
-      1_000_000,
-      Math.floor(Number(url.searchParams.get("count"))) || 1,
-    ));
-    const amount = Math.max(0, Math.min(1_000_000_000, Number(url.searchParams.get("amount")) || 0));
-    const defaultUnit = !valid || amount <= 0 || !["gift", "currency"].includes(type)
-      ? null
-      : platform === "tiktok"
-        ? "coin"
-        : platform === "twitch"
-          ? "bit"
-          : platform === "youtube"
-            ? "money"
-            : null;
-    const requestedUnit = (url.searchParams.get("unit") ?? "").trim().toLowerCase().slice(0, 24);
-    const requestedCurrency = (url.searchParams.get("currency") ?? "").trim().toUpperCase();
-    const event = {
-      schemaVersion: 1,
-      id: eventId,
-      eventId,
-      idempotencyKey: `${dashboardSessionId}:${eventId}`,
-      sequence,
-      connectionId: validPlatform ? connection.id : "simulator",
-      streamSessionId: dashboardSessionId,
-      platform: validPlatform ? platform : platform || "unknown",
-      connector: validPlatform ? connection.connector : "simulator",
-      type: validType ? type : type || "unknown",
-      user: (url.searchParams.get("user") ?? "").trim().slice(0, 80),
-      userId: (url.searchParams.get("userId") ?? "").trim().slice(0, 80) || null,
-      amount,
-      unit: requestedUnit || defaultUnit,
-      currency: /^[A-Z]{3}$/.test(requestedCurrency) ? requestedCurrency : null,
-      count,
-      itemName: (url.searchParams.get("itemName") ?? "").trim().slice(0, 80),
-      status: valid ? "received" : "ignored",
-      messageCode: valid
-        ? "simulation_received"
-        : !validPlatform && !validType
-          ? "unsupported_platform_and_type"
-          : !validPlatform
-            ? "unsupported_platform"
-            : "unsupported_event_type",
-      receivedAt,
-      simulated: true,
-    };
-    dashboardCounters.received += 1;
-    if (valid) {
-      connection.lastEventAt = receivedAt;
-      if (type === "gift") {
-        dashboardCounters.gifts += count;
-      }
-      if (["gift", "currency"].includes(type) && amount > 0) dashboardCounters.valued += 1;
-      if (type === "like") dashboardCounters.likes += count;
-      else if (type === "follow") dashboardCounters.follows += count;
-      else if (type === "subscription") dashboardCounters.subscriptions += count;
-    } else dashboardCounters.ignored += 1;
-    dashboardEvents = [event, ...dashboardEvents].slice(0, 500);
-    dashboardRevision += 1;
-    json(res, { ok: true, sequence }, 202);
+    const parsed = parseDashboardSimulation(url.searchParams);
+    if (parsed.error) {
+      json(res, { ok: false, error: parsed.error }, 400);
+      return;
+    }
+    if (dashboardScheduledTimers.size >= dashboardMaximumScheduled) {
+      json(res, { ok: false, error: "simulation_queue_full" }, 429);
+      return;
+    }
+    if (parsed.delaySeconds <= 0) {
+      executeDashboardSimulation(parsed.command);
+      json(res, { ok: true, queued: true }, 202);
+      return;
+    }
+
+    const scheduleId = dashboardNextScheduleId;
+    dashboardNextScheduleId += 1;
+    const timer = setTimeout(() => {
+      dashboardScheduledTimers.delete(scheduleId);
+      executeDashboardSimulation(parsed.command);
+    }, parsed.delaySeconds * 1000);
+    dashboardScheduledTimers.set(scheduleId, timer);
+    json(res, { ok: true, queued: true, scheduleId }, 202);
     return;
   }
   if (url.pathname === "/api/config") {
@@ -309,29 +482,7 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === "/api/config/interactions/rules") {
-    json(res, {
-      ready: true,
-      schemaVersion: 1,
-      revision: streamRulesRevision,
-      engineActive: false,
-      catalogVersion: giftCatalog.catalogVersion,
-      feedback: streamRulesFeedback,
-      error: streamRulesError,
-      maxRules: 100,
-      maxEvery: 1000000,
-      maxQuantity: 50,
-      rules: streamRules.map((rule) => {
-        const gift = giftsById.get(rule.giftId);
-        return {
-          ...rule,
-          platform: "tiktok",
-          connectionId: "all",
-          eventType: "gift",
-          giftName: gift?.name ?? rule.giftId,
-          coinsPerUnit: gift?.coinsPerUnit ?? 0,
-        };
-      }),
-    });
+    json(res, streamRulesState());
     return;
   }
   if (url.pathname === "/api/config/interactions/rules/set") {
@@ -340,6 +491,7 @@ createServer((req, res) => {
     const index = streamRules.findIndex((rule) => rule.id === id);
     streamRulesError = false;
     if (action === "delete" && index >= 0) {
+      resetStreamRuleAccumulators(id);
       streamRules.splice(index, 1);
       streamRulesFeedback = "deleted";
     } else if (action === "duplicate" && index >= 0) {
@@ -352,6 +504,7 @@ createServer((req, res) => {
       streamRulesFeedback = "duplicated";
     } else if (action === "toggle" && index >= 0) {
       streamRules[index].enabled = url.searchParams.get("enabled") === "1";
+      if (!streamRules[index].enabled) resetStreamRuleAccumulators(id);
       streamRulesFeedback = streamRules[index].enabled ? "enabled" : "disabled";
     } else if (action === "create" || (action === "update" && index >= 0)) {
       const giftId = url.searchParams.get("giftId") ?? "";
@@ -379,6 +532,7 @@ createServer((req, res) => {
           streamRulesNextId += 1;
           streamRulesFeedback = "created";
         } else {
+          resetStreamRuleAccumulators(id);
           streamRules[index] = rule;
           streamRulesFeedback = "updated";
         }
@@ -388,7 +542,7 @@ createServer((req, res) => {
       streamRulesError = true;
     }
     streamRulesRevision += 1;
-    json(res, { ok: true }, 202);
+    json(res, streamRulesState());
     return;
   }
   if (url.pathname === "/api/config/interactions/set") {

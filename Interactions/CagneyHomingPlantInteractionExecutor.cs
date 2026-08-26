@@ -9,6 +9,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private readonly NativeCagneyHomingPlantCache nativeCache;
         private readonly Func<bool> canSpawn;
+        private readonly Action<string> logWarning;
         private readonly List<CagneyHomingPlantInteractionState> activeStates =
             new List<CagneyHomingPlantInteractionState>();
 
@@ -20,6 +21,7 @@ namespace Gilomx.CupheadBossRoulette
             Action<string> logWarning)
         {
             this.canSpawn = canSpawn;
+            this.logWarning = logWarning;
             nativeCache = new NativeCagneyHomingPlantCache(
                 coroutineHost,
                 canPreload,
@@ -50,6 +52,7 @@ namespace Gilomx.CupheadBossRoulette
         public bool TrySpawn(
             string item,
             string donor,
+            string giftImagePath,
             out ICreatorToolsInteractionHandle handle,
             out string feedbackCode,
             out string error)
@@ -92,6 +95,10 @@ namespace Gilomx.CupheadBossRoulette
                 out error))
                 return false;
 
+            CreatorToolsInteractionPresentation.SetGiftImage(
+                state,
+                giftImagePath,
+                logWarning);
             activeStates.Add(state);
             handle = new CreatorToolsUnityObjectInteractionHandle(state);
             return true;

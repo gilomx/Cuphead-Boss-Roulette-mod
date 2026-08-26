@@ -16,6 +16,34 @@ TikFinity/TikTok, Twitch y YouTube están documentados en
 antes de modificar el contrato normalizado, `/dashboard` o la vista de
 Interacciones.
 
+## Creator Tools: reglas visibles y canjeos en curso (2026-08-26)
+
+Las pestañas internas de `/config/interactions` fueron retiradas. El catálogo
+permanece arriba y `StreamRulesView` ocupa directamente el primer espacio del
+workspace donde antes aparecía la cola de canjeos; en ventanas medianas el
+workspace se apila para mantener visibles todas las columnas y acciones. Las
+imágenes de regalos de esa tabla conservan su opacidad normal.
+
+En el juego, una interacción creada por una regla muestra el PNG local del
+regalo a la izquierda del nombre del donador con alpha `0.8`.
+La ruta se conserva a través del backlog y la cola; el icono comparte seguimiento,
+fade, snapshot y prioridad de render con la etiqueta. Las entradas manuales,
+Random Test y Modo Molestoso siguen mostrando sólo el nombre.
+
+La cola se extrajo a `InteractionQueuePanel.tsx`, combina el estado confirmado
+con `optimisticInteractionQueue` y ahora se muestra en `/dashboard`, después de
+Conexiones y antes del panel `Tiempo real`. Su etiqueta visible es `Canjeos en
+curso`; no añade polling ni un segundo dueño de estado.
+
+El simulador del Dashboard ya no expone `itemId` ni un nombre libre para
+regalos de TikTok. Usa un combobox buscable sobre los 43 regalos, deriva
+nombre/imagen/Coins en el backend y admite `Retraso (segundos)` de 0 a 3600.
+La agenda vive en el mod, conserva orden y capacidad 1024 y no se cancela al
+cerrar el navegador. Cuphead conserva su pausa nativa al perder el foco: los
+endpoints siguen aceptando y guardando solicitudes, mientras cualquier trabajo
+que requiere Unity queda pendiente y se aplica desde `Update` al volver al
+juego.
+
 ## Creator Tools: streaming dashboard foundation (2026-08-25)
 
 The first provider-agnostic streaming slice is implemented locally. `/dashboard`
@@ -637,6 +665,13 @@ therefore remain queued and the page reports `PENDIENTE: VUELVE A CUPHEAD`
 until focus returns and `UpdateCreatorToolsForceConfig()` applies them. Future
 work must preserve that main-thread boundary; do not mutate roulette or Unity
 state directly from the server thread.
+
+Update 2026-08-26: persistent stream-rule CRUD is intentionally exempt from
+that old pending-focus behavior. It validates, writes and publishes immutable
+rule configuration under serialized .NET locks on the HTTP worker, because it
+does not touch Unity. Rule evaluation and interaction spawning still remain on
+the main thread. Do not replace this split with `Application.runInBackground`,
+which would also advance Cuphead gameplay while its window is unfocused.
 
 The native navigation shipped in the same batch renames the map pause entry
 and compact hub to `LA PICHI RULETA`. The hub borrows Cuphead's main Options

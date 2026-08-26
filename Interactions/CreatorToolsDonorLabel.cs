@@ -11,6 +11,8 @@ namespace Gilomx.CupheadBossRoulette
         private const float VisualGap = 14f;
         private const float LabelWidth = 320f;
         private const float LabelHeight = 48f;
+        private const float GiftImageGap = 5f;
+        private const float GiftImageOpacity = 0.8f;
         private static readonly Color32 DefaultTextColor =
             new Color32(255, 240, 194, 255);
         private static readonly Color32 AlternateTextColor =
@@ -20,7 +22,9 @@ namespace Gilomx.CupheadBossRoulette
         private static readonly HashSet<Levels> AlternateTextColorLevels =
             new HashSet<Levels>();
         private CreatorToolsDonorLabelFollower follower;
+        private TextMeshPro labelText;
         private Renderer labelRenderer;
+        private SpriteRenderer giftRenderer;
 
         internal void Initialize(string value)
         {
@@ -44,7 +48,7 @@ namespace Gilomx.CupheadBossRoulette
                     "CreatorTools_DonorLabel");
                 labelObject.layer = gameObject.layer;
 
-                var labelText = labelObject.AddComponent<TextMeshPro>();
+                labelText = labelObject.AddComponent<TextMeshPro>();
                 // TextMeshPro replaces the GameObject's Transform with a
                 // RectTransform in this Unity version. Resolve it afterwards.
                 var labelTransform = labelText.rectTransform;
@@ -93,6 +97,60 @@ namespace Gilomx.CupheadBossRoulette
                     Destroy(labelObject);
                 throw;
             }
+        }
+
+        internal void SetGiftImage(string imagePath)
+        {
+            if (labelText == null || labelRenderer == null ||
+                string.IsNullOrEmpty(imagePath))
+                return;
+            string loadError;
+            var sprite = CreatorToolsGiftImageCache.TryGet(
+                imagePath, out loadError);
+            if (sprite == null)
+            {
+                // The presentation boundary catches and logs this once. The
+                // cache suppresses repeats for a path that already failed so
+                // a batch of redeems cannot flood BepInEx's log.
+                if (!string.IsNullOrEmpty(loadError))
+                    throw new InvalidOperationException(loadError);
+                return;
+            }
+
+            if (giftRenderer == null)
+            {
+                var giftObject = new GameObject(
+                    "CreatorTools_DonorGift");
+                giftObject.layer = labelText.gameObject.layer;
+                giftObject.transform.SetParent(
+                    labelText.rectTransform, false);
+                giftRenderer = giftObject.AddComponent<SpriteRenderer>();
+            }
+
+            labelText.margin = Vector4.zero;
+            var availableTextWidth = Mathf.Max(
+                1f, LabelWidth - sprite.bounds.size.x - GiftImageGap);
+            var textWidth = Mathf.Min(
+                availableTextWidth,
+                Mathf.Max(1f, labelText.preferredWidth));
+            labelText.margin = new Vector4(
+                sprite.bounds.size.x + GiftImageGap, 0f, 0f, 0f);
+
+            giftRenderer.sprite = sprite;
+            giftRenderer.color = new Color(1f, 1f, 1f,
+                GiftImageOpacity);
+            giftRenderer.sortingLayerID = labelRenderer.sortingLayerID;
+            giftRenderer.sortingOrder = labelRenderer.sortingOrder;
+            giftRenderer.transform.localPosition = new Vector3(
+                -(textWidth + GiftImageGap) * 0.5f,
+                -LabelHeight * 0.5f,
+                0f);
+            giftRenderer.transform.localRotation = Quaternion.identity;
+            giftRenderer.transform.localScale = Vector3.one;
+
+            if (follower != null)
+                follower.SetGiftRenderer(giftRenderer);
+            RegisterWithRenderPriority(gameObject);
         }
 
         internal bool RebindTo(
@@ -159,6 +217,7 @@ namespace Gilomx.CupheadBossRoulette
             frozen.enableWordWrapping = source.enableWordWrapping;
             frozen.richText = source.richText;
             frozen.isOrthographic = source.isOrthographic;
+            frozen.margin = source.margin;
             frozen.color = source.color;
             frozen.outlineColor = source.outlineColor;
             frozen.outlineWidth = source.outlineWidth;
@@ -180,6 +239,30 @@ namespace Gilomx.CupheadBossRoulette
                     labelRenderer.sortingLayerID;
                 frozenRenderer.sortingOrder =
                     labelRenderer.sortingOrder;
+            }
+            if (giftRenderer != null && giftRenderer.enabled &&
+                giftRenderer.sprite != null &&
+                giftRenderer.color.a > 0.01f)
+            {
+                var frozenGiftObject = new GameObject(
+                    giftRenderer.gameObject.name + "_Frozen");
+                frozenGiftObject.layer = giftRenderer.gameObject.layer;
+                var frozenGift = frozenGiftObject.AddComponent<
+                    SpriteRenderer>();
+                frozenGift.sprite = giftRenderer.sprite;
+                frozenGift.color = giftRenderer.color;
+                frozenGift.flipX = giftRenderer.flipX;
+                frozenGift.flipY = giftRenderer.flipY;
+                frozenGift.sortingLayerID = giftRenderer.sortingLayerID;
+                frozenGift.sortingOrder = giftRenderer.sortingOrder;
+                frozenGift.transform.SetParent(parent, false);
+                frozenGift.transform.position =
+                    giftRenderer.transform.position;
+                frozenGift.transform.rotation =
+                    giftRenderer.transform.rotation;
+                frozenGift.transform.localScale =
+                    giftRenderer.transform.lossyScale;
+                giftRenderer.enabled = false;
             }
             source.enabled = false;
             return true;
@@ -209,7 +292,11 @@ namespace Gilomx.CupheadBossRoulette
             var priority = actor.GetComponent<
                 CreatorToolsInteractionRenderPriority>();
             if (priority != null)
+            {
                 priority.RegisterLabel(labelRenderer);
+                if (giftRenderer != null)
+                    priority.RegisterLabel(giftRenderer);
+            }
         }
 
         private void MatchActorSorting(Renderer donorLabelRenderer)
@@ -268,11 +355,13 @@ namespace Gilomx.CupheadBossRoulette
         private Transform actorTransform;
         private SpriteRenderer actorRenderer;
         private TextMeshPro text;
+        private SpriteRenderer giftRenderer;
         private float fallbackVerticalOffset;
         private float visualGap;
         private float additionalVerticalOffset;
         private float fadeElapsed;
         private Color originalColor;
+        private Color originalGiftColor;
         private Color32 originalOutlineColor;
         private Vector3 actorOffset;
         private bool positioned;
@@ -331,6 +420,15 @@ namespace Gilomx.CupheadBossRoulette
                     Mathf.Abs(actorTransform.lossyScale.y),
                     Mathf.Abs(actorTransform.lossyScale.z));
             UpdatePosition();
+        }
+
+        internal void SetGiftRenderer(SpriteRenderer value)
+        {
+            giftRenderer = value;
+            originalGiftColor = value == null
+                ? Color.clear
+                : value.color;
+            ApplyOpacity(currentOpacity);
         }
 
         internal void SetVerticalOffsetPixels(float offsetPixels)
@@ -500,17 +598,24 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ApplyOpacity(float opacity)
         {
-            if (text == null)
-                return;
             var normalized = Mathf.Clamp01(opacity);
-            var color = originalColor;
-            color.a *= normalized;
-            text.color = color;
+            if (text != null)
+            {
+                var color = originalColor;
+                color.a *= normalized;
+                text.color = color;
 
-            var outline = originalOutlineColor;
-            outline.a = (byte)Mathf.RoundToInt(
-                originalOutlineColor.a * normalized);
-            text.outlineColor = outline;
+                var outline = originalOutlineColor;
+                outline.a = (byte)Mathf.RoundToInt(
+                    originalOutlineColor.a * normalized);
+                text.outlineColor = outline;
+            }
+            if (giftRenderer != null)
+            {
+                var giftColor = originalGiftColor;
+                giftColor.a *= normalized;
+                giftRenderer.color = giftColor;
+            }
         }
     }
 }

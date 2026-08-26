@@ -4,24 +4,49 @@
 
 - La SPA añade `/dashboard`, una vista operativa bilingüe con estado del motor,
   tarjetas de TikFinity/TikTok, Twitch y YouTube, resumen global, feed de
-  eventos recientes y un simulador local. En esta primera etapa las tres
-  conexiones aparecen como simuladas: todavía no inicia sesión en plataformas
-  ni ejecuta reglas o interacciones reales.
-- El mod incorpora el contrato normalizado v1 para eventos de streaming y un
+  eventos recientes y un simulador local. TikFinity muestra ahora el estado
+  real de su API local; Twitch y YouTube permanecen como integraciones futuras.
+- El mod incorpora el contrato normalizado v2 para eventos de streaming y un
   historial circular en memoria de 500 entradas. Las solicitudes del simulador
   se limitan y sólo se procesan desde `Update` de Unity; el hilo HTTP nunca toca
-  objetos del juego.
+  objetos del juego. Incluye IDs de artículo, valor unitario/total, rachas y
+  deduplicación antes de contadores y reglas.
+- Un acompañante Windows x64 autocontenido consume automáticamente la API
+  WebSocket local de TikFinity. No tiene ventana ni configuración propia,
+  reintenta la conexión, termina con Cuphead y normaliza regalos, likes,
+  follows y suscripciones sin cargar JSON/WebSocket moderno dentro de Unity.
 - Se añadió el catálogo base offline de TikTok `2026-08-26.1` con 43 regalos,
   IDs estables como texto, costo por unidad, metadatos de origen y sus imágenes
   locales. El único registro con nombre en otro idioma (`giftId 198895`) quedó
   fuera junto con su imagen. El build valida unicidad, precios, rutas y firmas
   PNG antes de compilar el panel.
-- Interacciones ahora separa `Catálogo y pruebas` de `Reglas de stream`. El
-  editor permite crear, editar, duplicar, activar y eliminar reglas de regalo
-  exacto por `giftId`, con umbral de unidades, interacción destino y cantidad.
+- Interacciones muestra ahora el catálogo y, justo debajo, `Reglas de stream`
+  sin pestañas ocultas. La tabla ocupa el espacio principal donde antes estaba
+  la cola; crear/editar abre un formulario completo animado dentro del mismo
+  panel. Permite duplicar, activar y eliminar reglas de regalo exacto por
+  `giftId`, con umbral, destino y cantidad. La tabla conserva las imágenes del
+  catálogo a opacidad normal. Al ejecutarse un canje real, la imagen local del
+  regalo aparece dentro del juego, a la izquierda del nombre del donador y con
+  80 % de transparencia; acompaña el seguimiento, las capas y los fades de la
+  etiqueta sin descargar recursos durante la partida.
   El mod valida los regalos y las interacciones, guarda las reglas en un JSON
-  con respaldo y las conserva aunque se cierre el navegador. Esta etapa aún no
-  recibe eventos reales ni despacha las reglas a la cola de canjeos.
+  con respaldo y las conserva aunque se cierre el navegador. Los eventos reales
+  ya evalúan todas las coincidencias, conservan el sobrante por regla/conexión y
+  despachan a la cola de canjeos existente desde el hilo principal. Los canjes
+  que no caben permanecen en un backlog agrupado y se drenan sin perderse; la
+  deuda ya ganada conserva la interacción vigente al momento del regalo. El
+  CRUD guarda primero una instantánea y sólo entonces cambia las reglas activas,
+  por lo que un fallo de escritura no altera el motor de la sesión.
+- La cola compartida se extrajo a un componente único y se movió al Dashboard,
+  encima de `Tiempo real`, con el nombre `Canjeos en curso`. Conserva las filas
+  activas, en espera y optimistas sin duplicar estado ni polling.
+- Crear, editar, duplicar, activar o eliminar reglas ya no depende del foco de
+  Cuphead. El servidor procesa únicamente ese CRUD persistente en un bloque
+  serializado y devuelve el estado autoritativo en la misma respuesta; la
+  evaluación de eventos y los efectos del juego permanecen en el hilo de Unity.
+- La entrada del acompañante prioriza regalos finales sobre estados, progreso
+  de racha y likes durante ráfagas. Los estados se coalescen y cualquier
+  descarte inevitable por capacidad queda registrado con telemetría agregada.
 - El servidor local usa exclusivamente `127.0.0.1:18081` para conservar las
   fuentes de OBS existentes y ya no cambia a otro puerto. Si está ocupado,
   `PANEL DE CONTROL` abre una página local con instrucciones para liberarlo y

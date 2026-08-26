@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -51,6 +52,7 @@ namespace Gilomx.CupheadBossRoulette
         private CreatorToolsInteractionController creatorToolsInteractions;
         private CreatorToolsDashboardController creatorToolsDashboard;
         private CreatorToolsStreamRulesController creatorToolsStreamRules;
+        private TikFinityCompanionHost creatorToolsTikFinityCompanion;
         private bool creatorToolsBattleSessionActive;
         private bool creatorToolsBattleCompleted;
         private bool creatorToolsBattleVisible;
@@ -113,10 +115,16 @@ namespace Gilomx.CupheadBossRoulette
                 1,
                 "Cantidad maxima de interacciones visibles al mismo tiempo.");
 
-            creatorToolsDashboard = new CreatorToolsDashboardController();
             creatorToolsStreamRules = new CreatorToolsStreamRulesController(
                 AssetsDirectory,
                 Config.ConfigFilePath,
+                delegate(string message) { Logger.LogWarning(message); });
+            creatorToolsDashboard = new CreatorToolsDashboardController(
+                creatorToolsStreamRules.TryResolveSimulationGift);
+            creatorToolsTikFinityCompanion = new TikFinityCompanionHost(
+                Path.GetDirectoryName(Info.Location) ??
+                    BepInEx.Paths.PluginPath,
+                delegate(string message) { Logger.LogInfo(message); },
                 delegate(string message) { Logger.LogWarning(message); });
             creatorToolsInteractions = new CreatorToolsInteractionController(
                 this,
@@ -1067,6 +1075,12 @@ namespace Gilomx.CupheadBossRoulette
                     delegate(string message) { Logger.LogInfo(message); },
                     delegate(string message) { Logger.LogWarning(message); });
             }
+            if (creatorToolsStreamRules != null)
+                creatorToolsServer.SetStreamRuleCommandHandler(
+                    creatorToolsStreamRules.ProcessServerCommand);
+            if (creatorToolsDashboard != null)
+                creatorToolsServer.SetDashboardSimulationHandler(
+                    creatorToolsDashboard.ScheduleSimulation);
             if (creatorToolsServer.IsRunning)
                 return true;
 
@@ -1088,6 +1102,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private void StopCreatorToolsServer()
         {
+            if (creatorToolsTikFinityCompanion != null)
+            {
+                creatorToolsTikFinityCompanion.Dispose();
+                creatorToolsTikFinityCompanion = null;
+            }
             if (creatorToolsServer != null)
                 creatorToolsServer.Stop();
             creatorToolsLastPublishedState = null;
@@ -1136,10 +1155,19 @@ namespace Gilomx.CupheadBossRoulette
 
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
-            if (creatorToolsDashboard != null)
-                creatorToolsDashboard.Update(creatorToolsServer);
+            var queuedFromStreamBacklog = 0;
             if (creatorToolsStreamRules != null)
-                creatorToolsStreamRules.Update(creatorToolsServer);
+                queuedFromStreamBacklog = creatorToolsStreamRules.Update(
+                    creatorToolsServer, creatorToolsInteractions);
+            if (creatorToolsDashboard != null &&
+                queuedFromStreamBacklog > 0)
+                creatorToolsDashboard.AddQueuedInteractions(
+                    queuedFromStreamBacklog);
+            UpdateTikFinityCompanion();
+            if (creatorToolsDashboard != null)
+                creatorToolsDashboard.Update(
+                    creatorToolsServer,
+                    EvaluateCreatorToolsStreamEvent);
             if (creatorToolsInteractions != null)
             {
                 // `_OnLevelStart` can precede a stable `Level.Current` on
@@ -1150,14 +1178,57 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private void UpdateTikFinityCompanion()
+        {
+            if (creatorToolsTikFinityCompanion == null)
+                return;
+            creatorToolsTikFinityCompanion.Update();
+            var processed = 0;
+            CreatorToolsStreamMessage message;
+            while (processed < 64 &&
+                   creatorToolsTikFinityCompanion.TryTakeMessage(out message))
+            {
+                if (message.Connection != null &&
+                    creatorToolsDashboard != null)
+                    creatorToolsDashboard.ApplyConnectionUpdate(
+                        message.Connection);
+                if (message.Event != null &&
+                    creatorToolsDashboard != null)
+                    creatorToolsDashboard.ProcessEvent(
+                        message.Event,
+                        EvaluateCreatorToolsStreamEvent);
+                processed++;
+            }
+        }
+
+        private CreatorToolsStreamEvaluation EvaluateCreatorToolsStreamEvent(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            if (creatorToolsStreamRules == null ||
+                creatorToolsInteractions == null)
+                return CreatorToolsStreamEvaluation.None;
+            return creatorToolsStreamRules.Evaluate(
+                streamEvent, creatorToolsInteractions);
+        }
+
         private void DisposeCreatorTools()
         {
             LevelPauseGUI.OnPauseEvent -=
                 OnCreatorToolsInteractionPaused;
             LevelPauseGUI.OnUnpauseEvent -=
                 OnCreatorToolsInteractionUnpaused;
+            if (creatorToolsServer != null)
+            {
+                creatorToolsServer.SetDashboardSimulationHandler(null);
+                creatorToolsServer.SetStreamRuleCommandHandler(null);
+            }
             creatorToolsDashboard = null;
             creatorToolsStreamRules = null;
+            if (creatorToolsTikFinityCompanion != null)
+            {
+                creatorToolsTikFinityCompanion.Dispose();
+                creatorToolsTikFinityCompanion = null;
+            }
             if (creatorToolsInteractions != null)
             {
                 creatorToolsInteractions.Dispose();

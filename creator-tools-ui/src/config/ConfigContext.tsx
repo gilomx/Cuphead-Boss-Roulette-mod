@@ -37,7 +37,7 @@ interface ConfigValue {
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
-  saveStreamRule: (draft: StreamRuleDraft) => void;
+  saveStreamRule: (draft: StreamRuleDraft) => boolean;
   deleteStreamRule: (id: number) => void;
   duplicateStreamRule: (id: number) => void;
   toggleStreamRule: (id: number, enabled: boolean) => void;
@@ -666,15 +666,25 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const sendStreamRuleUpdate = useCallback(
     (query: URLSearchParams) => {
-      if (!streamRules?.ready) return;
+      if (!streamRules?.ready) return false;
       streamRulesRevisionRef.current = streamRules.revision;
       setStatus("saving");
       const send = () => fetch(
         "/api/config/interactions/rules/set?" + query,
         { cache: "no-store" },
       )
-        .then((response) => {
+        .then(async (response) => {
           if (!response.ok) throw new Error("HTTP " + response.status);
+          const next = await response.json() as Partial<StreamRulesConfigState>;
+          if (next.ready && typeof next.revision === "number" &&
+              Array.isArray(next.rules)) {
+            streamRulesRevisionRef.current = null;
+            if (mountedRef.current) {
+              setStreamRules(next as StreamRulesConfigState);
+              setStatus(next.error ? "error" : "saved");
+            }
+            return;
+          }
           if (mountedRef.current) setStatus("pending");
           window.setTimeout(() => void load(), 160);
         })
@@ -687,6 +697,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         });
       streamRulesWriteChainRef.current =
         streamRulesWriteChainRef.current.then(send, send);
+      return true;
     },
     [load, streamRules],
   );
@@ -703,7 +714,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         quantity: String(draft.quantity),
       });
       if (draft.id !== undefined) query.set("id", String(draft.id));
-      sendStreamRuleUpdate(query);
+      return sendStreamRuleUpdate(query);
     },
     [sendStreamRuleUpdate],
   );

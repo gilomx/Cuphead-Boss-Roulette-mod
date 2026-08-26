@@ -63,6 +63,16 @@
       "disconnected": "Desconectada",
       "error": "Error"
     },
+    "connectionDescriptions": {
+      "tikfinity": {
+        "connecting": "Buscando la API local de TikFinity…",
+        "connected": "API local conectada; el acompañante ya puede recibir eventos.",
+        "waiting": "API local conectada; esperando actividad de TikFinity.",
+        "reconnecting": "Sin respuesta de TikFinity; reintentando automáticamente.",
+        "disconnected": "TikFinity no está disponible; se reintentará automáticamente.",
+        "error": "No se pudo iniciar o conectar el acompañante de TikFinity."
+      }
+    },
     "platforms": {
       "tiktok": "TikTok",
       "twitch": "Twitch",
@@ -109,13 +119,21 @@
       "type": "Tipo de evento",
       "user": "Usuario",
       "userPlaceholder": "Donador de prueba",
-      "itemName": "Regalo o canje",
-      "itemNamePlaceholder": "Rosa",
+      "item": "Regalo de TikTok",
+      "itemPlaceholder": "Buscar por nombre…",
+      "itemLoading": "Cargando regalos…",
+      "itemCatalogError": "No se pudo cargar el catálogo",
+      "itemNoResults": "No hay regalos que coincidan con la búsqueda.",
+      "itemCoins": "{coins} monedas",
+      "itemValueHint": "Valor automático: {coins} monedas por unidad.",
       "amount": "Valor / monedas",
       "count": "Cantidad",
+      "delay": "Retraso (segundos)",
+      "delayHint": "0 = inmediato.",
       "submit": "Enviar evento",
       "sending": "Enviando…",
       "sent": "El evento llegó al motor.",
+      "scheduled": "Evento programado; se ejecutará en {seconds} s.",
       "error": "No se pudo enviar el evento.",
       "hint": "El resultado aparecerá en el feed de esta sesión."
     },
@@ -126,32 +144,40 @@
   "interactions": {
     "title": "Interacciones",
     "description": "Administra los canjeos que entran al juego y prueba su orden de ejecución.",
-    "sections": {
-      "label": "Secciones de interacciones",
-      "catalog": "Catálogo y pruebas",
-      "rules": "Reglas de stream"
-    },
     "rules": {
       "coins": "monedas",
       "notice": {
-        "eyebrow": "Primera etapa",
-        "title": "Configuración conectada al catálogo de TikTok",
-        "description": "Estas reglas ya se guardan dentro del mod. La recepción de eventos reales y su envío a la cola se conectarán en la siguiente etapa.",
+        "eyebrow": "Regalos de TikTok",
+        "title": "Intercambios listos para tu stream",
+        "description": "Crea reglas para convertir regalos exactos en interacciones del juego. Puedes pausarlas o ajustarlas sin eliminarlas.",
         "catalog": "{count} regalos · catálogo {version}",
         "catalogLoading": "Cargando catálogo…",
         "catalogError": "No se pudo cargar el catálogo instalado."
       },
       "list": {
+        "eyebrow": "Mapa de interacciones",
         "title": "Reglas configuradas",
         "description": "Cada regalo se identifica por su giftId, aunque TikTok cambie su nombre visible.",
         "create": "Nueva regla",
+        "createFirst": "Crear primera regla",
+        "countLabel": "Reglas configuradas",
+        "limitReached": "Se alcanzó el límite de reglas.",
         "emptyTitle": "Todavía no hay reglas",
         "emptyDescription": "Crea la primera para relacionar un regalo de TikTok con una interacción del juego.",
         "enabled": "Activa",
         "disabled": "Inactiva",
-        "every": "cada {count} unidades"
+        "toggleLabel": "Activar o desactivar {name}",
+        "status": "Estado",
+        "rule": "Regla",
+        "trigger": "Cuando llega",
+        "result": "Enviar al juego",
+        "actions": "Acciones",
+        "every": "cada {count} unidades",
+        "everyOne": "cada unidad",
+        "quantity": "Cantidad ×{count}"
       },
       "editor": {
+        "eyebrow": "Editor de regla",
         "createTitle": "Nueva regla",
         "editTitle": "Editar regla",
         "description": "Elige el regalo exacto y qué elemento del catálogo deberá producir.",
@@ -165,18 +191,26 @@
         "gift": "Regalo exacto",
         "selectGift": "Regalo de TikTok",
         "searchGift": "Buscar por nombre, giftId o monedas",
+        "giftResults": "{count} resultados",
+        "noGiftResults": "No hay regalos que coincidan con esta búsqueda.",
+        "executionTitle": "Intercambio",
         "every": "Cada cuántas unidades",
         "everyHint": "1 ejecuta la regla con cada unidad recibida.",
         "interaction": "Interacción destino",
         "quantity": "Cantidad a enviar",
-        "enabled": "Guardar la regla activa"
+        "quantityHint": "Número de interacciones que entrarán a la cola.",
+        "enabled": "Regla activa",
+        "enabledHint": "Aceptará eventos en cuanto la conexión esté lista."
       },
       "actions": {
+        "label": "Acciones de la regla",
+        "back": "Volver a la tabla",
         "edit": "Editar",
         "duplicate": "Duplicar",
         "delete": "Eliminar",
         "deleteConfirm": "¿Quieres eliminar esta regla?",
         "cancel": "Cancelar",
+        "create": "Crear regla",
         "save": "Guardar regla"
       },
       "feedback": {
@@ -240,11 +274,11 @@
       }
     },
     "queue": {
-      "title": "Canjeos pendientes",
-      "description": "Los elementos se ejecutan según el máximo simultáneo configurado. Los siguientes esperan en el orden en que llegaron.",
-      "countLabel": "Elementos en la cola",
-      "emptyTitle": "La cola está vacía",
-      "emptyDescription": "Agrega una o varias pruebas desde la tabla para ver aquí su orden de ejecución.",
+      "title": "Canjeos en curso",
+      "description": "Aquí aparecen los canjeos activos y los que esperan su turno, respetando el máximo simultáneo configurado.",
+      "countLabel": "Canjeos en curso",
+      "emptyTitle": "No hay canjeos en curso",
+      "emptyDescription": "Cuando una prueba o una regla genere un canje, podrás seguir aquí su ejecución.",
       "position": "Orden",
       "item": "Canjeo",
       "donor": "Donador",
@@ -411,7 +445,7 @@
     "connecting": "Conectando con Cuphead",
     "saved": "Sincronizado",
     "saving": "Guardando cambios",
-    "pending": "Se aplicará al abrir el juego",
+    "pending": "Se aplicará al volver al juego",
     "error": "Sin conexión con el mod"
   },
   "catalog": {

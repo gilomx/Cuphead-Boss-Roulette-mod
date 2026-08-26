@@ -88,6 +88,8 @@ LOGO shows the LA PICHI RULETA logo when there is no active battle result.
 
 The local server always uses port 18081 and never switches to another port. If another application is already using it, CONTROL PANEL opens a local warning page with instructions. Close the application using the port, return to the game and select CONTROL PANEL again. The server remains available for CONTROL PANEL when STATUS is disabled; that setting only hides or shows the OBS source content. The overlay does not require an internet connection. Size, order, alignment, opacity and logo settings update live.
 
+STREAM RULES can exchange exact TikTok gifts for catalog interactions. They now appear directly below the catalog without an extra tab, while REDEEMS IN PROGRESS appears in the Dashboard above the real-time feed. Keep TikFinity open on the same computer; the mod starts its hidden companion automatically and reports the local connection in the Dashboard. You never need to open the companion yourself. Creating or editing a rule is confirmed even while Cuphead is unfocused, without advancing gameplay in the background. When a gift creates an interaction, its bundled image appears in-game beside the donor name at 80% transparency; nothing is downloaded during the fight.
+
 TIKTOK LIVE STUDIO
 
 TikTok Live Studio does not accept local addresses such as localhost or 127.0.0.1 directly, so a local hostname must be configured to use the overlay.
@@ -127,6 +129,7 @@ FEATURES
 • Supports all 12 languages available in Cuphead
 • Local OBS overlay with live Creator Tools settings
 • Creator Tools catalog interactions work in roulette and normally entered gameplay levels
+• Automatic local TikFinity connection with configurable TikTok gift rules
 • Automatically restores your previous equipment after the fight
 
 FEEDBACK
@@ -231,6 +234,8 @@ LOGO muestra el logo de LA PICHI RULETA cuando no hay un resultado de batalla ac
 
 El servidor local siempre usa el puerto 18081 y nunca cambia a otro. Si otra aplicación ya lo está usando, PANEL DE CONTROL abre una página local con instrucciones. Cierra la aplicación que usa el puerto, vuelve al juego y selecciona PANEL DE CONTROL otra vez. El servidor permanece disponible para PANEL DE CONTROL cuando ESTADO está desactivado; ese ajuste solo oculta o muestra el contenido de la fuente de OBS. El overlay no requiere conexión a internet. Los ajustes de tamaño, orden, alineación, opacidad y logo se actualizan en vivo.
 
+REGLAS DE STREAM permite intercambiar regalos exactos de TikTok por interacciones del catálogo. Ahora aparecen directamente debajo del catálogo, sin una pestaña adicional, mientras CANJEOS EN CURSO vive en el Dashboard encima del feed de tiempo real. Mantén TikFinity abierto en el mismo equipo; el mod inicia su acompañante oculto automáticamente y muestra la conexión local en el Dashboard. Nunca necesitas abrir el acompañante por tu cuenta. Crear o editar una regla se confirma aunque Cuphead esté desenfocado, sin hacer avanzar la partida en segundo plano. Cuando un regalo crea una interacción, su imagen incluida aparece dentro del juego junto al nombre del donador con 80 % de transparencia; no se descarga nada durante el combate.
+
 TIKTOK LIVE STUDIO
 
 TikTok Live Studio no acepta directamente direcciones locales como localhost o 127.0.0.1, por lo que es necesario configurar un nombre local para usar el overlay.
@@ -270,6 +275,7 @@ CARACTERÍSTICAS
 • Compatible con los 12 idiomas disponibles en Cuphead
 • Overlay local para OBS con ajustes en vivo desde Creator Tools
 • Interacciones del catálogo en la ruleta y en niveles iniciados normalmente
+• Conexión local automática con TikFinity y reglas configurables por regalo de TikTok
 • Restaura automáticamente tu equipamiento anterior después de la batalla
 
 FEEDBACK

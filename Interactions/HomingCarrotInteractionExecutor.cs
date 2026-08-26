@@ -9,6 +9,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private readonly NativeHomingCarrotCache nativeCache;
         private readonly Func<bool> canSpawn;
+        private readonly Action<string> logWarning;
         private readonly List<ActiveSpawn> activeSpawns =
             new List<ActiveSpawn>();
 
@@ -20,6 +21,7 @@ namespace Gilomx.CupheadBossRoulette
             Action<string> logWarning)
         {
             this.canSpawn = canSpawn;
+            this.logWarning = logWarning;
             nativeCache = new NativeHomingCarrotCache(
                 coroutineHost,
                 canPreload,
@@ -50,6 +52,7 @@ namespace Gilomx.CupheadBossRoulette
         public bool TrySpawn(
             string item,
             string donor,
+            string giftImagePath,
             out ICreatorToolsInteractionHandle handle,
             out string feedbackCode,
             out string error)
@@ -92,6 +95,10 @@ namespace Gilomx.CupheadBossRoulette
                 out error))
                 return false;
 
+            CreatorToolsInteractionPresentation.SetGiftImage(
+                spawned.gameObject,
+                giftImagePath,
+                logWarning);
             activeSpawns.Add(new ActiveSpawn
             {
                 Actor = spawned

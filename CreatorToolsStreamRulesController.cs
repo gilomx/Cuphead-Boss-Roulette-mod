@@ -18,9 +18,14 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly string settingsPath;
         private readonly Action<string> logWarning;
+        private readonly object ruleStateLock = new object();
         private readonly Dictionary<string, GiftEntry> gifts =
             new Dictionary<string, GiftEntry>(StringComparer.Ordinal);
         private readonly List<StreamRule> rules = new List<StreamRule>();
+        private readonly Dictionary<string, long> accumulators =
+            new Dictionary<string, long>(StringComparer.Ordinal);
+        private readonly CreatorToolsStreamDispatchBacklog dispatchBacklog =
+            new CreatorToolsStreamDispatchBacklog();
 
         private string catalogVersion = string.Empty;
         private bool catalogReady;
@@ -62,37 +67,192 @@ namespace Gilomx.CupheadBossRoulette
             LoadSettings();
         }
 
-        internal void Update(CreatorToolsServer server)
+        internal int Update(
+            CreatorToolsServer server,
+            CreatorToolsInteractionController interactions)
         {
-            if (server == null || !server.IsRunning)
-                return;
-
-            var processed = 0;
-            string query;
-            while (processed < MaximumCommandsPerUpdate &&
-                   server.TryTakeStreamRuleCommand(out query))
+            if (server != null && server.IsRunning)
             {
-                ProcessCommand(ParseQuery(query));
-                processed++;
-            }
+                var processed = 0;
+                string query;
+                while (processed < MaximumCommandsPerUpdate &&
+                       server.TryTakeStreamRuleCommand(out query))
+                {
+                    lock (ruleStateLock)
+                        ProcessCommand(ParseQuery(query));
+                    processed++;
+                }
 
-            if (!stateDirty)
-                return;
-            var state = BuildState();
-            if (state == lastPublishedState)
-            {
-                stateDirty = false;
-                return;
+                lock (ruleStateLock)
+                {
+                    if (stateDirty)
+                    {
+                        var state = BuildState();
+                        if (state != lastPublishedState)
+                        {
+                            lastPublishedState = state;
+                            server.SetStreamRulesState(state);
+                        }
+                        stateDirty = false;
+                    }
+                }
             }
-            lastPublishedState = state;
-            server.SetStreamRulesState(state);
-            stateDirty = false;
+            // HTTP CRUD can purge runtime state while Unity remains
+            // unfocused. Serialize backlog mutation with evaluation, but
+            // keep all gameplay queue access on this main-thread call.
+            lock (ruleStateLock)
+                return dispatchBacklog.Drain(interactions);
         }
 
         internal void InvalidateState()
         {
-            lastPublishedState = null;
-            stateDirty = true;
+            lock (ruleStateLock)
+            {
+                lastPublishedState = null;
+                stateDirty = true;
+            }
+        }
+
+        internal string ProcessServerCommand(string query)
+        {
+            lock (ruleStateLock)
+            {
+                ProcessCommand(ParseQuery(query));
+                var state = BuildState();
+                lastPublishedState = state;
+                stateDirty = false;
+                return state;
+            }
+        }
+
+        /// <summary>
+        /// Evaluates every compatible rule independently. Accumulators are
+        /// session-only and scoped by rule plus connection; each keeps its
+        /// remainder after crossing an every-N threshold.
+        /// </summary>
+        internal CreatorToolsStreamEvaluation Evaluate(
+            CreatorToolsStreamEvent streamEvent,
+            CreatorToolsInteractionController interactions)
+        {
+            lock (ruleStateLock)
+                return EvaluateLocked(streamEvent, interactions);
+        }
+
+        /// <summary>
+        /// Resolves simulator input against the installed catalog so the
+        /// browser cannot provide a forged gift name, image or coin value.
+        /// </summary>
+        internal bool TryResolveSimulationGift(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            if (streamEvent == null)
+                return false;
+            lock (ruleStateLock)
+            {
+                GiftEntry gift;
+                if (!catalogReady || streamEvent.Platform != "tiktok" ||
+                    streamEvent.Type != "gift" ||
+                    !gifts.TryGetValue(
+                        streamEvent.ItemId ?? string.Empty, out gift))
+                    return false;
+
+                streamEvent.ItemId = gift.Id;
+                streamEvent.ItemName = gift.Name;
+                streamEvent.ItemImageUrl =
+                    "/assets/creator-tools/gifts/images/" +
+                    gift.Id + ".png";
+                streamEvent.Count = Math.Max(
+                    1, Math.Min(1000000, streamEvent.Count));
+                streamEvent.UnitValue = gift.CoinsPerUnit;
+                streamEvent.TotalValue = Math.Min(
+                    1000000000m,
+                    (decimal)gift.CoinsPerUnit * streamEvent.Count);
+                streamEvent.Unit = "coin";
+                streamEvent.Currency = string.Empty;
+                return true;
+            }
+        }
+
+        private CreatorToolsStreamEvaluation EvaluateLocked(
+            CreatorToolsStreamEvent streamEvent,
+            CreatorToolsInteractionController interactions)
+        {
+            var result = new CreatorToolsStreamEvaluation();
+            if (!catalogReady || streamEvent == null || interactions == null ||
+                streamEvent.Platform != "tiktok" ||
+                streamEvent.Type != "gift")
+                return result;
+            if (string.IsNullOrEmpty(streamEvent.ItemId))
+            {
+                result.MessageCode = "gift_id_missing";
+                return result;
+            }
+
+            var matchedNames = new List<string>();
+            var interactionIds = new List<string>();
+            var thresholdObserved = false;
+            for (var i = 0; i < rules.Count; i++)
+            {
+                var rule = rules[i];
+                if (!rule.Enabled || rule.GiftId != streamEvent.ItemId)
+                    continue;
+                thresholdObserved = true;
+                var accumulatorKey = rule.Id.ToString(
+                    CultureInfo.InvariantCulture) + ":" +
+                    (streamEvent.ConnectionId ?? string.Empty);
+                long remainder;
+                accumulators.TryGetValue(accumulatorKey, out remainder);
+                var total = Math.Min(long.MaxValue - streamEvent.Count,
+                    Math.Max(0L, remainder)) + streamEvent.Count;
+                var triggers = total / rule.Every;
+                accumulators[accumulatorKey] = total % rule.Every;
+                if (triggers <= 0)
+                    continue;
+
+                result.MatchedRules++;
+                matchedNames.Add(rule.Name);
+                interactionIds.Add(rule.Interaction);
+                var requestedLong = triggers * (long)rule.Quantity;
+                var canDispatchImmediately = !dispatchBacklog.HasEntries;
+                var pending = dispatchBacklog.Add(
+                    rule.Id,
+                    streamEvent.ConnectionId,
+                    rule.Interaction,
+                    gifts[rule.GiftId].ImagePath,
+                    streamEvent.UserName,
+                    requestedLong);
+                var queuedForRule = 0;
+                if (canDispatchImmediately)
+                {
+                    string feedbackCode;
+                    queuedForRule = dispatchBacklog.DrainEntry(
+                        pending, interactions, out feedbackCode);
+                    dispatchBacklog.RemoveIfComplete(pending);
+                    if (queuedForRule == 0 &&
+                        string.IsNullOrEmpty(result.MessageCode))
+                        result.MessageCode = feedbackCode;
+                }
+                result.QueuedInteractions += queuedForRule;
+                result.DeferredInteractions += Math.Max(
+                    0L, requestedLong - queuedForRule);
+            }
+
+            result.RuleNames = string.Join(", ", matchedNames.ToArray());
+            result.InteractionIds = string.Join(", ",
+                interactionIds.ToArray());
+            if (result.QueuedInteractions > 0)
+                result.MessageCode = result.DeferredInteractions > 0
+                    ? "rules_partially_queued"
+                    : "rules_queued";
+            else if (result.MatchedRules > 0 &&
+                result.DeferredInteractions > 0)
+                result.MessageCode = "rules_waiting_queue";
+            else if (result.MatchedRules > 0 &&
+                     string.IsNullOrEmpty(result.MessageCode))
+                result.MessageCode = "rules_matched";
+            else if (thresholdObserved)
+                result.MessageCode = "threshold_pending";
+            return result;
         }
 
         private void ProcessCommand(Dictionary<string, string> values)
@@ -113,9 +273,9 @@ namespace Gilomx.CupheadBossRoulette
                 StreamRule rule;
                 if (!TryBuildRule(values, nextId, out rule))
                     return;
-                nextId++;
-                rules.Add(rule);
-                Persist("created");
+                var candidate = CloneRules();
+                candidate.Add(rule);
+                TryCommit(candidate, IncrementRuleId(nextId), "created");
                 return;
             }
 
@@ -139,8 +299,17 @@ namespace Gilomx.CupheadBossRoulette
                 StreamRule rule;
                 if (!TryBuildRule(values, id, out rule))
                     return;
-                rules[index] = rule;
-                Persist("updated");
+                var resetRuntimeState =
+                    rules[index].GiftId != rule.GiftId ||
+                    rules[index].Every != rule.Every ||
+                    rules[index].Interaction != rule.Interaction ||
+                    rules[index].Quantity != rule.Quantity ||
+                    (rules[index].Enabled && !rule.Enabled);
+                var candidate = CloneRules();
+                candidate[index] = rule;
+                if (TryCommit(candidate, nextId, "updated") &&
+                    resetRuntimeState)
+                    ResetRuleRuntimeState(id);
             }
             else if (action == "toggle")
             {
@@ -150,8 +319,11 @@ namespace Gilomx.CupheadBossRoulette
                     SetFeedback("invalid_rule", true);
                     return;
                 }
-                rules[index].Enabled = enabled;
-                Persist(enabled ? "enabled" : "disabled");
+                var candidate = CloneRules();
+                candidate[index].Enabled = enabled;
+                if (TryCommit(candidate, nextId,
+                        enabled ? "enabled" : "disabled") && !enabled)
+                    ResetRuleRuntimeState(id);
             }
             else if (action == "duplicate")
             {
@@ -160,15 +332,18 @@ namespace Gilomx.CupheadBossRoulette
                     SetFeedback("rules_limit", true);
                     return;
                 }
-                var copy = rules[index].Clone(nextId++);
+                var copy = rules[index].Clone(nextId);
                 copy.Name = NormalizeRuleName(copy.Name + " (copia)");
-                rules.Insert(index + 1, copy);
-                Persist("duplicated");
+                var candidate = CloneRules();
+                candidate.Insert(index + 1, copy);
+                TryCommit(candidate, IncrementRuleId(nextId), "duplicated");
             }
             else if (action == "delete")
             {
-                rules.RemoveAt(index);
-                Persist("deleted");
+                var candidate = CloneRules();
+                candidate.RemoveAt(index);
+                if (TryCommit(candidate, nextId, "deleted"))
+                    ResetRuleRuntimeState(id);
             }
             else
                 SetFeedback("invalid_action", true);
@@ -219,14 +394,21 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
-        private void Persist(string successFeedback)
+        private bool TryCommit(
+            List<StreamRule> candidateRules,
+            long candidateNextId,
+            string successFeedback)
         {
-            if (!SaveSettings())
+            if (!SaveSettings(candidateRules, candidateNextId))
             {
                 SetFeedback("save_failed", true);
-                return;
+                return false;
             }
+            rules.Clear();
+            rules.AddRange(candidateRules);
+            nextId = candidateNextId;
             SetFeedback(successFeedback, false);
+            return true;
         }
 
         private void SetFeedback(string value, bool isError)
@@ -246,7 +428,8 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(SchemaVersion)
                 .Append(",\"revision\":")
                 .Append(revision.ToString(CultureInfo.InvariantCulture))
-                .Append(",\"engineActive\":false")
+                .Append(",\"engineActive\":")
+                .Append(catalogReady ? "true" : "false")
                 .Append(",\"catalogVersion\":\"");
             AppendJson(builder, catalogVersion);
             builder.Append("\",\"feedback\":\"");
@@ -321,6 +504,10 @@ namespace Gilomx.CupheadBossRoulette
                     "(?<coins>\\d+)",
                     RegexOptions.CultureInvariant);
                 var matches = expression.Matches(json);
+                var catalogDirectory = Path.GetDirectoryName(
+                    Path.GetFullPath(path)) ?? string.Empty;
+                var imageDirectory = Path.Combine(
+                    catalogDirectory, "images");
                 for (var i = 0; i < matches.Count; i++)
                 {
                     int coins;
@@ -333,7 +520,9 @@ namespace Gilomx.CupheadBossRoulette
                         gifts.Add(id, new GiftEntry(
                             id,
                             UnescapeJson(matches[i].Groups["name"].Value),
-                            coins));
+                            coins,
+                            Path.GetFullPath(Path.Combine(
+                                imageDirectory, id + ".png"))));
                 }
                 return catalogVersion.Length > 0 && gifts.Count > 0;
             }
@@ -449,6 +638,13 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool SaveSettings()
         {
+            return SaveSettings(rules, nextId);
+        }
+
+        private bool SaveSettings(
+            IList<StreamRule> rulesToSave,
+            long nextIdToSave)
+        {
             try
             {
                 var directory = Path.GetDirectoryName(settingsPath);
@@ -458,16 +654,17 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append("{\n  \"version\": ")
                     .Append(SchemaVersion)
                     .Append(",\n  \"nextId\": ")
-                    .Append(nextId.ToString(CultureInfo.InvariantCulture))
+                    .Append(nextIdToSave.ToString(
+                        CultureInfo.InvariantCulture))
                     .Append(",\n  \"rules\": [");
-                for (var i = 0; i < rules.Count; i++)
+                for (var i = 0; i < rulesToSave.Count; i++)
                 {
                     if (i > 0)
                         builder.Append(',');
                     builder.Append("\n    ");
-                    AppendRuleJson(builder, rules[i], false);
+                    AppendRuleJson(builder, rulesToSave[i], false);
                 }
-                if (rules.Count > 0)
+                if (rulesToSave.Count > 0)
                     builder.Append('\n');
                 builder.Append("  ]\n}\n");
 
@@ -505,6 +702,31 @@ namespace Gilomx.CupheadBossRoulette
                 if (rules[i].Id == id)
                     return i;
             return -1;
+        }
+
+        private List<StreamRule> CloneRules()
+        {
+            var cloned = new List<StreamRule>(rules.Count);
+            for (var i = 0; i < rules.Count; i++)
+                cloned.Add(rules[i].Clone(rules[i].Id));
+            return cloned;
+        }
+
+        private void ResetRuleRuntimeState(long id)
+        {
+            var prefix = id.ToString(CultureInfo.InvariantCulture) + ":";
+            var keys = new List<string>();
+            foreach (var key in accumulators.Keys)
+                if (key.StartsWith(prefix, StringComparison.Ordinal))
+                    keys.Add(key);
+            for (var i = 0; i < keys.Count; i++)
+                accumulators.Remove(keys[i]);
+            dispatchBacklog.RemoveRule(id);
+        }
+
+        private static long IncrementRuleId(long value)
+        {
+            return value >= long.MaxValue ? long.MaxValue : value + 1;
         }
 
         private static bool IsKnownInteraction(string value)
@@ -724,12 +946,18 @@ namespace Gilomx.CupheadBossRoulette
             internal readonly string Id;
             internal readonly string Name;
             internal readonly int CoinsPerUnit;
+            internal readonly string ImagePath;
 
-            internal GiftEntry(string id, string name, int coinsPerUnit)
+            internal GiftEntry(
+                string id,
+                string name,
+                int coinsPerUnit,
+                string imagePath)
             {
                 Id = id;
                 Name = name;
                 CoinsPerUnit = coinsPerUnit;
+                ImagePath = imagePath ?? string.Empty;
             }
         }
 

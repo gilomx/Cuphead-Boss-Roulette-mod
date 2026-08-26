@@ -1,0 +1,16 @@
+{
+  "event": "gift",
+  "data": {
+    "msgId": "9001",
+    "groupId": "combo-44",
+    "userId": "1234567890123456789",
+    "uniqueId": "viewer_one",
+    "giftId": 5655,
+    "giftName": "Rose",
+    "giftType": 1,
+    "repeatCount": 3,
+    "repeatEnd": false,
+    "diamondCount": 1,
+    "giftPictureUrl": "https://example.invalid/rose.png"
+  }
+}

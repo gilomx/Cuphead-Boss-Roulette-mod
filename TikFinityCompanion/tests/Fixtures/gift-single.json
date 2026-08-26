@@ -1,0 +1,14 @@
+{
+  "event": "gift",
+  "data": {
+    "msgId": "single-1",
+    "userId": 42,
+    "uniqueId": "solo_viewer",
+    "giftId": "9999",
+    "giftName": "Not streakable",
+    "giftType": 0,
+    "repeatCount": 1,
+    "repeatEnd": false,
+    "diamondCount": 25
+  }
+}

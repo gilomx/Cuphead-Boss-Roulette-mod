@@ -44,8 +44,14 @@ central del runtime, `interactionItems` y el servidor simulado dejan de coincidi
 El mismo servidor de desarrollo expone `GET /api/dashboard` y
 `GET /api/dashboard/simulate`. Permite generar regalos, monedas, likes,
 follows, suscripciones y canjeos normalizados para TikTok, Twitch o YouTube sin
-conectar una cuenta real. Esta etapa sólo valida recepción, historial y UI; no
-evalúa reglas ni envía interacciones al juego.
+conectar una cuenta real. El mock no habla con TikFinity, pero sí valida
+recepción e historial, evalúa las reglas exactas creadas allí y
+refleja coincidencias y unidades encoladas en el Dashboard. En el mod real,
+TikFinity llega mediante el acompañante local y las coincidencias entran a la
+cola de juego. Para regalos de TikTok, el formulario selecciona por nombre en
+el catálogo y sólo transmite el `giftId`; tanto mock como mod derivan el nombre,
+la imagen y las Coins. `delaySeconds` se agenda del lado del servidor para que
+recargar o cerrar el panel no cancele la prueba.
 
 Después de `npm run build`, hay que instalar juntos `config.html`, `config.css`
 y `config.js` desde `assets/creator-tools`; copiar únicamente el DLL deja una

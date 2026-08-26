@@ -33,6 +33,13 @@ y Tosco.
 única para los nombres de donadores. Todo enemigo o elemento visual futuro debe
 reutilizarlos mediante `PrepareActor`.
 
+Las reglas de stream pueden añadir de forma opcional el PNG local del regalo
+con `CreatorToolsInteractionPresentation.SetGiftImage`. El dato debe viajar de
+forma explícita por backlog, cola y executor; no se deben usar contextos globales
+temporales ni descargar la URL remota durante gameplay. El label comparte con el
+icono seguimiento, alpha, snapshot y prioridad de render. Las rutas manuales que
+no tienen regalo conservan únicamente el nombre.
+
 ### Creación y renderizado
 
 1. La etiqueta se crea como un `GameObject` de mundo independiente, en la misma

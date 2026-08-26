@@ -24,6 +24,7 @@ namespace Gilomx.CupheadBossRoulette
         private Vector3 landingSurfaceLocalSeedAnchor;
         private Action<string> logWarning;
         private string donor;
+        private string giftImagePath = string.Empty;
         private float cameraScale = 1f;
         private bool virtualLandingTriggered;
         private bool plantWasAttached;
@@ -71,6 +72,12 @@ namespace Gilomx.CupheadBossRoulette
             this.cameraScale = Mathf.Max(0.01f, cameraScale);
             UseVirtualGroundOnly = useVirtualGroundOnly;
             this.logWarning = logWarning;
+        }
+
+        internal void SetGiftImage(string imagePath)
+        {
+            giftImagePath = imagePath ?? string.Empty;
+            ApplyGiftImage(seedLabel);
         }
 
         private void Update()
@@ -191,6 +198,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 if (activeLabel != null)
                 {
+                    ApplyGiftImage(activeLabel);
                     activeLabel.SetVerticalOffsetPixels(
                         DonorLabelVerticalOffsetPixels);
                     activeLabel.FadeInWhenActorVisible(
@@ -209,6 +217,20 @@ namespace Gilomx.CupheadBossRoulette
         {
             followLandingSurface = false;
             landingSurface = null;
+        }
+
+        private void ApplyGiftImage(CreatorToolsDonorLabel label)
+        {
+            if (label == null || string.IsNullOrEmpty(giftImagePath))
+                return;
+            try
+            {
+                label.SetGiftImage(giftImagePath);
+            }
+            catch (Exception exception)
+            {
+                Warn("Could not apply the Cagney gift image: ", exception);
+            }
         }
 
         private void WrapPlantScaleWithoutChangingNativeMovement()

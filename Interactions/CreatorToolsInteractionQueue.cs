@@ -26,13 +26,19 @@ namespace Gilomx.CupheadBossRoulette
             get { return active.Count; }
         }
 
+        internal int AvailableCapacity
+        {
+            get { return Math.Max(0, MaximumQueued - Count); }
+        }
+
         internal int Enqueue(
             string item,
             string donor,
+            string giftImagePath,
             int quantity,
             float delaySeconds)
         {
-            var availableSlots = MaximumQueued - Count;
+            var availableSlots = AvailableCapacity;
             var count = Math.Max(
                 0,
                 Math.Min(
@@ -45,6 +51,7 @@ namespace Gilomx.CupheadBossRoulette
                     Id = nextId++,
                     Item = item,
                     Donor = donor,
+                    GiftImagePath = giftImagePath ?? string.Empty,
                     DelaySeconds = delaySeconds,
                     ReadyAt = Time.realtimeSinceStartup + delaySeconds
                 });
@@ -196,6 +203,7 @@ namespace Gilomx.CupheadBossRoulette
             internal int Id;
             internal string Item;
             internal string Donor;
+            internal string GiftImagePath;
             internal float DelaySeconds;
             internal float ReadyAt;
             internal ICreatorToolsInteractionHandle Handle;

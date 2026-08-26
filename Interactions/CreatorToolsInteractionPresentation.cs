@@ -138,6 +138,46 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal static void SetGiftImage(
+            GameObject actor,
+            string giftImagePath,
+            Action<string> logWarning)
+        {
+            if (actor == null || string.IsNullOrEmpty(giftImagePath))
+                return;
+            try
+            {
+                var label = actor.GetComponent<CreatorToolsDonorLabel>();
+                if (label != null)
+                    label.SetGiftImage(giftImagePath);
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning,
+                    "The interaction actor spawned without its gift image: ",
+                    exception);
+            }
+        }
+
+        internal static void SetGiftImage(
+            CagneyHomingPlantInteractionState state,
+            string giftImagePath,
+            Action<string> logWarning)
+        {
+            if (state == null || string.IsNullOrEmpty(giftImagePath))
+                return;
+            try
+            {
+                state.SetGiftImage(giftImagePath);
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning,
+                    "The Cagney interaction spawned without its gift image: ",
+                    exception);
+            }
+        }
+
         internal static void FreezeActorsForLevelEnd(
             Level level,
             Action<string> logWarning)
@@ -515,7 +555,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private Renderer[] actorRenderers;
         private int[] relativeOrders;
-        private Renderer labelRenderer;
+        private readonly List<Renderer> labelRenderers =
+            new List<Renderer>();
         private string frontLayerName;
         private string coveredLayerName;
         private int maximumActorOrder;
@@ -550,7 +591,9 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void RegisterLabel(Renderer renderer)
         {
-            labelRenderer = renderer;
+            if (renderer == null || labelRenderers.Contains(renderer))
+                return;
+            labelRenderers.Add(renderer);
             ApplyPriority();
         }
 
@@ -577,12 +620,19 @@ namespace Gilomx.CupheadBossRoulette
                     short.MinValue,
                     maximumActorOrder);
             }
-            if (labelRenderer == null)
-                return;
-            labelRenderer.sortingLayerName = layerName;
-            labelRenderer.sortingOrder = Mathf.Min(
-                short.MaxValue,
-                maximumActorOrder + 1);
+            for (var i = labelRenderers.Count - 1; i >= 0; i--)
+            {
+                var labelRenderer = labelRenderers[i];
+                if (labelRenderer == null)
+                {
+                    labelRenderers.RemoveAt(i);
+                    continue;
+                }
+                labelRenderer.sortingLayerName = layerName;
+                labelRenderer.sortingOrder = Mathf.Min(
+                    short.MaxValue,
+                    maximumActorOrder + 1);
+            }
         }
 
         private static bool IsScreenCoverActive()

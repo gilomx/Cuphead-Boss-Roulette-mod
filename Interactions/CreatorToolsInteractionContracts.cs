@@ -29,6 +29,7 @@ namespace Gilomx.CupheadBossRoulette
         bool TrySpawn(
             string item,
             string donor,
+            string giftImagePath,
             out ICreatorToolsInteractionHandle handle,
             out string feedbackCode,
             out string error);

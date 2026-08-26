@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
+import { DashboardSimulatorForm } from "./DashboardSimulatorForm";
 import type {
   DashboardConnection,
   DashboardCounters,
   DashboardEvent,
   DashboardState,
-  StreamEventType,
-  StreamPlatform,
 } from "../../model";
 
 const EMPTY_COUNTERS: DashboardCounters = {
@@ -32,7 +32,7 @@ const EMPTY_STATE: DashboardState = {
 
 const DEFAULT_CONNECTIONS: DashboardConnection[] = [
   {
-    id: "tikfinity",
+    id: "tikfinity-local",
     platform: "tiktok",
     connector: "tikfinity",
     label: "TikFinity",
@@ -53,34 +53,6 @@ const DEFAULT_CONNECTIONS: DashboardConnection[] = [
     status: "pending",
   },
 ];
-
-const PLATFORMS: StreamPlatform[] = ["tiktok", "twitch", "youtube"];
-const EVENT_TYPES: StreamEventType[] = [
-  "gift",
-  "currency",
-  "like",
-  "follow",
-  "subscription",
-  "redemption",
-];
-
-interface SimulationDraft {
-  platform: StreamPlatform;
-  type: StreamEventType;
-  user: string;
-  amount: number;
-  count: number;
-  itemName: string;
-}
-
-const INITIAL_SIMULATION: SimulationDraft = {
-  platform: "tiktok",
-  type: "gift",
-  user: "",
-  amount: 1,
-  count: 1,
-  itemName: "",
-};
 
 function isDashboardState(value: unknown): value is DashboardState {
   if (!value || typeof value !== "object") return false;
@@ -111,8 +83,6 @@ export function DashboardView() {
   const { locale, t } = useLocalization();
   const [dashboard, setDashboard] = useState<DashboardState>(EMPTY_STATE);
   const [reachable, setReachable] = useState(true);
-  const [simulation, setSimulation] = useState<SimulationDraft>(INITIAL_SIMULATION);
-  const [simulationStatus, setSimulationStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const latestDashboardRequest = useRef(0);
 
   const loadDashboard = useCallback(async (signal?: AbortSignal) => {
@@ -173,13 +143,23 @@ export function DashboardView() {
     }).format(date);
   };
 
+  const connectionDescription = (connection: DashboardConnection) => {
+    const fallback = connection.message || connection.account || t("dashboard.connections.notConfigured");
+    return connection.connector === "tikfinity"
+      ? t(`dashboard.connectionDescriptions.tikfinity.${connection.status}`, fallback)
+      : fallback;
+  };
+
   const eventSummary = (event: DashboardEvent) => {
     if (event.itemName) {
       return `${event.count && event.count > 1 ? `${event.count} × ` : ""}${event.itemName}`;
     }
+    const eventValue = typeof event.totalValue === "number"
+      ? event.totalValue
+      : event.amount;
     if ((event.type === "currency" || event.type === "gift") &&
-        typeof event.amount === "number" && event.amount > 0) {
-      const amount = event.amount.toLocaleString(locale === "es" ? "es-MX" : "en-US");
+        typeof eventValue === "number" && eventValue > 0) {
+      const amount = eventValue.toLocaleString(locale === "es" ? "es-MX" : "en-US");
       const unit = event.currency || (event.unit
         ? t(`dashboard.units.${event.unit}`, event.unit)
         : t("dashboard.events.value"));
@@ -189,29 +169,6 @@ export function DashboardView() {
       return `${event.count.toLocaleString(locale === "es" ? "es-MX" : "en-US")} · ${t(`dashboard.eventTypes.${event.type}`, event.type)}`;
     }
     return t(`dashboard.eventTypes.${event.type}`, event.type);
-  };
-
-  const submitSimulation = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSimulationStatus("sending");
-    const query = new URLSearchParams({
-      platform: simulation.platform,
-      type: simulation.type,
-      user: simulation.user.trim(),
-      amount: String(Math.max(0, simulation.amount || 0)),
-      count: String(Math.max(1, Math.floor(simulation.count) || 1)),
-      itemName: simulation.itemName.trim(),
-    });
-
-    try {
-      const response = await fetch(`/api/dashboard/simulate?${query}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      setSimulationStatus("sent");
-      await loadDashboard();
-      window.setTimeout(() => setSimulationStatus((current) => current === "sent" ? "idle" : current), 2200);
-    } catch {
-      setSimulationStatus("error");
-    }
   };
 
   return (
@@ -276,7 +233,7 @@ export function DashboardView() {
               <div className="dashboard-connection-card__copy">
                 <p>{t(`dashboard.platforms.${connection.platform}`)}</p>
                 <h3>{connection.label}</h3>
-                <span>{connection.account || t("dashboard.connections.notConfigured")}</span>
+                <span>{connectionDescription(connection)}</span>
               </div>
               <div className="dashboard-connection-card__footer">
                 <span>{t("dashboard.connections.lastEvent")}</span>
@@ -286,6 +243,8 @@ export function DashboardView() {
           ))}
         </div>
       </section>
+
+      <InteractionQueuePanel className="dashboard-interaction-queue" />
 
       <div className="dashboard-workspace">
         <section className="dashboard-panel dashboard-event-feed" aria-labelledby="dashboard-events-title">
@@ -345,97 +304,7 @@ export function DashboardView() {
               <h2 id="dashboard-simulator-title">{t("dashboard.simulator.title")}</h2>
             </div>
           </div>
-          <p className="dashboard-simulator__description">{t("dashboard.simulator.description")}</p>
-          <form className="dashboard-simulator-form" onSubmit={(event) => void submitSimulation(event)}>
-            <div className="dashboard-simulator-form__row">
-              <label>
-                <span>{t("dashboard.simulator.platform")}</span>
-                <select
-                  value={simulation.platform}
-                  onChange={(event) => setSimulation((current) => ({
-                    ...current,
-                    platform: event.target.value as StreamPlatform,
-                  }))}
-                >
-                  {PLATFORMS.map((platform) => (
-                    <option key={platform} value={platform}>{t(`dashboard.platforms.${platform}`)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>{t("dashboard.simulator.type")}</span>
-                <select
-                  value={simulation.type}
-                  onChange={(event) => setSimulation((current) => ({
-                    ...current,
-                    type: event.target.value as StreamEventType,
-                  }))}
-                >
-                  {EVENT_TYPES.map((type) => (
-                    <option key={type} value={type}>{t(`dashboard.eventTypes.${type}`)}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label>
-              <span>{t("dashboard.simulator.user")}</span>
-              <input
-                type="text"
-                maxLength={64}
-                value={simulation.user}
-                placeholder={t("dashboard.simulator.userPlaceholder")}
-                onChange={(event) => setSimulation((current) => ({ ...current, user: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>{t("dashboard.simulator.itemName")}</span>
-              <input
-                type="text"
-                maxLength={80}
-                value={simulation.itemName}
-                placeholder={t("dashboard.simulator.itemNamePlaceholder")}
-                onChange={(event) => setSimulation((current) => ({ ...current, itemName: event.target.value }))}
-              />
-            </label>
-            <div className="dashboard-simulator-form__row">
-              <label>
-                <span>{t("dashboard.simulator.amount")}</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={simulation.amount}
-                  onChange={(event) => setSimulation((current) => ({
-                    ...current,
-                    amount: Math.max(0, Number(event.target.value) || 0),
-                  }))}
-                />
-              </label>
-              <label>
-                <span>{t("dashboard.simulator.count")}</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={1000000}
-                  value={simulation.count}
-                  onChange={(event) => setSimulation((current) => ({
-                    ...current,
-                    count: Math.max(1, Math.min(1000000, Math.floor(Number(event.target.value)) || 1)),
-                  }))}
-                />
-              </label>
-            </div>
-            <button type="submit" disabled={simulationStatus === "sending"}>
-              {t(`dashboard.simulator.${simulationStatus === "sending" ? "sending" : "submit"}`)}
-            </button>
-            <p data-status={simulationStatus} role="status" aria-live="polite">
-              {simulationStatus === "sent"
-                ? t("dashboard.simulator.sent")
-                : simulationStatus === "error"
-                  ? t("dashboard.simulator.error")
-                  : t("dashboard.simulator.hint")}
-            </p>
-          </form>
+          <DashboardSimulatorForm onSubmitted={loadDashboard} />
         </section>
       </div>
     </div>

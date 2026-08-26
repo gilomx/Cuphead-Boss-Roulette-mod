@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -9,27 +10,35 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const int MaximumEventCount = 500;
         private const int MaximumCommandsPerUpdate = 64;
-        private const int MaximumTextLength = 80;
+        private const int MaximumScheduledSimulations = 1024;
+        private const double MaximumDelaySeconds = 3600d;
+        private const int MaximumTextLength = 160;
         private const int MaximumCount = 1000000;
+        private const int MaximumSimulationCount = 1000;
         private const decimal MaximumAmount = 1000000000m;
-        private const int SchemaVersion = 1;
+        private const int SchemaVersion = 2;
 
-        private readonly DashboardEvent[] events =
-            new DashboardEvent[MaximumEventCount];
-        private readonly List<DashboardConnection> connections =
-            new List<DashboardConnection>();
+        private readonly CreatorToolsDashboardEventRecord[] events =
+            new CreatorToolsDashboardEventRecord[MaximumEventCount];
+        private readonly List<CreatorToolsDashboardConnection> connections =
+            new List<CreatorToolsDashboardConnection>();
+        private readonly CreatorToolsStreamDeduplicator deduplicator =
+            new CreatorToolsStreamDeduplicator();
+        private readonly object simulationLock = new object();
+        private readonly List<ScheduledSimulation> scheduledSimulations =
+            new List<ScheduledSimulation>();
+        private readonly Func<CreatorToolsStreamEvent, bool>
+            resolveSimulationGift;
+        private readonly string streamSessionId =
+            "stream-" + Guid.NewGuid().ToString("N");
 
         private int eventStart;
         private int eventCount;
-        private readonly string streamSessionId =
-            "simulation-" + Guid.NewGuid().ToString("N");
         private long revision = 1;
         private long eventSequence;
         private long receivedCount;
-        // These remain zero until the rule matcher and gameplay dispatcher
-        // are connected in the next stage of the streaming engine.
-        private long matchedCount = 0;
-        private long queuedCount = 0;
+        private long matchedCount;
+        private long queuedCount;
         private long ignoredCount;
         private long giftCount;
         private long valuedCount;
@@ -38,34 +47,32 @@ namespace Gilomx.CupheadBossRoulette
         private long subscriptionCount;
         private string lastPublishedState;
         private bool stateDirty = true;
+        private long nextSimulationSequence;
 
-        internal CreatorToolsDashboardController()
+        internal CreatorToolsDashboardController(
+            Func<CreatorToolsStreamEvent, bool> resolveSimulationGift)
         {
-            connections.Add(new DashboardConnection(
-                "tikfinity", "tiktok", "tikfinity",
-                "TikTok / TikFinity"));
-            connections.Add(new DashboardConnection(
+            this.resolveSimulationGift = resolveSimulationGift;
+            connections.Add(new CreatorToolsDashboardConnection(
+                "tikfinity-local", "tiktok", "tikfinity",
+                "TikTok / TikFinity", "connecting"));
+            connections.Add(new CreatorToolsDashboardConnection(
                 "twitch", "twitch", "twitch-eventsub",
-                "Twitch"));
-            connections.Add(new DashboardConnection(
+                "Twitch", "pending"));
+            connections.Add(new CreatorToolsDashboardConnection(
                 "youtube", "youtube", "youtube-live-chat",
-                "YouTube"));
+                "YouTube", "pending"));
         }
 
-        internal void Update(CreatorToolsServer server)
+        internal void Update(
+            CreatorToolsServer server,
+            Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation>
+                evaluate)
         {
+            ProcessDueSimulations(evaluate);
+
             if (server == null || !server.IsRunning)
                 return;
-
-            var processed = 0;
-            string query;
-            while (processed < MaximumCommandsPerUpdate &&
-                   server.TryTakeDashboardCommand(out query))
-            {
-                ProcessSimulation(ParseQuery(query));
-                processed++;
-            }
-
             if (!stateDirty)
                 return;
             var state = BuildState();
@@ -79,118 +86,312 @@ namespace Gilomx.CupheadBossRoulette
             stateDirty = false;
         }
 
+        /// <summary>
+        /// Runs on the local HTTP worker. It only validates and schedules
+        /// immutable event data; Unity evaluation remains on Update.
+        /// Returns an empty string when accepted or a stable API error code.
+        /// </summary>
+        internal string ScheduleSimulation(string query)
+        {
+            var acceptedAt = Stopwatch.GetTimestamp();
+            var values = ParseQuery(query);
+            CreatorToolsStreamEvent entry;
+            string error;
+            if (!TryBuildSimulation(values, out entry, out error))
+                return error;
+
+            var delaySeconds = ParseDelaySeconds(
+                Value(values, "delaySeconds"));
+            var delayTicks = (long)Math.Round(
+                delaySeconds * Stopwatch.Frequency,
+                MidpointRounding.AwayFromZero);
+            var dueAt = acceptedAt > long.MaxValue - delayTicks
+                ? long.MaxValue
+                : acceptedAt + delayTicks;
+
+            lock (simulationLock)
+            {
+                if (scheduledSimulations.Count >=
+                    MaximumScheduledSimulations)
+                    return "simulation_queue_full";
+
+                var scheduled = new ScheduledSimulation
+                {
+                    DueAt = dueAt,
+                    Sequence = ++nextSimulationSequence,
+                    Event = entry
+                };
+                var index = scheduledSimulations.Count;
+                while (index > 0 && ComesBefore(
+                    scheduled, scheduledSimulations[index - 1]))
+                    index--;
+                scheduledSimulations.Insert(index, scheduled);
+            }
+            return string.Empty;
+        }
+
+        internal void ApplyConnectionUpdate(
+            CreatorToolsStreamConnectionUpdate update)
+        {
+            if (update == null)
+                return;
+            var connection = FindConnectionById(update.ConnectionId) ??
+                FindConnectionByPlatform("tiktok");
+            if (connection == null)
+                return;
+            var status = NormalizeConnectionStatus(update.State);
+            var message = NormalizeText(
+                update.Message, string.Empty, MaximumTextLength);
+            var messageCode = NormalizeIdentifier(
+                update.MessageCode, 64);
+            var retryAttempt = Math.Max(0, update.RetryAttempt);
+            var changed = connection.Status != status ||
+                connection.Message != message ||
+                connection.MessageCode != messageCode ||
+                connection.RetryAttempt != retryAttempt;
+            connection.Status = status;
+            connection.Message = message;
+            connection.MessageCode = messageCode;
+            connection.RetryAttempt = retryAttempt;
+            if (changed)
+            {
+                revision++;
+                stateDirty = true;
+            }
+        }
+
+        /// <summary>
+        /// Single normalized boundary for real and simulated events. Dedupe
+        /// and streak-finalization happen before counters, rules or gameplay.
+        /// </summary>
+        internal void ProcessEvent(
+            CreatorToolsStreamEvent streamEvent,
+            Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation>
+                evaluate)
+        {
+            if (streamEvent == null)
+                return;
+            NormalizeEvent(streamEvent);
+
+            var record = new CreatorToolsDashboardEventRecord
+            {
+                Event = streamEvent,
+                Sequence = ++eventSequence,
+                LocalId = "evt-" + eventSequence.ToString(
+                    "D10", CultureInfo.InvariantCulture),
+                StreamSessionId = streamSessionId
+            };
+
+            var connection = FindConnectionById(streamEvent.ConnectionId);
+            var validPlatform = IsValidPlatform(streamEvent.Platform);
+            var validType = IsValidType(streamEvent.Type);
+            if (!deduplicator.TryAccept(streamEvent))
+            {
+                record.Status = "ignored";
+                record.MessageCode = "duplicate_event";
+                ignoredCount++;
+            }
+            else
+            {
+                receivedCount++;
+                if (streamEvent.StreakState == "progress")
+                {
+                    record.Status = "ignored";
+                    record.MessageCode = "streak_progress";
+                    ignoredCount++;
+                }
+                else if (!validPlatform || !validType)
+                {
+                    record.Status = "ignored";
+                    record.MessageCode = !validPlatform && !validType
+                        ? "unsupported_platform_and_type"
+                        : !validPlatform
+                            ? "unsupported_platform"
+                            : "unsupported_event_type";
+                    ignoredCount++;
+                }
+                else
+                {
+                    var result = evaluate == null
+                        ? CreatorToolsStreamEvaluation.None
+                        : evaluate(streamEvent) ??
+                            CreatorToolsStreamEvaluation.None;
+                    record.RuleNames = result.RuleNames;
+                    record.InteractionIds = result.InteractionIds;
+                    record.MessageCode = result.MessageCode;
+                    if (result.MatchedRules > 0)
+                    {
+                        matchedCount++;
+                        // The stream backlog is itself a reliable queue. Mark
+                        // accepted deferred work as queued immediately; the
+                        // global counter still advances only as gameplay-queue
+                        // slots are actually assigned.
+                        record.Status = result.QueuedInteractions > 0 ||
+                            result.DeferredInteractions > 0
+                            ? "queued"
+                            : "matched";
+                    }
+                    else
+                        record.Status = "received";
+                    queuedCount += Math.Max(0, result.QueuedInteractions);
+                    UpdateCounters(streamEvent);
+                }
+            }
+
+            if (connection != null)
+                connection.LastEventAt = streamEvent.ReceivedAt;
+            AddRecord(record);
+            revision++;
+            stateDirty = true;
+        }
+
         internal void InvalidateState()
         {
             lastPublishedState = null;
             stateDirty = true;
         }
 
-        private void ProcessSimulation(
-            Dictionary<string, string> values)
+        internal void AddQueuedInteractions(int count)
         {
-            var timestamp = DateTime.UtcNow.ToString(
-                "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
-                CultureInfo.InvariantCulture);
-            var platform = NormalizeIdentifier(Value(values, "platform"));
-            var type = NormalizeIdentifier(Value(values, "type"));
-            var connection = FindConnection(platform);
-            var validPlatform = connection != null;
-            var validType = IsValidType(type);
+            if (count <= 0)
+                return;
+            queuedCount += count;
+            revision++;
+            stateDirty = true;
+        }
 
-            var entry = new DashboardEvent();
-            eventSequence++;
-            entry.Id = "sim-" + eventSequence.ToString(
-                "D10", CultureInfo.InvariantCulture);
-            entry.EventId = entry.Id;
-            entry.IdempotencyKey =
-                streamSessionId + ":" + entry.EventId;
-            entry.Sequence = eventSequence;
-            entry.StreamSessionId = streamSessionId;
-            entry.Platform = validPlatform ? platform :
-                NormalizeText(platform, "unknown");
-            entry.Connector = validPlatform
-                ? connection.Connector
-                : "simulator";
-            entry.ConnectionId = validPlatform
-                ? connection.Id
-                : "simulator";
-            entry.Type = validType ? type : NormalizeText(type, "unknown");
-            entry.User = NormalizeText(
-                Value(values, "user"), string.Empty);
-            entry.UserId = NormalizeText(
-                Value(values, "userId"), string.Empty);
-            entry.Amount = ParseAmount(Value(values, "amount"));
-            entry.Count = ParseCount(Value(values, "count"));
-            entry.ItemName = NormalizeText(
-                Value(values, "itemName"), string.Empty);
-            entry.Unit = NormalizeIdentifier(Value(values, "unit"));
-            if (entry.Unit.Length == 0 && validPlatform && validType)
-                entry.Unit = DefaultUnit(platform, type, entry.Amount);
-            entry.Currency = NormalizeCurrency(
-                Value(values, "currency"));
-            entry.ReceivedAt = timestamp;
-            entry.Simulated = true;
-            receivedCount++;
-
-            if (validPlatform && validType)
+        private void ProcessDueSimulations(
+            Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation>
+                evaluate)
+        {
+            var ready = new List<ScheduledSimulation>();
+            var now = Stopwatch.GetTimestamp();
+            lock (simulationLock)
             {
-                entry.Status = "received";
-                entry.MessageCode = "simulation_received";
-                connection.LastEventAt = timestamp;
-                UpdateCounters(entry);
-            }
-            else
-            {
-                entry.Status = "ignored";
-                if (!validPlatform && !validType)
-                    entry.MessageCode = "unsupported_platform_and_type";
-                else if (!validPlatform)
-                    entry.MessageCode = "unsupported_platform";
-                else
-                    entry.MessageCode = "unsupported_event_type";
-                ignoredCount++;
+                while (ready.Count < MaximumCommandsPerUpdate &&
+                       scheduledSimulations.Count > 0 &&
+                       scheduledSimulations[0].DueAt <= now)
+                {
+                    ready.Add(scheduledSimulations[0]);
+                    scheduledSimulations.RemoveAt(0);
+                }
             }
 
+            for (var i = 0; i < ready.Count; i++)
+                ProcessSimulation(ready[i].Event, evaluate);
+        }
+
+        private bool TryBuildSimulation(
+            Dictionary<string, string> values,
+            out CreatorToolsStreamEvent entry,
+            out string error)
+        {
+            var platform = NormalizeIdentifier(
+                Value(values, "platform"), 24);
+            var type = NormalizeIdentifier(Value(values, "type"), 24);
+            var count = Math.Min(
+                MaximumSimulationCount,
+                ParseCount(Value(values, "count")));
+            var totalValue = ParseAmount(Value(values, "amount"));
+            var giftId = NormalizeText(
+                Value(values, "giftId"), string.Empty, 160);
+            if (giftId.Length == 0)
+                giftId = NormalizeText(
+                    Value(values, "itemId"), string.Empty, 160);
+
+            entry = new CreatorToolsStreamEvent
+            {
+                Platform = platform,
+                Type = type,
+                UserName = NormalizeText(
+                    Value(values, "user"), string.Empty, 80),
+                UserId = NormalizeText(
+                    Value(values, "userId"), string.Empty, 160),
+                ItemId = giftId,
+                Count = count,
+                UnitValue = count > 0 ? totalValue / count : totalValue,
+                TotalValue = totalValue,
+                Unit = NormalizeIdentifier(Value(values, "unit"), 24),
+                Currency = NormalizeCurrency(Value(values, "currency")),
+                StreakState = "none",
+                Simulated = true,
+                RawEventType = "dashboard_simulation"
+            };
+
+            if (platform == "tiktok" && type == "gift")
+            {
+                if (resolveSimulationGift == null ||
+                    !resolveSimulationGift(entry))
+                {
+                    error = "unknown_gift";
+                    entry = null;
+                    return false;
+                }
+            }
+            else if (entry.Unit.Length == 0)
+                entry.Unit = DefaultUnit(platform, type, totalValue);
+
+            error = string.Empty;
+            return true;
+        }
+
+        private void ProcessSimulation(
+            CreatorToolsStreamEvent entry,
+            Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation>
+                evaluate)
+        {
+            var sourceConnection = FindConnectionByPlatform(entry.Platform);
+            var simulationId = Guid.NewGuid().ToString("N");
+            entry.EventId = "sim-" + simulationId;
+            entry.IdempotencyKey = streamSessionId + ":sim:" + simulationId;
+            entry.ConnectionId = sourceConnection == null
+                ? "simulator"
+                : "simulator-" + entry.Platform;
+            entry.Connector = "simulator";
+            entry.ReceivedAt = UtcTimestamp();
+            ProcessEvent(entry, evaluate);
+        }
+
+        private void AddRecord(CreatorToolsDashboardEventRecord record)
+        {
             var writeIndex = (eventStart + eventCount) % MaximumEventCount;
             if (eventCount == MaximumEventCount)
             {
                 writeIndex = eventStart;
                 eventStart = (eventStart + 1) % MaximumEventCount;
             }
-            else
-                eventCount++;
-            events[writeIndex] = entry;
-            revision++;
-            stateDirty = true;
+            else eventCount++;
+            events[writeIndex] = record;
         }
 
-        private void UpdateCounters(DashboardEvent entry)
+        private void UpdateCounters(CreatorToolsStreamEvent entry)
         {
             if (entry.Type == "gift")
                 giftCount += entry.Count;
             if ((entry.Type == "gift" || entry.Type == "currency") &&
-                entry.Amount > 0m)
+                entry.TotalValue > 0m)
                 valuedCount++;
-            if (entry.Type == "like")
-                likeCount += entry.Count;
-            else if (entry.Type == "follow")
-                followCount += entry.Count;
+            if (entry.Type == "like") likeCount += entry.Count;
+            else if (entry.Type == "follow") followCount += entry.Count;
             else if (entry.Type == "subscription")
                 subscriptionCount += entry.Count;
         }
 
         private string BuildState()
         {
-            var builder = new StringBuilder(32768);
+            var builder = new StringBuilder(65536);
             builder.Append("{\"ready\":true,\"schemaVersion\":")
                 .Append(SchemaVersion)
                 .Append(",\"revision\":")
                 .Append(revision)
-                .Append(",\"engineStatus\":\"simulated\",\"connections\":[");
+                .Append(",\"engineStatus\":\"");
+            CreatorToolsJson.AppendEscaped(builder, EngineStatus());
+            builder.Append("\",\"streamSessionId\":\"");
+            CreatorToolsJson.AppendEscaped(builder, streamSessionId);
+            builder.Append("\",\"connections\":[");
             for (var i = 0; i < connections.Count; i++)
             {
-                if (i > 0)
-                    builder.Append(',');
+                if (i > 0) builder.Append(',');
                 connections[i].AppendJson(builder);
             }
             builder.Append("],\"counters\":{\"received\":")
@@ -205,13 +406,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"subscriptions\":")
                 .Append(subscriptionCount)
                 .Append("},\"events\":[");
-
-            // The newest events are first so the dashboard can prepend new
-            // activity without reordering the feed.
             for (var i = 0; i < eventCount; i++)
             {
-                if (i > 0)
-                    builder.Append(',');
+                if (i > 0) builder.Append(',');
                 var index = (eventStart + eventCount - 1 - i) %
                     MaximumEventCount;
                 events[index].AppendJson(builder);
@@ -220,7 +417,30 @@ namespace Gilomx.CupheadBossRoulette
             return builder.ToString();
         }
 
-        private DashboardConnection FindConnection(string platform)
+        private string EngineStatus()
+        {
+            var tikfinity = FindConnectionByPlatform("tiktok");
+            if (tikfinity == null) return "idle";
+            if (tikfinity.Status == "connected" ||
+                tikfinity.Status == "live")
+                return "running";
+            if (tikfinity.Status == "connecting" ||
+                tikfinity.Status == "reconnecting")
+                return "connecting";
+            if (tikfinity.Status == "error") return "degraded";
+            return "idle";
+        }
+
+        private CreatorToolsDashboardConnection FindConnectionById(string id)
+        {
+            for (var i = 0; i < connections.Count; i++)
+                if (connections[i].Id == id)
+                    return connections[i];
+            return null;
+        }
+
+        private CreatorToolsDashboardConnection FindConnectionByPlatform(
+            string platform)
         {
             for (var i = 0; i < connections.Count; i++)
                 if (connections[i].Platform == platform)
@@ -228,53 +448,102 @@ namespace Gilomx.CupheadBossRoulette
             return null;
         }
 
+        private static void NormalizeEvent(CreatorToolsStreamEvent entry)
+        {
+            entry.EventId = NormalizeText(
+                entry.EventId, Guid.NewGuid().ToString("N"), 160);
+            entry.ConnectionId = NormalizeText(
+                entry.ConnectionId, "unknown", 80);
+            entry.IdempotencyKey = NormalizeText(entry.IdempotencyKey,
+                entry.ConnectionId + ":" + entry.EventId, 240);
+            entry.Platform = NormalizeIdentifier(entry.Platform, 24);
+            entry.Connector = NormalizeIdentifier(entry.Connector, 64);
+            entry.Type = NormalizeIdentifier(entry.Type, 24);
+            entry.UserName = NormalizeText(
+                entry.UserName, string.Empty, 80);
+            entry.UserId = NormalizeText(entry.UserId, string.Empty, 160);
+            entry.ItemId = NormalizeText(entry.ItemId, string.Empty, 160);
+            entry.ItemName = NormalizeText(entry.ItemName, string.Empty, 160);
+            entry.ItemImageUrl = NormalizeText(
+                entry.ItemImageUrl, string.Empty, 2048);
+            entry.Count = Math.Max(1, Math.Min(MaximumCount, entry.Count));
+            entry.UnitValue = Math.Max(
+                0m, Math.Min(MaximumAmount, entry.UnitValue));
+            entry.TotalValue = Math.Max(
+                0m, Math.Min(MaximumAmount, entry.TotalValue));
+            entry.Unit = NormalizeIdentifier(entry.Unit, 24);
+            entry.Currency = NormalizeCurrency(entry.Currency);
+            entry.StreakId = NormalizeText(
+                entry.StreakId, string.Empty, 160);
+            if (entry.StreakState != "progress" &&
+                entry.StreakState != "final")
+                entry.StreakState = "none";
+            if (string.IsNullOrEmpty(entry.ReceivedAt))
+                entry.ReceivedAt = UtcTimestamp();
+        }
+
+        private static string NormalizeConnectionStatus(string value)
+        {
+            value = NormalizeIdentifier(value, 24);
+            if (value == "starting") return "connecting";
+            if (value == "connecting" || value == "connected" ||
+                value == "live" || value == "waiting" ||
+                value == "reconnecting" || value == "disconnected" ||
+                value == "error")
+                return value;
+            return "error";
+        }
+
+        private static bool IsValidPlatform(string value)
+        {
+            return value == "tiktok" || value == "twitch" ||
+                value == "youtube";
+        }
+
         private static bool IsValidType(string value)
         {
             return value == "gift" || value == "currency" ||
-                   value == "like" || value == "follow" ||
-                   value == "subscription" || value == "redemption";
+                value == "like" || value == "follow" ||
+                value == "subscription" || value == "redemption";
         }
 
         private static string DefaultUnit(
             string platform, string type, decimal amount)
         {
-            if (amount <= 0m ||
-                (type != "gift" && type != "currency"))
+            if (amount <= 0m || (type != "gift" && type != "currency"))
                 return string.Empty;
-            if (platform == "tiktok")
-                return "coin";
-            if (platform == "twitch")
-                return "bit";
-            if (platform == "youtube")
-                return "money";
+            if (platform == "tiktok") return "coin";
+            if (platform == "twitch") return "bit";
+            if (platform == "youtube") return "money";
             return string.Empty;
         }
 
         private static string NormalizeCurrency(string value)
         {
             value = (value ?? string.Empty).Trim().ToUpperInvariant();
-            if (value.Length != 3)
-                return string.Empty;
+            if (value.Length != 3) return string.Empty;
             for (var i = 0; i < value.Length; i++)
                 if (value[i] < 'A' || value[i] > 'Z')
                     return string.Empty;
             return value;
         }
 
-        private static string NormalizeIdentifier(string value)
+        private static string NormalizeIdentifier(string value, int maximum)
         {
             value = (value ?? string.Empty).Trim().ToLowerInvariant();
-            return value.Length <= 24 ? value : value.Substring(0, 24);
+            return value.Length <= maximum
+                ? value
+                : value.Substring(0, maximum);
         }
 
-        private static string NormalizeText(string value, string fallback)
+        private static string NormalizeText(
+            string value, string fallback, int maximum)
         {
             value = (value ?? string.Empty).Trim();
-            if (value.Length == 0)
-                value = fallback ?? string.Empty;
-            if (value.Length > MaximumTextLength)
-                value = value.Substring(0, MaximumTextLength);
-            return value;
+            if (value.Length == 0) value = fallback ?? string.Empty;
+            return value.Length <= maximum
+                ? value
+                : value.Substring(0, maximum);
         }
 
         private static decimal ParseAmount(string value)
@@ -295,6 +564,26 @@ namespace Gilomx.CupheadBossRoulette
             return Math.Max(1, Math.Min(MaximumCount, count));
         }
 
+        private static double ParseDelaySeconds(string value)
+        {
+            double delay;
+            if (!double.TryParse(value, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out delay) ||
+                double.IsNaN(delay) || double.IsInfinity(delay) ||
+                delay <= 0d)
+                return 0d;
+            return Math.Min(MaximumDelaySeconds, delay);
+        }
+
+        private static bool ComesBefore(
+            ScheduledSimulation left,
+            ScheduledSimulation right)
+        {
+            return left.DueAt < right.DueAt ||
+                (left.DueAt == right.DueAt &&
+                 left.Sequence < right.Sequence);
+        }
+
         private static string Value(
             Dictionary<string, string> values, string key)
         {
@@ -308,8 +597,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             var values = new Dictionary<string, string>(
                 StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrEmpty(query))
-                return values;
+            if (string.IsNullOrEmpty(query)) return values;
             var pairs = query.Split('&');
             for (var i = 0; i < pairs.Length; i++)
             {
@@ -325,178 +613,25 @@ namespace Gilomx.CupheadBossRoulette
                     key = Uri.UnescapeDataString(key.Replace('+', ' '));
                     value = Uri.UnescapeDataString(value.Replace('+', ' '));
                 }
-                catch
-                {
-                    continue;
-                }
-                if (key.Length <= 64)
+                catch { continue; }
+                if (key.Length <= 64 && value.Length <= 2048)
                     values[key] = value;
             }
             return values;
         }
 
-        private static void AppendJson(StringBuilder builder, string value)
+        private static string UtcTimestamp()
         {
-            value = value ?? string.Empty;
-            for (var i = 0; i < value.Length; i++)
-            {
-                var character = value[i];
-                if (character == '\\' || character == '"')
-                    builder.Append('\\').Append(character);
-                else if (character == '\n')
-                    builder.Append("\\n");
-                else if (character == '\r')
-                    builder.Append("\\r");
-                else if (character == '\t')
-                    builder.Append("\\t");
-                else if (character < 32)
-                    builder.Append("\\u")
-                        .Append(((int)character).ToString("x4"));
-                else
-                    builder.Append(character);
-            }
+            return DateTime.UtcNow.ToString(
+                "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                CultureInfo.InvariantCulture);
         }
 
-        private sealed class DashboardConnection
+        private sealed class ScheduledSimulation
         {
-            internal readonly string Id;
-            internal readonly string Platform;
-            internal readonly string Connector;
-            internal readonly string Label;
-            internal string LastEventAt;
-
-            internal DashboardConnection(
-                string id, string platform, string connector, string label)
-            {
-                Id = id;
-                Platform = platform;
-                Connector = connector;
-                Label = label;
-            }
-
-            internal void AppendJson(StringBuilder builder)
-            {
-                builder.Append("{\"id\":\"");
-                CreatorToolsDashboardController.AppendJson(builder, Id);
-                builder.Append("\",\"platform\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, Platform);
-                builder.Append("\",\"connector\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, Connector);
-                builder.Append("\",\"label\":\"");
-                CreatorToolsDashboardController.AppendJson(builder, Label);
-                builder.Append(
-                    "\",\"status\":\"simulated\",\"account\":\"\"," +
-                    "\"message\":\"\"," +
-                    "\"lastEventAt\":");
-                if (string.IsNullOrEmpty(LastEventAt))
-                    builder.Append("null");
-                else
-                {
-                    builder.Append('"');
-                    CreatorToolsDashboardController.AppendJson(
-                        builder, LastEventAt);
-                    builder.Append('"');
-                }
-                builder.Append('}');
-            }
-        }
-
-        private sealed class DashboardEvent
-        {
-            internal string Id;
-            internal string EventId;
-            internal string IdempotencyKey;
+            internal long DueAt;
             internal long Sequence;
-            internal string ConnectionId;
-            internal string StreamSessionId;
-            internal string Platform;
-            internal string Connector;
-            internal string Type;
-            internal string User;
-            internal string UserId;
-            internal decimal Amount;
-            internal string Unit;
-            internal string Currency;
-            internal int Count;
-            internal string ItemName;
-            internal string Status;
-            internal string MessageCode;
-            internal string ReceivedAt;
-            internal bool Simulated;
-
-            internal void AppendJson(StringBuilder builder)
-            {
-                builder.Append("{\"schemaVersion\":")
-                    .Append(SchemaVersion)
-                    .Append(",\"id\":\"");
-                CreatorToolsDashboardController.AppendJson(builder, Id);
-                builder.Append("\",\"eventId\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, EventId);
-                builder.Append("\",\"idempotencyKey\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, IdempotencyKey);
-                builder.Append("\",\"sequence\":").Append(Sequence)
-                    .Append(",\"connectionId\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, ConnectionId);
-                builder.Append("\",\"streamSessionId\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, StreamSessionId);
-                builder.Append("\",\"platform\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, Platform);
-                builder.Append("\",\"connector\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, Connector);
-                builder.Append("\",\"type\":\"");
-                CreatorToolsDashboardController.AppendJson(builder, Type);
-                builder.Append("\",\"user\":\"");
-                CreatorToolsDashboardController.AppendJson(builder, User);
-                builder.Append("\",\"userId\":");
-                AppendNullableString(builder, UserId);
-                builder.Append(",\"amount\":")
-                    .Append(Amount.ToString(
-                        "0.##", CultureInfo.InvariantCulture))
-                    .Append(",\"unit\":");
-                AppendNullableString(builder, Unit);
-                builder.Append(",\"currency\":");
-                AppendNullableString(builder, Currency);
-                builder.Append(",\"count\":").Append(Count);
-                if (!string.IsNullOrEmpty(ItemName))
-                {
-                    builder.Append(",\"itemName\":\"");
-                    CreatorToolsDashboardController.AppendJson(
-                        builder, ItemName);
-                    builder.Append('"');
-                }
-                builder.Append(",\"status\":\"");
-                CreatorToolsDashboardController.AppendJson(builder, Status);
-                builder.Append("\",\"messageCode\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, MessageCode);
-                builder.Append("\",\"receivedAt\":\"");
-                CreatorToolsDashboardController.AppendJson(
-                    builder, ReceivedAt);
-                builder.Append("\",\"simulated\":")
-                    .Append(Simulated ? "true" : "false")
-                    .Append('}');
-            }
-
-            private static void AppendNullableString(
-                StringBuilder builder, string value)
-            {
-                if (string.IsNullOrEmpty(value))
-                {
-                    builder.Append("null");
-                    return;
-                }
-                builder.Append('"');
-                CreatorToolsDashboardController.AppendJson(builder, value);
-                builder.Append('"');
-            }
+            internal CreatorToolsStreamEvent Event;
         }
     }
 }

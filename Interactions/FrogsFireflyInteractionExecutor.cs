@@ -9,6 +9,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private readonly NativeFrogsFireflyCache nativeCache;
         private readonly Func<bool> canSpawn;
+        private readonly Action<string> logWarning;
         private readonly List<NativeFrogsFireflySpawn> activeSpawns =
             new List<NativeFrogsFireflySpawn>();
 
@@ -20,6 +21,7 @@ namespace Gilomx.CupheadBossRoulette
             Action<string> logWarning)
         {
             this.canSpawn = canSpawn;
+            this.logWarning = logWarning;
             nativeCache = new NativeFrogsFireflyCache(
                 coroutineHost,
                 canPreload,
@@ -50,6 +52,7 @@ namespace Gilomx.CupheadBossRoulette
         public bool TrySpawn(
             string item,
             string donor,
+            string giftImagePath,
             out ICreatorToolsInteractionHandle handle,
             out string feedbackCode,
             out string error)
@@ -92,6 +95,12 @@ namespace Gilomx.CupheadBossRoulette
                 out error))
                 return false;
 
+            CreatorToolsInteractionPresentation.SetGiftImage(
+                spawned.Actor == null
+                    ? null
+                    : spawned.Actor.gameObject,
+                giftImagePath,
+                logWarning);
             activeSpawns.Add(spawned);
             handle = new CreatorToolsUnityObjectInteractionHandle(
                 spawned.Actor,
