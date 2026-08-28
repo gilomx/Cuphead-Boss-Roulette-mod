@@ -5,11 +5,11 @@ import {
   displaySupers,
   displayWeapons,
 } from "../../catalogMetadata";
-import { SelectField } from "../../components/SelectField";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { DisplayOption, ForceDraft } from "../../model";
 import { ChallengeCatalog } from "./ChallengeCatalog";
+import { RouletteSelectField } from "./RouletteSelectField";
 
 export function RouletteView() {
   const { config, draft, applyDraft, applyChallenge } = useConfig();
@@ -69,12 +69,12 @@ export function RouletteView() {
         {config && draft ? (
           <>
             <div className="form-grid">
-              <SelectField id="boss" label={t("roulette.force.boss")} value={draft.boss} options={bosses} getLabel={optionLabel("boss")} onChange={(value) => update("boss", value)} />
-              <SelectField id="weapon1" label={t("roulette.force.weapon1")} value={draft.weapon1} options={weapon1Options} getLabel={optionLabel("weapon")} onChange={(value) => update("weapon1", value)} />
-              <SelectField id="weapon2" label={t("roulette.force.weapon2")} value={draft.weapon2} options={weapon2Options} getLabel={optionLabel("weapon")} onChange={(value) => update("weapon2", value)} />
-              <SelectField id="super" label={t("roulette.force.super")} value={draft.super} options={supers} getLabel={optionLabel("super")} onChange={(value) => update("super", value)} />
-              <SelectField id="charm" label={t("roulette.force.charm")} value={draft.charm} options={charms} getLabel={optionLabel("charm")} onChange={(value) => update("charm", value)} />
-              <SelectField id="modifier" label={t("roulette.force.modifier")} value={draft.modifier} options={modifierOptions} getLabel={optionLabel("modifier")} onChange={(value) => update("modifier", value)} />
+              <RouletteSelectField id="boss" label={t("roulette.force.boss")} value={draft.boss} options={bosses} getLabel={optionLabel("boss")} onChange={(value) => update("boss", value)} />
+              <RouletteSelectField id="weapon1" label={t("roulette.force.weapon1")} value={draft.weapon1} options={weapon1Options} getLabel={optionLabel("weapon")} onChange={(value) => update("weapon1", value)} />
+              <RouletteSelectField id="weapon2" label={t("roulette.force.weapon2")} value={draft.weapon2} options={weapon2Options} getLabel={optionLabel("weapon")} onChange={(value) => update("weapon2", value)} />
+              <RouletteSelectField id="super" label={t("roulette.force.super")} value={draft.super} options={supers} getLabel={optionLabel("super")} onChange={(value) => update("super", value)} />
+              <RouletteSelectField id="charm" label={t("roulette.force.charm")} value={draft.charm} options={charms} getLabel={optionLabel("charm")} onChange={(value) => update("charm", value)} />
+              <RouletteSelectField id="modifier" label={t("roulette.force.modifier")} value={draft.modifier} options={modifierOptions} getLabel={optionLabel("modifier")} onChange={(value) => update("modifier", value)} />
             </div>
 
             <label className="force-check">

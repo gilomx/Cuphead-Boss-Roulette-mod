@@ -1,12 +1,14 @@
+import type { MouseEvent } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { interactionItemFor } from "./interactionCatalog";
 
 interface InteractionQueuePanelProps {
   className?: string;
+  onConfigure?: () => void;
 }
 
-export function InteractionQueuePanel({ className }: InteractionQueuePanelProps) {
+export function InteractionQueuePanel({ className, onConfigure }: InteractionQueuePanelProps) {
   const { interaction, optimisticInteractionQueue } = useConfig();
   const { t } = useLocalization();
   const available = interaction?.available ?? false;
@@ -24,6 +26,22 @@ export function InteractionQueuePanel({ className }: InteractionQueuePanelProps)
         <div>
           <h2 id="interaction-queue-title">{t("interactions.queue.title")}</h2>
           <p>{t("interactions.queue.description")}</p>
+          {onConfigure ? (
+            <a
+              className="interaction-queue__configure"
+              href="/config/interactions"
+              onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                  return;
+                }
+                event.preventDefault();
+                onConfigure();
+              }}
+            >
+              {t("interactions.queue.configure")}
+              <span aria-hidden="true">→</span>
+            </a>
+          ) : null}
         </div>
         <span className="interaction-count" aria-label={t("interactions.queue.countLabel")}>
           {queue.length}

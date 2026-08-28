@@ -28,17 +28,18 @@ interface ConfigValue {
   streamRules: StreamRulesConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
+  interactionSettingsStatus: InteractionSettingsStatus;
   status: ConnectionStatus;
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
-  applyInteractionMaxActive: (value: number) => void;
+  applyInteractionSettings: (maxActive: number, showGiftImage: boolean) => void;
   applyInteractionRandomTest: (enabled: boolean) => void;
   applyInteractionPhaseTransitionProtection: (enabled: boolean) => void;
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
   saveStreamRule: (draft: StreamRuleDraft) => boolean;
-  deleteStreamRule: (id: number) => void;
+  deleteStreamRule: (id: number) => boolean;
   duplicateStreamRule: (id: number) => void;
   toggleStreamRule: (id: number, enabled: boolean) => void;
   testInteraction: (item: string, donor: string, quantity: number, delay: number) => void;
@@ -59,6 +60,22 @@ interface DesiredPhaseTransitionProtection {
   enabled: boolean;
   baselineRevision: number;
   requestRevision: number;
+}
+
+type InteractionSettingsStatus =
+  | "idle"
+  | "saving"
+  | "pending"
+  | "reconnecting"
+  | "saved"
+  | "error";
+
+interface DesiredInteractionSettings {
+  maxActive: number;
+  showGiftImage: boolean;
+  baselineRevision: number;
+  requestRevision: number;
+  accepted: boolean;
 }
 
 const ConfigContext = createContext<ConfigValue | null>(null);
@@ -101,6 +118,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     InteractionQueueEntry[]
   >([]);
   const [interactionTesting, setInteractionTesting] = useState(false);
+  const [interactionSettingsStatus, setInteractionSettingsStatus] = useState<
+    InteractionSettingsStatus
+  >("idle");
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const desiredForceRef = useRef<ForceDraft | null>(null);
   const desiredChallengesRef = useRef(new Map<number, boolean>());
@@ -120,6 +140,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const phaseTransitionProtectionWriteChainRef = useRef<Promise<void>>(
     Promise.resolve(),
   );
+  const desiredInteractionSettingsRef = useRef<
+    DesiredInteractionSettings | null
+  >(null);
+  const interactionSettingsRequestRevisionRef = useRef(0);
+  const interactionSettingsWriteChainRef = useRef<Promise<void>>(
+    Promise.resolve(),
+  );
+  const interactionSettingsStatusTimerRef = useRef<number | null>(null);
   const confirmedPeskyRevisionRef = useRef(0);
   const pendingPeskyChangesRef = useRef<PendingPeskyChange[]>([]);
   const peskyWriteChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -167,7 +195,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setInteractionTesting(false);
         }
       }
-      let visibleInteraction = nextInteraction;
+      let visibleInteraction = {
+        ...nextInteraction,
+        showGiftImage: nextInteraction.showGiftImage !== false,
+        settingsRevision: nextInteraction.settingsRevision ?? 0,
+      };
       let randomTestPending = false;
       const desiredRandomTest = desiredInteractionRandomTestRef.current;
       if (desiredRandomTest !== null) {
@@ -180,7 +212,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         } else {
           randomTestPending = true;
           visibleInteraction = {
-            ...nextInteraction,
+            ...visibleInteraction,
             randomTestEnabled: desiredRandomTest.enabled,
           };
         }
@@ -202,6 +234,46 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             ...visibleInteraction,
             phaseTransitionProtectionEnabled:
               desiredPhaseTransitionProtection.enabled,
+          };
+        }
+      }
+      let interactionSettingsPending = false;
+      const desiredInteractionSettings = desiredInteractionSettingsRef.current;
+      if (desiredInteractionSettings !== null) {
+        const confirmed =
+          (nextInteraction.settingsRevision ?? 0) >
+            desiredInteractionSettings.baselineRevision &&
+          nextInteraction.maxActive === desiredInteractionSettings.maxActive &&
+          (nextInteraction.showGiftImage !== false) ===
+            desiredInteractionSettings.showGiftImage;
+        if (confirmed) {
+          const confirmedRequestRevision =
+            desiredInteractionSettings.requestRevision;
+          desiredInteractionSettingsRef.current = null;
+          setInteractionSettingsStatus("saved");
+          if (interactionSettingsStatusTimerRef.current !== null) {
+            window.clearTimeout(interactionSettingsStatusTimerRef.current);
+          }
+          interactionSettingsStatusTimerRef.current = window.setTimeout(() => {
+            if (
+              mountedRef.current &&
+              interactionSettingsRequestRevisionRef.current ===
+                confirmedRequestRevision &&
+              desiredInteractionSettingsRef.current === null
+            ) {
+              setInteractionSettingsStatus("idle");
+            }
+            interactionSettingsStatusTimerRef.current = null;
+          }, 3200);
+        } else {
+          interactionSettingsPending = true;
+          setInteractionSettingsStatus(
+            desiredInteractionSettings.accepted ? "pending" : "saving",
+          );
+          visibleInteraction = {
+            ...visibleInteraction,
+            maxActive: desiredInteractionSettings.maxActive,
+            showGiftImage: desiredInteractionSettings.showGiftImage,
           };
         }
       }
@@ -268,6 +340,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       setStatus(
         forcePending || challengePending || interactionPending ||
           randomTestPending || phaseTransitionProtectionPending ||
+          interactionSettingsPending ||
           peskyPending || streamRulesPending
           ? "pending"
           : "saved",
@@ -278,6 +351,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         loadRevision >= lastAppliedLoadRevisionRef.current
       ) {
         lastAppliedLoadRevisionRef.current = loadRevision;
+        if (desiredInteractionSettingsRef.current !== null) {
+          setInteractionSettingsStatus("reconnecting");
+        }
         setStatus("error");
       }
     }
@@ -290,6 +366,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     return () => {
       mountedRef.current = false;
       window.clearInterval(timer);
+      if (interactionSettingsStatusTimerRef.current !== null) {
+        window.clearTimeout(interactionSettingsStatusTimerRef.current);
+      }
     };
   }, [load]);
 
@@ -339,27 +418,77 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [load],
   );
 
-  const applyInteractionMaxActive = useCallback(
-    (value: number) => {
+  const applyInteractionSettings = useCallback(
+    (value: number, showGiftImage: boolean) => {
       if (!interaction?.ready) return;
       const normalized = Math.max(
         1,
         Math.min(interaction.maxActiveLimit ?? 20, Math.floor(value) || 1),
       );
+      const requestRevision = interactionSettingsRequestRevisionRef.current + 1;
+      interactionSettingsRequestRevisionRef.current = requestRevision;
+      desiredInteractionSettingsRef.current = {
+        maxActive: normalized,
+        showGiftImage,
+        baselineRevision: interaction.settingsRevision ?? 0,
+        requestRevision,
+        accepted: false,
+      };
+      if (interactionSettingsStatusTimerRef.current !== null) {
+        window.clearTimeout(interactionSettingsStatusTimerRef.current);
+        interactionSettingsStatusTimerRef.current = null;
+      }
       setInteraction((current) => current
-        ? { ...current, maxActive: normalized }
+        ? {
+            ...current,
+            maxActive: normalized,
+            showGiftImage,
+            feedback: "settings_saved",
+            error: false,
+          }
         : current);
+      setInteractionSettingsStatus("saving");
       setStatus("saving");
 
-      const query = new URLSearchParams({ maxActive: String(normalized) });
-      void fetch("/api/config/interactions/set?" + query, { cache: "no-store" })
+      const query = new URLSearchParams({
+        maxActive: String(normalized),
+        showGiftImage: showGiftImage ? "1" : "0",
+      });
+      const send = () => fetch(
+        "/api/config/interactions/set?" + query,
+        { cache: "no-store" },
+      )
         .then((response) => {
           if (!response.ok) throw new Error("HTTP " + response.status);
+          if (
+            interactionSettingsRequestRevisionRef.current !== requestRevision ||
+            desiredInteractionSettingsRef.current?.requestRevision !== requestRevision
+          ) return;
+          desiredInteractionSettingsRef.current.accepted = true;
+          if (mountedRef.current) {
+            setInteractionSettingsStatus("pending");
+            setStatus("pending");
+          }
           window.setTimeout(() => void load(), 160);
         })
         .catch(() => {
-          if (mountedRef.current) setStatus("error");
+          if (
+            interactionSettingsRequestRevisionRef.current !== requestRevision ||
+            desiredInteractionSettingsRef.current?.requestRevision !== requestRevision
+          ) return;
+          desiredInteractionSettingsRef.current = null;
+          if (interactionSettingsStatusTimerRef.current !== null) {
+            window.clearTimeout(interactionSettingsStatusTimerRef.current);
+            interactionSettingsStatusTimerRef.current = null;
+          }
+          if (mountedRef.current) {
+            setInteractionSettingsStatus("error");
+            setStatus("error");
+            void load();
+          }
         });
+      interactionSettingsWriteChainRef.current =
+        interactionSettingsWriteChainRef.current.then(send, send);
     },
     [interaction, load],
   );
@@ -753,10 +882,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
+      interactionSettingsStatus,
       status,
       applyDraft,
       applyChallenge,
-      applyInteractionMaxActive,
+      applyInteractionSettings,
       applyInteractionRandomTest,
       applyInteractionPhaseTransitionProtection,
       testInteraction,
@@ -776,10 +906,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
+      interactionSettingsStatus,
       status,
       applyDraft,
       applyChallenge,
-      applyInteractionMaxActive,
+      applyInteractionSettings,
       applyInteractionRandomTest,
       applyInteractionPhaseTransitionProtection,
       testInteraction,

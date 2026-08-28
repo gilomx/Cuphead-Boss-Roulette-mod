@@ -9,11 +9,15 @@ interface StreamRulesTableProps {
   canCreate: boolean;
   disabled: boolean;
   highlightedRuleId: number | null;
+  confirmingDeleteId: number | null;
+  deletingRuleId: number | null;
   onCreate: () => void;
   onEdit: (rule: StreamRule) => void;
   onToggle: (id: number, enabled: boolean) => void;
   onDuplicate: (id: number) => void;
-  onDelete: (id: number) => void;
+  onRequestDelete: (id: number) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: (id: number) => void;
 }
 
 export function StreamRulesTable({
@@ -22,11 +26,15 @@ export function StreamRulesTable({
   canCreate,
   disabled,
   highlightedRuleId,
+  confirmingDeleteId,
+  deletingRuleId,
   onCreate,
   onEdit,
   onToggle,
   onDuplicate,
-  onDelete,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
 }: StreamRulesTableProps) {
   const { t } = useLocalization();
   const giftsById = useMemo(
@@ -53,7 +61,6 @@ export function StreamRulesTable({
         <thead>
           <tr>
             <th scope="col">{t("interactions.rules.list.status")}</th>
-            <th scope="col">{t("interactions.rules.list.rule")}</th>
             <th scope="col">{t("interactions.rules.list.trigger")}</th>
             <th scope="col">{t("interactions.rules.list.result")}</th>
             <th scope="col">{t("interactions.rules.list.actions")}</th>
@@ -66,10 +73,14 @@ export function StreamRulesTable({
               gift={giftsById.get(rule.giftId)}
               disabled={disabled}
               highlighted={highlightedRuleId === rule.id}
+              confirmingDelete={confirmingDeleteId === rule.id}
+              deleting={deletingRuleId === rule.id}
               onEdit={onEdit}
               onToggle={onToggle}
               onDuplicate={onDuplicate}
-              onDelete={onDelete}
+              onRequestDelete={onRequestDelete}
+              onCancelDelete={onCancelDelete}
+              onConfirmDelete={onConfirmDelete}
               key={rule.id}
             />
           ))}

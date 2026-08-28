@@ -12,7 +12,6 @@ namespace Gilomx.CupheadBossRoulette
         private const float LabelWidth = 320f;
         private const float LabelHeight = 48f;
         private const float GiftImageGap = 5f;
-        private const float GiftImageOpacity = 0.8f;
         private static readonly Color32 DefaultTextColor =
             new Color32(255, 240, 194, 255);
         private static readonly Color32 AlternateTextColor =
@@ -21,10 +20,21 @@ namespace Gilomx.CupheadBossRoulette
         // approved. An empty set deliberately preserves today's presentation.
         private static readonly HashSet<Levels> AlternateTextColorLevels =
             new HashSet<Levels>();
+        private static bool giftImagesVisible = true;
         private CreatorToolsDonorLabelFollower follower;
         private TextMeshPro labelText;
         private Renderer labelRenderer;
         private SpriteRenderer giftRenderer;
+
+        internal static void SetGiftImagesVisible(bool visible)
+        {
+            giftImagesVisible = visible;
+            var followers = UnityEngine.Object.FindObjectsOfType<
+                CreatorToolsDonorLabelFollower>();
+            for (var i = 0; i < followers.Length; i++)
+                if (followers[i] != null)
+                    followers[i].SetGiftImagePreferenceVisible(visible);
+        }
 
         internal void Initialize(string value)
         {
@@ -137,8 +147,7 @@ namespace Gilomx.CupheadBossRoulette
                 sprite.bounds.size.x + GiftImageGap, 0f, 0f, 0f);
 
             giftRenderer.sprite = sprite;
-            giftRenderer.color = new Color(1f, 1f, 1f,
-                GiftImageOpacity);
+            giftRenderer.color = Color.white;
             giftRenderer.sortingLayerID = labelRenderer.sortingLayerID;
             giftRenderer.sortingOrder = labelRenderer.sortingOrder;
             giftRenderer.transform.localPosition = new Vector3(
@@ -149,7 +158,10 @@ namespace Gilomx.CupheadBossRoulette
             giftRenderer.transform.localScale = Vector3.one;
 
             if (follower != null)
+            {
                 follower.SetGiftRenderer(giftRenderer);
+                follower.SetGiftImagePreferenceVisible(giftImagesVisible);
+            }
             RegisterWithRenderPriority(gameObject);
         }
 
@@ -262,8 +274,11 @@ namespace Gilomx.CupheadBossRoulette
                     giftRenderer.transform.rotation;
                 frozenGift.transform.localScale =
                     giftRenderer.transform.lossyScale;
-                giftRenderer.enabled = false;
             }
+            if (follower != null)
+                follower.SuppressGiftImageForLevelEnd();
+            else if (giftRenderer != null)
+                giftRenderer.enabled = false;
             source.enabled = false;
             return true;
         }
@@ -363,6 +378,7 @@ namespace Gilomx.CupheadBossRoulette
         private Color originalColor;
         private Color originalGiftColor;
         private Color32 originalOutlineColor;
+        private Vector4 giftVisibleTextMargin;
         private Vector3 actorOffset;
         private bool positioned;
         private bool rendererAnchorCaptured;
@@ -374,6 +390,8 @@ namespace Gilomx.CupheadBossRoulette
         private bool waitingForActorVisibility;
         private bool fadingIn;
         private bool fadeOutStarted;
+        private bool giftImagePreferenceVisible = true;
+        private bool giftImageLifecycleSuppressed;
 
         internal void Initialize(
             Transform actorTransform,
@@ -425,10 +443,26 @@ namespace Gilomx.CupheadBossRoulette
         internal void SetGiftRenderer(SpriteRenderer value)
         {
             giftRenderer = value;
+            giftVisibleTextMargin = text == null
+                ? Vector4.zero
+                : text.margin;
             originalGiftColor = value == null
                 ? Color.clear
                 : value.color;
             ApplyOpacity(currentOpacity);
+            ApplyGiftRendererVisibility();
+        }
+
+        internal void SetGiftImagePreferenceVisible(bool visible)
+        {
+            giftImagePreferenceVisible = visible;
+            ApplyGiftRendererVisibility();
+        }
+
+        internal void SuppressGiftImageForLevelEnd()
+        {
+            giftImageLifecycleSuppressed = true;
+            ApplyGiftRendererVisibility();
         }
 
         internal void SetVerticalOffsetPixels(float offsetPixels)
@@ -616,6 +650,19 @@ namespace Gilomx.CupheadBossRoulette
                 giftColor.a *= normalized;
                 giftRenderer.color = giftColor;
             }
+        }
+
+        private void ApplyGiftRendererVisibility()
+        {
+            var visible = giftRenderer != null &&
+                giftImagePreferenceVisible &&
+                !giftImageLifecycleSuppressed;
+            if (giftRenderer != null)
+                giftRenderer.enabled = visible;
+            if (text != null)
+                text.margin = visible
+                    ? giftVisibleTextMargin
+                    : Vector4.zero;
         }
     }
 }

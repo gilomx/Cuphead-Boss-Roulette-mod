@@ -33,12 +33,13 @@ export default function App() {
     if (next === section) return;
     window.history.pushState(null, "", next === "dashboard" ? "/dashboard" : `/config/${next}`);
     setSection(next);
+    window.scrollTo({ top: 0 });
   };
 
   return (
     <AppShell activeSection={section} onSectionChange={navigate}>
       {section === "dashboard"
-        ? <DashboardView />
+        ? <DashboardView onOpenInteractions={() => navigate("interactions")} />
         : section === "interactions"
         ? <InteractionsView />
         : section === "pesky"

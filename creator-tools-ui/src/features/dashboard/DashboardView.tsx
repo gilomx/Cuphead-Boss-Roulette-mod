@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
-import { DashboardSimulatorForm } from "./DashboardSimulatorForm";
+import { DashboardEventsPanel } from "./DashboardEventsPanel";
 import type {
   DashboardConnection,
   DashboardCounters,
-  DashboardEvent,
   DashboardState,
 } from "../../model";
 
@@ -79,7 +78,11 @@ function normalizedCounter(value: number | undefined) {
   return Number.isFinite(value) ? Math.max(0, value ?? 0) : 0;
 }
 
-export function DashboardView() {
+interface DashboardViewProps {
+  onOpenInteractions: () => void;
+}
+
+export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
   const { locale, t } = useLocalization();
   const [dashboard, setDashboard] = useState<DashboardState>(EMPTY_STATE);
   const [reachable, setReachable] = useState(true);
@@ -150,27 +153,6 @@ export function DashboardView() {
       : fallback;
   };
 
-  const eventSummary = (event: DashboardEvent) => {
-    if (event.itemName) {
-      return `${event.count && event.count > 1 ? `${event.count} × ` : ""}${event.itemName}`;
-    }
-    const eventValue = typeof event.totalValue === "number"
-      ? event.totalValue
-      : event.amount;
-    if ((event.type === "currency" || event.type === "gift") &&
-        typeof eventValue === "number" && eventValue > 0) {
-      const amount = eventValue.toLocaleString(locale === "es" ? "es-MX" : "en-US");
-      const unit = event.currency || (event.unit
-        ? t(`dashboard.units.${event.unit}`, event.unit)
-        : t("dashboard.events.value"));
-      return `${amount} ${unit}`;
-    }
-    if (event.count && event.count > 1) {
-      return `${event.count.toLocaleString(locale === "es" ? "es-MX" : "en-US")} · ${t(`dashboard.eventTypes.${event.type}`, event.type)}`;
-    }
-    return t(`dashboard.eventTypes.${event.type}`, event.type);
-  };
-
   return (
     <div className="page page--dashboard">
       <header className="page-header dashboard-page-header">
@@ -178,15 +160,6 @@ export function DashboardView() {
           <h1>{t("dashboard.title")}</h1>
           <p>{t("dashboard.description")}</p>
         </div>
-        <span
-          className="dashboard-engine-status"
-          data-status={reachable ? dashboard.engineStatus : "error"}
-        >
-          <span aria-hidden="true" />
-          {reachable
-            ? t(`dashboard.engine.${dashboard.engineStatus}`, dashboard.engineStatus)
-            : t("dashboard.engine.unreachable")}
-        </span>
       </header>
 
       <section className="dashboard-summary" aria-labelledby="dashboard-summary-title">
@@ -222,16 +195,12 @@ export function DashboardView() {
               data-platform={connection.platform}
             >
               <div className="dashboard-connection-card__header">
-                <span className="dashboard-platform-mark" aria-hidden="true">
-                  {connection.platform === "tiktok" ? "TK" : connection.platform === "twitch" ? "TW" : "YT"}
-                </span>
                 <span className="dashboard-connection-state" data-status={connection.status}>
                   <span aria-hidden="true" />
                   {t(`dashboard.connectionStatus.${connection.status}`, connection.status)}
                 </span>
               </div>
               <div className="dashboard-connection-card__copy">
-                <p>{t(`dashboard.platforms.${connection.platform}`)}</p>
                 <h3>{connection.label}</h3>
                 <span>{connectionDescription(connection)}</span>
               </div>
@@ -244,68 +213,16 @@ export function DashboardView() {
         </div>
       </section>
 
-      <InteractionQueuePanel className="dashboard-interaction-queue" />
-
-      <div className="dashboard-workspace">
-        <section className="dashboard-panel dashboard-event-feed" aria-labelledby="dashboard-events-title">
-          <div className="dashboard-panel__heading">
-            <div>
-              <p className="dashboard-eyebrow">{t("dashboard.events.eyebrow")}</p>
-              <h2 id="dashboard-events-title">{t("dashboard.events.title")}</h2>
-            </div>
-            <span className="dashboard-live-indicator" data-active={reachable && dashboard.ready}>
-              <span aria-hidden="true" />
-              {t("dashboard.events.updatesActive")}
-            </span>
-          </div>
-
-          {dashboard.events.length === 0 ? (
-            <div className="dashboard-events-empty">
-              <strong>{t("dashboard.events.emptyTitle")}</strong>
-              <span>{t("dashboard.events.emptyDescription")}</span>
-            </div>
-          ) : (
-            <ol className="dashboard-events-list">
-              {dashboard.events.map((streamEvent) => (
-                <li key={streamEvent.id} data-platform={streamEvent.platform}>
-                  <div className="dashboard-event__time">
-                    <span>{formatDate(streamEvent.receivedAt)}</span>
-                    <strong>{t(`dashboard.platforms.${streamEvent.platform}`)}</strong>
-                  </div>
-                  <div className="dashboard-event__content">
-                    <div>
-                      <strong>{streamEvent.user || t("dashboard.events.community")}</strong>
-                      <span className="dashboard-event-type">
-                        {t(`dashboard.eventTypes.${streamEvent.type}`, streamEvent.type)}
-                      </span>
-                    </div>
-                    <p>{eventSummary(streamEvent)}</p>
-                    {streamEvent.rule || streamEvent.action ? (
-                      <small>
-                        {streamEvent.rule ? `${t("dashboard.events.rule")}: ${streamEvent.rule}` : ""}
-                        {streamEvent.rule && streamEvent.action ? " · " : ""}
-                        {streamEvent.action ? `${t("dashboard.events.action")}: ${streamEvent.action}` : ""}
-                      </small>
-                    ) : null}
-                  </div>
-                  <span className="dashboard-event-status" data-status={streamEvent.status}>
-                    {t(`dashboard.eventStatus.${streamEvent.status}`, streamEvent.status)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-
-        <section className="dashboard-panel dashboard-simulator" aria-labelledby="dashboard-simulator-title">
-          <div className="dashboard-panel__heading">
-            <div>
-              <p className="dashboard-eyebrow">{t("dashboard.simulator.eyebrow")}</p>
-              <h2 id="dashboard-simulator-title">{t("dashboard.simulator.title")}</h2>
-            </div>
-          </div>
-          <DashboardSimulatorForm onSubmitted={loadDashboard} />
-        </section>
+      <div className="dashboard-activity-grid">
+        <InteractionQueuePanel
+          className="dashboard-interaction-queue"
+          onConfigure={onOpenInteractions}
+        />
+        <DashboardEventsPanel
+          events={dashboard.events}
+          live={reachable && dashboard.ready}
+          onSimulationSubmitted={loadDashboard}
+        />
       </div>
     </div>
   );

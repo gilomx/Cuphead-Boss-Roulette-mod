@@ -61,6 +61,8 @@ export interface InteractionConfigState {
   randomTestRevision: number;
   phaseTransitionProtectionEnabled: boolean;
   phaseTransitionProtectionRevision: number;
+  showGiftImage?: boolean;
+  settingsRevision?: number;
   item: string;
   items: string[];
   lastItem: string;

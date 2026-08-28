@@ -6,13 +6,14 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { Check, ChevronDown } from "lucide-react";
 
 type SearchableSelectKey = string | number;
 
 interface SearchableSelectFieldProps<T> {
   id: string;
   label: string;
-  options: T[];
+  options: readonly T[];
   selectedKey: SearchableSelectKey | null;
   placeholder: string;
   noResults: string;
@@ -30,6 +31,16 @@ function normalizedSearchText(value: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase();
+}
+
+function optionMatchesSearch<T>(
+  option: T,
+  normalizedQuery: string,
+  getLabel: (option: T) => string,
+  getSearchTerms?: (option: T) => string[],
+) {
+  const terms = [getLabel(option), ...(getSearchTerms?.(option) ?? [])];
+  return terms.some((term) => normalizedSearchText(term).includes(normalizedQuery));
 }
 
 export function SearchableSelectField<T>({
@@ -53,16 +64,19 @@ export function SearchableSelectField<T>({
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [activeKey, setActiveKey] = useState<SearchableSelectKey | null>(null);
   const selected = options.find((option) => getKey(option) === selectedKey);
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalizedSearchText(query.trim());
     if (!normalizedQuery) return options;
-    return options.filter((option) => {
-      const terms = [getLabel(option), ...(getSearchTerms?.(option) ?? [])];
-      return terms.some((term) => normalizedSearchText(term).includes(normalizedQuery));
-    });
+    return options.filter((option) =>
+      optionMatchesSearch(option, normalizedQuery, getLabel, getSearchTerms));
   }, [getLabel, getSearchTerms, options, query]);
+  const filteredOptionKeys = filteredOptions.map(getKey);
+  const filteredOptionKeysSignature = JSON.stringify(filteredOptionKeys);
+  const activeIndex = activeKey === null
+    ? -1
+    : filteredOptionKeys.findIndex((optionKey) => optionKey === activeKey);
 
   useEffect(() => {
     if (!open) return;
@@ -70,6 +84,7 @@ export function SearchableSelectField<T>({
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false);
         setQuery("");
+        setActiveKey(null);
       }
     };
     document.addEventListener("pointerdown", closeOutside);
@@ -80,18 +95,19 @@ export function SearchableSelectField<T>({
     if (!disabled) return;
     setOpen(false);
     setQuery("");
+    setActiveKey(null);
   }, [disabled]);
 
   useEffect(() => {
-    if (!open || filteredOptions.length === 0) {
-      setActiveIndex(-1);
-      return;
-    }
-    const selectedIndex = query
-      ? -1
-      : filteredOptions.findIndex((option) => getKey(option) === selectedKey);
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [filteredOptions, getKey, open, query, selectedKey]);
+    if (!open) return;
+    setActiveKey((current) => {
+      if (current !== null && filteredOptionKeys.includes(current)) return current;
+      if (!query && selectedKey !== null && filteredOptionKeys.includes(selectedKey)) {
+        return selectedKey;
+      }
+      return filteredOptionKeys[0] ?? null;
+    });
+  }, [filteredOptionKeysSignature, open, query, selectedKey]);
 
   useEffect(() => {
     if (!open || activeIndex < 0) return;
@@ -103,6 +119,11 @@ export function SearchableSelectField<T>({
   const openList = () => {
     if (disabled) return;
     setQuery("");
+    const selectedIsAvailable = selectedKey !== null &&
+      options.some((option) => getKey(option) === selectedKey);
+    setActiveKey(selectedIsAvailable
+      ? selectedKey
+      : options[0] ? getKey(options[0]) : null);
     setOpen(true);
   };
 
@@ -110,6 +131,7 @@ export function SearchableSelectField<T>({
     onSelect(option);
     setOpen(false);
     setQuery("");
+    setActiveKey(null);
     window.requestAnimationFrame(() => inputRef.current?.select());
   };
 
@@ -122,23 +144,23 @@ export function SearchableSelectField<T>({
       }
       if (filteredOptions.length === 0) return;
       const direction = event.key === "ArrowDown" ? 1 : -1;
-      setActiveIndex((current) => {
-        if (current < 0) return direction > 0 ? 0 : filteredOptions.length - 1;
-        return (current + direction + filteredOptions.length) % filteredOptions.length;
-      });
+      const nextIndex = activeIndex < 0
+        ? direction > 0 ? 0 : filteredOptions.length - 1
+        : (activeIndex + direction + filteredOptions.length) % filteredOptions.length;
+      setActiveKey(getKey(filteredOptions[nextIndex]));
       return;
     }
     if (event.key === "Home" && open && filteredOptions.length > 0) {
       event.preventDefault();
-      setActiveIndex(0);
+      setActiveKey(getKey(filteredOptions[0]));
       return;
     }
     if (event.key === "End" && open && filteredOptions.length > 0) {
       event.preventDefault();
-      setActiveIndex(filteredOptions.length - 1);
+      setActiveKey(getKey(filteredOptions[filteredOptions.length - 1]));
       return;
     }
-    if (event.key === "Enter" && open && activeIndex >= 0) {
+    if (event.key === "Enter" && open) {
       event.preventDefault();
       const option = filteredOptions[activeIndex];
       if (option) choose(option);
@@ -148,11 +170,13 @@ export function SearchableSelectField<T>({
       event.preventDefault();
       setOpen(false);
       setQuery("");
+      setActiveKey(null);
       return;
     }
     if (event.key === "Tab") {
       setOpen(false);
       setQuery("");
+      setActiveKey(null);
     }
   };
 
@@ -169,6 +193,9 @@ export function SearchableSelectField<T>({
           <img
             src={selectedImage}
             alt=""
+            onLoad={(event) => {
+              event.currentTarget.hidden = false;
+            }}
             onError={(event) => {
               event.currentTarget.hidden = true;
             }}
@@ -193,12 +220,19 @@ export function SearchableSelectField<T>({
             if (!open) openList();
           }}
           onChange={(event) => {
-            setQuery(event.target.value);
+            const nextQuery = event.target.value;
+            const normalizedQuery = normalizedSearchText(nextQuery.trim());
+            const nextFilteredOptions = normalizedQuery
+              ? options.filter((option) =>
+                optionMatchesSearch(option, normalizedQuery, getLabel, getSearchTerms))
+              : options;
+            setQuery(nextQuery);
+            setActiveKey(nextFilteredOptions[0] ? getKey(nextFilteredOptions[0]) : null);
             setOpen(true);
           }}
           onKeyDown={handleKeyDown}
         />
-        <span className="searchable-select-control__chevron" aria-hidden="true" />
+        <ChevronDown className="searchable-select-control__chevron" aria-hidden="true" />
       </div>
 
       {open ? (
@@ -222,13 +256,16 @@ export function SearchableSelectField<T>({
                 onPointerDown={(event) => {
                   if (event.pointerType === "mouse") event.preventDefault();
                 }}
-                onPointerMove={() => setActiveIndex(index)}
+                onPointerMove={() => setActiveKey(optionKey)}
                 onClick={() => choose(option)}
               >
                 {image ? (
                   <img
                     src={image}
                     alt=""
+                    onLoad={(event) => {
+                      event.currentTarget.hidden = false;
+                    }}
                     onError={(event) => {
                       event.currentTarget.hidden = true;
                     }}
@@ -238,7 +275,9 @@ export function SearchableSelectField<T>({
                   <strong>{getLabel(option)}</strong>
                   {meta ? <small>{meta}</small> : null}
                 </span>
-                {optionKey === selectedKey ? <i aria-hidden="true">&#10003;</i> : null}
+                {optionKey === selectedKey ? (
+                  <Check className="searchable-select-option__check" aria-hidden="true" />
+                ) : null}
               </button>
             );
           })}

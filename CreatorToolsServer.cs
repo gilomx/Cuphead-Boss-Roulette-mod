@@ -59,7 +59,8 @@ namespace Gilomx.CupheadBossRoulette
         private string latestConfigState =
             "{\"enabled\":false,\"ready\":false}";
         private string latestInteractionsState =
-            "{\"ready\":false,\"available\":false}";
+            "{\"ready\":false,\"available\":false," +
+            "\"showGiftImage\":true,\"settingsRevision\":0}";
         private string latestDashboardState =
             "{\"ready\":false,\"schemaVersion\":2,\"revision\":0," +
             "\"engineStatus\":\"starting\",\"connections\":[]," +

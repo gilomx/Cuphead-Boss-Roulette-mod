@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { StreamRuleDraft, TikTokGift } from "../../model";
 import { interactionItemFor, interactionItems } from "./interactionCatalog";
@@ -36,7 +37,7 @@ export function StreamRuleForm({
   );
   const selectedInteraction = interactionItemFor(draft.interaction);
   const canSave = Boolean(
-    draft.name.trim() && selectedGift && selectedInteraction &&
+    selectedGift && selectedInteraction &&
     draft.every >= 1 && draft.every <= maxEvery &&
     draft.quantity >= 1 && draft.quantity <= maxQuantity,
   );
@@ -47,51 +48,36 @@ export function StreamRuleForm({
       aria-busy={saving}
       onSubmit={(event) => {
         event.preventDefault();
-        if (canSave) onSave(draft);
+        if (canSave && selectedGift) {
+          onSave({
+            ...draft,
+            name: selectedGift.name.trim().slice(0, 64),
+          });
+        }
       }}
     >
-      <div className="stream-rule-form__identity stream-rule-form__wide">
-        <label>
-          <span>{t("interactions.rules.editor.name")}</span>
-          <input
-            type="text"
-            maxLength={64}
-            autoFocus
-            disabled={saving}
-            value={draft.name}
-            onChange={(event) => onChange({ ...draft, name: event.target.value })}
-          />
-        </label>
-        <label className="stream-rule-form__enabled">
-          <span>
-            <strong>{t("interactions.rules.editor.enabled")}</strong>
-            <small>{t("interactions.rules.editor.enabledHint")}</small>
-          </span>
-          <input
-            type="checkbox"
-            disabled={saving}
-            checked={draft.enabled}
-            onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
-          />
-        </label>
-      </div>
-
-      <div className="stream-rule-fixed-fields stream-rule-form__wide">
-        <div><span>{t("interactions.rules.editor.platform")}</span><strong>TikTok</strong></div>
-        <div><span>{t("interactions.rules.editor.connection")}</span><strong>{t("interactions.rules.editor.allConnections")}</strong></div>
-        <div><span>{t("interactions.rules.editor.event")}</span><strong>{t("interactions.rules.editor.gift")}</strong></div>
-      </div>
+      <label className="stream-rule-form__enabled stream-rule-form__wide">
+        <span>
+          <strong>{t("interactions.rules.editor.enabled")}</strong>
+          <small>{t("interactions.rules.editor.enabledHint")}</small>
+        </span>
+        <input
+          type="checkbox"
+          disabled={saving}
+          checked={draft.enabled}
+          onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
+        />
+      </label>
 
       <TikTokGiftPicker
         gifts={gifts}
         selectedId={draft.giftId}
         disabled={saving}
         onSelect={(gift) => {
-          const shouldFollowGiftName = !draft.name.trim() || draft.name === selectedGift?.name;
           onChange({
             ...draft,
             giftId: gift.giftId,
-            name: shouldFollowGiftName ? gift.name : draft.name,
+            name: gift.name,
           });
         }}
       />
@@ -115,21 +101,26 @@ export function StreamRuleForm({
             <small>{t("interactions.rules.editor.everyHint")}</small>
           </label>
 
-          <label className="stream-rule-execution__interaction">
-            <span>{t("interactions.rules.editor.interaction")}</span>
-            <div>
-              {selectedInteraction ? <img src={selectedInteraction.image} alt="" /> : null}
-              <select
-                value={draft.interaction}
-                disabled={saving}
-                onChange={(event) => onChange({ ...draft, interaction: event.target.value })}
-              >
-                {interactionItems.map((item) => (
-                  <option value={item.id} key={item.id}>{t(item.titleKey)}</option>
-                ))}
-              </select>
-            </div>
-          </label>
+          <div className="stream-rule-execution__interaction">
+            <SearchableSelectField
+              id="stream-rule-interaction"
+              label={t("interactions.rules.editor.interaction")}
+              options={interactionItems}
+              selectedKey={draft.interaction}
+              placeholder={t("interactions.rules.editor.interactionPlaceholder")}
+              noResults={t("interactions.rules.editor.noInteractionResults")}
+              disabled={saving}
+              getKey={(item) => item.id}
+              getLabel={(item) => t(item.titleKey)}
+              getImage={(item) => item.image}
+              getMeta={(item) => t(item.typeKey)}
+              getSearchTerms={(item) => [item.id, t(item.typeKey)]}
+              onSelect={(item) => onChange({
+                ...draft,
+                interaction: item.id,
+              })}
+            />
+          </div>
 
           <label>
             <span>{t("interactions.rules.editor.quantity")}</span>

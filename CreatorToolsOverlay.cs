@@ -47,6 +47,8 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsRetryBehaviorSetting;
         private ConfigEntry<int>
             creatorToolsInteractionMaximumActiveSetting;
+        private ConfigEntry<bool>
+            creatorToolsInteractionShowGiftImageSetting;
 
         private CreatorToolsServer creatorToolsServer;
         private CreatorToolsInteractionController creatorToolsInteractions;
@@ -114,6 +116,11 @@ namespace Gilomx.CupheadBossRoulette
                 "InteraccionesMaximasEnPantalla",
                 1,
                 "Cantidad maxima de interacciones visibles al mismo tiempo.");
+            creatorToolsInteractionShowGiftImageSetting = Config.Bind(
+                "Creator Tools",
+                "MostrarImagenDelRegalo",
+                true,
+                "Muestra el regalo junto al nombre del donador en el juego.");
 
             creatorToolsStreamRules = new CreatorToolsStreamRulesController(
                 AssetsDirectory,
@@ -133,6 +140,8 @@ namespace Gilomx.CupheadBossRoulette
                 CanSpawnCreatorToolsInteraction,
                 GetCreatorToolsInteractionMaximumActive,
                 SetCreatorToolsInteractionMaximumActive,
+                GetCreatorToolsInteractionShowGiftImage,
+                SetCreatorToolsInteractionShowGiftImage,
                 GetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 SetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 delegate(string message) { Logger.LogInfo(message); },
@@ -1063,6 +1072,19 @@ namespace Gilomx.CupheadBossRoulette
                 normalized)
                 creatorToolsInteractionMaximumActiveSetting.Value =
                     normalized;
+        }
+
+        private bool GetCreatorToolsInteractionShowGiftImage()
+        {
+            return creatorToolsInteractionShowGiftImageSetting == null ||
+                creatorToolsInteractionShowGiftImageSetting.Value;
+        }
+
+        private void SetCreatorToolsInteractionShowGiftImage(bool value)
+        {
+            if (creatorToolsInteractionShowGiftImageSetting != null &&
+                creatorToolsInteractionShowGiftImageSetting.Value != value)
+                creatorToolsInteractionShowGiftImageSetting.Value = value;
         }
 
         private bool StartCreatorToolsServer()

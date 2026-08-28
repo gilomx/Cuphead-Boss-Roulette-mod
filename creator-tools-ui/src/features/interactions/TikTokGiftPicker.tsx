@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Check } from "lucide-react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { TikTokGift } from "../../model";
 
@@ -38,6 +39,7 @@ export function TikTokGiftPicker({
       </legend>
       <input
         type="search"
+        autoFocus
         disabled={disabled}
         value={search}
         aria-label={t("interactions.rules.editor.searchGift")}
@@ -64,7 +66,7 @@ export function TikTokGiftPicker({
               <small>
                 {gift.coinsPerUnit} {t("interactions.rules.coins")}
               </small>
-              <i aria-hidden="true">&#10003;</i>
+              <Check className="stream-gift-picker__check" aria-hidden="true" />
             </button>
           ))}
         </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { interactionItems } from "./interactionCatalog";
+import { InteractionSettingsPanel } from "./InteractionSettingsPanel";
 import { StreamRulesView } from "./StreamRulesView";
 
 export function InteractionsView() {
@@ -10,7 +11,6 @@ export function InteractionsView() {
     pesky,
     optimisticInteractionQueue,
     interactionTesting,
-    applyInteractionMaxActive,
     applyInteractionRandomTest,
     testInteraction,
   } = useConfig();
@@ -18,23 +18,21 @@ export function InteractionsView() {
   const [donors, setDonors] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [delays, setDelays] = useState<Record<string, number>>({});
-  const [maxActiveDraft, setMaxActiveDraft] = useState(1);
   const [testingItem, setTestingItem] = useState<string | null>(null);
   const [confirmingRandomTest, setConfirmingRandomTest] = useState(false);
   const suspendedByPesky = interaction?.suspendedByPesky ?? false;
   const randomTestEnabled = interaction?.randomTestEnabled ?? false;
   const maxBatch = interaction?.maxBatch ?? 50;
   const maxDelay = interaction?.maxDelay ?? 3600;
+  const testFeedback = optimisticInteractionQueue.length > 0
+    ? "waiting_game"
+    : interaction?.feedback ?? "ready";
+  const showTestFeedback = testFeedback !== "ready" &&
+    testFeedback !== "settings_saved";
 
   useEffect(() => {
     if (!interactionTesting) setTestingItem(null);
   }, [interactionTesting]);
-
-  useEffect(() => {
-    if (typeof interaction?.maxActive === "number") {
-      setMaxActiveDraft(interaction.maxActive);
-    }
-  }, [interaction?.maxActive]);
 
   useEffect(() => {
     if (confirmingRandomTest && !pesky?.enabled) {
@@ -78,42 +76,7 @@ export function InteractionsView() {
         <StreamRulesView />
 
         <div className="interaction-workspace__tools">
-          <section
-            className="interaction-panel interaction-settings-section"
-            aria-labelledby="interaction-settings-title"
-          >
-            <div className="interaction-panel__heading interaction-settings-heading">
-              <h2 id="interaction-settings-title">{t("interactions.settings.title")}</h2>
-              <p>{t("interactions.settings.description")}</p>
-            </div>
-            <form
-              className="interaction-settings"
-              onSubmit={(event) => {
-                event.preventDefault();
-                applyInteractionMaxActive(maxActiveDraft);
-              }}
-            >
-              <label>
-                <span>{t("interactions.settings.maxActiveLabel")}</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={interaction?.maxActiveLimit ?? 20}
-                  value={maxActiveDraft}
-                  onChange={(event) => setMaxActiveDraft(Math.max(
-                    1,
-                    Math.min(
-                      interaction?.maxActiveLimit ?? 20,
-                      Number(event.target.value) || 1,
-                    ),
-                  ))}
-                />
-              </label>
-              <button type="submit" disabled={!interaction?.ready}>
-                {t("interactions.settings.save")}
-              </button>
-            </form>
-          </section>
+          <InteractionSettingsPanel />
 
         <section className="interaction-panel interaction-tests" aria-labelledby="interaction-tests-title">
           <div className="interaction-panel__heading">
@@ -300,18 +263,16 @@ export function InteractionsView() {
             </table>
           </div>
 
-          <p
-            className="interaction-tests__feedback"
-            data-error={interaction?.error ?? false}
-            role="status"
-            aria-live="polite"
-          >
-            {t(`interactions.feedback.${
-              optimisticInteractionQueue.length > 0
-                ? "waiting_game"
-                : interaction?.feedback ?? "ready"
-            }`)}
-          </p>
+          {showTestFeedback ? (
+            <p
+              className="interaction-tests__feedback"
+              data-error={interaction?.error ?? false}
+              role="status"
+              aria-live="polite"
+            >
+              {t(`interactions.feedback.${testFeedback}`)}
+            </p>
+          ) : null}
         </section>
         </div>
       </div>

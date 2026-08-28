@@ -21,6 +21,8 @@ namespace Gilomx.CupheadBossRoulette
             new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
         private readonly Action<int> setMaximumActive;
+        private readonly Func<bool> getShowGiftImage;
+        private readonly Action<bool> setShowGiftImage;
         private readonly Func<bool>
             getPhaseTransitionProtectionEnabled;
         private readonly Action<bool>
@@ -40,6 +42,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool randomTestEnabled;
         private int randomTestRevision;
         private int phaseTransitionProtectionRevision;
+        private int settingsRevision;
         private bool gameplayLevelActive;
         private bool gameplayLevelLoadPending;
         private bool gameplayAvailabilityObserved;
@@ -57,6 +60,8 @@ namespace Gilomx.CupheadBossRoulette
             Func<bool> canSpawnInteraction,
             Func<int> getMaximumActive,
             Action<int> setMaximumActive,
+            Func<bool> getShowGiftImage,
+            Action<bool> setShowGiftImage,
             Func<bool> getPhaseTransitionProtectionEnabled,
             Action<bool> setPhaseTransitionProtectionEnabled,
             Action<string> logInfo,
@@ -66,10 +71,13 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
             this.setMaximumActive = setMaximumActive;
+            this.getShowGiftImage = getShowGiftImage;
+            this.setShowGiftImage = setShowGiftImage;
             this.getPhaseTransitionProtectionEnabled =
                 getPhaseTransitionProtectionEnabled;
             this.setPhaseTransitionProtectionEnabled =
                 setPhaseTransitionProtectionEnabled;
+            CreatorToolsDonorLabel.SetGiftImagesVisible(ShowGiftImage);
             peskySettings = CreatorToolsPeskyModeSettings.Load(
                 pluginConfigPath, logWarning);
             executors.Add(new ZeppelinInteractionExecutor(
@@ -295,9 +303,10 @@ namespace Gilomx.CupheadBossRoulette
         private void ProcessInteractionCommand(
             Dictionary<string, string> values)
         {
-            if (values.ContainsKey("maxActive"))
+            if (values.ContainsKey("maxActive") ||
+                values.ContainsKey("showGiftImage"))
             {
-                SetMaximumActive(values);
+                SetInteractionSettings(values);
                 return;
             }
             if (values.ContainsKey("randomTestEnabled"))
@@ -628,23 +637,37 @@ namespace Gilomx.CupheadBossRoulette
             SetInteractionFeedback("queue_full", true);
         }
 
-        private void SetMaximumActive(Dictionary<string, string> values)
+        private void SetInteractionSettings(
+            Dictionary<string, string> values)
         {
             string value;
-            int requested;
-            if (!values.TryGetValue("maxActive", out value) ||
-                !int.TryParse(value, out requested))
+            var maximumActive = MaximumActive;
+            var showGiftImage = ShowGiftImage;
+            if (values.TryGetValue("maxActive", out value))
+            {
+                int requested;
+                if (!int.TryParse(value, out requested))
+                {
+                    SetInteractionFeedback("invalid_setting", true);
+                    return;
+                }
+                maximumActive = Math.Max(
+                    1, Math.Min(MaximumActiveLimit, requested));
+            }
+            if (values.TryGetValue("showGiftImage", out value) &&
+                !TryParseSwitch(value, out showGiftImage))
             {
                 SetInteractionFeedback("invalid_setting", true);
                 return;
             }
 
-            var normalized = Math.Max(
-                1, Math.Min(MaximumActiveLimit, requested));
             if (setMaximumActive != null)
-                setMaximumActive(normalized);
+                setMaximumActive(maximumActive);
+            if (setShowGiftImage != null)
+                setShowGiftImage(showGiftImage);
+            CreatorToolsDonorLabel.SetGiftImagesVisible(showGiftImage);
+            settingsRevision++;
             SetInteractionFeedback("settings_saved", false);
-            InvalidateState();
         }
 
         private void ProcessQueue(
@@ -729,6 +752,14 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private bool ShowGiftImage
+        {
+            get
+            {
+                return getShowGiftImage == null || getShowGiftImage();
+            }
+        }
+
         private int TotalActiveCount
         {
             get
@@ -781,6 +812,10 @@ namespace Gilomx.CupheadBossRoulette
                         : "false")
                 .Append(",\"phaseTransitionProtectionRevision\":")
                 .Append(phaseTransitionProtectionRevision)
+                .Append(",\"showGiftImage\":")
+                .Append(ShowGiftImage ? "true" : "false")
+                .Append(",\"settingsRevision\":")
+                .Append(settingsRevision)
                 .Append(",\"revision\":").Append(interactionRevision)
                 .Append(",\"queueCount\":").Append(interactionQueue.Count)
                 .Append(",\"activeCount\":").Append(interactionQueue.ActiveCount)

@@ -28,7 +28,12 @@ interface SimulationDraft {
 }
 
 interface DashboardSimulatorFormProps {
-  onSubmitted: () => void | Promise<void>;
+  active: boolean;
+  onSubmitted: (result: DashboardSimulationResult) => void | Promise<void>;
+}
+
+export interface DashboardSimulationResult {
+  delaySeconds: number;
 }
 
 const INITIAL_SIMULATION: SimulationDraft = {
@@ -45,13 +50,12 @@ function boundedInteger(value: string, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, Math.floor(Number(value)) || minimum));
 }
 
-export function DashboardSimulatorForm({ onSubmitted }: DashboardSimulatorFormProps) {
+export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulatorFormProps) {
   const { locale, t } = useLocalization();
   const { catalog, error: catalogError } = useTikTokGiftCatalog();
   const [simulation, setSimulation] = useState<SimulationDraft>(INITIAL_SIMULATION);
-  const [simulationStatus, setSimulationStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [submittedDelaySeconds, setSubmittedDelaySeconds] = useState(0);
-  const statusTimer = useRef<number | null>(null);
+  const [simulationStatus, setSimulationStatus] = useState<"idle" | "sending" | "error">("idle");
+  const activeRef = useRef(active);
   const gifts = catalog?.gifts ?? [];
   const isCatalogGift = simulation.platform === "tiktok" && simulation.type === "gift";
   const selectedGift = useMemo(
@@ -60,9 +64,11 @@ export function DashboardSimulatorForm({ onSubmitted }: DashboardSimulatorFormPr
   );
   const canSubmit = simulationStatus !== "sending" && (!isCatalogGift || Boolean(selectedGift));
 
-  useEffect(() => () => {
-    if (statusTimer.current !== null) window.clearTimeout(statusTimer.current);
-  }, []);
+  useEffect(() => {
+    activeRef.current = active;
+    if (active) return;
+    setSimulationStatus((current) => current === "sending" ? current : "idle");
+  }, [active]);
 
   useEffect(() => {
     if (!simulation.selectedItemId) return;
@@ -98,19 +104,19 @@ export function DashboardSimulatorForm({ onSubmitted }: DashboardSimulatorFormPr
     }
 
     setSimulationStatus("sending");
-    if (statusTimer.current !== null) window.clearTimeout(statusTimer.current);
     try {
       const response = await fetch(`/api/dashboard/simulate?${query}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      setSubmittedDelaySeconds(delaySeconds);
-      setSimulationStatus("sent");
-      await onSubmitted();
-      statusTimer.current = window.setTimeout(() => {
-        setSimulationStatus((current) => current === "sent" ? "idle" : current);
-        statusTimer.current = null;
-      }, 2_200);
     } catch {
-      setSimulationStatus("error");
+      setSimulationStatus(activeRef.current ? "error" : "idle");
+      return;
+    }
+
+    setSimulationStatus("idle");
+    try {
+      await onSubmitted({ delaySeconds });
+    } catch {
+      // The simulation was already accepted even if refreshing the feed fails.
     }
   };
 
@@ -119,11 +125,6 @@ export function DashboardSimulatorForm({ onSubmitted }: DashboardSimulatorFormPr
     : catalog
       ? t("dashboard.simulator.itemPlaceholder")
       : t("dashboard.simulator.itemLoading");
-  const sentMessage = submittedDelaySeconds > 0
-    ? t("dashboard.simulator.scheduled")
-        .replace("{seconds}", submittedDelaySeconds.toLocaleString(locale === "es" ? "es-MX" : "en-US"))
-    : t("dashboard.simulator.sent");
-
   return (
     <>
       <p className="dashboard-simulator__description">{t("dashboard.simulator.description")}</p>
@@ -191,7 +192,7 @@ export function DashboardSimulatorForm({ onSubmitted }: DashboardSimulatorFormPr
               selectedKey={simulation.selectedItemId || null}
               placeholder={giftPickerPlaceholder}
               noResults={t("dashboard.simulator.itemNoResults")}
-              disabled={!catalog || catalogError || simulationStatus === "sending"}
+              disabled={!active || !catalog || catalogError || simulationStatus === "sending"}
               getKey={(gift) => gift.giftId}
               getLabel={(gift) => gift.name}
               getImage={(gift) => gift.imagePath}
@@ -287,11 +288,9 @@ export function DashboardSimulatorForm({ onSubmitted }: DashboardSimulatorFormPr
           {t(`dashboard.simulator.${simulationStatus === "sending" ? "sending" : "submit"}`)}
         </button>
         <p data-status={simulationStatus} role="status" aria-live="polite">
-          {simulationStatus === "sent"
-            ? sentMessage
-            : simulationStatus === "error"
-              ? t("dashboard.simulator.error")
-              : t("dashboard.simulator.hint")}
+          {simulationStatus === "error"
+            ? t("dashboard.simulator.error")
+            : t("dashboard.simulator.hint")}
         </p>
       </form>
     </>

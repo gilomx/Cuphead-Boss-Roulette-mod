@@ -17,6 +17,8 @@ let interactionLastItem = "";
 let interactionNextId = 1;
 let interactionQueue = [];
 let interactionMaxActive = 1;
+let interactionShowGiftImage = true;
+let interactionSettingsRevision = 0;
 let interactionRandomTestEnabled = false;
 let interactionRandomTestRevision = 0;
 let phaseTransitionProtectionEnabled = true;
@@ -465,6 +467,8 @@ createServer((req, res) => {
       randomTestRevision: interactionRandomTestRevision,
       phaseTransitionProtectionEnabled,
       phaseTransitionProtectionRevision,
+      showGiftImage: interactionShowGiftImage,
+      settingsRevision: interactionSettingsRevision,
       item: "hilda_green_zeppelin",
       items: interactionItems,
       lastItem: interactionLastItem,
@@ -547,12 +551,19 @@ createServer((req, res) => {
   }
   if (url.pathname === "/api/config/interactions/set") {
     const maxActiveValue = url.searchParams.get("maxActive");
+    const showGiftImageValue = url.searchParams.get("showGiftImage");
     let nextFeedback = "settings_saved";
     if (maxActiveValue !== null) {
       interactionMaxActive = Math.max(
         1,
         Math.min(20, Number(maxActiveValue) || 1),
       );
+    }
+    if (showGiftImageValue !== null) {
+      interactionShowGiftImage = showGiftImageValue === "1";
+    }
+    if (maxActiveValue !== null || showGiftImageValue !== null) {
+      interactionSettingsRevision += 1;
     }
     const randomTestValue = url.searchParams.get("randomTestEnabled");
     if (randomTestValue !== null) {
