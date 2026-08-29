@@ -9,7 +9,11 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsStreamRulesController
     {
-        private const int SchemaVersion = 1;
+        private const int SchemaVersion = 2;
+        private const int MinimumSupportedSchemaVersion = 1;
+        private const string GiftEventType = "gift";
+        private const string LikeEventType = "like";
+        private const string FollowEventType = "follow";
         private const int MaximumRules = 100;
         private const int MaximumCommandsPerUpdate = 64;
         private const int MaximumRuleNameLength = 64;
@@ -24,6 +28,8 @@ namespace Gilomx.CupheadBossRoulette
         private readonly List<StreamRule> rules = new List<StreamRule>();
         private readonly Dictionary<string, long> accumulators =
             new Dictionary<string, long>(StringComparer.Ordinal);
+        private readonly HashSet<string> followedViewers =
+            new HashSet<string>(StringComparer.Ordinal);
         private readonly CreatorToolsStreamDispatchBacklog dispatchBacklog =
             new CreatorToolsStreamDispatchBacklog();
 
@@ -126,9 +132,11 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         /// <summary>
-        /// Evaluates every compatible rule independently. Accumulators are
-        /// session-only and scoped by rule plus connection; each keeps its
-        /// remainder after crossing an every-N threshold.
+        /// Evaluates every compatible rule independently. Gift accumulators
+        /// are scoped by rule plus connection. Like accumulators also include
+        /// the viewer, so every user keeps a separate session-only remainder.
+        /// Follow identities are remembered for the whole session so a later
+        /// unfollow/follow cycle cannot dispatch twice.
         /// </summary>
         internal CreatorToolsStreamEvaluation Evaluate(
             CreatorToolsStreamEvent streamEvent,
@@ -180,12 +188,36 @@ namespace Gilomx.CupheadBossRoulette
             var result = new CreatorToolsStreamEvaluation();
             if (!catalogReady || streamEvent == null || interactions == null ||
                 streamEvent.Platform != "tiktok" ||
-                streamEvent.Type != "gift")
+                !IsSupportedEventType(streamEvent.Type))
                 return result;
-            if (string.IsNullOrEmpty(streamEvent.ItemId))
+            if (streamEvent.Type == GiftEventType &&
+                string.IsNullOrEmpty(streamEvent.ItemId))
             {
                 result.MessageCode = "gift_id_missing";
                 return result;
+            }
+
+            var viewerKey = string.Empty;
+            if (streamEvent.Type == LikeEventType ||
+                streamEvent.Type == FollowEventType)
+            {
+                viewerKey = BuildViewerKey(streamEvent);
+                if (viewerKey.Length == 0)
+                {
+                    result.MessageCode = "user_identity_missing";
+                    return result;
+                }
+            }
+
+            if (streamEvent.Type == FollowEventType)
+            {
+                var followKey = BuildConnectionViewerKey(
+                    streamEvent.ConnectionId, viewerKey);
+                if (!followedViewers.Add(followKey))
+                {
+                    result.MessageCode = "follow_already_seen";
+                    return result;
+                }
             }
 
             var matchedNames = new List<string>();
@@ -194,18 +226,29 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < rules.Count; i++)
             {
                 var rule = rules[i];
-                if (!rule.Enabled || rule.GiftId != streamEvent.ItemId)
+                if (!rule.Enabled || rule.EventType != streamEvent.Type ||
+                    (rule.EventType == GiftEventType &&
+                     rule.GiftId != streamEvent.ItemId))
                     continue;
                 thresholdObserved = true;
-                var accumulatorKey = rule.Id.ToString(
-                    CultureInfo.InvariantCulture) + ":" +
-                    (streamEvent.ConnectionId ?? string.Empty);
-                long remainder;
-                accumulators.TryGetValue(accumulatorKey, out remainder);
-                var total = Math.Min(long.MaxValue - streamEvent.Count,
-                    Math.Max(0L, remainder)) + streamEvent.Count;
-                var triggers = total / rule.Every;
-                accumulators[accumulatorKey] = total % rule.Every;
+                long triggers;
+                if (rule.EventType == FollowEventType)
+                    triggers = 1;
+                else
+                {
+                    var accumulatorKey = BuildAccumulatorKey(
+                        rule.Id,
+                        streamEvent.ConnectionId,
+                        rule.EventType == LikeEventType
+                            ? viewerKey
+                            : string.Empty);
+                    long remainder;
+                    accumulators.TryGetValue(accumulatorKey, out remainder);
+                    var total = Math.Min(long.MaxValue - streamEvent.Count,
+                        Math.Max(0L, remainder)) + streamEvent.Count;
+                    triggers = total / rule.Every;
+                    accumulators[accumulatorKey] = total % rule.Every;
+                }
                 if (triggers <= 0)
                     continue;
 
@@ -214,11 +257,16 @@ namespace Gilomx.CupheadBossRoulette
                 interactionIds.Add(rule.Interaction);
                 var requestedLong = triggers * (long)rule.Quantity;
                 var canDispatchImmediately = !dispatchBacklog.HasEntries;
+                var giftImagePath = string.Empty;
+                GiftEntry gift;
+                if (rule.EventType == GiftEventType &&
+                    gifts.TryGetValue(rule.GiftId, out gift))
+                    giftImagePath = gift.ImagePath;
                 var pending = dispatchBacklog.Add(
                     rule.Id,
                     streamEvent.ConnectionId,
                     rule.Interaction,
-                    gifts[rule.GiftId].ImagePath,
+                    giftImagePath,
                     streamEvent.UserName,
                     requestedLong);
                 var queuedForRule = 0;
@@ -300,6 +348,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (!TryBuildRule(values, id, out rule))
                     return;
                 var resetRuntimeState =
+                    rules[index].EventType != rule.EventType ||
                     rules[index].GiftId != rule.GiftId ||
                     rules[index].Every != rule.Every ||
                     rules[index].Interaction != rule.Interaction ||
@@ -356,10 +405,16 @@ namespace Gilomx.CupheadBossRoulette
         {
             rule = null;
             var name = NormalizeRuleName(Value(values, "name"));
+            var eventType = Value(values, "eventType").Trim()
+                .ToLowerInvariant();
+            if (eventType.Length == 0)
+                eventType = GiftEventType;
             var giftId = Value(values, "giftId").Trim();
             var interaction = Value(values, "interaction").Trim();
-            GiftEntry gift;
-            if (name.Length == 0 || !gifts.TryGetValue(giftId, out gift) ||
+            GiftEntry gift = null;
+            if (name.Length == 0 || !IsSupportedEventType(eventType) ||
+                (eventType == GiftEventType &&
+                 !gifts.TryGetValue(giftId, out gift)) ||
                 !IsKnownInteraction(interaction))
             {
                 SetFeedback("invalid_rule", true);
@@ -379,14 +434,21 @@ namespace Gilomx.CupheadBossRoulette
                 SetFeedback("invalid_rule", true);
                 return false;
             }
+            if (eventType == FollowEventType)
+                every = 1;
 
             rule = new StreamRule
             {
                 Id = id,
                 Name = name,
                 Enabled = enabled,
-                GiftId = gift.Id,
-                GiftName = gift.Name,
+                EventType = eventType,
+                GiftId = eventType == GiftEventType
+                    ? gift.Id
+                    : string.Empty,
+                GiftName = eventType == GiftEventType
+                    ? gift.Name
+                    : string.Empty,
                 Every = every,
                 Interaction = interaction,
                 Quantity = quantity
@@ -464,7 +526,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(rule.Enabled ? "true" : "false")
                 .Append(",\"platform\":\"tiktok\"")
                 .Append(",\"connectionId\":\"all\"")
-                .Append(",\"eventType\":\"gift\"")
+                .Append(",\"eventType\":\"");
+            AppendJson(builder, rule.EventType);
+            builder.Append("\"")
                 .Append(",\"giftId\":\"");
             AppendJson(builder, rule.GiftId);
             builder.Append("\",\"giftName\":\"");
@@ -478,7 +542,8 @@ namespace Gilomx.CupheadBossRoulette
             if (includeGift)
             {
                 GiftEntry gift;
-                if (gifts.TryGetValue(rule.GiftId, out gift))
+                if (rule.EventType == GiftEventType &&
+                    gifts.TryGetValue(rule.GiftId, out gift))
                 {
                     builder.Append(",\"coinsPerUnit\":")
                         .Append(gift.CoinsPerUnit);
@@ -563,7 +628,8 @@ namespace Gilomx.CupheadBossRoulette
                 int version;
                 long storedNextId;
                 if (!TryReadIntProperty(json, "version", out version) ||
-                    version != SchemaVersion ||
+                    version < MinimumSupportedSchemaVersion ||
+                    version > SchemaVersion ||
                     !TryReadLongProperty(json, "nextId", out storedNextId))
                     return false;
 
@@ -574,8 +640,8 @@ namespace Gilomx.CupheadBossRoulette
                     "\\\"enabled\\\":(?<enabled>true|false)," +
                     "\\\"platform\\\":\\\"tiktok\\\"," +
                     "\\\"connectionId\\\":\\\"all\\\"," +
-                    "\\\"eventType\\\":\\\"gift\\\"," +
-                    "\\\"giftId\\\":\\\"(?<giftId>\\d+)\\\"," +
+                    "\\\"eventType\\\":\\\"(?<eventType>gift|like|follow)\\\"," +
+                    "\\\"giftId\\\":\\\"(?<giftId>\\d*)\\\"," +
                     "\\\"giftName\\\":\\\"(?<giftName>(?:\\\\.|[^\\\"])*)\\\"," +
                     "\\\"every\\\":(?<every>\\d+)," +
                     "\\\"interaction\\\":\\\"(?<interaction>[^\\\"]+)\\\"," +
@@ -588,6 +654,8 @@ namespace Gilomx.CupheadBossRoulette
                     long id;
                     int every;
                     int quantity;
+                    var eventType =
+                        matches[i].Groups["eventType"].Value;
                     var giftId = matches[i].Groups["giftId"].Value;
                     var interaction = matches[i].Groups["interaction"].Value;
                     if (!long.TryParse(matches[i].Groups["id"].Value,
@@ -602,7 +670,9 @@ namespace Gilomx.CupheadBossRoulette
                         id <= 0 || !ids.Add(id) ||
                         every < 1 || every > MaximumEvery ||
                         quantity < 1 || quantity > MaximumQuantity ||
-                        !gifts.ContainsKey(giftId) ||
+                        (eventType == GiftEventType &&
+                         !gifts.ContainsKey(giftId)) ||
+                        (eventType == FollowEventType && every != 1) ||
                         !IsKnownInteraction(interaction))
                         return false;
                     loaded.Add(new StreamRule
@@ -611,17 +681,24 @@ namespace Gilomx.CupheadBossRoulette
                         Name = NormalizeRuleName(UnescapeJson(
                             matches[i].Groups["name"].Value)),
                         Enabled = matches[i].Groups["enabled"].Value == "true",
-                        GiftId = giftId,
-                        GiftName = UnescapeJson(
-                            matches[i].Groups["giftName"].Value),
+                        EventType = eventType,
+                        GiftId = eventType == GiftEventType
+                            ? giftId
+                            : string.Empty,
+                        GiftName = eventType == GiftEventType
+                            ? UnescapeJson(matches[i]
+                                .Groups["giftName"].Value)
+                            : string.Empty,
                         Every = every,
                         Interaction = interaction,
                         Quantity = quantity
                     });
                 }
                 if (loaded.Count > MaximumRules ||
-                    json.IndexOf("\"rules\":[",
-                        StringComparison.Ordinal) < 0)
+                    !Regex.IsMatch(
+                        json,
+                        "\\\"rules\\\"\\s*:\\s*\\[",
+                        RegexOptions.CultureInvariant))
                     return false;
                 rules.Clear();
                 rules.AddRange(loaded);
@@ -736,6 +813,41 @@ namespace Gilomx.CupheadBossRoulette
                     StringComparison.OrdinalIgnoreCase))
                     return true;
             return false;
+        }
+
+        private static bool IsSupportedEventType(string value)
+        {
+            return value == GiftEventType || value == LikeEventType ||
+                value == FollowEventType;
+        }
+
+        private static string BuildViewerKey(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            var userId = (streamEvent.UserId ?? string.Empty).Trim();
+            if (userId.Length > 0)
+                return "id:" + userId;
+            var userName = (streamEvent.UserName ?? string.Empty).Trim();
+            return userName.Length == 0
+                ? string.Empty
+                : "name:" + userName.ToLowerInvariant();
+        }
+
+        private static string BuildConnectionViewerKey(
+            string connectionId,
+            string viewerKey)
+        {
+            return (connectionId ?? string.Empty) + "\n" + viewerKey;
+        }
+
+        private static string BuildAccumulatorKey(
+            long ruleId,
+            string connectionId,
+            string viewerKey)
+        {
+            return ruleId.ToString(CultureInfo.InvariantCulture) + ":" +
+                (connectionId ?? string.Empty) + "\n" +
+                (viewerKey ?? string.Empty);
         }
 
         private static string NormalizeRuleName(string value)
@@ -966,6 +1078,7 @@ namespace Gilomx.CupheadBossRoulette
             internal long Id;
             internal string Name;
             internal bool Enabled;
+            internal string EventType;
             internal string GiftId;
             internal string GiftName;
             internal int Every;
@@ -979,6 +1092,7 @@ namespace Gilomx.CupheadBossRoulette
                     Id = id,
                     Name = Name,
                     Enabled = Enabled,
+                    EventType = EventType,
                     GiftId = GiftId,
                     GiftName = GiftName,
                     Every = Every,

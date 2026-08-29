@@ -29,11 +29,12 @@ let streamRulesFeedback = "ready";
 let streamRulesError = false;
 let streamRules = [];
 const streamRuleAccumulators = new Map();
+const followedViewers = new Set();
 
 function streamRulesState() {
   return {
     ready: true,
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: streamRulesRevision,
     engineActive: true,
     catalogVersion: giftCatalog.catalogVersion,
@@ -48,9 +49,10 @@ function streamRulesState() {
         ...rule,
         platform: "tiktok",
         connectionId: "all",
-        eventType: "gift",
-        giftName: gift?.name ?? rule.giftId,
-        coinsPerUnit: gift?.coinsPerUnit ?? 0,
+        giftName: rule.eventType === "gift" ? gift?.name ?? rule.giftId : "",
+        ...(rule.eventType === "gift"
+          ? { coinsPerUnit: gift?.coinsPerUnit ?? 0 }
+          : {}),
       };
     }),
   };
@@ -86,6 +88,8 @@ const dashboardCounters = {
   likes: 0,
   follows: 0,
   subscriptions: 0,
+  coins: 0,
+  bits: 0,
 };
 let dashboardEvents = [];
 let dashboardNextScheduleId = 1;
@@ -300,17 +304,36 @@ function executeDashboardSimulation(command) {
     if (command.type === "like") dashboardCounters.likes += command.count;
     else if (command.type === "follow") dashboardCounters.follows += command.count;
     else if (command.type === "subscription") dashboardCounters.subscriptions += command.count;
-    if (command.platform === "tiktok" && command.type === "gift" && command.itemId) {
+    else if (command.platform === "tiktok" && command.type === "gift") {
+      dashboardCounters.coins += amount;
+    }
+    if (command.platform === "twitch" && ["gift", "currency"].includes(command.type)) {
+      dashboardCounters.bits += amount;
+    }
+    if (command.platform === "tiktok" && ["gift", "like", "follow"].includes(command.type)) {
       const matchedRules = [];
       const queuedActions = [];
       let interactionQueueChanged = false;
-      for (const rule of streamRules.filter(
-        (candidate) => candidate.enabled && candidate.giftId === command.itemId,
-      )) {
-        const accumulatorKey = `${rule.id}:simulator-tiktok`;
-        const total = (streamRuleAccumulators.get(accumulatorKey) ?? 0) + command.count;
-        const triggers = Math.floor(total / rule.every);
-        streamRuleAccumulators.set(accumulatorKey, total % rule.every);
+      const viewerKey = command.userId
+        ? `id:${command.userId}`
+        : command.user ? `name:${command.user.toLowerCase()}` : "";
+      const followKey = `simulator-tiktok\n${viewerKey}`;
+      const repeatedFollow = command.type === "follow" && followedViewers.has(followKey);
+      if (command.type === "follow" && viewerKey && !repeatedFollow) {
+        followedViewers.add(followKey);
+      }
+      for (const rule of streamRules.filter((candidate) =>
+        !repeatedFollow && candidate.enabled && candidate.eventType === command.type &&
+        (candidate.eventType !== "gift" || candidate.giftId === command.itemId))) {
+        let triggers = 1;
+        if (rule.eventType !== "follow") {
+          const accumulatorKey = `${rule.id}:simulator-tiktok\n${
+            rule.eventType === "like" ? viewerKey : ""
+          }`;
+          const total = (streamRuleAccumulators.get(accumulatorKey) ?? 0) + command.count;
+          triggers = Math.floor(total / rule.every);
+          streamRuleAccumulators.set(accumulatorKey, total % rule.every);
+        }
         if (triggers <= 0) continue;
         matchedRules.push(rule.name);
         queuedActions.push(rule.interaction);
@@ -345,9 +368,11 @@ function executeDashboardSimulation(command) {
         event.messageCode = "rules_queued";
         event.rule = matchedRules.join(", ");
         event.action = queuedActions.join(", ");
-      } else if (streamRules.some(
-        (candidate) => candidate.enabled && candidate.giftId === command.itemId,
-      )) {
+      } else if (repeatedFollow) {
+        event.messageCode = "follow_already_seen";
+      } else if (streamRules.some((candidate) =>
+        candidate.enabled && candidate.eventType === command.type &&
+        (candidate.eventType !== "gift" || candidate.giftId === command.itemId))) {
         event.messageCode = "threshold_pending";
       }
     }
@@ -511,12 +536,15 @@ createServer((req, res) => {
       if (!streamRules[index].enabled) resetStreamRuleAccumulators(id);
       streamRulesFeedback = streamRules[index].enabled ? "enabled" : "disabled";
     } else if (action === "create" || (action === "update" && index >= 0)) {
+      const eventType = url.searchParams.get("eventType") ?? "gift";
       const giftId = url.searchParams.get("giftId") ?? "";
       const interaction = url.searchParams.get("interaction") ?? "";
       const every = Number(url.searchParams.get("every"));
       const quantity = Number(url.searchParams.get("quantity"));
       const name = (url.searchParams.get("name") ?? "").trim().slice(0, 64);
-      if (!name || !giftsById.has(giftId) || !interactionItems.includes(interaction) ||
+      if (!name || !["gift", "like", "follow"].includes(eventType) ||
+          (eventType === "gift" && !giftsById.has(giftId)) ||
+          !interactionItems.includes(interaction) ||
           !Number.isInteger(every) || every < 1 ||
           !Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
         streamRulesFeedback = "invalid_rule";
@@ -526,8 +554,9 @@ createServer((req, res) => {
           id: action === "create" ? streamRulesNextId : id,
           name,
           enabled: url.searchParams.get("enabled") !== "0",
-          giftId,
-          every,
+          eventType,
+          giftId: eventType === "gift" ? giftId : "",
+          every: eventType === "follow" ? 1 : every,
           interaction,
           quantity,
         };

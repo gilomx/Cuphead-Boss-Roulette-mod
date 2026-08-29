@@ -39,7 +39,16 @@ export function StreamRuleRow({
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const returnAnimationTimerRef = useRef<number | null>(null);
   const [returningFromDelete, setReturningFromDelete] = useState(false);
-  const ruleName = gift?.name || rule.giftName || rule.name;
+  const ruleName = rule.eventType === "gift"
+    ? gift?.name || rule.giftName || rule.name
+    : t(`interactions.rules.editor.${rule.eventType}Name`);
+  const triggerDetail = rule.eventType === "gift"
+    ? `${rule.coinsPerUnit ?? 0} ${t("interactions.rules.coins")} · ${rule.every === 1
+      ? t("interactions.rules.list.everyOne")
+      : t("interactions.rules.list.every").replace("{count}", String(rule.every))}`
+    : rule.eventType === "like"
+      ? t("interactions.rules.list.likeEvery").replace("{count}", String(rule.every))
+      : t("interactions.rules.list.followOnce");
 
   useEffect(() => () => {
     if (returnAnimationTimerRef.current !== null) {
@@ -64,6 +73,7 @@ export function StreamRuleRow({
   return (
     <tr
       className="stream-rule-row"
+      data-rule-id={rule.id}
       data-enabled={rule.enabled}
       data-highlighted={highlighted && !confirmingDelete}
       data-step={confirmingDelete ? "confirm" : "control"}
@@ -102,7 +112,7 @@ export function StreamRuleRow({
           </td>
           <td>
             <div className="stream-rule-table__gift">
-              {gift ? (
+              {rule.eventType === "gift" && gift ? (
                 <img
                   src={gift.imagePath}
                   alt=""
@@ -116,14 +126,9 @@ export function StreamRuleRow({
                 />
               ) : null}
               <span>
-                <strong>{gift?.name ?? rule.giftName}</strong>
+                <strong>{ruleName}</strong>
                 <small>
-                  #{rule.id} · {rule.coinsPerUnit} {t("interactions.rules.coins")} · {rule.every === 1
-                    ? t("interactions.rules.list.everyOne")
-                    : t("interactions.rules.list.every").replace(
-                      "{count}",
-                      String(rule.every),
-                    )}
+                  #{rule.id} · {triggerDetail}
                 </small>
               </span>
             </div>

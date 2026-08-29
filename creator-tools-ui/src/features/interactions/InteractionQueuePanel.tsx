@@ -25,23 +25,25 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
       <div className="interaction-panel__heading">
         <div>
           <h2 id="interaction-queue-title">{t("interactions.queue.title")}</h2>
-          <p>{t("interactions.queue.description")}</p>
-          {onConfigure ? (
-            <a
-              className="interaction-queue__configure"
-              href="/config/interactions"
-              onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-                  return;
-                }
-                event.preventDefault();
-                onConfigure();
-              }}
-            >
-              {t("interactions.queue.configure")}
-              <span aria-hidden="true">→</span>
-            </a>
-          ) : null}
+          <p>
+            {t("interactions.queue.description")}
+            {onConfigure ? (
+              <a
+                className="interaction-queue__configure"
+                href="/config/interactions"
+                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onConfigure();
+                }}
+              >
+                {t("interactions.queue.configure")}
+                <span aria-hidden="true">→</span>
+              </a>
+            ) : null}
+          </p>
         </div>
         <span className="interaction-count" aria-label={t("interactions.queue.countLabel")}>
           {queue.length}

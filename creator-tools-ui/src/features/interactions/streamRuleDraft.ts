@@ -5,6 +5,7 @@ export function createStreamRuleDraft(gift?: TikTokGift): StreamRuleDraft {
   return {
     name: gift?.name ?? "",
     enabled: true,
+    eventType: "gift",
     giftId: gift?.giftId ?? "",
     every: 1,
     interaction: interactionItems[0].id,
@@ -17,6 +18,7 @@ export function draftForStreamRule(rule: StreamRule): StreamRuleDraft {
     id: rule.id,
     name: rule.name,
     enabled: rule.enabled,
+    eventType: rule.eventType,
     giftId: rule.giftId,
     every: rule.every,
     interaction: rule.interaction,

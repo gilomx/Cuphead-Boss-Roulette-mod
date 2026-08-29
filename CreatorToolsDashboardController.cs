@@ -45,6 +45,8 @@ namespace Gilomx.CupheadBossRoulette
         private long likeCount;
         private long followCount;
         private long subscriptionCount;
+        private decimal coinCount;
+        private decimal bitCount;
         private string lastPublishedState;
         private bool stateDirty = true;
         private long nextSimulationSequence;
@@ -368,6 +370,13 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (entry.Type == "gift")
                 giftCount += entry.Count;
+            if (entry.Platform == "tiktok" && entry.Type == "gift" &&
+                entry.TotalValue > 0m)
+                coinCount += entry.TotalValue;
+            if (entry.Platform == "twitch" &&
+                (entry.Type == "gift" || entry.Type == "currency") &&
+                entry.TotalValue > 0m)
+                bitCount += entry.TotalValue;
             if ((entry.Type == "gift" || entry.Type == "currency") &&
                 entry.TotalValue > 0m)
                 valuedCount++;
@@ -405,6 +414,11 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"follows\":").Append(followCount)
                 .Append(",\"subscriptions\":")
                 .Append(subscriptionCount)
+                .Append(",\"coins\":");
+            CreatorToolsJson.AppendDecimal(builder, coinCount);
+            builder.Append(",\"bits\":");
+            CreatorToolsJson.AppendDecimal(builder, bitCount);
+            builder
                 .Append("},\"events\":[");
             for (var i = 0; i < eventCount; i++)
             {

@@ -22,7 +22,7 @@
     "description": "Monitor connections, events, and redeems from every platform in one place.",
     "summary": {
       "eyebrow": "Activity",
-      "title": "Global summary",
+      "title": "Live summary",
       "session": "Current session"
     },
     "counters": {
@@ -34,7 +34,9 @@
       "valued": "With value",
       "likes": "Likes",
       "follows": "Follows",
-      "subscriptions": "Subscriptions"
+      "subscriptions": "Subscriptions",
+      "coins": "Coins",
+      "bits": "Bits"
     },
     "connections": {
       "eyebrow": "Sources",
@@ -135,7 +137,7 @@
   },
   "interactions": {
     "title": "Interactions",
-    "description": "Manage the redeems entering the game and test their execution order.",
+    "description": "Configure how gifts, taps, and follows affect the match and test their execution order.",
     "rules": {
       "coins": "coins",
       "notice": {
@@ -150,7 +152,7 @@
         "countLabel": "Configured redeems",
         "limitReached": "The redeem limit has been reached.",
         "emptyTitle": "You don't have any redeems yet",
-        "emptyDescription": "Create the first one to link a gift or donation to an in-game interaction.",
+        "emptyDescription": "Create the first one to link a live event to an in-game action.",
         "enabled": "Active",
         "disabled": "Inactive",
         "toggleLabel": "Enable or disable {name}",
@@ -160,29 +162,44 @@
         "actions": "Actions",
         "every": "every {count} units",
         "everyOne": "every unit",
+        "likeEvery": "every {count} taps per user",
+        "followOnce": "once per user and session",
         "quantity": "Quantity ×{count}"
       },
       "editor": {
         "eyebrow": "Redeem editor",
         "createTitle": "New redeem",
         "editTitle": "Edit redeem",
-        "description": "Choose the gift or donation and the interaction it should produce.",
+        "description": "Choose which live event triggers it and the interaction it should produce.",
         "emptyTitle": "Select or create a redeem",
         "emptyDescription": "The editor will appear here without leaving the page.",
         "selectGift": "Gift or donation",
         "searchGift": "Search by name or value",
         "giftResults": "{count} results",
         "noGiftResults": "No gifts match this search.",
+        "triggerType": "Triggered by",
+        "triggerGift": "Gift",
+        "triggerLike": "Taps (likes)",
+        "triggerFollow": "Follow",
+        "giftName": "Gift",
+        "likeName": "Taps",
+        "followName": "Follow",
+        "giftTriggerHint": "Uses the received quantity of one specific gift.",
+        "likeTriggerHint": "Tracks the taps sent by each user separately during the session.",
+        "followTriggerHint": "Recognizes the first follow event from each user during the session.",
         "executionTitle": "Redeem result",
         "every": "Every how many units",
         "everyHint": "1 activates the redeem for each received unit.",
+        "likeEvery": "Taps required per user",
+        "likeEveryHint": "The remainder carries over to the next tap event from the same user.",
+        "followOnceHint": "Each user can trigger this interaction only once per session. Unfollowing and following again will not repeat it.",
         "interaction": "Appears in the game",
         "interactionPlaceholder": "Search interactions",
         "noInteractionResults": "No matching interactions.",
         "quantity": "Quantity to send",
         "quantityHint": "Number of interactions that will enter the queue.",
         "enabled": "Active redeem",
-        "enabledHint": "It will accept gifts or donations as soon as the connection is ready."
+        "enabledHint": "It will accept events as soon as the connection is ready."
       },
       "actions": {
         "label": "Redeem actions",

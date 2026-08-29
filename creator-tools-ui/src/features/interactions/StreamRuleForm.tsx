@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import type { StreamRuleDraft, TikTokGift } from "../../model";
+import type { StreamRuleDraft, StreamRuleTrigger, TikTokGift } from "../../model";
 import { interactionItemFor, interactionItems } from "./interactionCatalog";
 import { TikTokGiftPicker } from "./TikTokGiftPicker";
 
@@ -36,11 +36,17 @@ export function StreamRuleForm({
     [draft.giftId, gifts],
   );
   const selectedInteraction = interactionItemFor(draft.interaction);
+  const needsGift = draft.eventType === "gift";
+  const hasThreshold = draft.eventType !== "follow";
   const canSave = Boolean(
-    selectedGift && selectedInteraction &&
-    draft.every >= 1 && draft.every <= maxEvery &&
+    (!needsGift || selectedGift) && selectedInteraction &&
+    (!hasThreshold || (draft.every >= 1 && draft.every <= maxEvery)) &&
     draft.quantity >= 1 && draft.quantity <= maxQuantity,
   );
+
+  const triggerName = draft.eventType === "gift"
+    ? selectedGift?.name ?? ""
+    : t(`interactions.rules.editor.${draft.eventType}Name`);
 
   return (
     <form
@@ -48,10 +54,11 @@ export function StreamRuleForm({
       aria-busy={saving}
       onSubmit={(event) => {
         event.preventDefault();
-        if (canSave && selectedGift) {
+        if (canSave) {
           onSave({
             ...draft,
-            name: selectedGift.name.trim().slice(0, 64),
+            every: draft.eventType === "follow" ? 1 : draft.every,
+            name: triggerName.trim().slice(0, 64),
           });
         }
       }}
@@ -69,37 +76,71 @@ export function StreamRuleForm({
         />
       </label>
 
-      <TikTokGiftPicker
-        gifts={gifts}
-        selectedId={draft.giftId}
-        disabled={saving}
-        onSelect={(gift) => {
-          onChange({
-            ...draft,
-            giftId: gift.giftId,
-            name: gift.name,
-          });
-        }}
-      />
+      <label className="stream-rule-form__wide">
+        <span>{t("interactions.rules.editor.triggerType")}</span>
+        <select
+          disabled={saving}
+          value={draft.eventType}
+          onChange={(event) => {
+            const eventType = event.target.value as StreamRuleTrigger;
+            const nextGift = selectedGift ?? gifts[0];
+            onChange({
+              ...draft,
+              eventType,
+              giftId: eventType === "gift" ? nextGift?.giftId ?? "" : draft.giftId,
+              every: eventType === "follow" ? 1 : draft.every,
+              name: eventType === "gift"
+                ? nextGift?.name ?? ""
+                : t(`interactions.rules.editor.${eventType}Name`),
+            });
+          }}
+        >
+          <option value="gift">{t("interactions.rules.editor.triggerGift")}</option>
+          <option value="like">{t("interactions.rules.editor.triggerLike")}</option>
+          <option value="follow">{t("interactions.rules.editor.triggerFollow")}</option>
+        </select>
+        <small>{t(`interactions.rules.editor.${draft.eventType}TriggerHint`)}</small>
+      </label>
+
+      {draft.eventType === "gift" ? (
+        <TikTokGiftPicker
+          gifts={gifts}
+          selectedId={draft.giftId}
+          disabled={saving}
+          onSelect={(gift) => {
+            onChange({
+              ...draft,
+              giftId: gift.giftId,
+              name: gift.name,
+            });
+          }}
+        />
+      ) : null}
 
       <fieldset className="stream-rule-execution stream-rule-form__wide">
         <legend>{t("interactions.rules.editor.executionTitle")}</legend>
-        <div className="stream-rule-execution__grid">
-          <label>
-            <span>{t("interactions.rules.editor.every")}</span>
-            <input
-              type="number"
-              min={1}
-              max={maxEvery}
-              disabled={saving}
-              value={draft.every}
-              onChange={(event) => onChange({
-                ...draft,
-                every: boundedInteger(event.target.value, maxEvery),
-              })}
-            />
-            <small>{t("interactions.rules.editor.everyHint")}</small>
-          </label>
+        <div className="stream-rule-execution__grid" data-has-threshold={hasThreshold}>
+          {hasThreshold ? (
+            <label>
+              <span>{t(draft.eventType === "like"
+                ? "interactions.rules.editor.likeEvery"
+                : "interactions.rules.editor.every")}</span>
+              <input
+                type="number"
+                min={1}
+                max={maxEvery}
+                disabled={saving}
+                value={draft.every}
+                onChange={(event) => onChange({
+                  ...draft,
+                  every: boundedInteger(event.target.value, maxEvery),
+                })}
+              />
+              <small>{t(draft.eventType === "like"
+                ? "interactions.rules.editor.likeEveryHint"
+                : "interactions.rules.editor.everyHint")}</small>
+            </label>
+          ) : null}
 
           <div className="stream-rule-execution__interaction">
             <SearchableSelectField
@@ -138,6 +179,11 @@ export function StreamRuleForm({
             <small>{t("interactions.rules.editor.quantityHint")}</small>
           </label>
         </div>
+        {draft.eventType === "follow" ? (
+          <p className="stream-rule-execution__notice">
+            {t("interactions.rules.editor.followOnceHint")}
+          </p>
+        ) : null}
       </fieldset>
 
       <div className="stream-rule-form__actions stream-rule-form__wide">

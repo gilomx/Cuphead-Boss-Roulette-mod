@@ -67,7 +67,8 @@ namespace Gilomx.CupheadBossRoulette
             "\"counters\":{\"received\":0,\"matched\":0," +
             "\"queued\":0,\"ignored\":0,\"gifts\":0," +
             "\"valued\":0,\"likes\":0,\"follows\":0," +
-            "\"subscriptions\":0},\"events\":[]}";
+            "\"subscriptions\":0,\"coins\":0,\"bits\":0}," +
+            "\"events\":[]}";
         private string latestPeskyState =
             "{\"ready\":false,\"available\":false,\"enabled\":false}";
         private string latestStreamRulesState =

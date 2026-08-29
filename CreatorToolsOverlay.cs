@@ -68,6 +68,7 @@ namespace Gilomx.CupheadBossRoulette
         private string creatorToolsServerError;
         private bool creatorToolsInteractionLevelStartObserved;
         private int creatorToolsInteractionLevelInstanceId = -1;
+        private const float CreatorToolsInteractionStartSafetySeconds = 3f;
         private float creatorToolsInteractionAllowedAt =
             float.PositiveInfinity;
         private bool creatorToolsInteractionPhaseTransitionBlocked;
@@ -449,15 +450,6 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 return;
             }
-            if (sameLevel && rearmExistingLevel &&
-                creatorToolsInteractions != null &&
-                creatorToolsInteractions.GameplayLevelActive)
-            {
-                creatorToolsInteractionLevelStartObserved = false;
-                creatorToolsInteractions.ConfirmGameplayLevelStart();
-                return;
-            }
-
             CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
 
             var shouldClearPreviousAttempt =
@@ -468,7 +460,8 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractions != null)
                 creatorToolsInteractions.EndGameplayLevel();
             creatorToolsInteractionLevelInstanceId = instanceId;
-            creatorToolsInteractionAllowedAt = Time.realtimeSinceStartup;
+            creatorToolsInteractionAllowedAt = Time.realtimeSinceStartup +
+                CreatorToolsInteractionStartSafetySeconds;
             ResetCreatorToolsInteractionPhaseTransition();
             if (creatorToolsInteractions != null)
                 creatorToolsInteractions.BeginGameplayLevel(

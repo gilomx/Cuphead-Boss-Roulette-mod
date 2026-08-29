@@ -127,16 +127,18 @@ export interface TikTokGiftCatalog {
   gifts: TikTokGift[];
 }
 
+export type StreamRuleTrigger = "gift" | "like" | "follow";
+
 export interface StreamRule {
   id: number;
   name: string;
   enabled: boolean;
   platform: "tiktok";
   connectionId: "all";
-  eventType: "gift";
+  eventType: StreamRuleTrigger;
   giftId: string;
   giftName: string;
-  coinsPerUnit: number;
+  coinsPerUnit?: number;
   every: number;
   interaction: string;
   quantity: number;
@@ -146,6 +148,7 @@ export interface StreamRuleDraft {
   id?: number;
   name: string;
   enabled: boolean;
+  eventType: StreamRuleTrigger;
   giftId: string;
   every: number;
   interaction: string;
@@ -199,6 +202,8 @@ export interface DashboardCounters {
   likes: number;
   follows: number;
   subscriptions: number;
+  coins: number;
+  bits: number;
 }
 
 export interface DashboardEvent {

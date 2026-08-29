@@ -837,6 +837,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         action: draft.id === undefined ? "create" : "update",
         name: draft.name.trim(),
         enabled: draft.enabled ? "1" : "0",
+        eventType: draft.eventType,
         giftId: draft.giftId,
         every: String(draft.every),
         interaction: draft.interaction,

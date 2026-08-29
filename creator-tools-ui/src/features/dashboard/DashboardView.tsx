@@ -18,6 +18,8 @@ const EMPTY_COUNTERS: DashboardCounters = {
   likes: 0,
   follows: 0,
   subscriptions: 0,
+  coins: 0,
+  bits: 0,
 };
 
 const EMPTY_STATE: DashboardState = {
@@ -124,15 +126,11 @@ export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
 
   const counters = dashboard.counters ?? EMPTY_COUNTERS;
   const counterCards = [
-    ["received", counters.received],
-    ["matched", counters.matched],
-    ["queued", counters.queued],
-    ["ignored", counters.ignored],
-    ["gifts", counters.gifts],
-    ["valued", counters.valued],
     ["likes", counters.likes],
     ["follows", counters.follows],
     ["subscriptions", counters.subscriptions],
+    ["coins", counters.coins ?? 0],
+    ["bits", counters.bits ?? 0],
   ] as const;
 
   const formatDate = (value?: string | null) => {
@@ -165,7 +163,6 @@ export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
       <section className="dashboard-summary" aria-labelledby="dashboard-summary-title">
         <div className="dashboard-section-heading">
           <div>
-            <p className="dashboard-eyebrow">{t("dashboard.summary.eyebrow")}</p>
             <h2 id="dashboard-summary-title">{t("dashboard.summary.title")}</h2>
           </div>
           <span>{t("dashboard.summary.session")}</span>
@@ -195,13 +192,13 @@ export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
               data-platform={connection.platform}
             >
               <div className="dashboard-connection-card__header">
+                <h3>{connection.label}</h3>
                 <span className="dashboard-connection-state" data-status={connection.status}>
                   <span aria-hidden="true" />
                   {t(`dashboard.connectionStatus.${connection.status}`, connection.status)}
                 </span>
               </div>
               <div className="dashboard-connection-card__copy">
-                <h3>{connection.label}</h3>
                 <span>{connectionDescription(connection)}</span>
               </div>
               <div className="dashboard-connection-card__footer">

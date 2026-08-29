@@ -19,10 +19,10 @@
   "dashboard": {
     "documentTitle": "La Pichi Ruleta — Dashboard",
     "title": "Dashboard",
-    "description": "Observa las conexiones, eventos y canjeos de todas tus plataformas en un solo lugar.",
+    "description": "Observa las conexiones, eventos e interacciones de todas tus plataformas en un solo lugar.",
     "summary": {
       "eyebrow": "Actividad",
-      "title": "Resumen global",
+      "title": "Resumen del live",
       "session": "Sesión actual"
     },
     "counters": {
@@ -34,7 +34,9 @@
       "valued": "Con valor",
       "likes": "Likes",
       "follows": "Follows",
-      "subscriptions": "Suscripciones"
+      "subscriptions": "Suscripciones",
+      "coins": "Monedas",
+      "bits": "Bits"
     },
     "connections": {
       "eyebrow": "Fuentes",
@@ -86,7 +88,7 @@
       "like": "Likes",
       "follow": "Follow",
       "subscription": "Suscripción",
-      "redemption": "Canje"
+      "redemption": "Interacción"
     },
     "eventStatus": {
       "received": "Recibido",
@@ -135,7 +137,7 @@
   },
   "interactions": {
     "title": "Interacciones",
-    "description": "Administra los canjeos que entran al juego y prueba su orden de ejecución.",
+    "description": "Configura cómo los regalos, taps y follows afectan la partida y prueba su orden de ejecución.",
     "rules": {
       "coins": "monedas",
       "notice": {
@@ -143,14 +145,14 @@
         "catalogError": "No se pudo cargar el catálogo instalado."
       },
       "list": {
-        "title": "Canjeos",
-        "description": "Configura los canjeos que podrán aparecer mientras juegas.",
-        "create": "Nuevo canjeo",
-        "createFirst": "Crear primer canjeo",
-        "countLabel": "Canjeos configurados",
-        "limitReached": "Se alcanzó el límite de canjeos.",
-        "emptyTitle": "Todavía no tienes canjeos",
-        "emptyDescription": "Crea el primero para relacionar un regalo o una donación con una interacción del juego.",
+        "title": "Tus interacciones",
+        "description": "Configura las interacciones que podrán aparecer mientras juegas.",
+        "create": "Nueva interacción",
+        "createFirst": "Crear primera interacción",
+        "countLabel": "Tus interacciones",
+        "limitReached": "Se alcanzó el límite de interacciones.",
+        "emptyTitle": "Todavía no tienes interacciones",
+        "emptyDescription": "Crea la primera para relacionar un evento del live con una acción del juego.",
         "enabled": "Activo",
         "disabled": "Inactivo",
         "toggleLabel": "Activar o desactivar {name}",
@@ -160,66 +162,81 @@
         "actions": "Acciones",
         "every": "cada {count} unidades",
         "everyOne": "cada unidad",
+        "likeEvery": "cada {count} taps por usuario",
+        "followOnce": "una vez por usuario y sesión",
         "quantity": "Cantidad ×{count}"
       },
       "editor": {
-        "eyebrow": "Editor de canjeo",
-        "createTitle": "Nuevo canjeo",
-        "editTitle": "Editar canjeo",
-        "description": "Elige el regalo o la donación y qué interacción deberá producir.",
-        "emptyTitle": "Selecciona o crea un canjeo",
+        "eyebrow": "Editor de interacción",
+        "createTitle": "Nueva interacción",
+        "editTitle": "Editar interacción",
+        "description": "Elige qué evento del live la activa y qué interacción deberá producir.",
+        "emptyTitle": "Selecciona o crea una interacción",
         "emptyDescription": "El editor aparecerá aquí sin cambiar de página.",
         "selectGift": "Regalo o donación",
         "searchGift": "Buscar por nombre o valor",
         "giftResults": "{count} resultados",
         "noGiftResults": "No hay regalos que coincidan con esta búsqueda.",
-        "executionTitle": "Resultado del canjeo",
+        "triggerType": "Se activa con",
+        "triggerGift": "Regalo",
+        "triggerLike": "Taps (likes)",
+        "triggerFollow": "Follow",
+        "giftName": "Regalo",
+        "likeName": "Taps",
+        "followName": "Follow",
+        "giftTriggerHint": "Usa la cantidad recibida de un regalo específico.",
+        "likeTriggerHint": "Suma por separado los taps enviados por cada usuario durante la sesión.",
+        "followTriggerHint": "Reconoce la primera vez que cada usuario envía un follow durante la sesión.",
+        "executionTitle": "Resultado de la interacción",
         "every": "Cada cuántas unidades",
-        "everyHint": "1 activa el canjeo con cada unidad recibida.",
+        "everyHint": "1 activa la interacción con cada unidad recibida.",
+        "likeEvery": "Taps por usuario",
+        "likeEveryHint": "El sobrante se conserva para el siguiente evento de taps del mismo usuario.",
+        "followOnceHint": "Cada usuario puede activar esta interacción una sola vez por sesión. Hacer unfollow y follow de nuevo no la repite.",
         "interaction": "Aparece en el juego",
         "interactionPlaceholder": "Buscar una interacción",
         "noInteractionResults": "No hay interacciones que coincidan.",
         "quantity": "Cantidad a enviar",
         "quantityHint": "Número de interacciones que entrarán a la cola.",
-        "enabled": "Canjeo activo",
-        "enabledHint": "Aceptará regalos o donaciones en cuanto la conexión esté lista."
+        "enabled": "Interacción activa",
+        "enabledHint": "Aceptará eventos en cuanto la conexión esté lista."
       },
       "actions": {
-        "label": "Acciones del canjeo",
+        "label": "Acciones de la interacción",
         "back": "Volver a la tabla",
         "edit": "Editar",
         "duplicate": "Duplicar",
         "delete": "Eliminar",
-        "deleteConfirm": "¿Eliminar este canjeo?",
-        "deleteDescription": "Se eliminará el canjeo relacionado con «{name}».",
+        "deleteConfirm": "¿Eliminar esta interacción?",
+        "deleteDescription": "Se eliminará la interacción relacionada con «{name}».",
         "deleteSubmit": "Sí, eliminar",
         "deleting": "Eliminando…",
         "cancel": "Cancelar",
-        "create": "Crear canjeo",
-        "save": "Guardar canjeo"
+        "create": "Crear interacción",
+        "save": "Guardar interacción"
       },
       "feedback": {
-        "created": "El canjeo fue creado.",
-        "updated": "El canjeo fue actualizado.",
-        "enabled": "El canjeo fue activado.",
-        "disabled": "El canjeo fue desactivado.",
-        "duplicated": "El canjeo fue duplicado.",
-        "deleted": "El canjeo fue eliminado.",
+        "created": "La interacción fue creada.",
+        "updated": "La interacción fue actualizada.",
+        "enabled": "La interacción fue activada.",
+        "disabled": "La interacción fue desactivada.",
+        "duplicated": "La interacción fue duplicada.",
+        "deleted": "La interacción fue eliminada.",
         "catalog_unavailable": "El mod no pudo validar el catálogo de regalos.",
-        "rules_limit": "Se alcanzó el límite de canjeos.",
-        "invalid_rule": "El canjeo contiene datos no válidos.",
-        "rule_not_found": "El canjeo ya no existe.",
+        "rules_limit": "Se alcanzó el límite de interacciones.",
+        "invalid_rule": "La interacción contiene datos no válidos.",
+        "rule_not_found": "La interacción ya no existe.",
         "invalid_action": "La acción solicitada no es válida.",
-        "save_failed": "No se pudo guardar la configuración de canjeos."
+        "save_failed": "No se pudo guardar la configuración de interacciones."
       }
     },
 
     "catalog": {
-      "title": "Catálogo de canjeos"
+      "title": "Catálogo de interacciones"
     },
     "settings": {
       "title": "Configuración",
-      "description": "Ajusta los canjeos activos y cómo aparece el donador dentro del juego.",
+      "description": "Ajusta cómo se comportan las interacciones y cómo aparece el donador dentro del juego.",
       "maxActiveLabel": "Elementos simultáneos",
       "maxActiveHint": "Cantidad de elementos que pueden estar activos al mismo tiempo.",
       "showGiftImage": "Mostrar imagen del regalo",
@@ -269,14 +286,14 @@
       }
     },
     "queue": {
-      "title": "Canjeos en curso",
-      "description": "Aquí aparecen los canjeos activos y los que esperan su turno, respetando el máximo simultáneo configurado.",
-      "configure": "Configurar canjeos",
-      "countLabel": "Canjeos en curso",
-      "emptyTitle": "No hay canjeos en curso",
-      "emptyDescription": "Cuando una prueba o una regla genere un canje, podrás seguir aquí su ejecución.",
+      "title": "Interacciones en curso",
+      "description": "Aquí aparecen las interacciones activas y las que esperan su turno, respetando el máximo simultáneo configurado.",
+      "configure": "Configurar interacciones",
+      "countLabel": "Interacciones en curso",
+      "emptyTitle": "No hay interacciones en curso",
+      "emptyDescription": "Cuando una prueba o una regla genere una interacción, podrás seguir aquí su ejecución.",
       "position": "Orden",
-      "item": "Canjeo",
+      "item": "Interacción",
       "donor": "Donador",
       "status": "Estado",
       "active": "Ejecutándose",
@@ -286,8 +303,8 @@
     },
     "test": {
       "title": "Pruebas",
-      "description": "Agrega uno o varios canjeos sin alterar el orden de los que ya están esperando.",
-      "item": "Canjeo",
+      "description": "Agrega una o varias interacciones sin alterar el orden de las que ya están esperando.",
+      "item": "Interacción",
       "configuration": "Datos de prueba",
       "donorLabel": "Nombre del donador",
       "donorPlaceholder": "Donador de prueba",
@@ -297,7 +314,7 @@
       "testing": "Agregando",
       "suspended": {
         "title": "Interacciones en pausa",
-        "description": "Modo Molestoso está activo. Los canjeos nuevos conservarán su lugar, pero no entrarán al juego hasta que lo desactives."
+        "description": "Modo Molestoso está activo. Las interacciones nuevas conservarán su lugar, pero no entrarán al juego hasta que lo desactives."
       },
       "random": {
         "title": "Prueba aleatoria",
@@ -326,10 +343,10 @@
       "unknown_item": "El mod no reconoce este artículo.",
       "native_assets_loading": "Los recursos nativos del artículo todavía se están preparando.",
       "native_assets_unavailable": "No se pudieron preparar los recursos nativos del artículo.",
-      "requires_gameplay_level": "Inicia cualquier nivel jugable para enviar el canjeo.",
+      "requires_gameplay_level": "Inicia cualquier nivel jugable para enviar la interacción.",
       "waiting_game": "La solicitud ya está visible y espera a que el juego la confirme.",
-      "queued": "Los canjeos fueron agregados a la cola.",
-      "queued_paused": "Los canjeos fueron guardados en su cola y esperarán mientras Modo Molestoso esté activo.",
+      "queued": "Las interacciones fueron agregadas a la cola.",
+      "queued_paused": "Las interacciones fueron guardadas en su cola y esperarán mientras Modo Molestoso esté activo.",
       "settings_saved": "La configuración de interacciones fue guardada.",
       "invalid_setting": "El valor de configuración no es válido.",
       "queue_full": "La cola alcanzó su límite temporal.",

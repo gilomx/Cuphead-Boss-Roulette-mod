@@ -43,7 +43,9 @@ export function StreamRulesView() {
   >(null);
   const highlightRequestRef = useRef<HighlightRequest | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
   const feedbackTimerRef = useRef<number | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const observedRulesStateRef = useRef(false);
   const rules = streamRules?.rules ?? [];
   const canCreate = Boolean(
@@ -74,7 +76,30 @@ export function StreamRulesView() {
     if (feedbackTimerRef.current !== null) {
       window.clearTimeout(feedbackTimerRef.current);
     }
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+    }
   }, []);
+
+  useEffect(() => {
+    if (draft !== null || highlightedRuleId === null) return;
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+    }
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const row = panelRef.current?.querySelector<HTMLElement>(
+        `.stream-rule-row[data-rule-id="${highlightedRuleId}"]`,
+      );
+      if (!row) return;
+      row.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "center",
+      });
+    });
+  }, [draft, highlightedRuleId]);
 
   useEffect(() => {
     if (!streamRules) return;
@@ -191,6 +216,7 @@ export function StreamRulesView() {
   return (
     <div className="stream-rules">
       <section
+        ref={panelRef}
         className="interaction-panel stream-rules-panel"
         data-view={draft ? "editor" : "table"}
         aria-labelledby="stream-rules-panel-title"
