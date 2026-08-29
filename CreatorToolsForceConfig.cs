@@ -176,6 +176,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     var modifier = RouletteData.Modifiers[i];
                     if (modifier.Id == ModifierId.None ||
+                        !modifier.Selectable ||
                         modifier.Kind != kinds[kindIndex] ||
                         !ExperimentalFeatures.IsChallengeEnabled(modifier.Id))
                         continue;
@@ -202,6 +203,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (RouletteData.Modifiers[i].Id != id)
                     continue;
+                if (!RouletteData.Modifiers[i].Selectable)
+                    return false;
                 kind = RouletteData.Modifiers[i].Kind;
                 found = true;
                 break;
@@ -214,6 +217,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var modifier = RouletteData.Modifiers[i];
                 if (modifier.Id != ModifierId.None &&
+                    modifier.Selectable &&
                     modifier.Kind == kind &&
                     IsCreatorToolsChallengeEnabled(modifier.Id))
                     enabledCount++;
@@ -509,6 +513,8 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < RouletteData.Modifiers.Length; i++)
             {
                 var modifier = RouletteData.Modifiers[i];
+                if (!modifier.Selectable)
+                    continue;
                 if (modifier.Id != ModifierId.None &&
                     !ExperimentalFeatures.IsChallengeEnabled(modifier.Id))
                     continue;

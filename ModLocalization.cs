@@ -23,6 +23,7 @@ namespace Gilomx.CupheadBossRoulette
         SlotSuper,
         SlotCharm,
         SlotChallenge,
+        EquipEmpty,
         SettingDifficulty,
         SettingChallenge,
         SettingAutoLoad,
@@ -286,6 +287,7 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.SlotSuper] = "SÚPER";
             spanish[ModText.SlotCharm] = "AMULETO";
             spanish[ModText.SlotChallenge] = "RETO";
+            spanish[ModText.EquipEmpty] = "Vacío";
             spanish[ModText.SettingDifficulty] = "DIFICULTAD";
             spanish[ModText.SettingChallenge] = "RETO";
             spanish[ModText.SettingAutoLoad] = "CARGA AUTOMÁTICA";
@@ -353,6 +355,7 @@ namespace Gilomx.CupheadBossRoulette
             english[ModText.SlotSuper] = "SUPER";
             english[ModText.SlotCharm] = "CHARM";
             english[ModText.SlotChallenge] = "CHALLENGE";
+            english[ModText.EquipEmpty] = "Empty";
             english[ModText.SettingDifficulty] = "DIFFICULTY";
             english[ModText.SettingChallenge] = "CHALLENGE";
             english[ModText.SettingAutoLoad] = "AUTO-LOAD";
@@ -383,6 +386,7 @@ namespace Gilomx.CupheadBossRoulette
             english[ModText.ChallengeInkRain] = "INK RAIN";
             english[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             english[ModText.ChallengeStiffMode] = "LOCKED MODE";
+            english[ModText.ChallengeNone] = "NONE";
         }
 
         private void AddFrenchTexts()
@@ -392,6 +396,7 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.SlotSuper] = "SUPER";
             french[ModText.SlotCharm] = "CHARME";
             french[ModText.SlotChallenge] = "DÉFI";
+            french[ModText.EquipEmpty] = "Vide";
             french[ModText.SettingDifficulty] = "DIFFICULTÉ";
             french[ModText.SettingChallenge] = "DÉFI";
             french[ModText.SettingAutoLoad] = "CHARGEMENT AUTO";
@@ -422,6 +427,7 @@ namespace Gilomx.CupheadBossRoulette
             french[ModText.ChallengeInkRain] = "INK RAIN";
             french[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             french[ModText.ChallengeStiffMode] = "VERROUILLÉ";
+            french[ModText.ChallengeNone] = "AUCUN DÉFI";
         }
 
         private void AddItalianTexts()
@@ -431,6 +437,7 @@ namespace Gilomx.CupheadBossRoulette
             italian[ModText.SlotSuper] = "SUPER";
             italian[ModText.SlotCharm] = "AMULETO";
             italian[ModText.SlotChallenge] = "SFIDA";
+            italian[ModText.EquipEmpty] = "Vuoto";
             italian[ModText.SettingDifficulty] = "DIFFICOLTÀ";
             italian[ModText.SettingChallenge] = "SFIDA";
             italian[ModText.SettingAutoLoad] = "CARICAMENTO AUTOMATICO";
@@ -461,6 +468,7 @@ namespace Gilomx.CupheadBossRoulette
             italian[ModText.ChallengeInkRain] = "INK RAIN";
             italian[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             italian[ModText.ChallengeStiffMode] = "BLOCCATO";
+            italian[ModText.ChallengeNone] = "NESSUNA SFIDA";
         }
 
         private void AddGermanTexts()
@@ -470,6 +478,7 @@ namespace Gilomx.CupheadBossRoulette
             german[ModText.SlotSuper] = "SUPER";
             german[ModText.SlotCharm] = "AMULETT";
             german[ModText.SlotChallenge] = "CHALLENGE";
+            german[ModText.EquipEmpty] = "Leer";
             german[ModText.SettingDifficulty] = "SCHWIERIGKEIT";
             german[ModText.SettingChallenge] = "CHALLENGE";
             german[ModText.SettingAutoLoad] = "AUTO-LADEN";
@@ -500,6 +509,7 @@ namespace Gilomx.CupheadBossRoulette
             german[ModText.ChallengeInkRain] = "INK RAIN";
             german[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             german[ModText.ChallengeStiffMode] = "FESTGESETZT";
+            german[ModText.ChallengeNone] = "KEINE CHALLENGE";
         }
 
         private void AddKoreanTexts()
@@ -509,6 +519,7 @@ namespace Gilomx.CupheadBossRoulette
             korean[ModText.SlotSuper] = "필살기";
             korean[ModText.SlotCharm] = "능력";
             korean[ModText.SlotChallenge] = "도전";
+            korean[ModText.EquipEmpty] = "비어 있음";
             korean[ModText.SettingDifficulty] = "난이도";
             korean[ModText.SettingChallenge] = "도전";
             korean[ModText.SettingAutoLoad] = "자동 로드";
@@ -539,6 +550,7 @@ namespace Gilomx.CupheadBossRoulette
             korean[ModText.ChallengeInkRain] = "INK RAIN";
             korean[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             korean[ModText.ChallengeStiffMode] = "고정";
+            korean[ModText.ChallengeNone] = "도전 없음";
         }
 
         private void AddRussianTexts()
@@ -548,6 +560,7 @@ namespace Gilomx.CupheadBossRoulette
             russian[ModText.SlotSuper] = "СПЕЦАТАКА";
             russian[ModText.SlotCharm] = "НАВЫК";
             russian[ModText.SlotChallenge] = "ИСПЫТАНИЕ";
+            russian[ModText.EquipEmpty] = "Пусто";
             russian[ModText.SettingDifficulty] = "СЛОЖНОСТЬ";
             russian[ModText.SettingChallenge] = "ИСПЫТАНИЕ";
             russian[ModText.SettingAutoLoad] = "АВТОЗАГРУЗКА";
@@ -578,6 +591,7 @@ namespace Gilomx.CupheadBossRoulette
             russian[ModText.ChallengeInkRain] = "INK RAIN";
             russian[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             russian[ModText.ChallengeStiffMode] = "ЗАФИКСИРОВАН";
+            russian[ModText.ChallengeNone] = "БЕЗ ИСПЫТАНИЯ";
         }
 
         private void AddPolishTexts()
@@ -587,6 +601,7 @@ namespace Gilomx.CupheadBossRoulette
             polish[ModText.SlotSuper] = "SUPER";
             polish[ModText.SlotCharm] = "CZAR";
             polish[ModText.SlotChallenge] = "WYZWANIE";
+            polish[ModText.EquipEmpty] = "Pusto";
             polish[ModText.SettingDifficulty] = "TRUDNOŚĆ";
             polish[ModText.SettingChallenge] = "WYZWANIE";
             polish[ModText.SettingAutoLoad] = "AUTOMATYCZNE ŁADOWANIE";
@@ -617,6 +632,7 @@ namespace Gilomx.CupheadBossRoulette
             polish[ModText.ChallengeInkRain] = "INK RAIN";
             polish[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             polish[ModText.ChallengeStiffMode] = "ZABLOKOWANY";
+            polish[ModText.ChallengeNone] = "BRAK WYZWANIA";
         }
 
         private void AddPortugueseBrazilTexts()
@@ -626,6 +642,7 @@ namespace Gilomx.CupheadBossRoulette
             portugueseBrazil[ModText.SlotSuper] = "SUPER";
             portugueseBrazil[ModText.SlotCharm] = "RELÍQUIAS";
             portugueseBrazil[ModText.SlotChallenge] = "DESAFIO";
+            portugueseBrazil[ModText.EquipEmpty] = "Vazio";
             portugueseBrazil[ModText.SettingDifficulty] = "DIFICULDADE";
             portugueseBrazil[ModText.SettingChallenge] = "DESAFIO";
             portugueseBrazil[ModText.SettingAutoLoad] = "CARREGAMENTO AUTOMÁTICO";
@@ -656,6 +673,7 @@ namespace Gilomx.CupheadBossRoulette
             portugueseBrazil[ModText.ChallengeInkRain] = "INK RAIN";
             portugueseBrazil[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             portugueseBrazil[ModText.ChallengeStiffMode] = "TRAVADO";
+            portugueseBrazil[ModText.ChallengeNone] = "SEM DESAFIO";
         }
 
         private void AddJapaneseTexts()
@@ -665,6 +683,7 @@ namespace Gilomx.CupheadBossRoulette
             japanese[ModText.SlotSuper] = "必殺技";
             japanese[ModText.SlotCharm] = "お守り";
             japanese[ModText.SlotChallenge] = "チャレンジ";
+            japanese[ModText.EquipEmpty] = "空";
             japanese[ModText.SettingDifficulty] = "難易度";
             japanese[ModText.SettingChallenge] = "チャレンジ";
             japanese[ModText.SettingAutoLoad] = "自動ロード";
@@ -695,6 +714,7 @@ namespace Gilomx.CupheadBossRoulette
             japanese[ModText.ChallengeInkRain] = "INK RAIN";
             japanese[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             japanese[ModText.ChallengeStiffMode] = "固定";
+            japanese[ModText.ChallengeNone] = "チャレンジなし";
         }
 
         private void AddSimplifiedChineseTexts()
@@ -704,6 +724,7 @@ namespace Gilomx.CupheadBossRoulette
             simplifiedChinese[ModText.SlotSuper] = "必杀技";
             simplifiedChinese[ModText.SlotCharm] = "护符";
             simplifiedChinese[ModText.SlotChallenge] = "挑战";
+            simplifiedChinese[ModText.EquipEmpty] = "空";
             simplifiedChinese[ModText.SettingDifficulty] = "难度";
             simplifiedChinese[ModText.SettingChallenge] = "挑战";
             simplifiedChinese[ModText.SettingAutoLoad] = "自动加载";
@@ -734,6 +755,7 @@ namespace Gilomx.CupheadBossRoulette
             simplifiedChinese[ModText.ChallengeInkRain] = "INK RAIN";
             simplifiedChinese[ModText.ChallengeHalfDamage] = "DAMAGE -50%";
             simplifiedChinese[ModText.ChallengeStiffMode] = "锁定";
+            simplifiedChinese[ModText.ChallengeNone] = "无挑战";
         }
     }
 }

@@ -44,25 +44,36 @@ web.
 
 El catálogo actual incluye:
 
+- `BLANCO Y NEGRO`
+- `MAMÁ ESCUCHO BORROSO`
+- `LLUVIA DE TINTA`
+- `VOLTEADA DE CABEZA`
+- `UNA VIDA Y TE CALLAS`
+- `MODO TIESO`
+- `DISPAROS REBAJADOS`
 - `NO DASH`
-- `NO MINIAVIÓN`
+- `NO EX`
 - `SOLO BALAS DE MINIAVIÓN`
 - `NO DISPARO BOMBAS`
 - `SIN PEASHOOTER`
-- `NO EX`
-- `BLANCO Y NEGRO`
-- `MAMÁ ESCUCHO BORROSO`
-- `VOLTEADA DE CABEZA`
-- `UNA VIDA Y TE CALLAS`
-- `LLUVIA DE TINTA`
-- `DISPAROS REBAJADOS`
-- `MODO TIESO`
 
 Los retos compatibles se filtran automáticamente según el jefe y si el
 combate es terrestre o aéreo. `MODO TIESO` simula mantener pulsado el fijado
 mientras el personaje toca el suelo y bloquea el dash. Todavía se puede saltar
-y dirigir el movimiento en el aire. Durante las salas aéreas de Rey Dado,
-conserva el mismo nombre y se adapta bloqueando el miniavión.
+y dirigir el movimiento en el aire. En cualquier nivel de avión, `NO DASH` y
+`MODO TIESO` conservan su nombre e icono y bloquean el miniavión. Los tres retos
+del final funcionan exclusivamente en niveles de avión.
+
+La quinta entrada de la Equip Card nativa es `Reto` en lugar de la lista de
+contratos. Al abrirla reutiliza la selección de equipamiento del juego y muestra
+los 12 retos en una sola cuadrícula 5-4-3, con icono animado y descripción.
+La compatibilidad no ocupa una línea aparte; las reglas de avión se indican en
+la propia descripción con texto naranja rojizo. No hay un icono `Vacío` dentro
+de la cuadrícula: la acción nativa
+de desequipar deja la ranura vacía y la cara frontal muestra `Vacío`. El reto se
+guarda por partida y es compartido por ambos jugadores; si no es compatible con
+el combate iniciado, permanece equipado pero no se aplica. Un resultado de
+ruleta puede sustituirlo durante esa pelea sin modificar la selección guardada.
 
 ## Creator Tools y OBS
 

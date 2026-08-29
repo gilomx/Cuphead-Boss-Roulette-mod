@@ -345,6 +345,7 @@ namespace Gilomx.CupheadBossRoulette
             // cached native layout so its measured width is rebuilt too.
             nativeRoulettePromptLayoutToken = null;
             equipSlotLabelsFitReady = false;
+            RefreshManualChallengeLocalization();
             CreatorToolsLanguageChanged();
         }
 
@@ -424,6 +425,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             modLocalization = new ModLocalization();
             modLocalization.LanguageChanged += OnModLanguageChanged;
+            InitializeManualChallengeEquipment();
             toggleShortcut = Config.Bind("Controles", "AbrirCerrar", new KeyboardShortcut(KeyCode.F6), "Abre o cierra la ruleta.");
             spinShortcut = Config.Bind("Controles", "Girar", new KeyboardShortcut(KeyCode.F7), "Inicia un giro.");
             autoLoad = Config.Bind("Juego", "CargarAutomaticamente", true, "Carga el jefe al finalizar el giro.");
@@ -466,6 +468,7 @@ namespace Gilomx.CupheadBossRoulette
             SceneLoader.OnFadeInEndEvent +=
                 CompleteChallengeVisualRestartOnFadeInEnd;
             harmony = new Harmony(PluginGuid);
+            InstallManualChallengeEquipmentPatches();
             if (ExperimentalFeatures.EnableCreatorTools)
                 InstallCreatorToolsPatches();
             var mapPauseCanPause = AccessTools.Method(typeof(MapPauseUI), "get_CanPause");
@@ -1296,6 +1299,7 @@ namespace Gilomx.CupheadBossRoulette
         private void Update()
         {
             UpdateCreatorTools();
+            UpdateManualChallengeSelectors();
             SafeUpdateInkRainChallenge();
             UpdateLanguageTestShortcut();
             UpdateLoanedLoadoutLifecycle();
@@ -2918,14 +2922,37 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SetActiveChallenge(ModifierId challenge, int bossIndex)
         {
+            if (bossIndex < 0 || bossIndex >= RouletteData.Bosses.Length)
+            {
+                ClearActiveChallenge();
+                return;
+            }
+
+            var boss = RouletteData.Bosses[bossIndex];
+            SetActiveChallengeSession(challenge, boss.Level,
+                boss.IsPlane, false, bossIndex);
+        }
+
+        private void SetActiveChallengeSession(ModifierId challenge,
+            Levels targetLevel, bool planeControls, bool fromManualEquipment,
+            int bossIndex)
+        {
             ClearChallengeVisualRetryGate();
             soloMiniRestartPending = false;
             loggedHalfDamageSample = false;
             if (!ExperimentalFeatures.IsChallengeEnabled(challenge))
                 challenge = ModifierId.None;
             activeChallenge = challenge;
-            activeChallengeBoss = activeChallenge == ModifierId.None
-                ? -1 : bossIndex;
+            activeChallengeBoss = activeChallenge == ModifierId.None ||
+                                  fromManualEquipment
+                ? -1
+                : bossIndex;
+            activeChallengeFromManualEquipment =
+                activeChallenge != ModifierId.None && fromManualEquipment;
+            activeChallengeTargetAssigned =
+                activeChallenge != ModifierId.None;
+            activeChallengeTargetLevel = targetLevel;
+            activeChallengePlaneControls = planeControls;
         }
 
         private void ClearActiveChallenge(bool preserveInkRainFade = false)
@@ -2936,6 +2963,10 @@ namespace Gilomx.CupheadBossRoulette
             soloMiniRestartPending = false;
             activeChallenge = ModifierId.None;
             activeChallengeBoss = -1;
+            activeChallengeFromManualEquipment = false;
+            activeChallengeTargetAssigned = false;
+            activeChallengeTargetLevel = default(Levels);
+            activeChallengePlaneControls = false;
             SetNativeChallengePromptVisible(false);
         }
 
@@ -3032,6 +3063,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             return (activeChallenge == ModifierId.NoDash ||
                     activeChallenge == ModifierId.StiffMode) &&
+                   !ActiveChallengeUsesPlaneControls() &&
                    ShouldShowActiveChallenge();
         }
 
@@ -3051,6 +3083,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool ShouldForceLocked()
         {
             return activeChallenge == ModifierId.StiffMode &&
+                   !ActiveChallengeUsesPlaneControls() &&
                    ShouldShowActiveChallenge();
         }
 
@@ -3062,12 +3095,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockMiniPlane()
         {
-            var stiffModeDicePalacePlane =
-                activeChallenge == ModifierId.StiffMode &&
-                IsActiveDicePalaceChallenge() &&
-                ActiveChallengeUsesPlaneControls();
             return (activeChallenge == ModifierId.NoMiniPlane ||
-                    stiffModeDicePalacePlane) &&
+                    activeChallenge == ModifierId.NoDash ||
+                    activeChallenge == ModifierId.StiffMode) &&
+                   ActiveChallengeUsesPlaneControls() &&
                    ShouldShowActiveChallenge();
         }
 
@@ -3189,31 +3220,47 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             Weapon startingWeapon;
-            if (!plugin.TryGetRequiredPlaneWeapon(out startingWeapon))
+            if (!plugin.TryGetRequiredPlaneWeapon(
+                    __instance, out startingWeapon))
                 return;
 
             __instance.SwitchToWeapon(startingWeapon);
         }
 
         private static void EnforcePlaneWeaponRestrictionPrefix(
-            ref Weapon __0)
+            PlanePlayerWeaponManager __instance, ref Weapon __0)
         {
             var plugin = activeInstance;
             Weapon requiredWeapon;
             if (plugin != null && plugin.ShouldLockPlaneWeapon() &&
-                plugin.TryGetRequiredPlaneWeapon(out requiredWeapon))
+                plugin.TryGetRequiredPlaneWeapon(
+                    __instance, out requiredWeapon))
                 __0 = requiredWeapon;
         }
 
-        private bool TryGetRequiredPlaneWeapon(out Weapon weapon)
+        private bool TryGetRequiredPlaneWeapon(
+            PlanePlayerWeaponManager manager, out Weapon weapon)
         {
             weapon = Weapon.None;
-            if (result == null || result.Charm < 0 ||
-                result.Charm >= RouletteData.Charms.Length)
-                return false;
-
-            var isChalice =
-                RouletteData.Charms[result.Charm].Value == Charm.charm_chalice;
+            var isChalice = false;
+            try
+            {
+                var player = manager == null
+                    ? null
+                    : Traverse.Create(manager).Property("player")
+                        .GetValue<PlanePlayerController>();
+                isChalice = player != null && player.stats != null &&
+                            player.stats.isChalice;
+            }
+            catch
+            {
+                // During the earliest plane initialization, fall back to the
+                // loadout that the roulette already resolved for both players.
+                if (result != null && result.Charm >= 0 &&
+                    result.Charm < RouletteData.Charms.Length)
+                    isChalice = RouletteData.Charms[result.Charm].Value ==
+                                Charm.charm_chalice;
+            }
             if (activeChallenge == ModifierId.NoBombs)
             {
                 weapon = isChalice
@@ -3271,8 +3318,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ActiveChallengeUsesPlaneControls()
         {
-            if (activeChallengeBoss < 0 ||
-                activeChallengeBoss >= RouletteData.Bosses.Length)
+            if (!activeChallengeTargetAssigned)
                 return false;
 
             try
@@ -3288,7 +3334,7 @@ namespace Gilomx.CupheadBossRoulette
                 // Fall back to the roulette boss type during scene transitions.
             }
 
-            return RouletteData.Bosses[activeChallengeBoss].IsPlane;
+            return activeChallengePlaneControls;
         }
 
         private void UpdateActiveChallengeLifecycle()
@@ -3337,11 +3383,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ActiveChallengeMatches(Level level)
         {
-            if (activeChallengeBoss < 0 ||
-                activeChallengeBoss >= RouletteData.Bosses.Length)
+            if (!activeChallengeTargetAssigned)
                 return false;
 
-            var targetLevel = RouletteData.Bosses[activeChallengeBoss].Level;
+            var targetLevel = activeChallengeTargetLevel;
             return level.CurrentLevel == targetLevel ||
                    (targetLevel == Levels.DicePalaceMain &&
                     IsDicePalaceLevel(level.CurrentLevel));
@@ -3349,10 +3394,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool IsActiveDicePalaceChallenge()
         {
-            return activeChallengeBoss >= 0 &&
-                   activeChallengeBoss < RouletteData.Bosses.Length &&
-                   RouletteData.Bosses[activeChallengeBoss].Level ==
-                   Levels.DicePalaceMain;
+            return activeChallengeTargetAssigned &&
+                   activeChallengeTargetLevel == Levels.DicePalaceMain;
         }
 
         private static bool IsDicePalaceLevel(Levels level)
@@ -3597,6 +3640,7 @@ namespace Gilomx.CupheadBossRoulette
                 activeInstance = null;
             DestroyNativeRoulettePrompt();
             DestroyNativeChallengePrompt();
+            DisposeManualChallengeEquipment();
             DestroyBattleResultHud();
             CloseCreatorToolsMenu(false);
             DisposeCreatorTools();

@@ -2,6 +2,31 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- La Equip Card nativa reemplaza la entrada de contratos por una ranura
+  `Reto`. Reutiliza la cara de selección del equipamiento, sus cursores,
+  sonidos y animación, y muestra los 12 retos visibles en una única cuadrícula
+  5-4-3 con icono y descripción localizada. La línea `AMBOS`/`AVIÓN` se elimina
+  y las cláusulas sobre niveles de avión se destacan en naranja rojizo. El orden
+  visible queda: blanco y negro, Trippy, lluvia de tinta, Flip, HP 1, Locked,
+  50 %, No Dash, No EX y los tres retos exclusivos de avión. Los fondos editados de
+  Cuphead y Mugman eliminan el círculo negro de la antigua lista y las cinco
+  etiquetas inferiores se forman dinámicamente, incluido el inglés. No hay
+  una opción `Vacío` dentro de la cuadrícula; se conserva la acción nativa de
+  desequipar y la cara frontal muestra `Vacío`. La selección se guarda por partida, es
+  compartida en cooperativo y se aplica también a combates iniciados sin
+  ruleta; los retos incompatibles permanecen equipados pero inactivos. La
+  ruleta conserva prioridad temporal sin sobrescribir esa selección. `NO DASH`
+  y `MODO TIESO` bloquean el miniavión cuando el combate usa controles de avión;
+  `NO MINIAVIÓN` se conserva sólo como regla interna y deja de mostrarse o
+  sortearse por separado.
+- La animación de los iconos del selector queda bajo un único reloj de 12.5 FPS;
+  ya no compite con el coroutine nativo. Mover el cursor tampoco reproduce la
+  animación `E`: ésta sólo aparece al confirmar, igual que en la Equip Card
+  original, y permanece visible desde la primera pulsación. La imagen interna
+  heredada de cada amuleto se normaliza a su tamaño
+  nativo de 80×80, sin alterar los centros medidos de la cuadrícula. Al retirar
+  la línea de compatibilidad, la descripción recupera ese espacio vertical.
+
 - La SPA añade `/dashboard`, una vista operativa bilingüe con estado del motor,
   tarjetas de TikFinity/TikTok, Twitch y YouTube, resumen global, feed de
   eventos recientes y un simulador local. TikFinity muestra ahora el estado

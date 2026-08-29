@@ -169,8 +169,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!ExperimentalFeatures.EnableHpOneChallenge ||
                 activeChallenge != ModifierId.HpOne ||
-                activeChallengeBoss < 0 ||
-                activeChallengeBoss >= RouletteData.Bosses.Length)
+                !activeChallengeTargetAssigned)
                 return false;
 
             try
@@ -186,7 +185,8 @@ namespace Gilomx.CupheadBossRoulette
                 // battle. The HUD session below is already tied to the result.
             }
 
-            return battleHudPresentationActive && loanedLoadoutsActive;
+            return activeChallengeFromManualEquipment ||
+                   (battleHudPresentationActive && loanedLoadoutsActive);
         }
 
         private static void ClampHpOneHealthPrefix(ref int __0)

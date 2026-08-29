@@ -222,16 +222,20 @@ namespace Gilomx.CupheadBossRoulette
                 plugin.InitializeInkRainChallenge();
             var pirateChallenge =
                 hasCurrentLevel && currentLevel == Levels.Pirate;
-            if (!pirateChallenge &&
-                plugin.activeChallengeBoss >= 0 &&
-                plugin.activeChallengeBoss < RouletteData.Bosses.Length)
+            if (!pirateChallenge && plugin.activeChallengeTargetAssigned)
+                pirateChallenge = plugin.activeChallengeTargetLevel ==
+                                  Levels.Pirate;
+            var challengeDifficulty = plugin.difficulty;
+            try
             {
-                pirateChallenge =
-                    RouletteData.Bosses[plugin.activeChallengeBoss].Level ==
-                    Levels.Pirate;
+                if (Level.Current != null)
+                    challengeDifficulty = Level.Current.mode;
+            }
+            catch
+            {
             }
             plugin.inkRainRuntime.StartAttempt(
-                plugin.difficulty, showSquidIntro, pirateChallenge);
+                challengeDifficulty, showSquidIntro, pirateChallenge);
             if (showSquidIntro)
                 plugin.BeginInkRainSquidIntroOnce();
             plugin.Logger.LogInfo(showSquidIntro
@@ -289,14 +293,14 @@ namespace Gilomx.CupheadBossRoulette
 
             var activeFight = false;
             var levelInstanceId = -1;
+            Level activeLevel = null;
             if (!inkRainBattleEnded &&
                 activeChallenge == ModifierId.InkRain &&
                 !SceneLoader.CurrentlyLoading)
             {
-                Level level = null;
                 try
                 {
-                    level = Level.Current;
+                    activeLevel = Level.Current;
                 }
                 catch (Exception exception)
                 {
@@ -305,11 +309,11 @@ namespace Gilomx.CupheadBossRoulette
                         exception.Message);
                 }
 
-                if (level == null)
+                if (activeLevel == null)
                 {
                     try
                     {
-                        level = FindObjectOfType<Level>();
+                        activeLevel = FindObjectOfType<Level>();
                     }
                     catch (Exception exception)
                     {
@@ -319,14 +323,14 @@ namespace Gilomx.CupheadBossRoulette
                     }
                 }
 
-                if (level != null)
+                if (activeLevel != null)
                     inkRainBattleSignaled = false;
 
-                activeFight = level != null &&
-                              level.LevelType == Level.Type.Battle &&
-                              ActiveChallengeMatches(level);
+                activeFight = activeLevel != null &&
+                              activeLevel.LevelType == Level.Type.Battle &&
+                              ActiveChallengeMatches(activeLevel);
                 if (activeFight)
-                    levelInstanceId = level.GetInstanceID();
+                    levelInstanceId = activeLevel.GetInstanceID();
             }
 
             if (!activeFight && !inkRainBattleEnded &&
@@ -355,7 +359,11 @@ namespace Gilomx.CupheadBossRoulette
             if (newSession)
                 Logger.LogInfo(
                     "Lluvia de tinta detectÃƒÆ’Ã‚Â³ una batalla activa.");
-            inkRainRuntime.Configure(activeFight, difficulty, newSession);
+            var challengeDifficulty = difficulty;
+            if (activeLevel != null)
+                challengeDifficulty = activeLevel.mode;
+            inkRainRuntime.Configure(
+                activeFight, challengeDifficulty, newSession);
             inkRainLevelInstanceId = activeFight ? levelInstanceId : -1;
         }
 

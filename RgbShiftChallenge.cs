@@ -175,10 +175,8 @@ namespace Gilomx.CupheadBossRoulette
         private bool ShouldSuppressCagneyFuzzyDuringRgb()
         {
             if (activeChallenge != ModifierId.RgbShift ||
-                activeChallengeBoss < 0 ||
-                activeChallengeBoss >= RouletteData.Bosses.Length ||
-                RouletteData.Bosses[activeChallengeBoss].Level !=
-                    Levels.Flower)
+                !activeChallengeTargetAssigned ||
+                activeChallengeTargetLevel != Levels.Flower)
                 return false;
 
             return ShouldShowActiveChallenge();

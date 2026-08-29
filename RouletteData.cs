@@ -78,14 +78,16 @@ namespace Gilomx.CupheadBossRoulette
         internal readonly ModifierKind Kind;
         internal readonly string Image;
         internal readonly int FrameCount;
+        internal readonly bool Selectable;
 
         internal ModifierEntry(ModifierId id, ModifierKind kind, string image,
-            int frameCount = 3)
+            int frameCount = 3, bool selectable = true)
         {
             Id = id;
             Kind = kind;
             Image = image;
             FrameCount = frameCount;
+            Selectable = selectable;
         }
     }
 
@@ -170,8 +172,11 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static readonly ModifierEntry[] Modifiers =
         {
-            new ModifierEntry(ModifierId.NoDash, ModifierKind.Ground, "modifiers/nodash_01.png"),
-            new ModifierEntry(ModifierId.NoMiniPlane, ModifierKind.Plane, "modifiers/nomini_01.png"),
+            new ModifierEntry(ModifierId.NoDash, ModifierKind.Both, "modifiers/nodash_01.png"),
+            // Kept as an internal compatibility rule for old saves/tests.
+            // No Dash and Stiff Mode expose this behavior on airplane levels.
+            new ModifierEntry(ModifierId.NoMiniPlane, ModifierKind.Plane,
+                "modifiers/nomini_01.png", 3, false),
             new ModifierEntry(ModifierId.MiniPlaneOnly, ModifierKind.Plane, "modifiers/mini_01.png"),
             new ModifierEntry(ModifierId.NoBombs, ModifierKind.Plane, "modifiers/nobombs_01.png"),
             new ModifierEntry(ModifierId.NoPeashooter, ModifierKind.Plane, "modifiers/nopeashooter_01.png"),
@@ -187,7 +192,7 @@ namespace Gilomx.CupheadBossRoulette
                 "modifiers/inkrain_01.png"),
             new ModifierEntry(ModifierId.HalfDamage, ModifierKind.Both,
                 "modifiers/halfdamage_01.png"),
-            new ModifierEntry(ModifierId.StiffMode, ModifierKind.Ground,
+            new ModifierEntry(ModifierId.StiffMode, ModifierKind.Both,
                 "modifiers/locked_01.png"),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };
@@ -198,7 +203,7 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < Modifiers.Length; i++)
             {
                 var modifier = Modifiers[i];
-                if (modifier.Id == ModifierId.None)
+                if (modifier.Id == ModifierId.None || !modifier.Selectable)
                     continue;
                 if (!ExperimentalFeatures.IsChallengeEnabled(modifier.Id))
                     continue;

@@ -32,7 +32,23 @@ namespace Gilomx.CupheadBossRoulette
         {
             UpdateBattleResultHud();
             UpdateNativeRoulettePrompt();
+            UpdateEquippedChallengePrompt();
             ApplyRgbShiftEffectLate();
+        }
+
+        private void UpdateEquippedChallengePrompt()
+        {
+            if (nativeChallengePrompt == null &&
+                GetEquippedManualChallenge() != ModifierId.None)
+                PrepareNativeChallengePrompt();
+
+            if (!activeChallengeFromManualEquipment)
+            {
+                SetNativeChallengePromptVisible(false);
+                return;
+            }
+
+            UpdateNativeChallengePrompt();
         }
 
         private void UpdateNativeRoulettePrompt()
@@ -562,7 +578,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (nativeChallengePrompt != null)
                 return true;
-            if (activeChallenge == ModifierId.None)
+            if (activeChallenge == ModifierId.None &&
+                GetEquippedManualChallenge() == ModifierId.None)
                 return false;
             if (nativeRoulettePrompt == null && !TryCreateNativeRoulettePrompt())
                 return false;
