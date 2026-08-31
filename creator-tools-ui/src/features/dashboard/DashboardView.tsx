@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
@@ -86,6 +87,7 @@ interface DashboardViewProps {
 
 export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
   const { locale, t } = useLocalization();
+  const { interaction, applyInteractionsEnabled } = useConfig();
   const [dashboard, setDashboard] = useState<DashboardState>(EMPTY_STATE);
   const [reachable, setReachable] = useState(true);
   const latestDashboardRequest = useRef(0);
@@ -175,6 +177,38 @@ export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
             </article>
           ))}
         </div>
+      </section>
+
+      <section
+        className="dashboard-interaction-control"
+        data-enabled={interaction?.interactionsEnabled === true}
+        aria-labelledby="dashboard-interaction-control-title"
+      >
+        <div className="dashboard-interaction-control__copy">
+          <p className="dashboard-eyebrow">{t("dashboard.interactionControl.eyebrow")}</p>
+          <h2 id="dashboard-interaction-control-title">
+            {t("dashboard.interactionControl.title")}
+          </h2>
+          <p>{t(interaction?.interactionsEnabled
+            ? "dashboard.interactionControl.enabledDescription"
+            : "dashboard.interactionControl.disabledDescription")}</p>
+        </div>
+        <button
+          className="dashboard-master-switch"
+          type="button"
+          role="switch"
+          aria-checked={interaction?.interactionsEnabled === true}
+          disabled={!interaction?.ready}
+          data-enabled={interaction?.interactionsEnabled === true}
+          onClick={() => applyInteractionsEnabled(!interaction?.interactionsEnabled)}
+        >
+          <span className="dashboard-master-switch__track" aria-hidden="true">
+            <i />
+          </span>
+          <span>{t(interaction?.interactionsEnabled
+            ? "dashboard.interactionControl.enabled"
+            : "dashboard.interactionControl.disabled")}</span>
+        </button>
       </section>
 
       <section className="dashboard-connections" aria-labelledby="dashboard-connections-title">

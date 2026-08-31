@@ -17,8 +17,10 @@
   ruleta; los retos incompatibles permanecen equipados pero inactivos. La
   ruleta conserva prioridad temporal sin sobrescribir esa selección. `NO DASH`
   y `MODO TIESO` bloquean el miniavión cuando el combate usa controles de avión;
-  `NO MINIAVIÓN` se conserva sólo como regla interna y deja de mostrarse o
-  sortearse por separado.
+  `NO MINIAVIÓN` no ocupa una casilla de la Equip Card, pero conserva su
+  comportamiento original dentro de la ruleta F6 y del panel web. `NO DASH`
+  y `MODO TIESO` también conservan allí su compatibilidad original de tierra;
+  su variante de avión pertenece únicamente al equipamiento manual.
 - La animación de los iconos del selector queda bajo un único reloj de 12.5 FPS;
   ya no compite con el coroutine nativo. Mover el cursor tampoco reproduce la
   animación `E`: ésta sólo aparece al confirmar, igual que en la Equip Card
@@ -29,10 +31,10 @@
 
 - La SPA añade `/dashboard`, una vista operativa bilingüe con estado del motor,
   tarjetas de TikFinity/TikTok, Twitch y YouTube, resumen global, feed de
-  eventos recientes y un simulador local. TikFinity muestra ahora el estado
+  los últimos 30 eventos recientes y un simulador local. TikFinity muestra ahora el estado
   real de su API local; Twitch y YouTube permanecen como integraciones futuras.
 - El mod incorpora el contrato normalizado v2 para eventos de streaming y un
-  historial circular en memoria de 500 entradas. Las solicitudes del simulador
+  historial circular en memoria de 30 entradas. Las solicitudes del simulador
   se limitan y sólo se procesan desde `Update` de Unity; el hilo HTTP nunca toca
   objetos del juego. Incluye IDs de artículo, valor unitario/total, rachas y
   deduplicación antes de contadores y reglas.
@@ -65,6 +67,15 @@
 - La cola compartida se extrajo a un componente único y se movió al Dashboard,
   encima de `Tiempo real`, con el nombre `Canjeos en curso`. Conserva las filas
   activas, en espera y optimistas sin duplicar estado ni polling.
+- El Dashboard añade un interruptor general persistente para interacciones,
+  desactivado de forma predeterminada. Al apagarlo se siguen registrando los
+  eventos, pero no avanzan reglas ni se crean canjeos; se limpian la cola y el
+  backlog pendientes sin interrumpir lo que ya está ejecutándose. La cola
+  incorpora controles redondos para pausar/reanudar la reproducción durante la
+  sesión y borrar únicamente lo pendiente mediante una confirmación integrada.
+  Tanto esta lista como los eventos recientes usan scroll interno. El contador
+  incluye la cola materializada y el backlog; al final de las filas se indica
+  explícitamente cuántas interacciones adicionales siguen esperando.
 - Crear, editar, duplicar, activar o eliminar reglas ya no depende del foco de
   Cuphead. El servidor procesa únicamente ese CRUD persistente en un bloque
   serializado y devuelve el estado autoritativo en la misma respuesta; la

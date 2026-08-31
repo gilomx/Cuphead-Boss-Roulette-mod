@@ -8,7 +8,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsDashboardController
     {
-        private const int MaximumEventCount = 500;
+        private const int MaximumEventCount = 30;
         private const int MaximumCommandsPerUpdate = 64;
         private const int MaximumScheduledSimulations = 1024;
         private const double MaximumDelaySeconds = 3600d;
@@ -221,7 +221,12 @@ namespace Gilomx.CupheadBossRoulette
                     record.RuleNames = result.RuleNames;
                     record.InteractionIds = result.InteractionIds;
                     record.MessageCode = result.MessageCode;
-                    if (result.MatchedRules > 0)
+                    if (result.MessageCode == "interactions_disabled")
+                    {
+                        record.Status = "ignored";
+                        ignoredCount++;
+                    }
+                    else if (result.MatchedRules > 0)
                     {
                         matchedCount++;
                         // The stream backlog is itself a reliable queue. Mark

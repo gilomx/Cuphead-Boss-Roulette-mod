@@ -132,6 +132,17 @@ la partida avanzando en segundo plano. Cuando un regalo genera una interacción,
 su imagen local aparece dentro del juego junto al nombre del donador con 80 % de
 transparencia; no se descarga durante el combate.
 
+El Dashboard incluye un interruptor general de interacciones antes de las
+conexiones. Empieza desactivado y conserva su estado; al apagarlo se registran
+los eventos sin avanzar reglas ni crear interacciones, se elimina todo lo
+pendiente y se deja terminar lo que ya está activo. En `Canjeos en curso`, el
+botón de pausa detiene sólo el inicio de nuevas interacciones durante la sesión
+y el botón de papelera borra la cola y el backlog pendientes tras confirmar.
+La lista tiene scroll interno, el contador suma también el backlog y su última
+línea muestra cuántas interacciones adicionales siguen esperando fuera de la
+cola materializada. `Eventos recientes` conserva y muestra sólo los últimos 30
+registros, también con scroll interno.
+
 ## Instalación
 
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su

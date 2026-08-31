@@ -25,6 +25,14 @@
       "title": "Live summary",
       "session": "Current session"
     },
+    "interactionControl": {
+      "eyebrow": "Main control",
+      "title": "Interactions",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enabledDescription": "Rules, tests, and modes can add interactions to the queue.",
+      "disabledDescription": "Events are still recorded, but they do not create interactions or accumulate progress. Disabling clears everything pending."
+    },
     "counters": {
       "received": "Received",
       "matched": "Matched",
@@ -290,6 +298,16 @@
       "description": "Active redeems and those waiting their turn appear here, respecting the configured simultaneous limit.",
       "configure": "Configure redeems",
       "countLabel": "Redeems in progress",
+      "activeShort": "active",
+      "pendingShort": "pending",
+      "pause": "Pause queue",
+      "resume": "Resume queue",
+      "clear": "Clear pending",
+      "clearConfirmTitle": "Clear {count} pending interactions?",
+      "clearConfirmDescription": "Anything already active will keep running.",
+      "clearCancel": "Cancel",
+      "clearSubmit": "Clear pending",
+      "pausedDescription": "The queue is paused. New interactions will keep arriving, but no pending interaction will start until you resume it.",
       "emptyTitle": "No redeems in progress",
       "emptyDescription": "When a test or stream rule creates a redeem, you can follow its execution here.",
       "position": "Order",
@@ -299,7 +317,8 @@
       "active": "Running",
       "queued": "Queued",
       "scheduled": "Waiting for time",
-      "waiting_game": "Waiting for game"
+      "waiting_game": "Waiting for game",
+      "morePending": "and {count} more"
     },
     "test": {
       "title": "Tests",
@@ -346,7 +365,13 @@
       "requires_gameplay_level": "Start any gameplay level to send the redeem.",
       "waiting_game": "The request is already visible and is waiting for the game to confirm it.",
       "queued": "The redeems were added to the queue.",
-      "queued_paused": "The redeems were preserved in their queue and will wait while Pesky Mode is active.",
+      "queued_paused": "The interactions were saved in the queue and will wait until playback is available again.",
+      "interactions_enabled": "Interactions were enabled.",
+      "interactions_disabled": "Interactions are disabled and everything pending was cleared.",
+      "queue_paused": "The interaction queue is paused.",
+      "queue_resumed": "The interaction queue was resumed.",
+      "pending_cleared": "Pending interactions were cleared.",
+      "pending_empty": "There were no pending interactions to clear.",
       "settings_saved": "The interaction settings were saved.",
       "invalid_setting": "The setting value is invalid.",
       "queue_full": "The queue reached its temporary limit.",

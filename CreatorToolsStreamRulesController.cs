@@ -21,6 +21,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumQuantity = 50;
 
         private readonly string settingsPath;
+        private readonly Func<bool> getInteractionsEnabled;
         private readonly Action<string> logWarning;
         private readonly object ruleStateLock = new object();
         private readonly Dictionary<string, GiftEntry> gifts =
@@ -45,8 +46,10 @@ namespace Gilomx.CupheadBossRoulette
         internal CreatorToolsStreamRulesController(
             string assetsDirectory,
             string pluginConfigPath,
+            Func<bool> getInteractionsEnabled,
             Action<string> logWarning)
         {
+            this.getInteractionsEnabled = getInteractionsEnabled;
             this.logWarning = logWarning;
             var configDirectory = Path.GetDirectoryName(
                 string.IsNullOrEmpty(pluginConfigPath)
@@ -107,7 +110,36 @@ namespace Gilomx.CupheadBossRoulette
             // unfocused. Serialize backlog mutation with evaluation, but
             // keep all gameplay queue access on this main-thread call.
             lock (ruleStateLock)
-                return dispatchBacklog.Drain(interactions);
+                return InteractionsEnabled
+                    ? dispatchBacklog.Drain(interactions)
+                    : 0;
+        }
+
+        internal long BacklogCount
+        {
+            get
+            {
+                lock (ruleStateLock)
+                    return dispatchBacklog.PendingCount;
+            }
+        }
+
+        internal long ClearBacklog()
+        {
+            lock (ruleStateLock)
+                return dispatchBacklog.Clear();
+        }
+
+        internal void ResetRuntimeState()
+        {
+            lock (ruleStateLock)
+            {
+                dispatchBacklog.Clear();
+                accumulators.Clear();
+                followedViewers.Clear();
+                lastPublishedState = null;
+                stateDirty = true;
+            }
         }
 
         internal void InvalidateState()
@@ -186,6 +218,11 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsInteractionController interactions)
         {
             var result = new CreatorToolsStreamEvaluation();
+            if (!InteractionsEnabled)
+            {
+                result.MessageCode = "interactions_disabled";
+                return result;
+            }
             if (!catalogReady || streamEvent == null || interactions == null ||
                 streamEvent.Platform != "tiktok" ||
                 !IsSupportedEventType(streamEvent.Type))
@@ -491,7 +528,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"revision\":")
                 .Append(revision.ToString(CultureInfo.InvariantCulture))
                 .Append(",\"engineActive\":")
-                .Append(catalogReady ? "true" : "false")
+                .Append(catalogReady && InteractionsEnabled
+                    ? "true"
+                    : "false")
                 .Append(",\"catalogVersion\":\"");
             AppendJson(builder, catalogVersion);
             builder.Append("\",\"feedback\":\"");
@@ -513,6 +552,15 @@ namespace Gilomx.CupheadBossRoulette
             }
             builder.Append("]}");
             return builder.ToString();
+        }
+
+        private bool InteractionsEnabled
+        {
+            get
+            {
+                return getInteractionsEnabled != null &&
+                       getInteractionsEnabled();
+            }
         }
 
         private void AppendRuleJson(

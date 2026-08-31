@@ -21,6 +21,25 @@ namespace Gilomx.CupheadBossRoulette
             get { return entries.Count > 0; }
         }
 
+        internal long PendingCount
+        {
+            get
+            {
+                var total = 0L;
+                for (var i = 0; i < entries.Count; i++)
+                    total = SaturatingAdd(total, entries[i].Remaining);
+                return total;
+            }
+        }
+
+        internal long Clear()
+        {
+            var cleared = PendingCount;
+            entries.Clear();
+            nextEntry = 0;
+            return cleared;
+        }
+
         internal Entry Add(
             long ruleId,
             string connectionId,

@@ -56,6 +56,10 @@ export interface RouletteConfigState {
 export interface InteractionConfigState {
   ready: boolean;
   available: boolean;
+  interactionsEnabled: boolean;
+  masterRevision: number;
+  queuePaused: boolean;
+  queueControlRevision: number;
   suspendedByPesky: boolean;
   randomTestEnabled: boolean;
   randomTestRevision: number;
@@ -71,6 +75,8 @@ export interface InteractionConfigState {
   revision: number;
   queueCount: number;
   activeCount: number;
+  pendingCount: number;
+  backlogCount: number;
   maxActive: number;
   maxActiveLimit: number;
   maxBatch: number;

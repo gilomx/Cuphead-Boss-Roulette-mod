@@ -33,6 +33,9 @@ interface ConfigValue {
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
   applyInteractionSettings: (maxActive: number, showGiftImage: boolean) => void;
+  applyInteractionsEnabled: (enabled: boolean) => void;
+  applyInteractionQueuePaused: (paused: boolean) => void;
+  clearPendingInteractions: () => void;
   applyInteractionRandomTest: (enabled: boolean) => void;
   applyInteractionPhaseTransitionProtection: (enabled: boolean) => void;
   applyPeskyEnabled: (enabled: boolean) => void;
@@ -76,6 +79,20 @@ interface DesiredInteractionSettings {
   baselineRevision: number;
   requestRevision: number;
   accepted: boolean;
+}
+
+interface DesiredInteractionMaster {
+  enabled: boolean;
+  baselineRevision: number;
+}
+
+interface DesiredInteractionQueuePause {
+  paused: boolean;
+  baselineRevision: number;
+}
+
+interface DesiredInteractionQueueClear {
+  baselineRevision: number;
 }
 
 const ConfigContext = createContext<ConfigValue | null>(null);
@@ -147,6 +164,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const interactionSettingsWriteChainRef = useRef<Promise<void>>(
     Promise.resolve(),
   );
+  const interactionControlWriteChainRef = useRef<Promise<void>>(
+    Promise.resolve(),
+  );
+  const desiredInteractionMasterRef = useRef<DesiredInteractionMaster | null>(null);
+  const desiredInteractionQueuePauseRef = useRef<DesiredInteractionQueuePause | null>(null);
+  const desiredInteractionQueueClearRef = useRef<DesiredInteractionQueueClear | null>(null);
   const interactionSettingsStatusTimerRef = useRef<number | null>(null);
   const confirmedPeskyRevisionRef = useRef(0);
   const pendingPeskyChangesRef = useRef<PendingPeskyChange[]>([]);
@@ -197,9 +220,89 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       }
       let visibleInteraction = {
         ...nextInteraction,
+        interactionsEnabled: nextInteraction.interactionsEnabled === true,
+        masterRevision: nextInteraction.masterRevision ?? 0,
+        queuePaused: nextInteraction.queuePaused === true,
+        queueControlRevision: nextInteraction.queueControlRevision ?? 0,
+        pendingCount: nextInteraction.pendingCount ?? Math.max(
+          0,
+          (nextInteraction.queueCount ?? 0) -
+            (nextInteraction.activeCount ?? 0),
+        ),
+        backlogCount: nextInteraction.backlogCount ?? 0,
         showGiftImage: nextInteraction.showGiftImage !== false,
         settingsRevision: nextInteraction.settingsRevision ?? 0,
       };
+      let interactionMasterPending = false;
+      const desiredInteractionMaster = desiredInteractionMasterRef.current;
+      if (desiredInteractionMaster !== null) {
+        const confirmed =
+          visibleInteraction.masterRevision > desiredInteractionMaster.baselineRevision &&
+          visibleInteraction.interactionsEnabled === desiredInteractionMaster.enabled;
+        if (confirmed) {
+          desiredInteractionMasterRef.current = null;
+        } else {
+          interactionMasterPending = true;
+          visibleInteraction = {
+            ...visibleInteraction,
+            interactionsEnabled: desiredInteractionMaster.enabled,
+            available: desiredInteractionMaster.enabled
+              ? visibleInteraction.available
+              : false,
+            queuePaused: desiredInteractionMaster.enabled
+              ? visibleInteraction.queuePaused
+              : false,
+            queue: desiredInteractionMaster.enabled
+              ? visibleInteraction.queue
+              : visibleInteraction.queue.filter((entry) => entry.status === "active"),
+            queueCount: desiredInteractionMaster.enabled
+              ? visibleInteraction.queueCount
+              : visibleInteraction.activeCount,
+            pendingCount: desiredInteractionMaster.enabled
+              ? visibleInteraction.pendingCount
+              : 0,
+            backlogCount: desiredInteractionMaster.enabled
+              ? visibleInteraction.backlogCount
+              : 0,
+          };
+        }
+      }
+      let interactionQueuePausePending = false;
+      const desiredInteractionQueuePause = desiredInteractionQueuePauseRef.current;
+      if (desiredInteractionQueuePause !== null) {
+        const confirmed =
+          visibleInteraction.queueControlRevision >
+            desiredInteractionQueuePause.baselineRevision &&
+          visibleInteraction.queuePaused === desiredInteractionQueuePause.paused;
+        if (confirmed) {
+          desiredInteractionQueuePauseRef.current = null;
+        } else if (visibleInteraction.interactionsEnabled) {
+          interactionQueuePausePending = true;
+          visibleInteraction = {
+            ...visibleInteraction,
+            queuePaused: desiredInteractionQueuePause.paused,
+          };
+        }
+      }
+      let interactionQueueClearPending = false;
+      const desiredInteractionQueueClear = desiredInteractionQueueClearRef.current;
+      if (desiredInteractionQueueClear !== null) {
+        const confirmed =
+          visibleInteraction.queueControlRevision >
+            desiredInteractionQueueClear.baselineRevision;
+        if (confirmed) {
+          desiredInteractionQueueClearRef.current = null;
+        } else {
+          interactionQueueClearPending = true;
+          visibleInteraction = {
+            ...visibleInteraction,
+            queue: visibleInteraction.queue.filter((entry) => entry.status === "active"),
+            queueCount: visibleInteraction.activeCount,
+            pendingCount: 0,
+            backlogCount: 0,
+          };
+        }
+      }
       let randomTestPending = false;
       const desiredRandomTest = desiredInteractionRandomTestRef.current;
       if (desiredRandomTest !== null) {
@@ -339,6 +442,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         : next);
       setStatus(
         forcePending || challengePending || interactionPending ||
+          interactionMasterPending || interactionQueuePausePending ||
+          interactionQueueClearPending ||
           randomTestPending || phaseTransitionProtectionPending ||
           interactionSettingsPending ||
           peskyPending || streamRulesPending
@@ -492,6 +597,127 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     },
     [interaction, load],
   );
+
+  const sendInteractionControl = useCallback(
+    (query: URLSearchParams, onError: () => void) => {
+      setStatus("saving");
+      const send = () => fetch(
+        "/api/config/interactions/set?" + query,
+        { cache: "no-store" },
+      )
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (mountedRef.current) setStatus("pending");
+          window.setTimeout(() => void load(), 160);
+        })
+        .catch(() => {
+          onError();
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        });
+      interactionControlWriteChainRef.current =
+        interactionControlWriteChainRef.current.then(send, send);
+    },
+    [load],
+  );
+
+  const applyInteractionsEnabled = useCallback(
+    (enabled: boolean) => {
+      if (!interaction?.ready) return;
+      const desired: DesiredInteractionMaster = {
+        enabled,
+        baselineRevision: interaction.masterRevision ?? 0,
+      };
+      desiredInteractionMasterRef.current = desired;
+      if (!enabled) {
+        desiredInteractionQueuePauseRef.current = null;
+        desiredInteractionQueueClearRef.current = null;
+      }
+      setInteraction((current) => current
+        ? {
+            ...current,
+            interactionsEnabled: enabled,
+            queuePaused: enabled ? current.queuePaused : false,
+            queue: enabled
+              ? current.queue
+              : current.queue.filter((entry) => entry.status === "active"),
+            queueCount: enabled ? current.queueCount : current.activeCount,
+            pendingCount: enabled ? current.pendingCount : 0,
+            backlogCount: enabled ? current.backlogCount : 0,
+            feedback: enabled ? "interactions_enabled" : "interactions_disabled",
+            error: false,
+          }
+        : current);
+      if (!enabled) setOptimisticInteractionQueue([]);
+      sendInteractionControl(
+        new URLSearchParams({ interactionsEnabled: enabled ? "1" : "0" }),
+        () => {
+          if (desiredInteractionMasterRef.current === desired) {
+            desiredInteractionMasterRef.current = null;
+          }
+        },
+      );
+    },
+    [interaction, sendInteractionControl],
+  );
+
+  const applyInteractionQueuePaused = useCallback(
+    (paused: boolean) => {
+      if (!interaction?.ready || !interaction.interactionsEnabled) return;
+      const desired: DesiredInteractionQueuePause = {
+        paused,
+        baselineRevision: interaction.queueControlRevision ?? 0,
+      };
+      desiredInteractionQueuePauseRef.current = desired;
+      setInteraction((current) => current
+        ? {
+            ...current,
+            queuePaused: paused,
+            feedback: paused ? "queue_paused" : "queue_resumed",
+            error: false,
+          }
+        : current);
+      sendInteractionControl(
+        new URLSearchParams({ queuePaused: paused ? "1" : "0" }),
+        () => {
+          if (desiredInteractionQueuePauseRef.current === desired) {
+            desiredInteractionQueuePauseRef.current = null;
+          }
+        },
+      );
+    },
+    [interaction, sendInteractionControl],
+  );
+
+  const clearPendingInteractions = useCallback(() => {
+    if (!interaction?.ready) return;
+    const desired: DesiredInteractionQueueClear = {
+      baselineRevision: interaction.queueControlRevision ?? 0,
+    };
+    desiredInteractionQueueClearRef.current = desired;
+    setOptimisticInteractionQueue([]);
+    setInteraction((current) => current
+      ? {
+          ...current,
+          queue: current.queue.filter((entry) => entry.status === "active"),
+          queueCount: current.activeCount,
+          pendingCount: 0,
+          backlogCount: 0,
+          feedback: "pending_cleared",
+          error: false,
+        }
+      : current);
+    sendInteractionControl(
+      new URLSearchParams({ clearPending: "1" }),
+      () => {
+        if (desiredInteractionQueueClearRef.current === desired) {
+          desiredInteractionQueueClearRef.current = null;
+        }
+      },
+    );
+  }, [interaction, sendInteractionControl]);
 
   const sendPeskyUpdate = useCallback(
     (
@@ -740,7 +966,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const testInteraction = useCallback(
     (item: string, donor: string, quantity: number, delay: number) => {
-      if (!interaction?.ready) return;
+      if (!interaction?.ready || !interaction.interactionsEnabled) return;
       const normalizedQuantity = Math.max(
         1,
         Math.min(interaction.maxBatch ?? 50, Math.floor(quantity) || 1),
@@ -888,6 +1114,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyDraft,
       applyChallenge,
       applyInteractionSettings,
+      applyInteractionsEnabled,
+      applyInteractionQueuePaused,
+      clearPendingInteractions,
       applyInteractionRandomTest,
       applyInteractionPhaseTransitionProtection,
       testInteraction,
@@ -912,6 +1141,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyDraft,
       applyChallenge,
       applyInteractionSettings,
+      applyInteractionsEnabled,
+      applyInteractionQueuePaused,
+      clearPendingInteractions,
       applyInteractionRandomTest,
       applyInteractionPhaseTransitionProtection,
       testInteraction,

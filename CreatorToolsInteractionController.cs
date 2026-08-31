@@ -23,6 +23,11 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<int> setMaximumActive;
         private readonly Func<bool> getShowGiftImage;
         private readonly Action<bool> setShowGiftImage;
+        private readonly Func<bool> getInteractionsEnabled;
+        private readonly Action<bool> setInteractionsEnabled;
+        private readonly Func<long> getStreamBacklogCount;
+        private readonly Action clearStreamBacklog;
+        private readonly Action resetStreamRuntimeState;
         private readonly Func<bool>
             getPhaseTransitionProtectionEnabled;
         private readonly Action<bool>
@@ -43,6 +48,9 @@ namespace Gilomx.CupheadBossRoulette
         private int randomTestRevision;
         private int phaseTransitionProtectionRevision;
         private int settingsRevision;
+        private int masterRevision;
+        private int queueControlRevision;
+        private bool queuePaused;
         private bool gameplayLevelActive;
         private bool gameplayLevelLoadPending;
         private bool gameplayAvailabilityObserved;
@@ -62,6 +70,11 @@ namespace Gilomx.CupheadBossRoulette
             Action<int> setMaximumActive,
             Func<bool> getShowGiftImage,
             Action<bool> setShowGiftImage,
+            Func<bool> getInteractionsEnabled,
+            Action<bool> setInteractionsEnabled,
+            Func<long> getStreamBacklogCount,
+            Action clearStreamBacklog,
+            Action resetStreamRuntimeState,
             Func<bool> getPhaseTransitionProtectionEnabled,
             Action<bool> setPhaseTransitionProtectionEnabled,
             Action<string> logInfo,
@@ -73,6 +86,11 @@ namespace Gilomx.CupheadBossRoulette
             this.setMaximumActive = setMaximumActive;
             this.getShowGiftImage = getShowGiftImage;
             this.setShowGiftImage = setShowGiftImage;
+            this.getInteractionsEnabled = getInteractionsEnabled;
+            this.setInteractionsEnabled = setInteractionsEnabled;
+            this.getStreamBacklogCount = getStreamBacklogCount;
+            this.clearStreamBacklog = clearStreamBacklog;
+            this.resetStreamRuntimeState = resetStreamRuntimeState;
             this.getPhaseTransitionProtectionEnabled =
                 getPhaseTransitionProtectionEnabled;
             this.setPhaseTransitionProtectionEnabled =
@@ -119,12 +137,20 @@ namespace Gilomx.CupheadBossRoulette
             while (server.TryTakePeskyCommand(out query))
                 ProcessPeskyCommand(ParseQuery(query));
 
-            var available = AnyItemAvailable();
+            var enabled = InteractionsEnabled;
+            var available = enabled && AnyItemAvailable();
             if (gameplayLevelActive && available)
                 gameplayAvailabilityObserved = true;
             var waitingForInteractions =
                 peskySettings.Enabled && interactionQueue.ActiveCount > 0;
-            if (peskySettings.Enabled)
+            if (!enabled)
+            {
+                nextPeskyAt = -1f;
+                nextRandomTestAt = -1f;
+                nextInteractionDispatchAt = -1f;
+                nextPeskyDispatchAt = -1f;
+            }
+            else if (peskySettings.Enabled)
             {
                 nextRandomTestAt = -1f;
                 nextInteractionDispatchAt = -1f;
@@ -144,7 +170,7 @@ namespace Gilomx.CupheadBossRoulette
                 nextPeskyAt = -1f;
                 nextPeskyDispatchAt = -1f;
                 UpdateRandomTest(available);
-                if (available)
+                if (available && !queuePaused)
                     ProcessQueue(interactionQueue, false);
                 else
                     nextInteractionDispatchAt = -1f;
@@ -173,7 +199,21 @@ namespace Gilomx.CupheadBossRoulette
 
         internal int StreamQueueAvailableCapacity
         {
-            get { return interactionQueue.AvailableCapacity; }
+            get
+            {
+                return InteractionsEnabled
+                    ? interactionQueue.AvailableCapacity
+                    : 0;
+            }
+        }
+
+        internal bool InteractionsEnabled
+        {
+            get
+            {
+                return getInteractionsEnabled != null &&
+                       getInteractionsEnabled();
+            }
         }
 
         /// <summary>
@@ -187,6 +227,11 @@ namespace Gilomx.CupheadBossRoulette
             int quantity,
             out string feedbackCode)
         {
+            if (!InteractionsEnabled)
+            {
+                feedbackCode = "interactions_disabled";
+                return 0;
+            }
             var executor = FindExecutor(item);
             if (executor == null)
             {
@@ -207,7 +252,7 @@ namespace Gilomx.CupheadBossRoulette
                 return 0;
             }
 
-            feedbackCode = peskySettings.Enabled
+            feedbackCode = peskySettings.Enabled || queuePaused
                 ? "queued_paused"
                 : "queued";
             SetInteractionFeedback(feedbackCode, false);
@@ -303,6 +348,21 @@ namespace Gilomx.CupheadBossRoulette
         private void ProcessInteractionCommand(
             Dictionary<string, string> values)
         {
+            if (values.ContainsKey("interactionsEnabled"))
+            {
+                SetInteractionsEnabled(values);
+                return;
+            }
+            if (values.ContainsKey("queuePaused"))
+            {
+                SetQueuePaused(values);
+                return;
+            }
+            if (values.ContainsKey("clearPending"))
+            {
+                ClearPendingInteractions();
+                return;
+            }
             if (values.ContainsKey("maxActive") ||
                 values.ContainsKey("showGiftImage"))
             {
@@ -321,6 +381,81 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
             EnqueueInteraction(values);
+        }
+
+        private void SetInteractionsEnabled(
+            Dictionary<string, string> values)
+        {
+            string value;
+            bool enabled;
+            if (!values.TryGetValue("interactionsEnabled", out value) ||
+                !TryParseSwitch(value, out enabled))
+            {
+                SetInteractionFeedback("invalid_setting", true);
+                return;
+            }
+
+            if (setInteractionsEnabled != null)
+                setInteractionsEnabled(enabled);
+            if (!enabled)
+            {
+                interactionQueue.ClearPending();
+                peskyQueue.ClearPending();
+                if (resetStreamRuntimeState != null)
+                    resetStreamRuntimeState();
+                queuePaused = false;
+                nextPeskyAt = -1f;
+                nextRandomTestAt = -1f;
+                nextInteractionDispatchAt = -1f;
+                nextPeskyDispatchAt = -1f;
+            }
+            masterRevision++;
+            queueControlRevision++;
+            SetInteractionFeedback(
+                enabled
+                    ? "interactions_enabled"
+                    : "interactions_disabled",
+                false);
+        }
+
+        private void SetQueuePaused(Dictionary<string, string> values)
+        {
+            string value;
+            bool paused;
+            if (!values.TryGetValue("queuePaused", out value) ||
+                !TryParseSwitch(value, out paused) ||
+                !InteractionsEnabled)
+            {
+                SetInteractionFeedback(
+                    InteractionsEnabled
+                        ? "invalid_setting"
+                        : "interactions_disabled",
+                    !InteractionsEnabled ? false : true);
+                return;
+            }
+
+            queuePaused = paused;
+            nextInteractionDispatchAt = -1f;
+            queueControlRevision++;
+            SetInteractionFeedback(
+                paused ? "queue_paused" : "queue_resumed", false);
+        }
+
+        private void ClearPendingInteractions()
+        {
+            var cleared = (long)interactionQueue.ClearPending();
+            if (clearStreamBacklog != null)
+            {
+                var backlogBefore = getStreamBacklogCount == null
+                    ? 0L
+                    : Math.Max(0L, getStreamBacklogCount());
+                clearStreamBacklog();
+                cleared += backlogBefore;
+            }
+            queueControlRevision++;
+            SetInteractionFeedback(
+                cleared > 0L ? "pending_cleared" : "pending_empty",
+                false);
         }
 
         private void SetPhaseTransitionProtectionEnabled(
@@ -478,7 +613,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdatePeskyMode(bool available)
         {
-            if (!peskySettings.Enabled || !available)
+            if (!InteractionsEnabled || !peskySettings.Enabled || !available)
             {
                 nextPeskyAt = -1f;
                 return;
@@ -530,7 +665,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateRandomTest(bool available)
         {
-            if (!randomTestEnabled || !available)
+            if (!InteractionsEnabled || !randomTestEnabled || !available)
             {
                 nextRandomTestAt = -1f;
                 return;
@@ -599,6 +734,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private void EnqueueInteraction(Dictionary<string, string> values)
         {
+            if (!InteractionsEnabled)
+            {
+                SetInteractionFeedback("interactions_disabled", false);
+                return;
+            }
             string item;
             if (!values.TryGetValue("item", out item))
             {
@@ -627,7 +767,10 @@ namespace Gilomx.CupheadBossRoulette
             if (added > 0)
             {
                 SetInteractionFeedback(
-                    peskySettings.Enabled ? "queued_paused" : "queued", false);
+                    peskySettings.Enabled || queuePaused
+                        ? "queued_paused"
+                        : "queued",
+                    false);
                 if (logInfo != null)
                     logInfo(added + " canje(s) de " + item +
                         " agregados a la cola para " + donor + ".");
@@ -789,6 +932,14 @@ namespace Gilomx.CupheadBossRoulette
             var builder = new StringBuilder(4096);
             builder.Append("{\"ready\":true,\"available\":")
                 .Append(available ? "true" : "false")
+                .Append(",\"interactionsEnabled\":")
+                .Append(InteractionsEnabled ? "true" : "false")
+                .Append(",\"masterRevision\":")
+                .Append(masterRevision)
+                .Append(",\"queuePaused\":")
+                .Append(queuePaused ? "true" : "false")
+                .Append(",\"queueControlRevision\":")
+                .Append(queueControlRevision)
                 .Append(",\"suspendedByPesky\":")
                 .Append(peskySettings.Enabled ? "true" : "false")
                 .Append(",\"item\":\"")
@@ -819,6 +970,12 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"revision\":").Append(interactionRevision)
                 .Append(",\"queueCount\":").Append(interactionQueue.Count)
                 .Append(",\"activeCount\":").Append(interactionQueue.ActiveCount)
+                .Append(",\"pendingCount\":")
+                .Append(interactionQueue.PendingCount)
+                .Append(",\"backlogCount\":")
+                .Append(getStreamBacklogCount == null
+                    ? 0L
+                    : Math.Max(0L, getStreamBacklogCount()))
                 .Append(",\"maxActive\":").Append(MaximumActive)
                 .Append(",\"maxActiveLimit\":").Append(MaximumActiveLimit)
                 .Append(",\"maxBatch\":")
@@ -835,9 +992,11 @@ namespace Gilomx.CupheadBossRoulette
             bool available, bool waitingForInteractions)
         {
             var running = peskySettings.Enabled && available &&
+                InteractionsEnabled &&
                 !gameplayLevelLoadPending &&
                 !waitingForInteractions;
             var startingBattle = peskySettings.Enabled &&
+                InteractionsEnabled &&
                 (gameplayLevelLoadPending ||
                  (gameplayLevelActive &&
                   !gameplayAvailabilityObserved)) &&

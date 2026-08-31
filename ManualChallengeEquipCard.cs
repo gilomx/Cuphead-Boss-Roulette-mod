@@ -1887,7 +1887,8 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
-            if (!ManualChallengeMatchesControls(modifier.Kind, planeControls))
+            if (!ManualChallengeMatchesControls(
+                    challenge, modifier.Kind, planeControls))
             {
                 if (activeChallengeFromManualEquipment)
                     ClearActiveChallenge();
@@ -1944,8 +1945,16 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private static bool ManualChallengeMatchesControls(
-            ModifierKind kind, bool planeControls)
+            ModifierId challenge, ModifierKind kind, bool planeControls)
         {
+            // The manual Equip Card intentionally reuses No Dash and Stiff
+            // Mode on airplane battles. Keep that broader behavior local to
+            // manual equipment so the F6 roulette preserves its original
+            // ground/plane challenge catalog and odds.
+            if (planeControls &&
+                (challenge == ModifierId.NoDash ||
+                 challenge == ModifierId.StiffMode))
+                return true;
             return kind == ModifierKind.Both ||
                    (planeControls && kind == ModifierKind.Plane) ||
                    (!planeControls && kind == ModifierKind.Ground);

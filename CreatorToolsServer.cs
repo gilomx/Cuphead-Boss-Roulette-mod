@@ -60,6 +60,9 @@ namespace Gilomx.CupheadBossRoulette
             "{\"enabled\":false,\"ready\":false}";
         private string latestInteractionsState =
             "{\"ready\":false,\"available\":false," +
+            "\"interactionsEnabled\":false,\"masterRevision\":0," +
+            "\"queuePaused\":false,\"queueControlRevision\":0," +
+            "\"pendingCount\":0,\"backlogCount\":0," +
             "\"showGiftImage\":true,\"settingsRevision\":0}";
         private string latestDashboardState =
             "{\"ready\":false,\"schemaVersion\":2,\"revision\":0," +

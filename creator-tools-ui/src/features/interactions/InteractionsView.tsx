@@ -183,6 +183,7 @@ export function InteractionsView() {
                   const quantity = quantities[item.id] ?? 1;
                   const delay = delays[item.id] ?? 0;
                   const canQueue = (interaction?.ready ?? false) &&
+                    (interaction?.interactionsEnabled ?? false) &&
                     !suspendedByPesky && donor.trim().length > 0;
                   return (
                     <tr key={item.id}>

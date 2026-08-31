@@ -7,6 +7,7 @@ import {
 } from "./DashboardSimulatorForm";
 
 const SIMULATION_CONFIRMATION_DURATION_MS = 5_000;
+const MAXIMUM_VISIBLE_EVENT_COUNT = 30;
 
 interface DashboardEventsPanelProps {
   events: DashboardEvent[];
@@ -28,6 +29,7 @@ export function DashboardEventsPanel({
   const initialView = useRef(true);
   const confirmationTimer = useRef<number | null>(null);
   const simulatorActive = view === "simulator";
+  const recentEvents = events.slice(0, MAXIMUM_VISIBLE_EVENT_COUNT);
 
   useEffect(() => {
     if (initialView.current) {
@@ -160,14 +162,14 @@ export function DashboardEventsPanel({
               <strong>{simulationConfirmation}</strong>
             </div>
           ) : null}
-          {events.length === 0 ? (
+          {recentEvents.length === 0 ? (
             <div className="dashboard-events-empty">
               <strong>{t("dashboard.events.emptyTitle")}</strong>
               <span>{t("dashboard.events.emptyDescription")}</span>
             </div>
           ) : (
             <ol className="dashboard-events-list">
-              {events.map((streamEvent) => (
+              {recentEvents.map((streamEvent) => (
                 <li key={streamEvent.id} data-platform={streamEvent.platform}>
                   <div className="dashboard-event__time">
                     <span>{formatDate(streamEvent.receivedAt)}</span>

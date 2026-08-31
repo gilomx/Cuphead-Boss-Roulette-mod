@@ -172,11 +172,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static readonly ModifierEntry[] Modifiers =
         {
-            new ModifierEntry(ModifierId.NoDash, ModifierKind.Both, "modifiers/nodash_01.png"),
-            // Kept as an internal compatibility rule for old saves/tests.
-            // No Dash and Stiff Mode expose this behavior on airplane levels.
-            new ModifierEntry(ModifierId.NoMiniPlane, ModifierKind.Plane,
-                "modifiers/nomini_01.png", 3, false),
+            new ModifierEntry(ModifierId.NoDash, ModifierKind.Ground, "modifiers/nodash_01.png"),
+            new ModifierEntry(ModifierId.NoMiniPlane, ModifierKind.Plane, "modifiers/nomini_01.png"),
             new ModifierEntry(ModifierId.MiniPlaneOnly, ModifierKind.Plane, "modifiers/mini_01.png"),
             new ModifierEntry(ModifierId.NoBombs, ModifierKind.Plane, "modifiers/nobombs_01.png"),
             new ModifierEntry(ModifierId.NoPeashooter, ModifierKind.Plane, "modifiers/nopeashooter_01.png"),
@@ -192,7 +189,7 @@ namespace Gilomx.CupheadBossRoulette
                 "modifiers/inkrain_01.png"),
             new ModifierEntry(ModifierId.HalfDamage, ModifierKind.Both,
                 "modifiers/halfdamage_01.png"),
-            new ModifierEntry(ModifierId.StiffMode, ModifierKind.Both,
+            new ModifierEntry(ModifierId.StiffMode, ModifierKind.Ground,
                 "modifiers/locked_01.png"),
             new ModifierEntry(ModifierId.None, ModifierKind.Both, "weapons/vacio.png")
         };

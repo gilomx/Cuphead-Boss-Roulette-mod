@@ -49,6 +49,8 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractionMaximumActiveSetting;
         private ConfigEntry<bool>
             creatorToolsInteractionShowGiftImageSetting;
+        private ConfigEntry<bool>
+            creatorToolsInteractionsEnabledSetting;
 
         private CreatorToolsServer creatorToolsServer;
         private CreatorToolsInteractionController creatorToolsInteractions;
@@ -122,10 +124,17 @@ namespace Gilomx.CupheadBossRoulette
                 "MostrarImagenDelRegalo",
                 true,
                 "Muestra el regalo junto al nombre del donador en el juego.");
+            creatorToolsInteractionsEnabledSetting = Config.Bind(
+                "Creator Tools",
+                "InteraccionesActivadas",
+                false,
+                "Permite que eventos, pruebas y Modo Molestoso generen " +
+                "interacciones dentro del juego.");
 
             creatorToolsStreamRules = new CreatorToolsStreamRulesController(
                 AssetsDirectory,
                 Config.ConfigFilePath,
+                GetCreatorToolsInteractionsEnabled,
                 delegate(string message) { Logger.LogWarning(message); });
             creatorToolsDashboard = new CreatorToolsDashboardController(
                 creatorToolsStreamRules.TryResolveSimulationGift);
@@ -143,6 +152,11 @@ namespace Gilomx.CupheadBossRoulette
                 SetCreatorToolsInteractionMaximumActive,
                 GetCreatorToolsInteractionShowGiftImage,
                 SetCreatorToolsInteractionShowGiftImage,
+                GetCreatorToolsInteractionsEnabled,
+                SetCreatorToolsInteractionsEnabled,
+                GetCreatorToolsStreamBacklogCount,
+                ClearCreatorToolsStreamBacklog,
+                ResetCreatorToolsStreamRuntimeState,
                 GetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 SetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 delegate(string message) { Logger.LogInfo(message); },
@@ -159,6 +173,41 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsPreviewSetting.Value)
                 creatorToolsPreviewSetting.Value = false;
             StartCreatorToolsServer();
+        }
+
+        private bool GetCreatorToolsInteractionsEnabled()
+        {
+            return creatorToolsInteractionsEnabledSetting != null &&
+                   creatorToolsInteractionsEnabledSetting.Value;
+        }
+
+        private void SetCreatorToolsInteractionsEnabled(bool enabled)
+        {
+            if (creatorToolsInteractionsEnabledSetting != null)
+                creatorToolsInteractionsEnabledSetting.Value = enabled;
+            if (creatorToolsStreamRules != null)
+                creatorToolsStreamRules.InvalidateState();
+            if (creatorToolsDashboard != null)
+                creatorToolsDashboard.InvalidateState();
+        }
+
+        private long GetCreatorToolsStreamBacklogCount()
+        {
+            return creatorToolsStreamRules == null
+                ? 0L
+                : creatorToolsStreamRules.BacklogCount;
+        }
+
+        private void ClearCreatorToolsStreamBacklog()
+        {
+            if (creatorToolsStreamRules != null)
+                creatorToolsStreamRules.ClearBacklog();
+        }
+
+        private void ResetCreatorToolsStreamRuntimeState()
+        {
+            if (creatorToolsStreamRules != null)
+                creatorToolsStreamRules.ResetRuntimeState();
         }
 
         private bool CanPreloadNativeInteractionAssets()
@@ -1170,6 +1219,14 @@ namespace Gilomx.CupheadBossRoulette
 
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
+            if (creatorToolsInteractions != null)
+            {
+                // Process control commands before stream events and backlog
+                // draining so disabling or pausing wins on the first frame
+                // after returning focus to Cuphead.
+                RefreshCreatorToolsInteractionGameplayLevel();
+                creatorToolsInteractions.Update(creatorToolsServer);
+            }
             var queuedFromStreamBacklog = 0;
             if (creatorToolsStreamRules != null)
                 queuedFromStreamBacklog = creatorToolsStreamRules.Update(
@@ -1183,14 +1240,6 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsDashboard.Update(
                     creatorToolsServer,
                     EvaluateCreatorToolsStreamEvent);
-            if (creatorToolsInteractions != null)
-            {
-                // `_OnLevelStart` can precede a stable `Level.Current` on
-                // native entry paths. Polling the authoritative current level
-                // makes normal boss entrances as reliable as roulette loads.
-                RefreshCreatorToolsInteractionGameplayLevel();
-                creatorToolsInteractions.Update(creatorToolsServer);
-            }
         }
 
         private void UpdateTikFinityCompanion()
@@ -1222,6 +1271,13 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsStreamRules == null ||
                 creatorToolsInteractions == null)
                 return CreatorToolsStreamEvaluation.None;
+            if (!GetCreatorToolsInteractionsEnabled())
+            {
+                return new CreatorToolsStreamEvaluation
+                {
+                    MessageCode = "interactions_disabled"
+                };
+            }
             return creatorToolsStreamRules.Evaluate(
                 streamEvent, creatorToolsInteractions);
         }

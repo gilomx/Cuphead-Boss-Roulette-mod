@@ -26,6 +26,11 @@ namespace Gilomx.CupheadBossRoulette
             get { return active.Count; }
         }
 
+        internal int PendingCount
+        {
+            get { return pending.Count; }
+        }
+
         internal int AvailableCapacity
         {
             get { return Math.Max(0, MaximumQueued - Count); }
@@ -103,10 +108,17 @@ namespace Gilomx.CupheadBossRoulette
             active.Clear();
         }
 
+        internal int ClearPending()
+        {
+            var cleared = pending.Count;
+            pending.Clear();
+            return cleared;
+        }
+
         internal void Clear()
         {
             ClearActive();
-            pending.Clear();
+            ClearPending();
         }
 
         private static bool IsFinished(Entry entry)

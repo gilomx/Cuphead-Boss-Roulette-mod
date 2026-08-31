@@ -2,7 +2,11 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 
-const port = 18081;
+const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
+const port = Number.isInteger(configuredPort) && configuredPort > 0
+  ? configuredPort
+  : 18081;
+const host = process.argv[3] ?? "127.0.0.1";
 const assetsRoot = resolve(process.cwd(), "../assets") + sep;
 const giftCatalog = JSON.parse(readFileSync(
   resolve(assetsRoot, "creator-tools/gifts/catalog.json"),
@@ -19,6 +23,10 @@ let interactionQueue = [];
 let interactionMaxActive = 1;
 let interactionShowGiftImage = true;
 let interactionSettingsRevision = 0;
+let interactionsEnabled = false;
+let interactionMasterRevision = 0;
+let interactionQueuePaused = false;
+let interactionQueueControlRevision = 0;
 let interactionRandomTestEnabled = false;
 let interactionRandomTestRevision = 0;
 let phaseTransitionProtectionEnabled = true;
@@ -36,7 +44,7 @@ function streamRulesState() {
     ready: true,
     schemaVersion: 2,
     revision: streamRulesRevision,
-    engineActive: true,
+    engineActive: interactionsEnabled,
     catalogVersion: giftCatalog.catalogVersion,
     feedback: streamRulesFeedback,
     error: streamRulesError,
@@ -158,7 +166,7 @@ function refreshInteractionQueue() {
       entry.status = "queued";
     }
   }
-  if (peskyEnabled) return;
+  if (!interactionsEnabled || interactionQueuePaused || peskyEnabled) return;
   let active = interactionQueue.filter((entry) => entry.status === "active").length;
   for (const entry of interactionQueue) {
     if (active >= interactionMaxActive) break;
@@ -310,7 +318,11 @@ function executeDashboardSimulation(command) {
     if (command.platform === "twitch" && ["gift", "currency"].includes(command.type)) {
       dashboardCounters.bits += amount;
     }
-    if (command.platform === "tiktok" && ["gift", "like", "follow"].includes(command.type)) {
+    if (!interactionsEnabled) {
+      event.status = "ignored";
+      event.messageCode = "interactions_disabled";
+      dashboardCounters.ignored += 1;
+    } else if (command.platform === "tiktok" && ["gift", "like", "follow"].includes(command.type)) {
       const matchedRules = [];
       const queuedActions = [];
       let interactionQueueChanged = false;
@@ -486,7 +498,11 @@ createServer((req, res) => {
     refreshInteractionQueue();
     json(res, {
       ready: true,
-      available: true,
+      available: interactionsEnabled,
+      interactionsEnabled,
+      masterRevision: interactionMasterRevision,
+      queuePaused: interactionQueuePaused,
+      queueControlRevision: interactionQueueControlRevision,
       suspendedByPesky: peskyEnabled,
       randomTestEnabled: interactionRandomTestEnabled,
       randomTestRevision: interactionRandomTestRevision,
@@ -502,6 +518,8 @@ createServer((req, res) => {
       revision: interactionRevision,
       queueCount: interactionQueue.length,
       activeCount: interactionQueue.filter((entry) => entry.status === "active").length,
+      pendingCount: interactionQueue.filter((entry) => entry.status !== "active").length,
+      backlogCount: 0,
       maxActive: interactionMaxActive,
       maxActiveLimit: 20,
       maxBatch: 50,
@@ -579,9 +597,37 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === "/api/config/interactions/set") {
+    const interactionsEnabledValue = url.searchParams.get("interactionsEnabled");
+    const queuePausedValue = url.searchParams.get("queuePaused");
+    const clearPendingValue = url.searchParams.get("clearPending");
     const maxActiveValue = url.searchParams.get("maxActive");
     const showGiftImageValue = url.searchParams.get("showGiftImage");
     let nextFeedback = "settings_saved";
+    if (interactionsEnabledValue !== null) {
+      interactionsEnabled = interactionsEnabledValue === "1";
+      interactionMasterRevision += 1;
+      if (!interactionsEnabled) {
+        interactionQueue = interactionQueue.filter((entry) => entry.status === "active");
+        interactionQueuePaused = false;
+        interactionQueueControlRevision += 1;
+        streamRuleAccumulators.clear();
+        followedViewers.clear();
+      }
+      nextFeedback = interactionsEnabled
+        ? "interactions_enabled"
+        : "interactions_disabled";
+    } else if (queuePausedValue !== null && interactionsEnabled) {
+      interactionQueuePaused = queuePausedValue === "1";
+      interactionQueueControlRevision += 1;
+      nextFeedback = interactionQueuePaused ? "queue_paused" : "queue_resumed";
+    } else if (clearPendingValue !== null) {
+      const previousLength = interactionQueue.length;
+      interactionQueue = interactionQueue.filter((entry) => entry.status === "active");
+      interactionQueueControlRevision += 1;
+      nextFeedback = interactionQueue.length < previousLength
+        ? "pending_cleared"
+        : "pending_empty";
+    }
     if (maxActiveValue !== null) {
       interactionMaxActive = Math.max(
         1,
@@ -672,6 +718,12 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === "/api/config/interactions/test") {
+    if (!interactionsEnabled) {
+      interactionFeedback = "interactions_disabled";
+      interactionRevision += 1;
+      json(res, { ok: true }, 202);
+      return;
+    }
     interactionLastItem = url.searchParams.get("item") ?? "";
     const donor = (url.searchParams.get("donor") ?? "DONOR").slice(0, 32);
     const quantity = Math.max(1, Math.min(50, Number(url.searchParams.get("quantity")) || 1));
@@ -699,6 +751,7 @@ createServer((req, res) => {
     return;
   }
   res.writeHead(404).end();
-}).listen(port, "127.0.0.1", () => {
-  console.log("Creator Tools mock listening on http://127.0.0.1:" + port);
+}).listen(port, host, () => {
+  const displayHost = host.includes(":") ? `[${host}]` : host;
+  console.log(`Creator Tools mock listening on http://${displayHost}:${port}`);
 });
