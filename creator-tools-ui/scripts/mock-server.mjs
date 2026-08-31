@@ -27,8 +27,6 @@ let interactionsEnabled = false;
 let interactionMasterRevision = 0;
 let interactionQueuePaused = false;
 let interactionQueueControlRevision = 0;
-let interactionRandomTestEnabled = false;
-let interactionRandomTestRevision = 0;
 let phaseTransitionProtectionEnabled = true;
 let phaseTransitionProtectionRevision = 0;
 let streamRulesRevision = 0;
@@ -76,8 +74,19 @@ function resetStreamRuleAccumulators(ruleId) {
 let peskyEnabled = false;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
-let peskyNames = ["Claudia", "YeiAndPelos", "Yerrisito", "Malono", "Suches", "Elver_hijas"];
+let peskyNames = [];
 let peskyDisabledItems = [];
+let peskyBattleRevision = 0;
+let peskyBattlePhase = "off";
+let peskyBattleSessionId = 0;
+let peskyBattleAttempt = 0;
+let peskyBattleGiftId = "";
+let peskyBattleAllowStreamAttacks = true;
+let peskyBattleParticipants = [];
+let peskyBattleDisabledItems = [];
+let peskyBattleFeedback = "ready";
+let peskyBattleError = false;
+let peskyBattleTargetLevel = "";
 let dashboardRevision = 1;
 let dashboardNextSequence = 1;
 const dashboardSessionId = "mock-session";
@@ -111,6 +120,102 @@ const interactionItems = [
   "cagney_homing_plant",
   "frogs_firefly",
 ];
+
+function peskyBattleIsExclusive() {
+  return ["recruiting", "ready", "waiting_level", "active"].includes(
+    peskyBattlePhase,
+  );
+}
+
+function peskyBattleState() {
+  const gift = giftsById.get(peskyBattleGiftId);
+  return {
+    ready: true,
+    schemaVersion: 1,
+    revision: peskyBattleRevision,
+    phase: peskyBattlePhase,
+    sessionId: peskyBattleSessionId,
+    attempt: peskyBattleAttempt,
+    capacity: 5,
+    exclusive: peskyBattleIsExclusive(),
+    gameplayAvailable: true,
+    targetLevel: peskyBattleTargetLevel,
+    trigger: {
+      giftId: gift?.giftId ?? "",
+      giftName: gift?.name ?? "",
+      giftImagePath: gift?.imagePath ?? "",
+      coinsPerUnit: gift?.coinsPerUnit ?? 0,
+    },
+    allowStreamAttacks: peskyBattleAllowStreamAttacks,
+    participants: peskyBattleParticipants.map(({ identity: _identity, ...participant }) =>
+      participant),
+    items: interactionItems,
+    disabledItems: peskyBattleDisabledItems,
+    feedback: peskyBattleFeedback,
+    error: peskyBattleError,
+  };
+}
+
+function closePeskyBattle(feedback = "battle_cancelled") {
+  peskyBattlePhase = "off";
+  peskyBattleAttempt = 0;
+  peskyBattleParticipants = [];
+  peskyBattleTargetLevel = "";
+  peskyBattleFeedback = feedback;
+  peskyBattleError = false;
+}
+
+function recruitPeskyBattleParticipant(command) {
+  if (
+    peskyBattlePhase !== "recruiting" ||
+    command.platform !== "tiktok" ||
+    command.type !== "gift" ||
+    command.itemId !== peskyBattleGiftId
+  ) return false;
+
+  const userId = command.userId.trim();
+  const userName = command.user.trim();
+  const identity = userId
+    ? `id:${userId.toLocaleLowerCase()}`
+    : userName
+      ? `name:${userName.toLocaleLowerCase()}`
+      : "";
+  if (!identity) {
+    peskyBattleFeedback = "participant_identity_missing";
+    peskyBattleError = true;
+    peskyBattleRevision += 1;
+    return false;
+  }
+
+  const duplicate = peskyBattleParticipants.some((participant) =>
+    participant.identity === identity);
+  if (duplicate) {
+    peskyBattleFeedback = "participant_already_joined";
+    peskyBattleError = false;
+    peskyBattleRevision += 1;
+    return false;
+  }
+
+  const slot = peskyBattleParticipants.length + 1;
+  peskyBattleParticipants.push({
+    slot,
+    userId: userId || `mock-user-${slot}-${peskyBattleSessionId}`,
+    userName: userName || userId,
+    displayName: userName || userId,
+    avatarUrl: "",
+    joinedAt: new Date().toISOString(),
+    identity,
+  });
+  if (peskyBattleParticipants.length >= 5) {
+    peskyBattlePhase = "ready";
+    peskyBattleFeedback = "lobby_ready";
+  } else {
+    peskyBattleFeedback = "participant_joined";
+  }
+  peskyBattleError = false;
+  peskyBattleRevision += 1;
+  return true;
+}
 
 const bosses = [
   { id: 0, name: "Hosco y Tosco", plane: false },
@@ -166,7 +271,7 @@ function refreshInteractionQueue() {
       entry.status = "queued";
     }
   }
-  if (!interactionsEnabled || interactionQueuePaused || peskyEnabled) return;
+  if (!interactionsEnabled || interactionQueuePaused) return;
   let active = interactionQueue.filter((entry) => entry.status === "active").length;
   for (const entry of interactionQueue) {
     if (active >= interactionMaxActive) break;
@@ -305,6 +410,7 @@ function executeDashboardSimulation(command) {
 
   dashboardCounters.received += 1;
   if (valid) {
+    const recruitedForBattle = recruitPeskyBattleParticipant(command);
     if (command.type === "gift") dashboardCounters.gifts += command.count;
     if (["gift", "currency"].includes(command.type) && command.amount > 0) {
       dashboardCounters.valued += 1;
@@ -313,15 +419,23 @@ function executeDashboardSimulation(command) {
     else if (command.type === "follow") dashboardCounters.follows += command.count;
     else if (command.type === "subscription") dashboardCounters.subscriptions += command.count;
     else if (command.platform === "tiktok" && command.type === "gift") {
-      dashboardCounters.coins += amount;
+      dashboardCounters.coins += command.amount;
     }
     if (command.platform === "twitch" && ["gift", "currency"].includes(command.type)) {
-      dashboardCounters.bits += amount;
+      dashboardCounters.bits += command.amount;
     }
     if (!interactionsEnabled) {
-      event.status = "ignored";
-      event.messageCode = "interactions_disabled";
-      dashboardCounters.ignored += 1;
+      if (!recruitedForBattle) {
+        event.status = "ignored";
+        event.messageCode = "interactions_disabled";
+        dashboardCounters.ignored += 1;
+      }
+    } else if (peskyBattleIsExclusive() && !peskyBattleAllowStreamAttacks) {
+      if (!recruitedForBattle) {
+        event.status = "ignored";
+        event.messageCode = "pesky_battle_stream_attacks_blocked";
+        dashboardCounters.ignored += 1;
+      }
     } else if (command.platform === "tiktok" && ["gift", "like", "follow"].includes(command.type)) {
       const matchedRules = [];
       const queuedActions = [];
@@ -388,6 +502,9 @@ function executeDashboardSimulation(command) {
         event.messageCode = "threshold_pending";
       }
     }
+    if (recruitedForBattle) {
+      event.messageCode = peskyBattleFeedback;
+    }
   } else {
     dashboardCounters.ignored += 1;
   }
@@ -422,8 +539,49 @@ function serveAsset(pathname, res) {
   createReadStream(file).pipe(res);
 }
 
+function serveCreatorToolFile(fileName, contentType, res) {
+  const file = resolve(assetsRoot, "creator-tools", fileName);
+  if (!file.startsWith(assetsRoot) || !existsSync(file)) {
+    res.writeHead(404).end();
+    return;
+  }
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Cache-Control": "no-store",
+  });
+  createReadStream(file).pipe(res);
+}
+
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
+  if ([
+    "/pesky-battle-overlay",
+    "/pesky-battle-overlay/",
+    "/pesky-battle-overlay.html",
+  ].includes(url.pathname)) {
+    serveCreatorToolFile(
+      "pesky-battle-overlay.html",
+      "text/html; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if (url.pathname === "/pesky-battle-overlay.css") {
+    serveCreatorToolFile(
+      "pesky-battle-overlay.css",
+      "text/css; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if (url.pathname === "/pesky-battle-overlay.js") {
+    serveCreatorToolFile(
+      "pesky-battle-overlay.js",
+      "text/javascript; charset=utf-8",
+      res,
+    );
+    return;
+  }
   if (url.pathname === "/api/dashboard") {
     json(res, {
       ready: true,
@@ -503,9 +661,6 @@ createServer((req, res) => {
       masterRevision: interactionMasterRevision,
       queuePaused: interactionQueuePaused,
       queueControlRevision: interactionQueueControlRevision,
-      suspendedByPesky: peskyEnabled,
-      randomTestEnabled: interactionRandomTestEnabled,
-      randomTestRevision: interactionRandomTestRevision,
       phaseTransitionProtectionEnabled,
       phaseTransitionProtectionRevision,
       showGiftImage: interactionShowGiftImage,
@@ -640,15 +795,6 @@ createServer((req, res) => {
     if (maxActiveValue !== null || showGiftImageValue !== null) {
       interactionSettingsRevision += 1;
     }
-    const randomTestValue = url.searchParams.get("randomTestEnabled");
-    if (randomTestValue !== null) {
-      interactionRandomTestEnabled = randomTestValue === "1";
-      interactionRandomTestRevision += 1;
-      nextFeedback = interactionRandomTestEnabled
-        ? "random_test_enabled"
-        : "random_test_disabled";
-      if (interactionRandomTestEnabled) peskyEnabled = false;
-    }
     const phaseTransitionProtectionValue = url.searchParams.get(
       "phaseTransitionProtectionEnabled",
     );
@@ -666,6 +812,136 @@ createServer((req, res) => {
     json(res, { ok: true }, 202);
     return;
   }
+  if (url.pathname === "/api/config/pesky-battle") {
+    json(res, peskyBattleState());
+    return;
+  }
+  if (url.pathname === "/api/config/pesky-battle/set") {
+    const requestedAction = (url.searchParams.get("action") ?? "")
+      .trim()
+      .toLowerCase();
+    const enabledValue = url.searchParams.get("enabled");
+    const action = requestedAction || (enabledValue === "1"
+      ? "arm"
+      : enabledValue === "0"
+        ? "off"
+        : "");
+    const giftIdValue = url.searchParams.get("giftId");
+    const streamAttacksValue = url.searchParams.get("allowStreamAttacks");
+    const itemValue = url.searchParams.get("item");
+    const itemEnabledValue = url.searchParams.get("itemEnabled");
+    const hasSetting = giftIdValue !== null || streamAttacksValue !== null ||
+      itemValue !== null;
+
+    peskyBattleError = false;
+    if (enabledValue !== null && !["0", "1"].includes(enabledValue)) {
+      peskyBattleFeedback = "invalid_setting";
+      peskyBattleError = true;
+    }
+
+    if (!peskyBattleError && giftIdValue !== null) {
+      if (peskyBattlePhase !== "off") {
+        peskyBattleFeedback = "battle_active_setting_locked";
+        peskyBattleError = true;
+      } else if (!giftsById.has(giftIdValue)) {
+        peskyBattleFeedback = "unknown_gift";
+        peskyBattleError = true;
+      } else {
+        peskyBattleGiftId = giftIdValue;
+        peskyBattleFeedback = "gift_saved";
+      }
+    }
+    if (!peskyBattleError && itemValue !== null) {
+      if (peskyBattlePhase !== "off") {
+        peskyBattleFeedback = "battle_active_setting_locked";
+        peskyBattleError = true;
+      } else if (!interactionItems.includes(itemValue) ||
+          !["0", "1"].includes(itemEnabledValue ?? "")) {
+        peskyBattleFeedback = interactionItems.includes(itemValue)
+          ? "invalid_setting"
+          : "unknown_item";
+        peskyBattleError = true;
+      } else if (itemEnabledValue === "1") {
+        peskyBattleDisabledItems = peskyBattleDisabledItems.filter(
+          (item) => item !== itemValue,
+        );
+        peskyBattleFeedback = "items_saved";
+      } else if (
+        !peskyBattleDisabledItems.includes(itemValue) &&
+        peskyBattleDisabledItems.length < interactionItems.length - 1
+      ) {
+        peskyBattleDisabledItems.push(itemValue);
+        peskyBattleFeedback = "items_saved";
+      } else if (peskyBattleDisabledItems.includes(itemValue)) {
+        peskyBattleFeedback = "items_saved";
+      } else {
+        peskyBattleFeedback = "items_required";
+        peskyBattleError = true;
+      }
+    }
+
+    if (!peskyBattleError && streamAttacksValue !== null) {
+      if (!["0", "1"].includes(streamAttacksValue)) {
+        peskyBattleFeedback = "invalid_setting";
+        peskyBattleError = true;
+      } else {
+        peskyBattleAllowStreamAttacks = streamAttacksValue === "1";
+        peskyBattleFeedback = peskyBattleAllowStreamAttacks
+          ? "stream_attacks_allowed"
+          : "stream_attacks_blocked";
+      }
+    }
+
+    if (!peskyBattleError && action === "arm") {
+      if (peskyBattlePhase !== "off") {
+        peskyBattleFeedback = "invalid_action";
+        peskyBattleError = true;
+      } else if (!giftsById.has(peskyBattleGiftId)) {
+        peskyBattleFeedback = "gift_required";
+        peskyBattleError = true;
+      } else if (peskyBattleDisabledItems.length >= interactionItems.length) {
+        peskyBattleFeedback = "items_required";
+        peskyBattleError = true;
+      } else {
+        peskyBattleSessionId += 1;
+        peskyBattlePhase = "recruiting";
+        peskyBattleAttempt = 0;
+        peskyBattleParticipants = [];
+        peskyBattleTargetLevel = "";
+        peskyBattleFeedback = "battle_armed";
+        if (peskyEnabled) {
+          peskyEnabled = false;
+          peskyFeedback = "disabled_by_pesky_battle";
+          peskyRevision += 1;
+        }
+      }
+    } else if (!peskyBattleError && action === "start") {
+      if (peskyBattlePhase !== "ready" || peskyBattleParticipants.length < 5) {
+        peskyBattleFeedback = peskyBattlePhase === "ready" ||
+          peskyBattlePhase === "recruiting"
+          ? "lobby_not_ready"
+          : "invalid_action";
+        peskyBattleError = true;
+      } else {
+        peskyBattlePhase = "waiting_level";
+        peskyBattleFeedback = "waiting_for_level";
+      }
+    } else if (!peskyBattleError && ["cancel", "off", "disable"].includes(action)) {
+      closePeskyBattle();
+    } else if (!peskyBattleError && action === "reset") {
+      closePeskyBattle();
+    } else if (!peskyBattleError && action && action !== "arm") {
+      peskyBattleFeedback = "invalid_action";
+      peskyBattleError = true;
+    } else if (!peskyBattleError && !action && !hasSetting) {
+      peskyBattleFeedback = "invalid_setting";
+      peskyBattleError = true;
+    }
+
+    peskyBattleRevision += 1;
+    json(res, peskyBattleState(), 202);
+    return;
+  }
   if (url.pathname === "/api/config/pesky") {
     json(res, {
       ready: true,
@@ -673,7 +949,6 @@ createServer((req, res) => {
       enabled: peskyEnabled,
       running: peskyEnabled,
       startingBattle: false,
-      waitingForInteractions: false,
       revision: peskyRevision,
       feedback: peskyFeedback,
       error: false,
@@ -684,10 +959,9 @@ createServer((req, res) => {
       disabledItems: peskyDisabledItems,
       queueCount: 0,
       activeCount: 0,
-      pausedInteractionCount: interactionQueue.length,
-      pausedInteractionActiveCount: interactionQueue.filter((entry) => entry.status === "active").length,
       maxActive: interactionMaxActive,
       queue: [],
+      blockedByPeskyBattle: peskyBattleIsExclusive(),
     });
     return;
   }
@@ -696,12 +970,13 @@ createServer((req, res) => {
     const namesValue = url.searchParams.get("names");
     const itemValue = url.searchParams.get("item");
     if (enabledValue !== null) {
-      peskyEnabled = enabledValue === "1";
-      if (peskyEnabled) {
-        interactionRandomTestEnabled = false;
-        interactionRandomTestRevision += 1;
+      if (enabledValue === "1" && peskyBattleIsExclusive()) {
+        peskyEnabled = false;
+        peskyFeedback = "blocked_by_pesky_battle";
+      } else {
+        peskyEnabled = enabledValue === "1";
+        peskyFeedback = peskyEnabled ? "enabled" : "disabled";
       }
-      peskyFeedback = peskyEnabled ? "enabled" : "disabled";
     } else if (namesValue !== null) {
       peskyNames = [...new Set(namesValue.split(/\r?\n|\r/).map((name) => name.trim()).filter(Boolean))];
       peskyFeedback = "names_saved";

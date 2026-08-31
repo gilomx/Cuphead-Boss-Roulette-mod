@@ -29,7 +29,6 @@ export function PeskyModeView() {
   const { t } = useLocalization();
   const [namesDraft, setNamesDraft] = useState("");
   const [namesDirty, setNamesDirty] = useState(false);
-  const [confirmingPesky, setConfirmingPesky] = useState(false);
   // Preserved for a future diagnostics build. Transition protection remains
   // enabled by default, but its public panel control is intentionally hidden.
   // const phaseTransitionProtectionEnabled =
@@ -41,29 +40,24 @@ export function PeskyModeView() {
     }
   }, [namesDirty, pesky?.names]);
 
-  useEffect(() => {
-    if (confirmingPesky && !interaction?.randomTestEnabled) {
-      setConfirmingPesky(false);
-    }
-  }, [confirmingPesky, interaction?.randomTestEnabled]);
-
   const normalizedNames = useMemo(() => validNames(namesDraft), [namesDraft]);
   const disabledItems = new Set(pesky?.disabledItems ?? []);
   const enabledItemCount = interactionItems.filter(
     (item) => !disabledItems.has(item.id),
   ).length;
+  const blockedByPeskyBattle = pesky?.blockedByPeskyBattle ?? false;
   const canEnable = (pesky?.ready ?? false) &&
-    normalizedNames.length > 0 && enabledItemCount > 0;
+    !blockedByPeskyBattle && enabledItemCount > 0;
   const queue = pesky?.queue ?? [];
-  const statusKey = pesky?.waitingForInteractions
-    ? "waitingInteractions"
-    : pesky?.running
-      ? "running"
-      : pesky?.enabled && pesky?.startingBattle
-        ? "startingBattle"
-      : pesky?.enabled
-        ? "waitingGame"
-        : "disabled";
+  const statusKey = pesky?.running
+    ? "running"
+    : pesky?.enabled && pesky?.startingBattle
+      ? "startingBattle"
+    : pesky?.enabled
+      ? "waitingGame"
+      : "disabled";
+  const showInteractionsNotice = (pesky?.enabled ?? false) &&
+    (interaction?.interactionsEnabled ?? false);
 
   return (
     <div className="page page--pesky">
@@ -77,12 +71,11 @@ export function PeskyModeView() {
       <section
         className="pesky-hero mode-switch-shell"
         data-active={pesky?.enabled ?? false}
-        data-step={confirmingPesky ? "confirm" : "control"}
+        data-step="control"
       >
         <div className="mode-switch-stage">
           <div
             className="mode-switch-pane mode-switch-pane--primary pesky-hero__pane"
-            aria-hidden={confirmingPesky}
           >
             <div className="pesky-hero__copy">
               <span className="pesky-status" data-status={statusKey}>
@@ -96,15 +89,15 @@ export function PeskyModeView() {
             <button
               className="pesky-toggle"
               type="button"
-              tabIndex={confirmingPesky ? -1 : 0}
               aria-pressed={pesky?.enabled ?? false}
+              aria-describedby={blockedByPeskyBattle
+                ? "pesky-battle-block-notice"
+                : undefined}
               data-active={pesky?.enabled ?? false}
               disabled={!pesky?.ready || (!(pesky?.enabled ?? false) && !canEnable)}
               onClick={() => {
                 if (pesky?.enabled) {
                   applyPeskyEnabled(false);
-                } else if (interaction?.randomTestEnabled) {
-                  setConfirmingPesky(true);
                 } else {
                   applyPeskyEnabled(true);
                 }
@@ -113,47 +106,33 @@ export function PeskyModeView() {
               {t(`pesky.control.${pesky?.enabled ? "disable" : "enable"}`)}
             </button>
           </div>
-          <div
-            className="mode-switch-pane mode-switch-pane--confirmation pesky-hero__pane"
-            aria-hidden={!confirmingPesky}
-          >
-            <div className="mode-switch-confirmation__copy">
-              <strong>{t("pesky.control.switch.title")}</strong>
-              <p>{t("pesky.control.switch.description")}</p>
-            </div>
-            <div className="mode-switch-confirmation__actions">
-              <button
-                type="button"
-                className="mode-switch-action mode-switch-action--cancel"
-                tabIndex={confirmingPesky ? 0 : -1}
-                onClick={() => setConfirmingPesky(false)}
-              >
-                {t("pesky.control.switch.cancel")}
-              </button>
-              <button
-                type="button"
-                className="mode-switch-action mode-switch-action--confirm"
-                tabIndex={confirmingPesky ? 0 : -1}
-                onClick={() => {
-                  setConfirmingPesky(false);
-                  applyPeskyEnabled(true);
-                }}
-              >
-                {t("pesky.control.switch.confirm")}
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
+      {blockedByPeskyBattle ? (
+        <p
+          className="pesky-interactions-notice"
+          id="pesky-battle-block-notice"
+          role="status"
+        >
+          {t("pesky.battleBlocked")}
+        </p>
+      ) : null}
+
+      {showInteractionsNotice ? (
+        <p className="pesky-interactions-notice" role="status">
+          {t("pesky.interactionsNotice")}
+        </p>
+      ) : null}
+
       {/* Preserved for future transition-protection diagnostics.
       <section
-        className="interaction-random-test interaction-phase-protection"
+        className="interaction-phase-protection"
         data-active={phaseTransitionProtectionEnabled}
         aria-labelledby="pesky-phase-protection-title"
       >
-        <div className="interaction-random-test__copy">
-          <div className="interaction-random-test__title">
+        <div className="interaction-phase-protection__copy">
+          <div className="interaction-phase-protection__title">
             <strong id="pesky-phase-protection-title">
               {t("pesky.phaseProtection.title")}
             </strong>
@@ -262,9 +241,9 @@ export function PeskyModeView() {
               }}
             />
             <div className="pesky-names__footer">
-              <span data-error={normalizedNames.length === 0}>
+              <span>
                 {t(normalizedNames.length === 0
-                  ? "pesky.names.required"
+                  ? "pesky.names.emptyHint"
                   : "pesky.names.hint")}
               </span>
               <div

@@ -10,9 +10,6 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const float PeskyMinimumIntervalSeconds = 1.25f;
         private const float PeskyMaximumIntervalSeconds = 3.25f;
-        private const float RandomTestMinimumIntervalSeconds = 1.25f;
-        private const float RandomTestMaximumIntervalSeconds = 3.25f;
-        private const string RandomTestDonor = "gilo.mx";
         private const float MinimumDispatchSeparationSeconds = 0.35f;
 
         private readonly Action<string> logInfo;
@@ -37,6 +34,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsInteractionQueue peskyQueue =
             new CreatorToolsInteractionQueue();
         private readonly CreatorToolsPeskyModeSettings peskySettings;
+        private readonly CreatorToolsPeskyBattleController peskyBattle;
         private string lastInteractionState;
         private string lastPeskyState;
         private string lastItem = string.Empty;
@@ -44,8 +42,6 @@ namespace Gilomx.CupheadBossRoulette
         private bool interactionFeedbackError;
         private string peskyFeedback = "ready";
         private bool peskyFeedbackError;
-        private bool randomTestEnabled;
-        private int randomTestRevision;
         private int phaseTransitionProtectionRevision;
         private int settingsRevision;
         private int masterRevision;
@@ -55,9 +51,11 @@ namespace Gilomx.CupheadBossRoulette
         private bool gameplayLevelLoadPending;
         private bool gameplayAvailabilityObserved;
         private float nextPeskyAt = -1f;
-        private float nextRandomTestAt = -1f;
+        private float nextAnyDispatchAt = -1f;
         private float nextInteractionDispatchAt = -1f;
         private float nextPeskyDispatchAt = -1f;
+        private bool preferPeskyNext;
+        private bool preferPeskyBattleNext = true;
         private int interactionRevision;
         private int peskyRevision;
 
@@ -75,6 +73,7 @@ namespace Gilomx.CupheadBossRoulette
             Func<long> getStreamBacklogCount,
             Action clearStreamBacklog,
             Action resetStreamRuntimeState,
+            CreatorToolsGiftResolver resolveGift,
             Func<bool> getPhaseTransitionProtectionEnabled,
             Action<bool> setPhaseTransitionProtectionEnabled,
             Action<string> logInfo,
@@ -110,6 +109,10 @@ namespace Gilomx.CupheadBossRoulette
             executors.Add(new FrogsFireflyInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
                 logInfo, logWarning));
+            peskyBattle = new CreatorToolsPeskyBattleController(
+                pluginConfigPath, interactionQueue, resolveGift,
+                IsItemAvailable, DisableFreePeskyForBattle,
+                logInfo, logWarning);
         }
 
         internal void Update(CreatorToolsServer server)
@@ -122,68 +125,50 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             string query;
-            bool peskyModeCommand;
-            while (server.TryTakeModeCommand(
-                out peskyModeCommand, out query))
-            {
-                var values = ParseQuery(query);
-                if (peskyModeCommand)
-                    ProcessPeskyCommand(values);
-                else
-                    ProcessInteractionCommand(values);
-            }
+            peskyBattle.ProcessCommands(server);
             while (server.TryTakeInteractionCommand(out query))
                 ProcessInteractionCommand(ParseQuery(query));
             while (server.TryTakePeskyCommand(out query))
                 ProcessPeskyCommand(ParseQuery(query));
 
-            var enabled = InteractionsEnabled;
-            var available = enabled && AnyItemAvailable();
-            if (gameplayLevelActive && available)
+            var interactionsEnabled = InteractionsEnabled;
+            var gameplayAvailable = AnyItemAvailable();
+            var interactionsAvailable =
+                interactionsEnabled && gameplayAvailable;
+            if (gameplayLevelActive && gameplayAvailable)
                 gameplayAvailabilityObserved = true;
-            var waitingForInteractions =
-                peskySettings.Enabled && interactionQueue.ActiveCount > 0;
-            if (!enabled)
-            {
-                nextPeskyAt = -1f;
-                nextRandomTestAt = -1f;
+
+            var canDispatchInteractions = gameplayAvailable &&
+                (peskyBattle.Active ||
+                 (interactionsEnabled && !queuePaused));
+            if (!canDispatchInteractions)
                 nextInteractionDispatchAt = -1f;
-                nextPeskyDispatchAt = -1f;
-            }
-            else if (peskySettings.Enabled)
+
+            var canDispatchPesky = false;
+            if (peskySettings.Enabled)
             {
-                nextRandomTestAt = -1f;
-                nextInteractionDispatchAt = -1f;
-                if (waitingForInteractions)
-                    nextPeskyAt = -1f;
-                else
-                {
-                    UpdatePeskyMode(available);
-                    if (available)
-                        ProcessQueue(peskyQueue, true);
-                    else
-                        nextPeskyDispatchAt = -1f;
-                }
+                UpdatePeskyMode(gameplayAvailable);
+                canDispatchPesky = gameplayAvailable;
+                if (!canDispatchPesky)
+                    nextPeskyDispatchAt = -1f;
             }
             else
             {
                 nextPeskyAt = -1f;
                 nextPeskyDispatchAt = -1f;
-                UpdateRandomTest(available);
-                if (available && !queuePaused)
-                    ProcessQueue(interactionQueue, false);
-                else
-                    nextInteractionDispatchAt = -1f;
             }
+            ProcessReadyQueues(
+                canDispatchInteractions, canDispatchPesky);
+            peskyBattle.Update(server, gameplayAvailable);
 
-            var interactionState = BuildInteractionState(available);
+            var interactionState = BuildInteractionState(
+                interactionsAvailable);
             if (interactionState != lastInteractionState)
             {
                 lastInteractionState = interactionState;
                 server.SetInteractionsState(interactionState);
             }
-            var peskyState = BuildPeskyState(
-                available, waitingForInteractions);
+            var peskyState = BuildPeskyState(gameplayAvailable);
             if (peskyState != lastPeskyState)
             {
                 lastPeskyState = peskyState;
@@ -195,6 +180,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             lastInteractionState = null;
             lastPeskyState = null;
+            peskyBattle.InvalidateState();
         }
 
         internal int StreamQueueAvailableCapacity
@@ -214,6 +200,37 @@ namespace Gilomx.CupheadBossRoulette
                 return getInteractionsEnabled != null &&
                        getInteractionsEnabled();
             }
+        }
+
+        internal bool StreamAttacksAllowed
+        {
+            get { return peskyBattle.StreamAttacksAllowed; }
+        }
+
+        internal string ObservePeskyBattleEvent(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            return peskyBattle.ObserveStreamEvent(streamEvent);
+        }
+
+        internal void PeskyBattleLevelStarted(Level level)
+        {
+            peskyBattle.OnLevelStarted(level);
+        }
+
+        internal void PeskyBattleLevelDefeated(Level level)
+        {
+            peskyBattle.OnLevelDefeated(level);
+        }
+
+        internal void PeskyBattleLevelPreWin(Level level)
+        {
+            peskyBattle.OnLevelPreWin(level);
+        }
+
+        internal void PeskyBattleLevelEnded(Level level)
+        {
+            peskyBattle.OnLevelEnded(level);
         }
 
         /// <summary>
@@ -243,7 +260,8 @@ namespace Gilomx.CupheadBossRoulette
 
             donor = NormalizeDonor(donor);
             var added = interactionQueue.Enqueue(
-                item, donor, giftImagePath, quantity, 0f);
+                item, donor, giftImagePath, quantity, 0f,
+                CreatorToolsInteractionSource.Stream);
             lastItem = item ?? string.Empty;
             if (added <= 0)
             {
@@ -252,9 +270,7 @@ namespace Gilomx.CupheadBossRoulette
                 return 0;
             }
 
-            feedbackCode = peskySettings.Enabled || queuePaused
-                ? "queued_paused"
-                : "queued";
+            feedbackCode = queuePaused ? "queued_paused" : "queued";
             SetInteractionFeedback(feedbackCode, false);
             InvalidateState();
             if (logInfo != null)
@@ -323,9 +339,10 @@ namespace Gilomx.CupheadBossRoulette
             gameplayAvailabilityObserved = false;
             peskyQueue.Clear();
             nextPeskyAt = -1f;
-            nextRandomTestAt = -1f;
+            nextAnyDispatchAt = -1f;
             nextInteractionDispatchAt = -1f;
             nextPeskyDispatchAt = -1f;
+            preferPeskyNext = false;
             InvalidateState();
         }
 
@@ -335,12 +352,14 @@ namespace Gilomx.CupheadBossRoulette
                 .ClearActiveActorsForPhaseTransition();
             interactionQueue.ClearActive();
             peskyQueue.Clear();
+            peskyBattle.OnPhaseTransition();
             for (var i = 0; i < executors.Count; i++)
                 executors[i].EndGameplayLevel();
             nextPeskyAt = -1f;
-            nextRandomTestAt = -1f;
+            nextAnyDispatchAt = -1f;
             nextInteractionDispatchAt = -1f;
             nextPeskyDispatchAt = -1f;
+            preferPeskyNext = false;
             InvalidateState();
             return cleared;
         }
@@ -369,11 +388,6 @@ namespace Gilomx.CupheadBossRoulette
                 SetInteractionSettings(values);
                 return;
             }
-            if (values.ContainsKey("randomTestEnabled"))
-            {
-                SetRandomTestEnabled(values);
-                return;
-            }
             if (values.ContainsKey(
                 "phaseTransitionProtectionEnabled"))
             {
@@ -399,15 +413,14 @@ namespace Gilomx.CupheadBossRoulette
                 setInteractionsEnabled(enabled);
             if (!enabled)
             {
-                interactionQueue.ClearPending();
-                peskyQueue.ClearPending();
+                interactionQueue.ClearPending(
+                    CreatorToolsInteractionSource.Manual);
+                interactionQueue.ClearPending(
+                    CreatorToolsInteractionSource.Stream);
                 if (resetStreamRuntimeState != null)
                     resetStreamRuntimeState();
                 queuePaused = false;
-                nextPeskyAt = -1f;
-                nextRandomTestAt = -1f;
                 nextInteractionDispatchAt = -1f;
-                nextPeskyDispatchAt = -1f;
             }
             masterRevision++;
             queueControlRevision++;
@@ -443,7 +456,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ClearPendingInteractions()
         {
-            var cleared = (long)interactionQueue.ClearPending();
+            var cleared = (long)interactionQueue.ClearPending(
+                CreatorToolsInteractionSource.Manual);
+            cleared += interactionQueue.ClearPending(
+                CreatorToolsInteractionSource.Stream);
             if (clearStreamBacklog != null)
             {
                 var backlogBefore = getStreamBacklogCount == null
@@ -481,34 +497,6 @@ namespace Gilomx.CupheadBossRoulette
                 false);
         }
 
-        private void SetRandomTestEnabled(
-            Dictionary<string, string> values)
-        {
-            string value;
-            bool enabled;
-            if (!values.TryGetValue("randomTestEnabled", out value) ||
-                !TryParseSwitch(value, out enabled))
-            {
-                SetInteractionFeedback("invalid_setting", true);
-                return;
-            }
-
-            if (enabled && peskySettings.Enabled)
-            {
-                peskySettings.Enabled = false;
-                peskyQueue.Clear();
-                ResetPeskySchedule();
-                peskySettings.Save();
-                SetPeskyFeedback("disabled_by_random_test", false);
-            }
-            randomTestEnabled = enabled;
-            randomTestRevision++;
-            nextRandomTestAt = -1f;
-            SetInteractionFeedback(
-                enabled ? "random_test_enabled" : "random_test_disabled",
-                false);
-        }
-
         private void ProcessPeskyCommand(
             Dictionary<string, string> values)
         {
@@ -532,9 +520,9 @@ namespace Gilomx.CupheadBossRoulette
                 SetPeskyFeedback("invalid_setting", true);
                 return;
             }
-            if (enabled && peskySettings.Names.Count == 0)
+            if (enabled && peskyBattle.Exclusive)
             {
-                SetPeskyFeedback("names_required", true);
+                SetPeskyFeedback("blocked_by_pesky_battle", true);
                 return;
             }
             if (enabled && peskySettings.EnabledItemCount == 0)
@@ -544,14 +532,6 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             peskySettings.Enabled = enabled;
-            if (enabled && randomTestEnabled)
-            {
-                randomTestEnabled = false;
-                randomTestRevision++;
-                nextRandomTestAt = -1f;
-                SetInteractionFeedback(
-                    "random_test_disabled_by_pesky", false);
-            }
             if (!enabled)
                 peskyQueue.Clear();
             ResetPeskySchedule();
@@ -562,6 +542,20 @@ namespace Gilomx.CupheadBossRoulette
                     (enabled ? "activado." : "desactivado."));
         }
 
+        private void DisableFreePeskyForBattle()
+        {
+            if (!peskySettings.Enabled && peskyQueue.Count == 0)
+                return;
+            peskySettings.Enabled = false;
+            peskyQueue.Clear();
+            ResetPeskySchedule();
+            peskySettings.Save();
+            SetPeskyFeedback("disabled_by_pesky_battle", false);
+            if (logInfo != null)
+                logInfo("Modo Molestoso libre se desactivo para Batalla " +
+                    "Molestosa.");
+        }
+
         private void SetPeskyNames(Dictionary<string, string> values)
         {
             string value;
@@ -569,15 +563,7 @@ namespace Gilomx.CupheadBossRoulette
             peskySettings.SetNames((value ?? string.Empty).Split(
                 new[] { "\r\n", "\n", "\r" },
                 StringSplitOptions.None));
-            if (peskySettings.Enabled && peskySettings.Names.Count == 0)
-            {
-                peskySettings.Enabled = false;
-                peskyQueue.Clear();
-                ResetPeskySchedule();
-                SetPeskyFeedback("disabled_invalid_config", true);
-            }
-            else
-                SetPeskyFeedback("names_saved", false);
+            SetPeskyFeedback("names_saved", false);
             peskySettings.Save();
         }
 
@@ -613,7 +599,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdatePeskyMode(bool available)
         {
-            if (!InteractionsEnabled || !peskySettings.Enabled || !available)
+            if (!peskySettings.Enabled || !available)
             {
                 nextPeskyAt = -1f;
                 return;
@@ -630,9 +616,9 @@ namespace Gilomx.CupheadBossRoulette
 
             ScheduleNextPesky(now);
 
-            // Keep Random Test's no-backlog behavior: select only when every
-            // Pesky entry is active and the shared active limit has room.
-            if (TotalActiveCount >= MaximumActive ||
+            // Avoid an automatic backlog: select only when every Pesky entry
+            // is active and this queue's active limit has room.
+            if (peskyQueue.ActiveCount >= MaximumActive ||
                 peskyQueue.Count != peskyQueue.ActiveCount)
                 return;
 
@@ -645,78 +631,25 @@ namespace Gilomx.CupheadBossRoulette
                     executor != null && executor.IsAvailable(candidate))
                     availableItems.Add(candidate);
             }
-            if (availableItems.Count == 0 || peskySettings.Names.Count == 0)
+            if (availableItems.Count == 0)
                 return;
 
             var item = availableItems[UnityEngine.Random.Range(
                 0, availableItems.Count)];
-            var name = peskySettings.Names[UnityEngine.Random.Range(
-                0, peskySettings.Names.Count)];
+            var name = peskySettings.Names.Count == 0
+                ? string.Empty
+                : peskySettings.Names[UnityEngine.Random.Range(
+                    0, peskySettings.Names.Count)];
             if (peskyQueue.Enqueue(
-                    item, name, string.Empty, 1, 0f) <= 0)
+                    item, name, string.Empty, 1, 0f,
+                    CreatorToolsInteractionSource.Pesky) <= 0)
                 return;
 
             lastItem = item;
             InvalidateState();
             if (logInfo != null)
                 logInfo("Modo Molestoso agrego " + item +
-                    " para " + name + ".");
-        }
-
-        private void UpdateRandomTest(bool available)
-        {
-            if (!InteractionsEnabled || !randomTestEnabled || !available)
-            {
-                nextRandomTestAt = -1f;
-                return;
-            }
-
-            var now = Time.realtimeSinceStartup;
-            if (nextRandomTestAt < 0f)
-            {
-                ScheduleNextRandomTest(now);
-                return;
-            }
-            if (now < nextRandomTestAt)
-                return;
-
-            ScheduleNextRandomTest(now);
-
-            // This intentionally matches the original Random Test: manual
-            // entries take priority and no automatic backlog is created.
-            if (interactionQueue.ActiveCount >= MaximumActive ||
-                interactionQueue.Count != interactionQueue.ActiveCount)
-                return;
-
-            var availableItems = new List<string>();
-            for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
-            {
-                var candidate = CreatorToolsInteractionIds.All[i];
-                var executor = FindExecutor(candidate);
-                if (executor != null && executor.IsAvailable(candidate))
-                    availableItems.Add(candidate);
-            }
-            if (availableItems.Count == 0)
-                return;
-
-            var item = availableItems[UnityEngine.Random.Range(
-                0, availableItems.Count)];
-            if (interactionQueue.Enqueue(
-                item, RandomTestDonor, string.Empty, 1, 0f) <= 0)
-                return;
-
-            lastItem = item;
-            InvalidateState();
-            if (logInfo != null)
-                logInfo("Prueba aleatoria de " + item +
-                    " agregada para " + RandomTestDonor + ".");
-        }
-
-        private void ScheduleNextRandomTest(float now)
-        {
-            nextRandomTestAt = now + UnityEngine.Random.Range(
-                RandomTestMinimumIntervalSeconds,
-                RandomTestMaximumIntervalSeconds);
+                    (name.Length == 0 ? "." : " para " + name + "."));
         }
 
         private void ScheduleNextPesky(float now)
@@ -763,13 +696,12 @@ namespace Gilomx.CupheadBossRoulette
                 donor,
                 string.Empty,
                 ParseQuantity(values),
-                ParseDelaySeconds(values));
+                ParseDelaySeconds(values),
+                CreatorToolsInteractionSource.Manual);
             if (added > 0)
             {
                 SetInteractionFeedback(
-                    peskySettings.Enabled || queuePaused
-                        ? "queued_paused"
-                        : "queued",
+                    queuePaused ? "queued_paused" : "queued",
                     false);
                 if (logInfo != null)
                     logInfo(added + " canje(s) de " + item +
@@ -813,33 +745,134 @@ namespace Gilomx.CupheadBossRoulette
             SetInteractionFeedback("settings_saved", false);
         }
 
-        private void ProcessQueue(
-            CreatorToolsInteractionQueue queue, bool pesky)
+        private void ProcessReadyQueues(
+            bool canDispatchInteractions, bool canDispatchPesky)
         {
-            if (TotalActiveCount >= MaximumActive)
+            if (!peskyBattle.Active)
+                preferPeskyBattleNext = true;
+            if (!canDispatchInteractions && !canDispatchPesky)
                 return;
 
             var now = Time.realtimeSinceStartup;
+            if (nextAnyDispatchAt >= 0f && now < nextAnyDispatchAt)
+                return;
+
+            if (preferPeskyNext)
+            {
+                if (canDispatchPesky &&
+                    ProcessQueue(peskyQueue, true))
+                {
+                    preferPeskyNext = false;
+                    return;
+                }
+                if (canDispatchInteractions &&
+                    ProcessQueue(interactionQueue, false))
+                    preferPeskyNext = true;
+                return;
+            }
+
+            if (canDispatchInteractions &&
+                ProcessQueue(interactionQueue, false))
+            {
+                preferPeskyNext = true;
+                return;
+            }
+            if (canDispatchPesky && ProcessQueue(peskyQueue, true))
+                preferPeskyNext = false;
+        }
+
+        private bool ProcessQueue(
+            CreatorToolsInteractionQueue queue, bool pesky)
+        {
+            if (queue.ActiveCount >= MaximumActive)
+                return false;
+
+            var now = Time.realtimeSinceStartup;
+            if (nextAnyDispatchAt >= 0f && now < nextAnyDispatchAt)
+                return false;
             var nextDispatchAt = pesky
                 ? nextPeskyDispatchAt
                 : nextInteractionDispatchAt;
             if (nextDispatchAt >= 0f && now < nextDispatchAt)
-                return;
+                return false;
 
-            var entry = queue.Peek();
+            Func<CreatorToolsInteractionQueue.Entry, bool> canDispatch =
+                delegate(CreatorToolsInteractionQueue.Entry candidate)
+                {
+                    return candidate.IsReady &&
+                        CanDispatchEntry(candidate, pesky);
+                };
+            if (pesky)
+                return TryDispatchEntry(
+                    queue, queue.Peek(canDispatch), true, now);
+
+            CreatorToolsInteractionQueue.Entry battleEntry;
+            CreatorToolsInteractionQueue.Entry regularEntry;
+            queue.PeekBySource(
+                canDispatch,
+                CreatorToolsInteractionSource.PeskyBattle,
+                out battleEntry,
+                out regularEntry);
+            var entry = SelectSharedQueueEntry(
+                queue, battleEntry, regularEntry);
+            if (entry == null)
+                return false;
+            var alternate = entry == battleEntry
+                ? regularEntry
+                : battleEntry;
+            if (TryDispatchEntry(queue, entry, false, now))
+                return true;
+            // A temporarily unavailable lane must not head-of-line block the
+            // other one; the shared dispatch clock advances only on success.
+            return alternate != null &&
+                TryDispatchEntry(queue, alternate, false, now);
+        }
+
+        private CreatorToolsInteractionQueue.Entry SelectSharedQueueEntry(
+            CreatorToolsInteractionQueue queue,
+            CreatorToolsInteractionQueue.Entry battleEntry,
+            CreatorToolsInteractionQueue.Entry regularEntry)
+        {
+            if (battleEntry == null)
+                return regularEntry;
+            if (regularEntry == null)
+                return battleEntry;
+
+            var remainingCapacity = MaximumActive - queue.ActiveCount;
+            if (remainingCapacity == 1)
+            {
+                // Do not let either lane consume the final slot while only
+                // the other lane is represented among active entries.
+                var activeBattle = queue.ActiveCountFor(
+                    CreatorToolsInteractionSource.PeskyBattle);
+                var activeRegular = queue.ActiveCount - activeBattle;
+                if (activeBattle == 0 && activeRegular > 0)
+                    return battleEntry;
+                if (activeRegular == 0 && activeBattle > 0)
+                    return regularEntry;
+            }
+            return preferPeskyBattleNext
+                ? battleEntry
+                : regularEntry;
+        }
+
+        private bool TryDispatchEntry(
+            CreatorToolsInteractionQueue queue,
+            CreatorToolsInteractionQueue.Entry entry,
+            bool pesky,
+            float now)
+        {
             if (entry == null || !entry.IsReady)
-                return;
+                return false;
 
             var executor = FindExecutor(entry.Item);
             if (executor == null)
             {
-                queue.RejectFirst();
+                queue.Reject(entry);
                 lastItem = entry.Item;
-                if (pesky)
-                    SetPeskyFeedback("unknown_item", true);
-                else
-                    SetInteractionFeedback("unknown_item", true);
-                return;
+                SetDispatchFeedback(
+                    entry, pesky, "unknown_item", true);
+                return false;
             }
 
             ICreatorToolsInteractionHandle handle;
@@ -852,36 +885,73 @@ namespace Gilomx.CupheadBossRoulette
                 out handle,
                 out feedbackCode, out error))
             {
-                queue.ActivateFirst(handle);
+                queue.Activate(entry, handle);
+                if (!pesky)
+                    preferPeskyBattleNext = entry.Source !=
+                        CreatorToolsInteractionSource.PeskyBattle;
                 if (pesky)
                     nextPeskyDispatchAt = now +
                         MinimumDispatchSeparationSeconds;
                 else
                     nextInteractionDispatchAt = now +
                         MinimumDispatchSeparationSeconds;
+                nextAnyDispatchAt = now +
+                    MinimumDispatchSeparationSeconds;
                 InvalidateState();
                 if (logInfo != null)
-                    logInfo((pesky ? "Ejecutando ataque molesto #" :
-                        "Ejecutando canje #") + entry.Id + " de " +
+                    logInfo((entry.Source ==
+                            CreatorToolsInteractionSource.PeskyBattle
+                        ? "Ejecutando ataque de Batalla Molestosa #"
+                        : pesky ? "Ejecutando ataque molesto #"
+                        : "Ejecutando canje #") + entry.Id + " de " +
                         entry.Donor + ".");
-                return;
+                return true;
             }
 
             if (feedbackCode == "native_assets_loading" ||
                 feedbackCode == "requires_gameplay_level")
-                return;
+                return false;
 
-            queue.RejectFirst();
+            queue.Reject(entry);
             lastItem = entry.Item;
-            if (pesky)
-                SetPeskyFeedback(feedbackCode, true);
-            else
-                SetInteractionFeedback(feedbackCode, true);
+            SetDispatchFeedback(entry, pesky, feedbackCode, true);
             if (logWarning != null)
                 logWarning(entry.Item + " interaction failed: " +
                     (string.IsNullOrEmpty(error)
                         ? "No diagnostic detail was returned."
                         : error));
+            return false;
+        }
+
+        private bool CanDispatchEntry(
+            CreatorToolsInteractionQueue.Entry entry, bool pesky)
+        {
+            if (entry == null)
+                return false;
+            if (pesky)
+                return peskySettings.Enabled;
+            if (entry.Source == CreatorToolsInteractionSource.PeskyBattle)
+                return peskyBattle.Active;
+            if (!InteractionsEnabled || queuePaused)
+                return false;
+            if (entry.Source == CreatorToolsInteractionSource.Stream)
+                return peskyBattle.StreamAttacksAllowed;
+            return true;
+        }
+
+        private void SetDispatchFeedback(
+            CreatorToolsInteractionQueue.Entry entry,
+            bool pesky,
+            string value,
+            bool error)
+        {
+            if (entry != null && entry.Source ==
+                    CreatorToolsInteractionSource.PeskyBattle)
+                peskyBattle.ReportDispatchFeedback(value, error);
+            else if (pesky)
+                SetPeskyFeedback(value, error);
+            else
+                SetInteractionFeedback(value, error);
         }
 
         internal const int MaximumActiveLimit = 20;
@@ -900,14 +970,6 @@ namespace Gilomx.CupheadBossRoulette
             get
             {
                 return getShowGiftImage == null || getShowGiftImage();
-            }
-        }
-
-        private int TotalActiveCount
-        {
-            get
-            {
-                return interactionQueue.ActiveCount + peskyQueue.ActiveCount;
             }
         }
 
@@ -940,8 +1002,6 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(queuePaused ? "true" : "false")
                 .Append(",\"queueControlRevision\":")
                 .Append(queueControlRevision)
-                .Append(",\"suspendedByPesky\":")
-                .Append(peskySettings.Enabled ? "true" : "false")
                 .Append(",\"item\":\"")
                 .Append(CreatorToolsInteractionIds.All[0])
                 .Append("\",\"items\":[");
@@ -952,10 +1012,6 @@ namespace Gilomx.CupheadBossRoulette
             AppendJson(builder, interactionFeedback);
             builder.Append("\",\"error\":")
                 .Append(interactionFeedbackError ? "true" : "false")
-                .Append(",\"randomTestEnabled\":")
-                .Append(randomTestEnabled ? "true" : "false")
-                .Append(",\"randomTestRevision\":")
-                .Append(randomTestRevision)
                 .Append(",\"phaseTransitionProtectionEnabled\":")
                 .Append(getPhaseTransitionProtectionEnabled == null ||
                     getPhaseTransitionProtectionEnabled()
@@ -988,29 +1044,24 @@ namespace Gilomx.CupheadBossRoulette
             return builder.ToString();
         }
 
-        private string BuildPeskyState(
-            bool available, bool waitingForInteractions)
+        private string BuildPeskyState(bool available)
         {
             var running = peskySettings.Enabled && available &&
-                InteractionsEnabled &&
-                !gameplayLevelLoadPending &&
-                !waitingForInteractions;
+                !gameplayLevelLoadPending;
             var startingBattle = peskySettings.Enabled &&
-                InteractionsEnabled &&
                 (gameplayLevelLoadPending ||
                  (gameplayLevelActive &&
-                  !gameplayAvailabilityObserved)) &&
-                !waitingForInteractions;
+                  !gameplayAvailabilityObserved));
             var builder = new StringBuilder(4096);
             builder.Append("{\"ready\":true,\"available\":")
                 .Append(available ? "true" : "false")
                 .Append(",\"enabled\":")
                 .Append(peskySettings.Enabled ? "true" : "false")
+                .Append(",\"blockedByPeskyBattle\":")
+                .Append(peskyBattle.Exclusive ? "true" : "false")
                 .Append(",\"running\":").Append(running ? "true" : "false")
                 .Append(",\"startingBattle\":")
                 .Append(startingBattle ? "true" : "false")
-                .Append(",\"waitingForInteractions\":")
-                .Append(waitingForInteractions ? "true" : "false")
                 .Append(",\"revision\":").Append(peskyRevision)
                 .Append(",\"feedback\":\"");
             AppendJson(builder, peskyFeedback);
@@ -1049,10 +1100,6 @@ namespace Gilomx.CupheadBossRoulette
             }
             builder.Append("],\"queueCount\":").Append(peskyQueue.Count)
                 .Append(",\"activeCount\":").Append(peskyQueue.ActiveCount)
-                .Append(",\"pausedInteractionCount\":")
-                .Append(interactionQueue.Count)
-                .Append(",\"pausedInteractionActiveCount\":")
-                .Append(interactionQueue.ActiveCount)
                 .Append(",\"maxActive\":").Append(MaximumActive)
                 .Append(",\"queue\":");
             peskyQueue.AppendJson(builder);
@@ -1085,11 +1132,16 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
             {
                 var item = CreatorToolsInteractionIds.All[i];
-                var executor = FindExecutor(item);
-                if (executor != null && executor.IsAvailable(item))
+                if (IsItemAvailable(item))
                     return true;
             }
             return false;
+        }
+
+        private bool IsItemAvailable(string item)
+        {
+            var executor = FindExecutor(item);
+            return executor != null && executor.IsAvailable(item);
         }
 
         private static int ParseQuantity(
@@ -1199,6 +1251,7 @@ namespace Gilomx.CupheadBossRoulette
 
         public void Dispose()
         {
+            peskyBattle.Dispose();
             interactionQueue.Dispose();
             peskyQueue.Dispose();
             for (var i = 0; i < executors.Count; i++)
@@ -1206,9 +1259,11 @@ namespace Gilomx.CupheadBossRoulette
             executors.Clear();
             CreatorToolsGiftImageCache.Clear();
             nextPeskyAt = -1f;
-            nextRandomTestAt = -1f;
+            nextAnyDispatchAt = -1f;
             nextInteractionDispatchAt = -1f;
             nextPeskyDispatchAt = -1f;
+            preferPeskyNext = false;
+            preferPeskyBattleNext = true;
             InvalidateState();
         }
     }

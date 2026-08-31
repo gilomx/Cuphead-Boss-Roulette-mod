@@ -13,6 +13,7 @@ import type {
   ForceDraft,
   InteractionConfigState,
   InteractionQueueEntry,
+  PeskyBattleConfigState,
   PeskyModeConfigState,
   RouletteConfigState,
   RouletteSelection,
@@ -25,6 +26,7 @@ interface ConfigValue {
   draft: ForceDraft | null;
   interaction: InteractionConfigState | null;
   pesky: PeskyModeConfigState | null;
+  peskyBattle: PeskyBattleConfigState | null;
   streamRules: StreamRulesConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
@@ -36,11 +38,18 @@ interface ConfigValue {
   applyInteractionsEnabled: (enabled: boolean) => void;
   applyInteractionQueuePaused: (paused: boolean) => void;
   clearPendingInteractions: () => void;
-  applyInteractionRandomTest: (enabled: boolean) => void;
   applyInteractionPhaseTransitionProtection: (enabled: boolean) => void;
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
+  applyPeskyBattleGift: (giftId: string) => void;
+  applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
+  applyPeskyBattleItem: (item: string, enabled: boolean) => void;
+  armPeskyBattle: (giftId: string) => void;
+  startPeskyBattle: () => void;
+  cancelPeskyBattle: () => void;
+  disablePeskyBattle: () => void;
+  resetPeskyBattle: () => void;
   saveStreamRule: (draft: StreamRuleDraft) => boolean;
   deleteStreamRule: (id: number) => boolean;
   duplicateStreamRule: (id: number) => void;
@@ -53,10 +62,9 @@ interface PendingPeskyChange {
   apply: (state: PeskyModeConfigState) => PeskyModeConfigState;
 }
 
-interface DesiredInteractionRandomTest {
-  enabled: boolean;
-  baselineRandomTestRevision: number;
-  requestRevision: number;
+interface PendingPeskyBattleChange {
+  targetRevision: number;
+  apply: (state: PeskyBattleConfigState) => PeskyBattleConfigState;
 }
 
 interface DesiredPhaseTransitionProtection {
@@ -130,6 +138,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<ForceDraft | null>(null);
   const [interaction, setInteraction] = useState<InteractionConfigState | null>(null);
   const [pesky, setPesky] = useState<PeskyModeConfigState | null>(null);
+  const [peskyBattle, setPeskyBattle] = useState<PeskyBattleConfigState | null>(null);
   const [streamRules, setStreamRules] = useState<StreamRulesConfigState | null>(null);
   const [optimisticInteractionQueue, setOptimisticInteractionQueue] = useState<
     InteractionQueueEntry[]
@@ -145,11 +154,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const lastAppliedLoadRevisionRef = useRef(0);
   const interactionRevisionRef = useRef<number | null>(null);
   const nextOptimisticInteractionIdRef = useRef(-1);
-  const desiredInteractionRandomTestRef = useRef<
-    DesiredInteractionRandomTest | null
-  >(null);
-  const randomTestRequestRevisionRef = useRef(0);
-  const randomTestWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const desiredPhaseTransitionProtectionRef = useRef<
     DesiredPhaseTransitionProtection | null
   >(null);
@@ -174,6 +178,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const confirmedPeskyRevisionRef = useRef(0);
   const pendingPeskyChangesRef = useRef<PendingPeskyChange[]>([]);
   const peskyWriteChainRef = useRef<Promise<void>>(Promise.resolve());
+  const confirmedPeskyBattleRevisionRef = useRef(0);
+  const pendingPeskyBattleChangesRef = useRef<PendingPeskyBattleChange[]>([]);
+  const peskyBattleWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const streamRulesRevisionRef = useRef<number | null>(null);
   const streamRulesWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
@@ -186,20 +193,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         configResponse,
         interactionResponse,
         peskyResponse,
+        peskyBattleResponse,
         streamRulesResponse,
       ] = await Promise.all([
         fetch("/api/config", { cache: "no-store" }),
         fetch("/api/config/interactions", { cache: "no-store" }),
         fetch("/api/config/pesky", { cache: "no-store" }),
+        fetch("/api/config/pesky-battle", { cache: "no-store" }),
         fetch("/api/config/interactions/rules", { cache: "no-store" }),
       ]);
       if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
       if (!interactionResponse.ok) throw new Error(`HTTP ${interactionResponse.status}`);
       if (!peskyResponse.ok) throw new Error(`HTTP ${peskyResponse.status}`);
+      if (!peskyBattleResponse.ok) throw new Error(`HTTP ${peskyBattleResponse.status}`);
       if (!streamRulesResponse.ok) throw new Error(`HTTP ${streamRulesResponse.status}`);
       const next = (await configResponse.json()) as RouletteConfigState;
       const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
       const nextPesky = (await peskyResponse.json()) as PeskyModeConfigState;
+      const nextPeskyBattle = (await peskyBattleResponse.json()) as PeskyBattleConfigState;
       const nextStreamRules = (await streamRulesResponse.json()) as StreamRulesConfigState;
       if (
         !mountedRef.current ||
@@ -303,23 +314,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           };
         }
       }
-      let randomTestPending = false;
-      const desiredRandomTest = desiredInteractionRandomTestRef.current;
-      if (desiredRandomTest !== null) {
-        const confirmed =
-          nextInteraction.randomTestRevision >
-            desiredRandomTest.baselineRandomTestRevision &&
-          nextInteraction.randomTestEnabled === desiredRandomTest.enabled;
-        if (confirmed) {
-          desiredInteractionRandomTestRef.current = null;
-        } else {
-          randomTestPending = true;
-          visibleInteraction = {
-            ...visibleInteraction,
-            randomTestEnabled: desiredRandomTest.enabled,
-          };
-        }
-      }
       let phaseTransitionProtectionPending = false;
       const desiredPhaseTransitionProtection =
         desiredPhaseTransitionProtectionRef.current;
@@ -392,6 +386,17 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       );
       setPesky(visiblePesky);
       const peskyPending = pendingPeskyChanges.length > 0;
+      confirmedPeskyBattleRevisionRef.current = nextPeskyBattle.revision;
+      const pendingPeskyBattleChanges = pendingPeskyBattleChangesRef.current.filter(
+        (change) => change.targetRevision > nextPeskyBattle.revision,
+      );
+      pendingPeskyBattleChangesRef.current = pendingPeskyBattleChanges;
+      const visiblePeskyBattle = pendingPeskyBattleChanges.reduce(
+        (state, change) => change.apply(state),
+        nextPeskyBattle,
+      );
+      setPeskyBattle(visiblePeskyBattle);
+      const peskyBattlePending = pendingPeskyBattleChanges.length > 0;
       let streamRulesPending = false;
       const streamRulesRevision = streamRulesRevisionRef.current;
       if (streamRulesRevision !== null) {
@@ -403,7 +408,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       }
       setStreamRules(nextStreamRules);
       if (!next.ready || !nextInteraction.ready || !nextPesky.ready ||
-          !nextStreamRules.ready) {
+          !nextPeskyBattle.ready || !nextStreamRules.ready) {
         setStatus("connecting");
         return;
       }
@@ -444,9 +449,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         forcePending || challengePending || interactionPending ||
           interactionMasterPending || interactionQueuePausePending ||
           interactionQueueClearPending ||
-          randomTestPending || phaseTransitionProtectionPending ||
+          phaseTransitionProtectionPending ||
           interactionSettingsPending ||
-          peskyPending || streamRulesPending
+          peskyPending || peskyBattlePending || streamRulesPending
           ? "pending"
           : "saved",
       );
@@ -758,57 +763,26 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [load],
   );
 
-  const applyInteractionRandomTest = useCallback(
-    (enabled: boolean) => {
-      if (!interaction?.ready) return;
-      const requestRevision = randomTestRequestRevisionRef.current + 1;
-      randomTestRequestRevisionRef.current = requestRevision;
-      desiredInteractionRandomTestRef.current = {
-        enabled,
-        baselineRandomTestRevision: interaction.randomTestRevision,
-        requestRevision,
-      };
-      setInteraction((current) => current
-        ? {
-            ...current,
-            randomTestEnabled: enabled,
-            feedback: enabled
-              ? "random_test_enabled"
-              : "random_test_disabled",
-            error: false,
-          }
-        : current);
-      if (enabled && pesky?.enabled) {
-        const pending = pendingPeskyChangesRef.current;
-        const previousTarget = pending.length > 0
-          ? pending[pending.length - 1].targetRevision
-          : confirmedPeskyRevisionRef.current;
-        const applyPeskySwitch = (state: PeskyModeConfigState) => ({
-          ...state,
-          enabled: false,
-          running: false,
-          waitingForInteractions: false,
-          feedback: "disabled_by_random_test",
-          error: false,
-        });
-        pending.push({
-          targetRevision: Math.max(
-            confirmedPeskyRevisionRef.current,
-            previousTarget,
-          ) + 1,
-          apply: applyPeskySwitch,
-        });
-        setPesky((current) => current
-          ? applyPeskySwitch(current)
-          : current);
-      }
-      setStatus("saving");
-
-      const query = new URLSearchParams({
-        randomTestEnabled: enabled ? "1" : "0",
+  const sendPeskyBattleUpdate = useCallback(
+    (
+      query: URLSearchParams,
+      apply: (state: PeskyBattleConfigState) => PeskyBattleConfigState,
+    ) => {
+      const pending = pendingPeskyBattleChangesRef.current;
+      const previousTarget = pending.length > 0
+        ? pending[pending.length - 1].targetRevision
+        : confirmedPeskyBattleRevisionRef.current;
+      pending.push({
+        targetRevision: Math.max(
+          confirmedPeskyBattleRevisionRef.current,
+          previousTarget,
+        ) + 1,
+        apply,
       });
+      setPeskyBattle((current) => current ? apply(current) : current);
+      setStatus("saving");
       const send = () => fetch(
-        "/api/config/interactions/set?" + query,
+        "/api/config/pesky-battle/set?" + query,
         { cache: "no-store" },
       )
         .then((response) => {
@@ -817,21 +791,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           window.setTimeout(() => void load(), 160);
         })
         .catch(() => {
-          if (
-            randomTestRequestRevisionRef.current !== requestRevision ||
-            desiredInteractionRandomTestRef.current?.requestRevision !==
-              requestRevision
-          ) return;
-          desiredInteractionRandomTestRef.current = null;
+          pendingPeskyBattleChangesRef.current = [];
           if (mountedRef.current) {
             setStatus("error");
             void load();
           }
         });
-      randomTestWriteChainRef.current =
-        randomTestWriteChainRef.current.then(send, send);
+      peskyBattleWriteChainRef.current =
+        peskyBattleWriteChainRef.current.then(send, send);
     },
-    [interaction, pesky, load],
+    [load],
   );
 
   const applyInteractionPhaseTransitionProtection = useCallback(
@@ -892,23 +861,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const applyPeskyEnabled = useCallback(
     (enabled: boolean) => {
       if (!pesky?.ready) return;
-      if (enabled && interaction?.randomTestEnabled) {
-        const requestRevision = randomTestRequestRevisionRef.current + 1;
-        randomTestRequestRevisionRef.current = requestRevision;
-        desiredInteractionRandomTestRef.current = {
-          enabled: false,
-          baselineRandomTestRevision: interaction.randomTestRevision,
-          requestRevision,
-        };
-        setInteraction((current) => current
-          ? {
-              ...current,
-              randomTestEnabled: false,
-              feedback: "random_test_disabled_by_pesky",
-              error: false,
-            }
-          : current);
-      }
       sendPeskyUpdate(
         new URLSearchParams({ enabled: enabled ? "1" : "0" }),
         (state) => ({
@@ -917,13 +869,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           feedback: enabled ? "enabled" : "disabled",
           error: false,
           running: enabled ? state.running : false,
-          waitingForInteractions: enabled
-            ? state.waitingForInteractions
-            : false,
+          startingBattle: enabled ? state.startingBattle : false,
+          queue: enabled ? state.queue : [],
+          queueCount: enabled ? state.queueCount : 0,
+          activeCount: enabled ? state.activeCount : 0,
         }),
       );
     },
-    [interaction, pesky, sendPeskyUpdate],
+    [pesky, sendPeskyUpdate],
   );
 
   const applyPeskyNames = useCallback(
@@ -962,6 +915,162 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       );
     },
     [sendPeskyUpdate],
+  );
+
+  const applyPeskyBattleGift = useCallback(
+    (giftId: string) => {
+      if (!peskyBattle?.ready || peskyBattle.phase !== "off") return;
+      sendPeskyBattleUpdate(
+        new URLSearchParams({ giftId }),
+        (state) => ({
+          ...state,
+          trigger: {
+            ...state.trigger,
+            giftId,
+            giftName: state.trigger.giftId === giftId
+              ? state.trigger.giftName
+              : "",
+            giftImagePath: state.trigger.giftId === giftId
+              ? state.trigger.giftImagePath
+              : "",
+            coinsPerUnit: state.trigger.giftId === giftId
+              ? state.trigger.coinsPerUnit
+              : 0,
+          },
+          feedback: "gift_saved",
+          error: false,
+        }),
+      );
+    },
+    [peskyBattle, sendPeskyBattleUpdate],
+  );
+
+  const applyPeskyBattleStreamAttacks = useCallback(
+    (enabled: boolean) => {
+      if (!peskyBattle?.ready) return;
+      sendPeskyBattleUpdate(
+        new URLSearchParams({ allowStreamAttacks: enabled ? "1" : "0" }),
+        (state) => ({
+          ...state,
+          allowStreamAttacks: enabled,
+          feedback: enabled
+            ? "stream_attacks_allowed"
+            : "stream_attacks_blocked",
+          error: false,
+        }),
+      );
+    },
+    [peskyBattle, sendPeskyBattleUpdate],
+  );
+
+  const applyPeskyBattleItem = useCallback(
+    (item: string, enabled: boolean) => {
+      if (!peskyBattle?.ready || peskyBattle.phase !== "off") return;
+      sendPeskyBattleUpdate(
+        new URLSearchParams({
+          item,
+          itemEnabled: enabled ? "1" : "0",
+        }),
+        (state) => ({
+          ...state,
+          disabledItems: enabled
+            ? state.disabledItems.filter((candidate) => candidate !== item)
+            : state.disabledItems.includes(item)
+              ? state.disabledItems
+              : [...state.disabledItems, item],
+          feedback: "items_saved",
+          error: false,
+        }),
+      );
+    },
+    [peskyBattle, sendPeskyBattleUpdate],
+  );
+
+  const armPeskyBattle = useCallback(
+    (giftId: string) => {
+      if (!peskyBattle?.ready || peskyBattle.phase !== "off") return;
+      setPesky((current) => current
+        ? {
+            ...current,
+            enabled: false,
+            running: false,
+            startingBattle: false,
+            blockedByPeskyBattle: true,
+            feedback: current.enabled
+              ? "disabled_by_pesky_battle"
+              : current.feedback,
+            queue: [],
+            queueCount: 0,
+            activeCount: 0,
+          }
+        : current);
+      sendPeskyBattleUpdate(
+        new URLSearchParams({ action: "arm", giftId }),
+        (state) => ({
+          ...state,
+          phase: "recruiting",
+          exclusive: true,
+          participants: [],
+          attempt: 0,
+          trigger: { ...state.trigger, giftId },
+          feedback: "battle_armed",
+          error: false,
+        }),
+      );
+    },
+    [peskyBattle, sendPeskyBattleUpdate],
+  );
+
+  const startPeskyBattle = useCallback(() => {
+    if (!peskyBattle?.ready || peskyBattle.phase !== "ready" ||
+        peskyBattle.participants.length < peskyBattle.capacity) return;
+    sendPeskyBattleUpdate(
+      new URLSearchParams({ action: "start" }),
+      (state) => ({
+        ...state,
+        phase: "waiting_level",
+        exclusive: true,
+        feedback: "waiting_for_level",
+        error: false,
+      }),
+    );
+  }, [peskyBattle, sendPeskyBattleUpdate]);
+
+  const finishPeskyBattle = useCallback(
+    (action: "cancel" | "off" | "reset") => {
+      if (!peskyBattle?.ready) return;
+      setPesky((current) => current
+        ? { ...current, blockedByPeskyBattle: false }
+        : current);
+      sendPeskyBattleUpdate(
+        new URLSearchParams({ action }),
+        (state) => ({
+          ...state,
+          phase: "off",
+          exclusive: false,
+          gameplayAvailable: false,
+          targetLevel: "",
+          participants: [],
+          attempt: 0,
+          feedback: "battle_cancelled",
+          error: false,
+        }),
+      );
+    },
+    [peskyBattle, sendPeskyBattleUpdate],
+  );
+
+  const cancelPeskyBattle = useCallback(
+    () => finishPeskyBattle("cancel"),
+    [finishPeskyBattle],
+  );
+  const disablePeskyBattle = useCallback(
+    () => finishPeskyBattle("off"),
+    [finishPeskyBattle],
+  );
+  const resetPeskyBattle = useCallback(
+    () => finishPeskyBattle("reset"),
+    [finishPeskyBattle],
   );
 
   const testInteraction = useCallback(
@@ -1106,6 +1215,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       draft,
       interaction,
       pesky,
+      peskyBattle,
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
@@ -1117,12 +1227,19 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyInteractionsEnabled,
       applyInteractionQueuePaused,
       clearPendingInteractions,
-      applyInteractionRandomTest,
       applyInteractionPhaseTransitionProtection,
       testInteraction,
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      applyPeskyBattleGift,
+      applyPeskyBattleStreamAttacks,
+      applyPeskyBattleItem,
+      armPeskyBattle,
+      startPeskyBattle,
+      cancelPeskyBattle,
+      disablePeskyBattle,
+      resetPeskyBattle,
       saveStreamRule,
       deleteStreamRule,
       duplicateStreamRule,
@@ -1133,6 +1250,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       draft,
       interaction,
       pesky,
+      peskyBattle,
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
@@ -1144,12 +1262,19 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyInteractionsEnabled,
       applyInteractionQueuePaused,
       clearPendingInteractions,
-      applyInteractionRandomTest,
       applyInteractionPhaseTransitionProtection,
       testInteraction,
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      applyPeskyBattleGift,
+      applyPeskyBattleStreamAttacks,
+      applyPeskyBattleItem,
+      armPeskyBattle,
+      startPeskyBattle,
+      cancelPeskyBattle,
+      disablePeskyBattle,
+      resetPeskyBattle,
       saveStreamRule,
       deleteStreamRule,
       duplicateStreamRule,

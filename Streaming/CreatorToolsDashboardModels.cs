@@ -91,7 +91,13 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJson.AppendEscaped(builder, entry.Type);
             builder.Append("\",\"user\":\"");
             CreatorToolsJson.AppendEscaped(builder, entry.UserName);
-            builder.Append("\",\"userId\":");
+            builder.Append("\",\"userDisplayName\":");
+            CreatorToolsJson.AppendNullableString(
+                builder, entry.UserDisplayName);
+            builder.Append(",\"userAvatarUrl\":");
+            CreatorToolsJson.AppendNullableString(
+                builder, entry.UserAvatarUrl);
+            builder.Append(",\"userId\":");
             CreatorToolsJson.AppendNullableString(builder, entry.UserId);
             builder.Append(",\"itemId\":");
             CreatorToolsJson.AppendNullableString(builder, entry.ItemId);

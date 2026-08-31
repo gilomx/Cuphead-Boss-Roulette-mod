@@ -61,12 +61,18 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   activos y pendientes. El canjeo activo permanece visible hasta que su actor
   termina o muere; entonces libera su cupo. Estos límites y el despacho
   pertenecen a C#, no a la vista.
-- La prueba aleatoria tiene un interruptor con estado optimista inmediato. Su
-  escritura se serializa y se confirma mediante una revisión independiente para
-  que respuestas antiguas no reviertan el último clic. Sólo genera dentro de
-  una partida activa y no acumula eventos mientras el juego no puede recibirlos.
-  Todo artículo nuevo del catálogo se incorpora también a la tabla de prueba
-  manual y al conjunto elegible de esta prueba aleatoria.
+- Todo artículo nuevo del catálogo se incorpora tanto a la tabla de prueba
+  manual como al catálogo configurable de Modo Molestoso. La sección de
+  Interacciones no contiene un generador aleatorio automático: ese uso pertenece
+  exclusivamente a Modo Molestoso.
+- Modo Molestoso tiene una cola operativa separada. El interruptor general,
+  Pausar y Vaciar de Interacciones no la controlan; su propio interruptor basta
+  porque al desactivarlo puede borrar pendientes y actores activos sin perder
+  donaciones. Si ambos modos están activos, la vista informa que los ataques de
+  donaciones continuarán junto con los del modo.
+- `Nombres aleatorios` es una configuración opcional. Cero nombres no es un
+  error ni bloquea el interruptor: el panel debe explicar que los ataques se
+  mostrarán sin nombre y permitir guardar la lista vacía.
 - Una prueba se refleja optimistamente en la tabla antes de esperar a `Update`
   de Unity. Sus filas temporales usan `Esperando al juego`; al cambiar la
   revisión del mod se eliminan y se muestra la cola autoritativa recibida. La

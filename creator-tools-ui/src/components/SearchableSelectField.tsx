@@ -62,6 +62,7 @@ export function SearchableSelectField<T>({
   const listboxId = `${id}-${reactId}-listbox`;
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<SearchableSelectKey | null>(null);
@@ -111,10 +112,22 @@ export function SearchableSelectField<T>({
 
   useEffect(() => {
     if (!open || activeIndex < 0) return;
-    document.getElementById(`${listboxId}-option-${activeIndex}`)?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [activeIndex, listboxId, open]);
+    const menu = menuRef.current;
+    const option = menu?.querySelector<HTMLElement>(
+      `[data-option-index="${activeIndex}"]`,
+    );
+    if (!menu || !option) return;
+
+    const optionTop = option.offsetTop;
+    const optionBottom = optionTop + option.offsetHeight;
+    const viewportTop = menu.scrollTop;
+    const viewportBottom = viewportTop + menu.clientHeight;
+    if (optionTop < viewportTop) {
+      menu.scrollTop = optionTop;
+    } else if (optionBottom > viewportBottom) {
+      menu.scrollTop = optionBottom - menu.clientHeight;
+    }
+  }, [activeIndex, open]);
 
   const openList = () => {
     if (disabled) return;
@@ -138,12 +151,21 @@ export function SearchableSelectField<T>({
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
+      event.stopPropagation();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
       if (!open) {
-        openList();
+        const selectedIndex = selectedKey === null
+          ? -1
+          : options.findIndex((option) => getKey(option) === selectedKey);
+        const nextIndex = selectedIndex < 0
+          ? direction > 0 ? 0 : options.length - 1
+          : (selectedIndex + direction + options.length) % options.length;
+        setQuery("");
+        setActiveKey(options[nextIndex] ? getKey(options[nextIndex]) : null);
+        setOpen(true);
         return;
       }
       if (filteredOptions.length === 0) return;
-      const direction = event.key === "ArrowDown" ? 1 : -1;
       const nextIndex = activeIndex < 0
         ? direction > 0 ? 0 : filteredOptions.length - 1
         : (activeIndex + direction + filteredOptions.length) % filteredOptions.length;
@@ -152,22 +174,30 @@ export function SearchableSelectField<T>({
     }
     if (event.key === "Home" && open && filteredOptions.length > 0) {
       event.preventDefault();
+      event.stopPropagation();
       setActiveKey(getKey(filteredOptions[0]));
       return;
     }
     if (event.key === "End" && open && filteredOptions.length > 0) {
       event.preventDefault();
+      event.stopPropagation();
       setActiveKey(getKey(filteredOptions[filteredOptions.length - 1]));
       return;
     }
-    if (event.key === "Enter" && open) {
+    if (event.key === "Enter") {
       event.preventDefault();
-      const option = filteredOptions[activeIndex];
-      if (option) choose(option);
+      event.stopPropagation();
+      if (!open) {
+        openList();
+      } else {
+        const option = filteredOptions[activeIndex] ?? filteredOptions[0];
+        if (option) choose(option);
+      }
       return;
     }
     if (event.key === "Escape" && open) {
       event.preventDefault();
+      event.stopPropagation();
       setOpen(false);
       setQuery("");
       setActiveKey(null);
@@ -236,7 +266,13 @@ export function SearchableSelectField<T>({
       </div>
 
       {open ? (
-        <div className="searchable-select-menu" id={listboxId} role="listbox" aria-label={label}>
+        <div
+          ref={menuRef}
+          className="searchable-select-menu"
+          id={listboxId}
+          role="listbox"
+          aria-label={label}
+        >
           {filteredOptions.length === 0 ? (
             <p className="searchable-select-menu__empty" role="status">{noResults}</p>
           ) : filteredOptions.map((option, index) => {
@@ -252,6 +288,7 @@ export function SearchableSelectField<T>({
                 tabIndex={-1}
                 aria-selected={optionKey === selectedKey}
                 data-active={index === activeIndex}
+                data-option-index={index}
                 key={optionKey}
                 onPointerDown={(event) => {
                   if (event.pointerType === "mouse") event.preventDefault();

@@ -143,6 +143,39 @@ línea muestra cuántas interacciones adicionales siguen esperando fuera de la
 cola materializada. `Eventos recientes` conserva y muestra sólo los últimos 30
 registros, también con scroll interno.
 
+Modo Molestoso libre se activa y desactiva por separado. Su cola no depende de
+ese interruptor ni de Pausar/Vaciar, de modo que puede convivir con ataques de
+donaciones. Al apagarlo se eliminan únicamente sus molestias pendientes y las
+que sigan activas en pantalla. La lista de nombres aleatorios es opcional; si se
+deja vacía, los ataques aparecen sin nombre.
+
+`Batalla Molestosa` se arma desde el Dashboard eligiendo un regalo de TikTok.
+Los primeros cinco donadores distintos que envíen ese regalo ocupan los cinco
+lugares con su nombre y, cuando TikFinity la proporciona, su foto. Una donación
+repetida de la misma persona no ocupa otro lugar. Al completar el grupo, el
+botón `Iniciar en el siguiente nivel` vincula la batalla al próximo nivel que
+comience: perder o reintentar conserva a los cinco contrincantes y el modo sólo
+termina al ganar ese nivel o al cancelarlo manualmente.
+
+Batalla tiene su propio conjunto de ataques, pero los coloca en la cola de
+Interacciones con un origen separado. Por ello sigue funcionando aunque el
+interruptor general esté apagado y los controles Pausar/Vaciar no eliminan sus
+ataques. Cuando coinciden ataques LIVE y de Batalla, ambos orígenes se alternan
+sin reordenar ni borrar donaciones, de modo que una cola LIVE llena no deja a
+los cinco participantes esperando indefinidamente. El Dashboard permite decidir
+si las reglas del LIVE también pueden
+atacar durante la sesión; cuando se bloquean, su trabajo ya aceptado espera sin
+perderse y se reanuda al terminar. Armar Batalla desactiva Modo Molestoso libre
+y ambos modos no pueden convivir.
+
+Para OBS, añade una Fuente de navegador con:
+
+`http://127.0.0.1:18081/pesky-battle-overlay`
+
+El overlay conserva los cinco lugares al recargarse y usa una inicial si el
+evento no incluye foto o la imagen deja de estar disponible. La sesión y el
+grupo sobreviven a reintentos, pero se cancelan al cerrar Cuphead.
+
 ## Instalación
 
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su
@@ -173,8 +206,8 @@ Para añadir artículos a Creator Tools, consulta primero la
 [guía del catálogo de interacciones](INTERACTION_CATALOG.md). Define la
 arquitectura común, la etiqueta del donador, su seguimiento, el fade de muerte,
 la limpieza y las pruebas obligatorias para todos los elementos nuevos. Cada ID
-nuevo debe aparecer tanto en la prueba manual como en la prueba aleatoria; el
-build del panel valida que sus registros sigan sincronizados.
+nuevo debe aparecer en la prueba manual y en el catálogo configurable de Modo
+Molestoso; el build del panel valida que sus registros sigan sincronizados.
 
 Las propuestas que todavía no forman parte del mod se conservan en
 [Ideas para versiones futuras](FUTURE_IDEAS.md). Este archivo también registra

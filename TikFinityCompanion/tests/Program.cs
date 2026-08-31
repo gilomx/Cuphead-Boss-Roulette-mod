@@ -16,6 +16,10 @@ internal static class Program
         {
             ("flat gift progress", FlatGiftProgress),
             ("nested gift final", NestedGiftFinal),
+            ("display name fallback", DisplayNameFallback),
+            ("avatar URL variants", AvatarUrlVariants),
+            ("unsafe avatar URLs", UnsafeAvatarUrls),
+            ("long avatar URL", LongAvatarUrl),
             ("non-streak gift", NonStreakGift),
             ("unknown streak end is provisional", UnknownStreakEnd),
             ("streak idempotency", StreakIdempotency),
@@ -26,6 +30,7 @@ internal static class Program
             ("malformed input", MalformedInput),
             ("status JSON contract", StatusJsonContract),
             ("event JSON null contract", EventJsonNullContract),
+            ("event JSON user contract", EventJsonUserContract),
             ("argument parsing", ArgumentParsing),
             ("reconnect backoff", Backoff),
             ("long image URL", LongImageUrl),
@@ -56,7 +61,9 @@ internal static class Program
         Equal("gift", streamEvent.Type);
         Equal("9001", streamEvent.EventId);
         Equal("viewer_one", streamEvent.UserName);
+        Equal("viewer_one", streamEvent.UserDisplayName);
         Equal("1234567890123456789", streamEvent.UserId);
+        Equal(null, streamEvent.UserAvatarUrl);
         Equal("5655", streamEvent.ItemId);
         Equal("Rose", streamEvent.ItemName);
         Equal("https://example.invalid/rose.png", streamEvent.ItemImageUrl);
@@ -74,6 +81,8 @@ internal static class Program
     {
         var streamEvent = One(Fixture("gift-final-nested.json"));
         Equal("viewer_one", streamEvent.UserName);
+        Equal("Viewer One", streamEvent.UserDisplayName);
+        Equal("https://example.invalid/viewer-one.png", streamEvent.UserAvatarUrl);
         Equal("5655", streamEvent.ItemId);
         Equal("Rose", streamEvent.ItemName);
         Equal("https://example.invalid/rose-current.png", streamEvent.ItemImageUrl);
@@ -81,6 +90,80 @@ internal static class Program
         Equal(1m, streamEvent.UnitValue);
         Equal(5m, streamEvent.TotalValue);
         Equal(StreakStates.Final, streamEvent.StreakState);
+    }
+
+    private static void DisplayNameFallback()
+    {
+        var explicitDisplayName = One("""
+            {"event":"follow","data":{"msgId":"display-1","uniqueId":"viewer_handle","displayName":"Viewer Display"}}
+            """);
+        Equal("viewer_handle", explicitDisplayName.UserName);
+        Equal("Viewer Display", explicitDisplayName.UserDisplayName);
+
+        var fallback = One("""
+            {"event":"follow","data":{"msgId":"display-2","username":"fallback_handle"}}
+            """);
+        Equal("fallback_handle", fallback.UserName);
+        Equal("fallback_handle", fallback.UserDisplayName);
+
+        var nicknameOnly = One("""
+            {"event":"follow","data":{"msgId":"display-3","nickname":"Nickname Only"}}
+            """);
+        Equal(null, nicknameOnly.UserName);
+        Equal("Nickname Only", nicknameOnly.UserDisplayName);
+    }
+
+    private static void AvatarUrlVariants()
+    {
+        var profilePicture = One("""
+            {"event":"follow","data":{"msgId":"avatar-1","profilePictureUrl":"https://cdn.example/avatar-1.png"}}
+            """);
+        Equal("https://cdn.example/avatar-1.png", profilePicture.UserAvatarUrl);
+
+        var avatarObject = One("""
+            {"event":"follow","data":{"msgId":"avatar-2","avatar":{"urlList":["https://cdn.example/avatar-2.png"]}}}
+            """);
+        Equal("https://cdn.example/avatar-2.png", avatarObject.UserAvatarUrl);
+
+        var profilePictureArray = One("""
+            {"event":"follow","data":{"msgId":"avatar-3","profilePictureUrls":["https://cdn.example/avatar-3.png"]}}
+            """);
+        Equal("https://cdn.example/avatar-3.png", profilePictureArray.UserAvatarUrl);
+
+        var userDetails = One("""
+            {"event":"follow","data":{"msgId":"avatar-4","userDetails":{"profilePictureUrl":{"url_list":["https://cdn.example/avatar-4.png"]}}}}
+            """);
+        Equal("https://cdn.example/avatar-4.png", userDetails.UserAvatarUrl);
+    }
+
+    private static void UnsafeAvatarUrls()
+    {
+        foreach (var unsafeUrl in new[]
+                 {
+                     "http://cdn.example/avatar.png",
+                     "/avatars/viewer.png",
+                     "not a URL",
+                     "https://[::1",
+                     "file:///avatars/viewer.png",
+                     "https://localhost/avatar.png",
+                     "https://127.0.0.1/avatar.png",
+                     "https://[::1]/avatar.png",
+                     "https://192.168.1.10/avatar.png",
+                     "https://avatar-host/avatar.png",
+                 })
+        {
+            Equal(null, AvatarEvent(unsafeUrl).UserAvatarUrl);
+        }
+    }
+
+    private static void LongAvatarUrl()
+    {
+        const string prefix = "https://cdn.example/";
+        var acceptedUrl = prefix + new string('a', 2048 - prefix.Length);
+        Equal(acceptedUrl, AvatarEvent(acceptedUrl).UserAvatarUrl);
+
+        var rejectedUrl = prefix + new string('b', 2049 - prefix.Length);
+        Equal(null, AvatarEvent(rejectedUrl).UserAvatarUrl);
     }
 
     private static void NonStreakGift()
@@ -185,16 +268,31 @@ internal static class Program
         foreach (var name in new[]
                  {
                      "eventId", "idempotencyKey", "connectionId", "platform", "connector",
-                     "type", "userName", "userId", "itemId", "itemName", "itemImageUrl",
-                     "count", "unitValue", "totalValue", "unit", "currency", "streakId",
-                     "streakState", "receivedAt", "simulated", "rawEventType",
+                     "type", "userName", "userDisplayName", "userId", "userAvatarUrl",
+                     "itemId", "itemName", "itemImageUrl", "count", "unitValue",
+                     "totalValue", "unit", "currency", "streakId", "streakState",
+                     "receivedAt", "simulated", "rawEventType",
                  })
         {
             True(root.TryGetProperty(name, out _), "Missing JSON property " + name);
         }
 
         Equal(JsonValueKind.Null, root.GetProperty("itemId").ValueKind);
+        Equal(JsonValueKind.Null, root.GetProperty("userDisplayName").ValueKind);
+        Equal(JsonValueKind.Null, root.GetProperty("userAvatarUrl").ValueKind);
         Equal(false, root.GetProperty("simulated").GetBoolean());
+    }
+
+    private static void EventJsonUserContract()
+    {
+        var streamEvent = One(Fixture("gift-final-nested.json"));
+        using var json = JsonDocument.Parse(NdjsonWriter.Serialize(streamEvent));
+        var root = json.RootElement;
+        Equal("viewer_one", root.GetProperty("userName").GetString());
+        Equal("Viewer One", root.GetProperty("userDisplayName").GetString());
+        Equal(
+            "https://example.invalid/viewer-one.png",
+            root.GetProperty("userAvatarUrl").GetString());
     }
 
     private static void ArgumentParsing()
@@ -246,6 +344,13 @@ internal static class Program
         Equal(0, batch.Errors.Count);
         Equal(1, batch.Events.Count);
         return batch.Events[0];
+    }
+
+    private static CompanionEvent AvatarEvent(string avatarUrl)
+    {
+        return One(
+            "{\"event\":\"follow\",\"data\":{\"msgId\":\"avatar-url\"," +
+            "\"profilePictureUrl\":" + JsonSerializer.Serialize(avatarUrl) + "}}");
     }
 
     private static NormalizationBatch Normalize(string json)

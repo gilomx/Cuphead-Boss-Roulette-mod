@@ -148,6 +148,19 @@ textarea:focus-visible {
   border-color: var(--color-focus);
 }
 
+.pesky-interactions-notice {
+  margin: var(--space-3) 0 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgb(120 217 171 / 24%);
+  border-radius: var(--radius-medium);
+  color: var(--color-text-muted);
+  background:
+    linear-gradient(90deg, rgb(120 217 171 / 10%), transparent 72%),
+    rgb(255 255 255 / 1.8%);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .pesky-hero__copy {
   min-width: 0;
 }
@@ -250,7 +263,6 @@ textarea:focus-visible {
   background: var(--color-success);
 }
 
-.pesky-status[data-status="waitingInteractions"],
 .pesky-status[data-status="startingBattle"],
 .pesky-status[data-status="waitingGame"] {
   color: #2e2004;
@@ -837,10 +849,38 @@ textarea:focus-visible {
   max-height: 18rem;
   padding: 0.32rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--color-focus) rgb(16 0 24 / 65%);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   background: #26083a;
   box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
+}
+
+.searchable-select-menu::-webkit-scrollbar,
+.stream-gift-picker__grid::-webkit-scrollbar {
+  width: 0.56rem;
+}
+
+.searchable-select-menu::-webkit-scrollbar-track,
+.stream-gift-picker__grid::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgb(16 0 24 / 65%);
+}
+
+.searchable-select-menu::-webkit-scrollbar-thumb,
+.stream-gift-picker__grid::-webkit-scrollbar-thumb {
+  min-height: 2.5rem;
+  border: 0.12rem solid rgb(16 0 24 / 65%);
+  border-radius: 999px;
+  background: var(--color-focus);
+}
+
+.searchable-select-menu::-webkit-scrollbar-thumb:hover,
+.stream-gift-picker__grid::-webkit-scrollbar-thumb:hover {
+  background: #dda9fa;
 }
 
 .searchable-select-option {
@@ -860,10 +900,13 @@ textarea:focus-visible {
 
 .searchable-select-option:hover,
 .searchable-select-option:focus-visible,
-.searchable-select-option[data-active="true"],
-.searchable-select-option[aria-selected="true"] {
+.searchable-select-option[data-active="true"] {
   color: var(--color-text);
   background: var(--color-control-active);
+}
+
+.searchable-select-option[aria-selected="true"] {
+  color: var(--color-text);
 }
 
 .searchable-select-option > img {
@@ -1470,7 +1513,11 @@ textarea:focus-visible {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.45rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 0.25rem;
+  scrollbar-color: var(--color-focus) rgb(16 0 24 / 65%);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .stream-gift-picker__grid button {
@@ -1492,13 +1539,27 @@ textarea:focus-visible {
   transition:
     border-color var(--transition-fast),
     background var(--transition-fast),
+    box-shadow var(--transition-fast),
     transform var(--transition-fast);
 }
 
-.stream-gift-picker__grid button:hover,
 .stream-gift-picker__grid button[data-selected="true"] {
+  border-color: rgb(120 217 171 / 55%);
+  background: rgb(120 217 171 / 8%);
+}
+
+.stream-gift-picker__grid button:hover,
+.stream-gift-picker__grid button:focus-visible,
+.stream-gift-picker__grid button[data-active="true"] {
   border-color: var(--color-focus);
-  background: rgb(106 40 154 / 22%);
+  background: var(--color-control-active);
+  box-shadow:
+    0 0 0 0.12rem rgb(196 138 233 / 34%),
+    0 0.55rem 1.25rem rgb(0 0 0 / 22%);
+}
+
+.stream-gift-picker__grid button[data-active="true"] small {
+  color: var(--color-text-soft);
 }
 
 .stream-gift-picker__grid button:hover {
@@ -2232,59 +2293,34 @@ textarea:focus-visible {
   background: var(--color-warning);
 }
 
-.interaction-random-test {
+.interaction-phase-protection {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border-bottom: 1px solid rgb(255 255 255 / 7%);
-  background: rgb(255 255 255 / 1.8%);
-}
-
-.interaction-random-test[data-active="true"] {
-  background:
-    linear-gradient(90deg, rgb(120 217 171 / 10%), transparent 72%),
-    rgb(255 255 255 / 1.8%);
-}
-
-.interaction-phase-protection {
   margin-top: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
   overflow: hidden;
+  background: rgb(255 255 255 / 1.8%);
 }
 
-.interaction-random-test--switch {
-  display: block;
-  height: 5.85rem;
-  padding: 0;
-  overflow: hidden;
-}
-
-.interaction-random-test__pane {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-}
-
-.interaction-random-test__copy {
+.interaction-phase-protection__copy {
   min-width: 0;
 }
 
-.interaction-random-test__title {
+.interaction-phase-protection__title {
   display: flex;
   align-items: center;
   gap: 0.55rem;
 }
 
-.interaction-random-test__title strong {
+.interaction-phase-protection__title strong {
   font-size: 0.88rem;
 }
 
-.interaction-random-test__title span {
+.interaction-phase-protection__title span {
   display: inline-flex;
   align-items: center;
   padding: 0.22rem 0.45rem;
@@ -2297,20 +2333,19 @@ textarea:focus-visible {
   background: var(--color-control);
 }
 
-.interaction-random-test__title span[data-active="true"] {
+.interaction-phase-protection__title span[data-active="true"] {
   color: #10281d;
   background: var(--color-success);
 }
 
-.interaction-random-test__copy p {
+.interaction-phase-protection__copy p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
   font-size: 0.72rem;
   line-height: 1.35;
 }
 
-.interaction-random-test > button,
-.interaction-random-test__toggle {
+.interaction-phase-protection > button {
   min-height: 2.55rem;
   padding: 0.55rem 0.85rem;
   border: 1px solid transparent;
@@ -2321,29 +2356,17 @@ textarea:focus-visible {
   background: var(--color-control-active);
   cursor: pointer;
   transition:
-    color var(--transition-fast),
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
     filter var(--transition-fast),
     transform var(--transition-fast),
     opacity var(--transition-fast);
 }
 
-.interaction-random-test > button[data-active="true"],
-.interaction-random-test__toggle[data-active="true"] {
-  border-color: rgb(255 255 255 / 14%);
-  color: #fff;
-  background: var(--color-danger);
-}
-
-.interaction-random-test > button:hover:not(:disabled),
-.interaction-random-test__toggle:hover:not(:disabled) {
+.interaction-phase-protection > button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-0.06rem);
 }
 
-.interaction-random-test > button:disabled,
-.interaction-random-test__toggle:disabled {
+.interaction-phase-protection > button:disabled {
   cursor: not-allowed;
   opacity: 0.62;
 }
@@ -2614,6 +2637,544 @@ textarea:focus-visible {
 .dashboard-master-switch[data-enabled="true"] .dashboard-master-switch__track i {
   background: var(--color-success);
   transform: translateX(1.15rem);
+}
+
+.dashboard-pesky-battle {
+  position: relative;
+  margin-top: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background:
+    radial-gradient(circle at 92% 6%, rgb(196 138 233 / 13%), transparent 23rem),
+    linear-gradient(135deg, rgb(74 22 105 / 16%), transparent 52%),
+    var(--color-background-raised);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 13%);
+}
+
+.dashboard-pesky-battle[data-phase="recruiting"],
+.dashboard-pesky-battle[data-phase="ready"],
+.dashboard-pesky-battle[data-phase="waiting_level"],
+.dashboard-pesky-battle[data-phase="active"] {
+  border-color: rgb(196 138 233 / 42%);
+}
+
+.dashboard-pesky-battle[data-phase="won"] {
+  border-color: rgb(120 217 171 / 38%);
+}
+
+.dashboard-pesky-battle__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 1.25rem 1.35rem 1rem;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.dashboard-pesky-battle__heading > div:first-child {
+  min-width: 0;
+}
+
+.dashboard-pesky-battle__heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.12rem 0 0;
+  font-size: 1.42rem;
+}
+
+.dashboard-pesky-battle__heading h2 svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--color-focus);
+}
+
+.dashboard-pesky-battle__heading > div:first-child > p:last-child {
+  max-width: 52rem;
+  margin: 0.38rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.dashboard-pesky-battle__heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.dashboard-pesky-battle__status,
+.dashboard-pesky-battle__copy {
+  display: inline-flex;
+  min-height: 2.2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  padding: 0.42rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+}
+
+.dashboard-pesky-battle__status {
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 5%);
+}
+
+.dashboard-pesky-battle__status[data-phase="recruiting"],
+.dashboard-pesky-battle__status[data-phase="ready"],
+.dashboard-pesky-battle__status[data-phase="waiting_level"] {
+  color: var(--color-warning);
+  background: rgb(244 199 111 / 9%);
+}
+
+.dashboard-pesky-battle__status[data-phase="active"],
+.dashboard-pesky-battle__status[data-phase="won"] {
+  color: var(--color-success);
+  background: rgb(120 217 171 / 9%);
+}
+
+.dashboard-pesky-battle__copy {
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: var(--color-text-soft);
+  background: var(--color-control);
+  cursor: pointer;
+}
+
+.dashboard-pesky-battle__copy:hover {
+  border-color: var(--color-border);
+  background: var(--color-control-hover);
+}
+
+.dashboard-pesky-battle__copy svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.dashboard-pesky-battle__state {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  padding: 0.72rem 1.35rem;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  background: rgb(255 255 255 / 1.8%);
+}
+
+.dashboard-pesky-battle__state strong {
+  flex: 0 0 auto;
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+}
+
+.dashboard-pesky-battle__state span {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.dashboard-pesky-battle__layout {
+  display: grid;
+  grid-template-columns: minmax(22rem, 0.9fr) minmax(30rem, 1.25fr);
+  align-items: start;
+}
+
+.dashboard-pesky-battle__configuration,
+.dashboard-pesky-battle__roster {
+  min-width: 0;
+  padding: 1.1rem 1.25rem;
+}
+
+.dashboard-pesky-battle__configuration {
+  display: grid;
+  gap: var(--space-3);
+  border-right: 1px solid rgb(255 255 255 / 7%);
+}
+
+.dashboard-pesky-battle__trigger > small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.dashboard-pesky-battle__stream-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 3.4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.65rem 0.72rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  text-align: left;
+  background: rgb(255 255 255 / 2.5%);
+  cursor: pointer;
+}
+
+.dashboard-pesky-battle__stream-toggle > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.dashboard-pesky-battle__stream-toggle strong {
+  font-size: 0.72rem;
+}
+
+.dashboard-pesky-battle__stream-toggle small {
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.3;
+}
+
+.dashboard-pesky-battle__stream-toggle > i {
+  position: relative;
+  width: 2.45rem;
+  height: 1.3rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 14%);
+}
+
+.dashboard-pesky-battle__stream-toggle > i > b {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.dashboard-pesky-battle__stream-toggle[data-enabled="true"] {
+  border-color: rgb(120 217 171 / 20%);
+}
+
+.dashboard-pesky-battle__stream-toggle[data-enabled="true"] > i {
+  background: rgb(120 217 171 / 30%);
+}
+
+.dashboard-pesky-battle__stream-toggle[data-enabled="true"] > i > b {
+  background: var(--color-success);
+  transform: translateX(1.15rem);
+}
+
+.dashboard-pesky-battle__stream-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dashboard-pesky-battle__attacks {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dashboard-pesky-battle__attacks-heading,
+.dashboard-pesky-battle__roster-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dashboard-pesky-battle__attacks-heading > div,
+.dashboard-pesky-battle__roster-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.dashboard-pesky-battle__attacks-heading strong,
+.dashboard-pesky-battle__roster-heading strong {
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+}
+
+.dashboard-pesky-battle__roster-heading strong {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dashboard-pesky-battle__roster-heading strong svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--color-focus);
+}
+
+.dashboard-pesky-battle__attacks-heading small,
+.dashboard-pesky-battle__roster-heading small {
+  color: var(--color-text-muted);
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
+.dashboard-pesky-battle__attacks-heading > span,
+.dashboard-pesky-battle__roster-heading > span {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.45rem;
+  border-radius: 999px;
+  color: var(--color-text-soft);
+  font-size: 0.61rem;
+  font-weight: 900;
+  background: rgb(255 255 255 / 6%);
+}
+
+.dashboard-pesky-battle__attack-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.38rem;
+}
+
+.dashboard-pesky-battle__attack {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 5rem;
+  justify-items: center;
+  align-content: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.3rem;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: var(--radius-small);
+  color: var(--color-text-muted);
+  text-align: center;
+  background: rgb(255 255 255 / 1.8%);
+  cursor: pointer;
+}
+
+.dashboard-pesky-battle__attack[data-enabled="true"] {
+  border-color: rgb(120 217 171 / 35%);
+  color: var(--color-text-soft);
+  background: rgb(120 217 171 / 5%);
+}
+
+.dashboard-pesky-battle__attack:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.dashboard-pesky-battle__attack:focus-within {
+  outline: 0.18rem solid var(--color-focus);
+  outline-offset: 0.12rem;
+}
+
+.dashboard-pesky-battle__attack > img {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+}
+
+.dashboard-pesky-battle__attack > span {
+  width: 100%;
+  overflow: hidden;
+  font-size: 0.56rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-pesky-battle__attack > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.dashboard-pesky-battle__attack > svg {
+  position: absolute;
+  top: 0.32rem;
+  right: 0.32rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  padding: 0.1rem;
+  border-radius: 50%;
+  color: #10281d;
+  background: var(--color-success);
+  opacity: 0;
+}
+
+.dashboard-pesky-battle__attack[data-enabled="true"] > svg {
+  opacity: 1;
+}
+
+.dashboard-pesky-battle__roster {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.dashboard-pesky-battle__progress {
+  height: 0.32rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.dashboard-pesky-battle__progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-focus), var(--color-success));
+  transition: width 220ms ease;
+}
+
+.dashboard-pesky-battle__slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.dashboard-pesky-battle__slot {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 7.5rem;
+  justify-items: center;
+  align-content: center;
+  gap: 0.52rem;
+  padding: 0.75rem 0.45rem 0.6rem;
+  border: 1px dashed rgb(255 255 255 / 13%);
+  border-radius: var(--radius-small);
+  color: var(--color-text-muted);
+  background: rgb(16 0 24 / 28%);
+}
+
+.dashboard-pesky-battle__slot[data-filled="true"] {
+  border-style: solid;
+  border-color: rgb(196 138 233 / 32%);
+  color: var(--color-text-soft);
+  background: rgb(81 25 116 / 13%);
+}
+
+.dashboard-pesky-battle__slot-number {
+  position: absolute;
+  top: 0.34rem;
+  left: 0.42rem;
+  color: var(--color-text-muted);
+  font-size: 0.52rem;
+  font-weight: 900;
+}
+
+.dashboard-pesky-battle__avatar {
+  position: relative;
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 50%;
+  color: var(--color-text-soft);
+  font-size: 0.88rem;
+  font-weight: 900;
+  background: var(--color-control-active);
+}
+
+.dashboard-pesky-battle__avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dashboard-pesky-battle__slot > strong {
+  width: 100%;
+  overflow: hidden;
+  font-size: 0.62rem;
+  line-height: 1.25;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-pesky-battle__simulation-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.61rem;
+  line-height: 1.4;
+}
+
+.dashboard-pesky-battle__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+}
+
+.dashboard-pesky-battle__footer > div:first-child {
+  min-width: 0;
+}
+
+.dashboard-pesky-battle__footer p {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 0.68rem;
+}
+
+.dashboard-pesky-battle__footer p[data-error="true"] {
+  color: var(--color-danger);
+}
+
+.dashboard-pesky-battle__footer small {
+  display: block;
+  margin-top: 0.22rem;
+  color: var(--color-text-muted);
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
+.dashboard-pesky-battle__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.dashboard-pesky-battle__actions button {
+  min-height: 2.55rem;
+  padding: 0.56rem 0.82rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  font-size: 0.66rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dashboard-pesky-battle__primary {
+  background: var(--color-control-active);
+}
+
+.dashboard-pesky-battle__secondary {
+  border-color: rgb(255 255 255 / 10%) !important;
+  background: var(--color-control);
+}
+
+.dashboard-pesky-battle__danger {
+  color: #fff !important;
+  background: var(--color-danger);
+}
+
+.dashboard-pesky-battle__actions button:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-0.04rem);
+}
+
+.dashboard-pesky-battle__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .dashboard-section-heading,
@@ -3157,7 +3718,7 @@ textarea:focus-visible {
 
 .dashboard-simulator-form input,
 .dashboard-simulator-form select,
-.dashboard-simulator-form button {
+.dashboard-simulator-form > button {
   min-width: 0;
   min-height: 2.55rem;
   border: 1px solid transparent;
@@ -3198,7 +3759,7 @@ textarea:focus-visible {
   background: var(--color-control-hover);
 }
 
-.dashboard-simulator-form button {
+.dashboard-simulator-form > button {
   margin-top: 0.2rem;
   padding: 0.55rem 0.8rem;
   color: var(--color-text);
@@ -3209,17 +3770,17 @@ textarea:focus-visible {
   transition: filter var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
-.dashboard-simulator-form button:hover:not(:disabled) {
+.dashboard-simulator-form > button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-0.06rem);
 }
 
-.dashboard-simulator-form button:disabled {
+.dashboard-simulator-form > button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
 
-.dashboard-simulator-form button[data-sending="true"] {
+.dashboard-simulator-form > button[data-sending="true"] {
   cursor: wait;
 }
 
@@ -3285,6 +3846,11 @@ textarea:focus-visible {
   .main-content { padding-inline: 3.5rem; }
   .dashboard-counter-grid { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
   .dashboard-activity-grid { grid-template-columns: 1fr; }
+  .dashboard-pesky-battle__layout { grid-template-columns: 1fr; }
+  .dashboard-pesky-battle__configuration {
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 7%);
+  }
   .form-grid,
   .form-skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -3320,6 +3886,15 @@ textarea:focus-visible {
   .dashboard-connection-grid { grid-template-columns: 1fr; }
   .dashboard-connection-card__copy { min-height: auto; }
   .dashboard-interaction-control { align-items: flex-start; }
+  .dashboard-pesky-battle__heading,
+  .dashboard-pesky-battle__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .dashboard-pesky-battle__heading-actions,
+  .dashboard-pesky-battle__actions {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 39rem) {
@@ -3350,13 +3925,11 @@ textarea:focus-visible {
   .stream-rule-execution__grid { grid-template-columns: 1fr; }
   .stream-gift-picker__grid { grid-template-columns: 1fr; }
   .pesky-hero { height: 11rem; }
-  .pesky-hero__pane,
-  .interaction-random-test__pane {
+  .pesky-hero__pane {
     grid-template-columns: 1fr;
     align-content: center;
     gap: var(--space-2);
   }
-  .interaction-random-test--switch { height: 9.25rem; }
   .interaction-phase-protection {
     grid-template-columns: 1fr;
   }
@@ -3381,6 +3954,31 @@ textarea:focus-visible {
   .interaction-queue__totals { margin-right: auto; }
   .dashboard-interaction-control { flex-direction: column; }
   .dashboard-master-switch { width: 100%; }
+  .dashboard-pesky-battle__heading { padding: 1rem; }
+  .dashboard-pesky-battle__heading-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .dashboard-pesky-battle__status,
+  .dashboard-pesky-battle__copy { width: 100%; }
+  .dashboard-pesky-battle__state {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-inline: 1rem;
+  }
+  .dashboard-pesky-battle__configuration,
+  .dashboard-pesky-battle__roster,
+  .dashboard-pesky-battle__footer { padding-inline: 1rem; }
+  .dashboard-pesky-battle__attack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-pesky-battle__slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-pesky-battle__slot:last-child { grid-column: 1 / -1; }
+  .dashboard-pesky-battle__actions,
+  .dashboard-pesky-battle__actions button { width: 100%; }
   .interaction-table th,
   .interaction-table td { padding-inline: 0.7rem; }
   .interaction-settings {

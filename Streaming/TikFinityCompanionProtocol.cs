@@ -97,6 +97,10 @@ namespace Gilomx.CupheadBossRoulette
                     Type = type,
                     UserName = Text(CreatorToolsFlatJson.Value(
                         values, "userName"), string.Empty, 80),
+                    UserDisplayName = Text(CreatorToolsFlatJson.Value(
+                        values, "userDisplayName"), string.Empty, 160),
+                    UserAvatarUrl = Text(CreatorToolsFlatJson.Value(
+                        values, "userAvatarUrl"), string.Empty, 2048),
                     UserId = Text(CreatorToolsFlatJson.Value(
                         values, "userId"), string.Empty, 160),
                     ItemId = Text(CreatorToolsFlatJson.Value(

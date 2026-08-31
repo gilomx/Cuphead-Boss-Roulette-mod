@@ -30,8 +30,116 @@
       "title": "Interactions",
       "enabled": "Enabled",
       "disabled": "Disabled",
-      "enabledDescription": "Rules, tests, and modes can add interactions to the queue.",
+      "enabledDescription": "Stream rules and tests can add interactions to the queue.",
       "disabledDescription": "Events are still recorded, but they do not create interactions or accumulate progress. Disabling clears everything pending."
+    },
+    "peskyBattle": {
+      "eyebrow": "Live game",
+      "title": "Pesky Battle",
+      "description": "Recruit five participants with a specific gift and face their attacks for a full level. The roster stays intact if you lose and retry.",
+      "phase": {
+        "off": "Not armed",
+        "recruiting": "Recruiting",
+        "ready": "Roster ready",
+        "waiting_level": "Waiting for level",
+        "active": "In battle",
+        "won": "Victory"
+      },
+      "phaseDescription": {
+        "off": "Configure the gift and attacks before opening the five slots.",
+        "recruiting": "Each unique user who sends the gift will fill one slot.",
+        "ready": "All five slots are ready. The battle will start in the next level.",
+        "waiting_level": "Enter the next level to start the battle.",
+        "waitingTarget": "The battle is armed for the next level: {level}.",
+        "active": "Attempt {attempt}. If you lose, the same five participants will remain for the retry.",
+        "won": "You won the level. Attacks stopped and the roster remains visible until you start another battle."
+      },
+      "overlay": {
+        "idle": "Copy overlay URL",
+        "copied": "URL copied",
+        "error": "Could not copy"
+      },
+      "trigger": {
+        "label": "Gift required to join",
+        "placeholder": "Search for a gift…",
+        "loading": "Loading gifts…",
+        "catalogError": "The catalog could not be loaded",
+        "noResults": "No gifts match this search.",
+        "coins": "{coins} coins",
+        "hint": "A user can fill only one slot, even if they send the gift more than once.",
+        "locked": "The gift is locked until you cancel or finish this battle."
+      },
+      "streamAttacks": {
+        "title": "Allow live interaction attacks",
+        "enabled": "Live rules may continue launching attacks during this battle.",
+        "disabled": "All live rules are blocked while the battle is exclusive."
+      },
+      "attacks": {
+        "title": "Battle attacks",
+        "description": "Choose the independent pool used by the five participants.",
+        "locked": "The pool is locked while the battle is armed."
+      },
+      "roster": {
+        "title": "Participants",
+        "description": "The first five unique users who send the gift enter the battle.",
+        "progress": "Filled slots",
+        "emptySlot": "Slot {slot}",
+        "participantFallback": "Participant {slot}",
+        "simulationHint": "Gifts sent from Simulate event can also fill these slots; initials are shown when no photo is provided."
+      },
+      "actions": {
+        "arm": "Arm recruitment",
+        "cancel": "Cancel recruitment",
+        "start": "Start in the next level",
+        "disable": "Disable battle",
+        "reset": "New battle"
+      },
+      "master": {
+        "off": "Interactions is disabled. Recruitment and the battle's own attacks still work.",
+        "streamAllowed": "Live-rule attacks will continue arriving in addition to the battle.",
+        "streamBlocked": "All live rules will be blocked during the battle without affecting its own attacks."
+      },
+      "feedback": {
+        "generic": "The battle state changed. Review the configuration before continuing.",
+        "ready": "Configure the battle whenever you are ready.",
+        "settings_saved": "The battle configuration was saved.",
+        "gift_saved": "The required gift was saved.",
+        "items_saved": "The attack pool was saved.",
+        "recruiting": "Recruitment is open.",
+        "battle_armed": "Recruitment is open.",
+        "participant_joined": "A participant filled a slot.",
+        "participant_already_joined": "This user already occupies a slot.",
+        "participant_identity_missing": "The event does not include a valid user identity.",
+        "roster_ready": "The five-participant roster is complete.",
+        "lobby_ready": "The five-participant roster is complete.",
+        "lobby_not_ready": "The roster still needs five participants.",
+        "waiting_level": "The battle is waiting for the next level.",
+        "waiting_for_level": "The battle is waiting for the next level.",
+        "waiting_target_level": "The battle is waiting for the target level.",
+        "active": "The battle is in progress.",
+        "battle_started": "The battle has started.",
+        "battle_lost_retrying": "You lost; the same roster will continue in the retry.",
+        "waiting_for_retry": "The battle is waiting for the retry.",
+        "dice_palace_transition": "The battle continues through the King Dice transition.",
+        "won": "The battle ended in victory.",
+        "battle_won": "The battle ended in victory.",
+        "cancelled": "The battle was cancelled.",
+        "battle_cancelled": "The battle was cancelled.",
+        "reset": "The battle is ready to configure again.",
+        "gift_required": "Select a gift before arming recruitment.",
+        "unknown_gift": "The mod does not recognize the selected gift.",
+        "items_required": "Enable at least one attack before arming the battle.",
+        "roster_incomplete": "Five participants are required to start.",
+        "stream_attacks_allowed": "Live-rule attacks are allowed.",
+        "stream_attacks_blocked": "Live rules will be blocked during the battle.",
+        "battle_active_setting_locked": "This setting is locked during the active battle.",
+        "invalid_action": "This action is not available in the current state.",
+        "invalid_setting": "The submitted configuration is invalid.",
+        "unknown_item": "The mod does not recognize one of the attacks.",
+        "native_assets_unavailable": "Assets for one of the attacks could not be prepared.",
+        "spawn_failed": "One of the battle attacks could not be created.",
+        "battle_active": "The battle is already active."
+      }
     },
     "counters": {
       "received": "Received",
@@ -330,33 +438,10 @@
       "quantityLabel": "Times",
       "delayLabel": "Wait (s)",
       "action": "Add to queue",
-      "testing": "Adding",
-      "suspended": {
-        "title": "Interactions paused",
-        "description": "Pesky Mode is active. New redeems keep their place, but will not enter the game until you disable it."
-      },
-      "random": {
-        "title": "Random test",
-        "description": "Sends random catalog items and names at short, varying intervals, only while a match is active.",
-        "active": "Active",
-        "inactive": "Inactive",
-        "enable": "Enable",
-        "disable": "Disable",
-        "switch": {
-          "title": "Pesky Mode is active right now",
-          "description": "To use Random Test, I will disable Pesky Mode.",
-          "cancel": "Cancel",
-          "confirm": "Yes, enable"
-        }
-      }
+      "testing": "Adding"
     },
     "feedback": {
       "ready": "The test is ready.",
-      "random_test_enabled": "Random Test is active.",
-      "random_test_disabled": "Random Test is inactive.",
-      "random_test_disabled_by_pesky": "The random test was disabled because Pesky Mode was enabled.",
-      "random_test_enabled": "The random test is active and will wait for a match to be in progress.",
-      "random_test_disabled": "The random test was disabled.",
       "phase_transition_protection_enabled": "Transition protection is active.",
       "phase_transition_protection_disabled": "Transition protection is inactive for this session.",
       "unknown_item": "The mod does not recognize this item.",
@@ -382,16 +467,12 @@
   "pesky": {
     "title": "Pesky Mode",
     "description": "Adds random attacks from the interaction catalog during any fight, whether entered normally or through the roulette. You can also configure names to appear randomly with the attacks.",
+    "interactionsNotice": "Interactions are enabled, so donation attacks will continue arriving in addition to this mode's attacks.",
+    "battleBlocked": "Pesky Battle has exclusive control. Finish or cancel that battle before enabling the free mode again.",
     "control": {
       "title": "Mode control",
       "enable": "Enable mode",
-      "disable": "Disable mode",
-      "switch": {
-        "title": "Random Test is active right now",
-        "description": "To use Pesky Mode, I will disable Random Test.",
-        "cancel": "Cancel",
-        "confirm": "Yes, enable"
-      }
+      "disable": "Disable mode"
     },
     "phaseProtection": {
       "title": "Transition protection",
@@ -405,7 +486,6 @@
       "disabled": "Disabled",
       "waitingGame": "Waiting for a level",
       "startingBattle": "Starting battle",
-      "waitingInteractions": "Finishing active interactions",
       "running": "Being pesky now"
     },
     "queue": {
@@ -425,10 +505,10 @@
     },
     "names": {
       "title": "Random names",
-      "description": "Enter one name per line. Blank lines and duplicates are removed; each name may contain up to 32 characters.",
+      "description": "Optional. Enter one name per line; blank lines and duplicates are removed, and each name may contain up to 32 characters. If you leave the list empty, attacks will appear without a name.",
       "placeholder": "Claudia\nYeiAndPelos\nYerrisito",
       "hint": "One name is selected randomly for each attack.",
-      "required": "You need at least one name to enable the mode.",
+      "emptyHint": "No names: attacks will appear without a name.",
       "save": "Save names"
     },
     "attacks": {
@@ -440,12 +520,12 @@
       "ready": "The configuration is ready.",
       "enabled": "Pesky Mode is enabled.",
       "disabled": "Pesky Mode is disabled.",
-      "disabled_by_random_test": "Pesky Mode was disabled because Random Test was enabled.",
       "names_saved": "The names were saved.",
       "items_saved": "The attack selection was saved.",
-      "names_required": "Add and save at least one name before enabling the mode.",
+      "blocked_by_pesky_battle": "Free Pesky Mode cannot be enabled during a Pesky Battle.",
+      "disabled_by_pesky_battle": "Free Pesky Mode was disabled because a Pesky Battle was armed.",
       "items_required": "Enable at least one attack before enabling the mode.",
-      "disabled_invalid_config": "The mode was disabled because it needs names and at least one attack.",
+      "disabled_invalid_config": "The mode was disabled because it needs at least one enabled attack.",
       "invalid_setting": "The submitted configuration is invalid.",
       "unknown_item": "The mod does not recognize this attack.",
       "native_assets_loading": "The attack's assets are still being prepared.",

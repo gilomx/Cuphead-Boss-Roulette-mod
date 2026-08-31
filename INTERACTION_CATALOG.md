@@ -17,8 +17,8 @@ y Tosco.
   ese handle hasta que indique `IsComplete`; así puede representar enemigos,
   proyectiles y futuros objetos compuestos sin conocer sus clases concretas.
 - Los IDs públicos viven en `CreatorToolsInteractionIds.All` y el controlador
-  resuelve su ejecutor por `Supports`. La prueba aleatoria obtiene candidatos de
-  esa misma lista y sólo elige los que reporten `IsAvailable`.
+  resuelve su ejecutor por `Supports`. Modo Molestoso obtiene candidatos de esa
+  misma lista y sólo elige los que reporten `IsAvailable`.
 - La presentación compartida se aplica una sola vez con
   `CreatorToolsInteractionPresentation.PrepareActor(actor, donor, logWarning)`.
   Si el sprite principal vive en un hijo, se usa la sobrecarga que recibe su
@@ -174,7 +174,7 @@ ampliar el contrato compartido con una señal explícita de finalización.
   antes de que el singleton quedara estable. Esa reconciliación compara el ID
   de instancia y nunca reinicia el margen cada frame.
 - Al pausar o llegar a derrota, los actores existentes permanecen visibles y
-  congelados. No se crean actores nuevos ni avanza el generador aleatorio.
+  congelados. No se crean actores nuevos ni avanza el generador de Modo Molestoso.
 - Perder el foco también puede llevar `CupheadTime.GlobalSpeed` a cero. Mientras
   el tiempo global no avance, una solicitud permanece pendiente y nunca se
   crea un actor cuya corrutina vaya a quedar congelada fuera de cámara.
@@ -185,13 +185,31 @@ ampliar el contrato compartido con una señal explícita de finalización.
 - Si un reintento reutiliza la misma instancia de `Level`, el siguiente
   `_OnLevelStart` también limpia los actores del intento anterior antes de
   rearmar el margen. El polling no hace esa limpieza: sólo reconcilia IDs nuevos.
-- El máximo simultáneo es persistente y configurable de 1 a 20. La cola sigue
-  siendo la autoridad y retira un registro activo cuando su handle termina.
+- El máximo simultáneo es persistente y configurable de 1 a 20. Se aplica por
+  separado a la cola de Interacciones y a la de Modo Molestoso, por lo que con
+  valor 1 puede existir un ataque activo de cada origen. Cada cola retira un
+  registro activo cuando su handle termina.
 - Las pruebas manuales aceptan una espera de 0 a 3600 segundos. Incluso con
   espacio disponible, dos despachos se separan por un mínimo de 0.35 segundos.
-- La prueba aleatoria conserva su estado aunque el panel se abra con el juego
-  pausado. Sólo genera durante una partida disponible, espera entre 1.25 y 3.25
-  segundos y nunca construye un backlog automático.
+- Modo Molestoso conserva su estado aunque el panel se abra con el juego
+  pausado. No depende del interruptor ni de los controles de cola de
+  Interacciones: ambas fuentes pueden atacar durante la misma partida. Sólo
+  genera durante una partida disponible, espera entre 1.25 y 3.25 segundos y
+  usa su propia cola sin construir un backlog automático. Desactivarlo elimina
+  sus pendientes y dispone sus actores activos sin tocar canjeos de donaciones.
+- La lista de nombres de Modo Molestoso es opcional. Si está vacía, se encola
+  `string.Empty` y el actor aparece sin texto ni sustituto predeterminado; la
+  configuración vacía sigue siendo válida y puede permanecer activada entre
+  reinicios.
+- Batalla Molestosa usa el mismo `interactionQueue` que manual/LIVE, con la
+  fuente `pesky_battle` y un único pendiente reservado. Sus cinco nombres vienen
+  del roster reclutado por regalo, no de la lista aleatoria del modo libre.
+  Master, Pausar y Vaciar omiten las entradas de Batalla; cancelarla, perder o
+  ganar limpia únicamente esa fuente. El máximo activo sí es compartido por
+  las tres fuentes de la cola.
+- Batalla y Modo Molestoso libre son mutuamente exclusivos. Armar Batalla
+  desactiva y guarda el modo libre, limpia `peskyQueue` y bloquea su reactivación
+  mientras la sesión esté reclutando, lista, esperando nivel o activa.
 
 ## Proyectil nativo de referencia
 
@@ -338,7 +356,7 @@ mismo jefe.
 - Pausar con un actor vivo y durante el fade: nada debe moverse ni desaparecer.
 - Perder la partida: los actores presentes deben quedarse congelados y no deben
   llegar otros. Al abandonar o reiniciar la escena no deben quedar residuos.
-- Activar la prueba aleatoria desde el panel mientras el juego está pausado,
+- Activar Modo Molestoso desde el panel mientras el juego está pausado,
   comprobar el cambio de estado inmediato y después iniciar una partida.
 - Con caches fríos, entrar inmediatamente por una puerta normal sin abrir la
   ruleta. Encolar primero el último artículo de la serie de precarga y confirmar

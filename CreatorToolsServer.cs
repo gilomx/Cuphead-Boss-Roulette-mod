@@ -14,8 +14,11 @@ namespace Gilomx.CupheadBossRoulette
         private const string WebSocketMagic =
             "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         private const int MaximumHeaderBytes = 65536;
+        private const int HttpHeaderReadTimeoutMilliseconds = 5000;
         private const int MaximumClientPayloadBytes = 1024 * 1024;
         private const int MaximumDashboardQueryLength = 4096;
+        private const int MaximumPeskyBattleQueryLength = 4096;
+        private const int MaximumPeskyBattleCommands = 128;
         private const int MaximumStreamRuleCommands = 256;
         private const int MaximumStreamRuleQueryLength = 4096;
 
@@ -33,13 +36,13 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object peskyLock = new object();
         private readonly Queue<string> peskyCommands =
             new Queue<string>();
+        private readonly object peskyBattleLock = new object();
+        private readonly Queue<string> peskyBattleCommands =
+            new Queue<string>();
         private readonly object streamRulesLock = new object();
         private readonly object streamRulesProcessingLock = new object();
         private readonly Queue<string> streamRuleCommands =
             new Queue<string>();
-        private readonly object modeCommandsLock = new object();
-        private readonly Queue<ModeCommand> modeCommands =
-            new Queue<ModeCommand>();
         private readonly object clientsLock = new object();
         private readonly List<WebSocketClient> clients =
             new List<WebSocketClient>();
@@ -74,6 +77,17 @@ namespace Gilomx.CupheadBossRoulette
             "\"events\":[]}";
         private string latestPeskyState =
             "{\"ready\":false,\"available\":false,\"enabled\":false}";
+        private string latestPeskyBattleState =
+            "{\"ready\":false,\"schemaVersion\":1," +
+            "\"revision\":0,\"phase\":\"off\"," +
+            "\"sessionId\":0,\"attempt\":0,\"capacity\":5," +
+            "\"exclusive\":false,\"gameplayAvailable\":false," +
+            "\"targetLevel\":\"\",\"trigger\":{" +
+            "\"giftId\":\"\",\"giftName\":\"\"," +
+            "\"giftImagePath\":\"\",\"coinsPerUnit\":0}," +
+            "\"allowStreamAttacks\":true,\"participants\":[]," +
+            "\"items\":[],\"disabledItems\":[]," +
+            "\"feedback\":\"starting\",\"error\":false}";
         private string latestStreamRulesState =
             "{\"ready\":false,\"schemaVersion\":1,\"revision\":0," +
             "\"engineActive\":false,\"rules\":[]}";
@@ -258,6 +272,28 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal void SetPeskyBattleState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (peskyBattleLock)
+                latestPeskyBattleState = json;
+        }
+
+        internal bool TryTakePeskyBattleCommand(out string command)
+        {
+            lock (peskyBattleLock)
+            {
+                if (peskyBattleCommands.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = peskyBattleCommands.Dequeue();
+                return true;
+            }
+        }
+
         internal void SetStreamRulesState(string json)
         {
             if (string.IsNullOrEmpty(json))
@@ -292,23 +328,6 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        internal bool TryTakeModeCommand(
-            out bool pesky, out string command)
-        {
-            lock (modeCommandsLock)
-            {
-                if (modeCommands.Count == 0)
-                {
-                    pesky = false;
-                    command = null;
-                    return false;
-                }
-                var entry = modeCommands.Dequeue();
-                pesky = entry.Pesky;
-                command = entry.Query;
-                return true;
-            }
-        }
         internal void Stop()
         {
             if (!running && listener == null)
@@ -366,6 +385,10 @@ namespace Gilomx.CupheadBossRoulette
                         break;
                     connection = current.AcceptTcpClient();
                     connection.NoDelay = true;
+                    connection.ReceiveTimeout =
+                        HttpHeaderReadTimeoutMilliseconds;
+                    connection.SendTimeout =
+                        HttpHeaderReadTimeoutMilliseconds;
                     var thread = new Thread(HandleConnection);
                     thread.IsBackground = true;
                     thread.Name = "La Pichi Ruleta Creator Tools Client";
@@ -411,10 +434,19 @@ namespace Gilomx.CupheadBossRoulette
                 if (request == null)
                     return;
 
+                if (!IsAllowedLocalRequest(request))
+                {
+                    WriteResponse(stream, 403, "Forbidden", "text/plain",
+                        Encoding.UTF8.GetBytes("Forbidden."), false);
+                    return;
+                }
+
                 if (request.Path == "/ws" && request.IsWebSocket)
                 {
                     if (!CompleteWebSocketHandshake(stream, request))
                         return;
+                    connection.ReceiveTimeout = 0;
+                    connection.SendTimeout = 0;
                     upgraded = true;
                     RunWebSocketClient(connection, stream);
                     return;
@@ -436,6 +468,49 @@ namespace Gilomx.CupheadBossRoulette
                     catch { }
                 }
             }
+        }
+
+        private bool IsAllowedLocalRequest(HttpRequest request)
+        {
+            if (request == null || request.Headers == null || Port <= 0)
+                return false;
+
+            string host;
+            if (!request.Headers.TryGetValue("Host", out host))
+                return false;
+            host = (host ?? string.Empty).Trim();
+            var ipv4Host = "127.0.0.1:" + Port;
+            var localHost = "localhost:" + Port;
+            if (!string.Equals(host, ipv4Host,
+                    StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(host, localHost,
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string fetchSite;
+            if (request.Headers.TryGetValue(
+                    "Sec-Fetch-Site", out fetchSite) &&
+                string.Equals((fetchSite ?? string.Empty).Trim(),
+                    "cross-site", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (!request.IsWebSocket)
+                return true;
+
+            string origin;
+            if (!request.Headers.TryGetValue("Origin", out origin) ||
+                string.IsNullOrEmpty(origin))
+                return true;
+            Uri parsedOrigin;
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out parsedOrigin) ||
+                parsedOrigin.Port != Port ||
+                !string.Equals(parsedOrigin.Scheme, "http",
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+            return string.Equals(parsedOrigin.Host, "127.0.0.1",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(parsedOrigin.Host, "localhost",
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private void RunWebSocketClient(
@@ -626,6 +701,9 @@ namespace Gilomx.CupheadBossRoulette
                 path == "/config/pesky" ||
                 path == "/config/pesky/" ||
                 path == "/config/pesky.html" ||
+                path == "/config/pesky-battle" ||
+                path == "/config/pesky-battle/" ||
+                path == "/config/pesky-battle.html" ||
                 path == "/dashboard" ||
                 path == "/dashboard/" ||
                 path == "/dashboard.html")
@@ -633,6 +711,29 @@ namespace Gilomx.CupheadBossRoulette
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.html"),
                     "text/html; charset=utf-8", false);
+                return;
+            }
+            if (path == "/pesky-battle-overlay" ||
+                path == "/pesky-battle-overlay/" ||
+                path == "/pesky-battle-overlay.html")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\pesky-battle-overlay.html"),
+                    "text/html; charset=utf-8", false);
+                return;
+            }
+            if (path == "/pesky-battle-overlay.css")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\pesky-battle-overlay.css"),
+                    "text/css; charset=utf-8", false);
+                return;
+            }
+            if (path == "/pesky-battle-overlay.js")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\pesky-battle-overlay.js"),
+                    "application/javascript; charset=utf-8", false);
                 return;
             }
             if (path == "/config/roulette.css" || path == "/config.css")
@@ -691,16 +792,8 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/api/config/interactions/set")
             {
                 var query = request.Query ?? string.Empty;
-                if (QueryHasKey(query, "randomTestEnabled"))
-                {
-                    lock (modeCommandsLock)
-                        modeCommands.Enqueue(new ModeCommand(false, query));
-                }
-                else
-                {
-                    lock (interactionsLock)
-                        interactionCommands.Enqueue(query);
-                }
+                lock (interactionsLock)
+                    interactionCommands.Enqueue(query);
                 WriteResponse(stream, 202, "Accepted",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
@@ -856,19 +949,46 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/api/config/pesky/set")
             {
                 var query = request.Query ?? string.Empty;
-                if (QueryHasKey(query, "enabled"))
-                {
-                    lock (modeCommandsLock)
-                        modeCommands.Enqueue(new ModeCommand(true, query));
-                }
-                else
-                {
-                    lock (peskyLock)
-                        peskyCommands.Enqueue(query);
-                }
+                lock (peskyLock)
+                    peskyCommands.Enqueue(query);
                 WriteResponse(stream, 202, "Accepted",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                return;
+            }
+            if (path == "/api/config/pesky-battle")
+            {
+                string json;
+                lock (peskyBattleLock)
+                    json = latestPeskyBattleState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/config/pesky-battle/set")
+            {
+                var query = request.Query ?? string.Empty;
+                if (query.Length > MaximumPeskyBattleQueryLength)
+                    query = query.Substring(0,
+                        MaximumPeskyBattleQueryLength);
+                var accepted = false;
+                lock (peskyBattleLock)
+                {
+                    if (peskyBattleCommands.Count <
+                        MaximumPeskyBattleCommands)
+                    {
+                        peskyBattleCommands.Enqueue(query);
+                        accepted = true;
+                    }
+                }
+                WriteResponse(stream, accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}"
+                        : "{\"ok\":false,\"error\":" +
+                          "\"battle_command_queue_full\"}"), false);
                 return;
             }
             if (path == "/generated/challenge.png")
@@ -978,6 +1098,8 @@ namespace Gilomx.CupheadBossRoulette
                              ? "Cache-Control: public, max-age=3600\r\n"
                              : "Cache-Control: no-store\r\n") +
                          "X-Content-Type-Options: nosniff\r\n" +
+                         "X-Frame-Options: DENY\r\n" +
+                         "Content-Security-Policy: frame-ancestors 'none'\r\n" +
                          (additionalHeaders ?? string.Empty) + "\r\n";
             var headerBytes = Encoding.ASCII.GetBytes(header);
             stream.Write(headerBytes, 0, headerBytes.Length);
@@ -1080,41 +1202,6 @@ namespace Gilomx.CupheadBossRoulette
                 offset += read;
             }
             return result;
-        }
-
-        private static bool QueryHasKey(string query, string expectedKey)
-        {
-            if (string.IsNullOrEmpty(query))
-                return false;
-            var pairs = query.Split('&');
-            for (var i = 0; i < pairs.Length; i++)
-            {
-                var separator = pairs[i].IndexOf('=');
-                var key = separator < 0
-                    ? pairs[i]
-                    : pairs[i].Substring(0, separator);
-                try
-                {
-                    key = Uri.UnescapeDataString(key.Replace('+', ' '));
-                }
-                catch { }
-                if (string.Equals(key, expectedKey,
-                    StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
-        }
-
-        private sealed class ModeCommand
-        {
-            internal readonly bool Pesky;
-            internal readonly string Query;
-
-            internal ModeCommand(bool pesky, string query)
-            {
-                Pesky = pesky;
-                Query = query;
-            }
         }
 
         private sealed class HttpRequest

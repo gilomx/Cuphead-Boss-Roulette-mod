@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -129,9 +131,15 @@ internal sealed class TikFinityEventNormalizer
             "uniqueId",
             "username",
             "user.uniqueId",
-            "user.username",
+            "user.username"));
+        var userDisplayName = CleanOptional(JsonFieldReader.String(
+            data,
             "nickname",
-            "user.nickname"));
+            "displayName",
+            "display_name",
+            "user.nickname",
+            "user.displayName",
+            "user.display_name")) ?? userName;
         var userId = CleanOptional(JsonFieldReader.String(
             data,
             "userId",
@@ -139,6 +147,30 @@ internal sealed class TikFinityEventNormalizer
             "user.userId",
             "user.user_id",
             "user.id"));
+        var userAvatarUrl = CleanHttpsUrl(JsonFieldReader.Url(
+            data,
+            "profilePictureUrl",
+            "profile_picture_url",
+            "avatarUrl",
+            "avatar_url",
+            "avatar",
+            "profilePictureUrls",
+            "profile_picture_urls",
+            "user.profilePictureUrl",
+            "user.profile_picture_url",
+            "user.avatarUrl",
+            "user.avatar_url",
+            "user.avatar",
+            "user.profilePictureUrls",
+            "user.profile_picture_urls",
+            "userDetails.profilePictureUrl",
+            "userDetails.profile_picture_url",
+            "userDetails.profilePictureUrls",
+            "userDetails.profile_picture_urls",
+            "user.userDetails.profilePictureUrl",
+            "user.userDetails.profile_picture_url",
+            "user.userDetails.profilePictureUrls",
+            "user.userDetails.profile_picture_urls"));
 
         var itemId = type == "gift"
             ? CleanOptional(JsonFieldReader.String(
@@ -225,7 +257,9 @@ internal sealed class TikFinityEventNormalizer
             IdempotencyKey = idempotencyKey,
             Type = type,
             UserName = userName,
+            UserDisplayName = userDisplayName,
             UserId = userId,
+            UserAvatarUrl = userAvatarUrl,
             ItemId = itemId,
             ItemName = itemName,
             ItemImageUrl = itemImageUrl,
@@ -416,6 +450,64 @@ internal sealed class TikFinityEventNormalizer
         const int maximumUrlLength = 2048;
         var cleaned = ProtocolText.Clean(value, maximumUrlLength + 1);
         return cleaned.Length is 0 or > maximumUrlLength ? null : cleaned;
+    }
+
+    private static string? CleanHttpsUrl(string? value)
+    {
+        var cleaned = CleanUrl(value);
+        if (cleaned is null ||
+            !Uri.TryCreate(cleaned, UriKind.Absolute, out var uri) ||
+            !uri.IsWellFormedOriginalString() ||
+            !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(uri.Host) ||
+            IsLocalHost(uri))
+        {
+            return null;
+        }
+
+        return cleaned;
+    }
+
+    private static bool IsLocalHost(Uri uri)
+    {
+        if (uri.IsLoopback)
+            return true;
+
+        var host = uri.Host.TrimEnd('.');
+        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+            host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) ||
+            host.EndsWith(".local", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!IPAddress.TryParse(host, out var address))
+            return !host.Contains('.');
+
+        if (address.IsIPv4MappedToIPv6)
+            address = address.MapToIPv4();
+
+        if (address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            var bytes = address.GetAddressBytes();
+            return bytes[0] is 0 or 10 or 127 ||
+                   bytes[0] == 169 && bytes[1] == 254 ||
+                   bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
+                   bytes[0] == 192 && bytes[1] == 168;
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            var bytes = address.GetAddressBytes();
+            return address.Equals(IPAddress.IPv6Any) ||
+                   address.Equals(IPAddress.IPv6Loopback) ||
+                   address.IsIPv6LinkLocal ||
+                   address.IsIPv6SiteLocal ||
+                   address.IsIPv6Multicast ||
+                   (bytes[0] & 0xfe) == 0xfc;
+        }
+
+        return true;
     }
 
     private static string BuildIdempotencyKey(

@@ -60,9 +60,6 @@ export interface InteractionConfigState {
   masterRevision: number;
   queuePaused: boolean;
   queueControlRevision: number;
-  suspendedByPesky: boolean;
-  randomTestEnabled: boolean;
-  randomTestRevision: number;
   phaseTransitionProtectionEnabled: boolean;
   phaseTransitionProtectionRevision: number;
   showGiftImage?: boolean;
@@ -90,7 +87,6 @@ export interface PeskyModeConfigState {
   enabled: boolean;
   running: boolean;
   startingBattle: boolean;
-  waitingForInteractions: boolean;
   revision: number;
   feedback: string;
   error: boolean;
@@ -101,10 +97,53 @@ export interface PeskyModeConfigState {
   disabledItems: string[];
   queueCount: number;
   activeCount: number;
-  pausedInteractionCount: number;
-  pausedInteractionActiveCount: number;
   maxActive: number;
   queue: InteractionQueueEntry[];
+  blockedByPeskyBattle?: boolean;
+}
+
+export type PeskyBattlePhase =
+  | "off"
+  | "recruiting"
+  | "ready"
+  | "waiting_level"
+  | "active"
+  | "won";
+
+export interface PeskyBattleTrigger {
+  giftId: string;
+  giftName: string;
+  giftImagePath: string;
+  coinsPerUnit: number;
+}
+
+export interface PeskyBattleParticipant {
+  slot: number;
+  userId: string;
+  userName: string;
+  displayName: string;
+  avatarUrl: string;
+  joinedAt: string;
+}
+
+export interface PeskyBattleConfigState {
+  ready: boolean;
+  schemaVersion: number;
+  revision: number;
+  phase: PeskyBattlePhase;
+  sessionId: number;
+  attempt: number;
+  capacity: number;
+  exclusive: boolean;
+  gameplayAvailable: boolean;
+  targetLevel: string;
+  trigger: PeskyBattleTrigger;
+  allowStreamAttacks: boolean;
+  participants: PeskyBattleParticipant[];
+  items: string[];
+  disabledItems: string[];
+  feedback: string;
+  error: boolean;
 }
 
 export interface InteractionQueueEntry {

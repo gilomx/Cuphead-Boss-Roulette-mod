@@ -61,7 +61,11 @@ internal sealed class CompanionEvent
 
     public string? UserName { get; init; }
 
+    public string? UserDisplayName { get; init; }
+
     public string? UserId { get; init; }
+
+    public string? UserAvatarUrl { get; init; }
 
     public string? ItemId { get; init; }
 

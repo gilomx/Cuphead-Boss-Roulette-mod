@@ -6,7 +6,14 @@
     "user": {
       "userId": "1234567890123456789",
       "uniqueId": "viewer_one",
-      "nickname": "Viewer One"
+      "nickname": "Viewer One",
+      "userDetails": {
+        "profilePictureUrls": {
+          "urlList": [
+            "https://example.invalid/viewer-one.png"
+          ]
+        }
+      }
     },
     "giftId": "5655",
     "giftDetails": {

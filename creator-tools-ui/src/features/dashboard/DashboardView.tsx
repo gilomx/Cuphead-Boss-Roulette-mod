@@ -3,6 +3,7 @@ import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
+import { PeskyBattlePanel } from "./PeskyBattlePanel";
 import type {
   DashboardConnection,
   DashboardCounters,
@@ -210,6 +211,8 @@ export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
             : "dashboard.interactionControl.disabled")}</span>
         </button>
       </section>
+
+      <PeskyBattlePanel />
 
       <section className="dashboard-connections" aria-labelledby="dashboard-connections-title">
         <div className="dashboard-section-heading">

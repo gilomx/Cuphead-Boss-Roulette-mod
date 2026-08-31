@@ -155,7 +155,7 @@ namespace Gilomx.CupheadBossRoulette
                 for (var i = 0; i < disabledItems.Count; i++)
                     if (IsKnownItem(disabledItems[i]))
                         DisabledItems.Add(disabledItems[i]);
-                if (Names.Count == 0 || EnabledItemCount == 0)
+                if (EnabledItemCount == 0)
                     Enabled = false;
                 return true;
             }

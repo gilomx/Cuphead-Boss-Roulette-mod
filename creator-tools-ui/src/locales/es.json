@@ -30,8 +30,116 @@
       "title": "Interacciones",
       "enabled": "Activadas",
       "disabled": "Desactivadas",
-      "enabledDescription": "Las reglas, pruebas y modos pueden agregar interacciones a la cola.",
+      "enabledDescription": "Las reglas de stream y las pruebas pueden agregar interacciones a la cola.",
       "disabledDescription": "Los eventos se siguen registrando, pero no generan interacciones ni acumulan progreso. Al desactivar se borra todo lo pendiente."
+    },
+    "peskyBattle": {
+      "eyebrow": "Juego del live",
+      "title": "Batalla Molestosa",
+      "description": "Reúne cinco participantes con un regalo específico y enfréntate a sus ataques durante un nivel completo. La lista se conserva si pierdes y reintentas.",
+      "phase": {
+        "off": "Sin armar",
+        "recruiting": "Reclutando",
+        "ready": "Lista completa",
+        "waiting_level": "Esperando nivel",
+        "active": "En batalla",
+        "won": "Victoria"
+      },
+      "phaseDescription": {
+        "off": "Configura el regalo y los ataques antes de abrir los cinco cupos.",
+        "recruiting": "Cada usuario único que envíe el regalo ocupará un cupo.",
+        "ready": "Los cinco lugares están listos. La batalla comenzará en el siguiente nivel.",
+        "waiting_level": "Entra al siguiente nivel para comenzar la batalla.",
+        "waitingTarget": "La batalla está armada para el siguiente nivel: {level}.",
+        "active": "Intento {attempt}. Si pierdes, los mismos cinco participantes seguirán en el reintento.",
+        "won": "Ganaste el nivel. Los ataques se detuvieron y la lista queda visible hasta iniciar otra batalla."
+      },
+      "overlay": {
+        "idle": "Copiar URL del overlay",
+        "copied": "URL copiada",
+        "error": "No se pudo copiar"
+      },
+      "trigger": {
+        "label": "Regalo para entrar",
+        "placeholder": "Buscar un regalo…",
+        "loading": "Cargando regalos…",
+        "catalogError": "No se pudo cargar el catálogo",
+        "noResults": "No hay regalos que coincidan con la búsqueda.",
+        "coins": "{coins} monedas",
+        "hint": "Un usuario obtiene un solo cupo, aunque envíe el regalo más de una vez.",
+        "locked": "El regalo queda congelado hasta cancelar o terminar esta batalla."
+      },
+      "streamAttacks": {
+        "title": "Permitir ataques de interacciones del live",
+        "enabled": "Las reglas del live pueden seguir lanzando ataques durante esta batalla.",
+        "disabled": "Todas las reglas del live quedan bloqueadas mientras la batalla sea exclusiva."
+      },
+      "attacks": {
+        "title": "Ataques de la batalla",
+        "description": "Elige el pool propio que usarán los cinco participantes.",
+        "locked": "El pool queda congelado mientras la batalla está armada."
+      },
+      "roster": {
+        "title": "Participantes",
+        "description": "Los primeros cinco usuarios únicos que envíen el regalo entran a la batalla.",
+        "progress": "Cupos ocupados",
+        "emptySlot": "Cupo {slot}",
+        "participantFallback": "Participante {slot}",
+        "simulationHint": "Los regalos enviados desde Simular evento también pueden llenar estos cupos; si no incluyen foto se mostrarán sus iniciales."
+      },
+      "actions": {
+        "arm": "Armar reclutamiento",
+        "cancel": "Cancelar reclutamiento",
+        "start": "Iniciar en el siguiente nivel",
+        "disable": "Desactivar batalla",
+        "reset": "Nueva batalla"
+      },
+      "master": {
+        "off": "Interacciones está desactivado. El reclutamiento y los ataques propios de la batalla siguen funcionando.",
+        "streamAllowed": "Además de la batalla, seguirán llegando los ataques generados por las reglas del live.",
+        "streamBlocked": "Durante la batalla se bloquearán todas las reglas del live, sin afectar sus ataques propios."
+      },
+      "feedback": {
+        "generic": "El estado de la batalla cambió. Revisa la configuración antes de continuar.",
+        "ready": "Configura la batalla cuando quieras.",
+        "settings_saved": "La configuración de la batalla fue guardada.",
+        "gift_saved": "El regalo para entrar fue guardado.",
+        "items_saved": "El pool de ataques fue guardado.",
+        "recruiting": "El reclutamiento está abierto.",
+        "battle_armed": "El reclutamiento está abierto.",
+        "participant_joined": "Un participante ocupó un cupo.",
+        "participant_already_joined": "Este usuario ya ocupa un cupo.",
+        "participant_identity_missing": "El evento no incluye una identidad de usuario válida.",
+        "roster_ready": "La lista de cinco participantes está completa.",
+        "lobby_ready": "La lista de cinco participantes está completa.",
+        "lobby_not_ready": "La lista todavía necesita cinco participantes.",
+        "waiting_level": "La batalla espera el siguiente nivel.",
+        "waiting_for_level": "La batalla espera el siguiente nivel.",
+        "waiting_target_level": "La batalla espera el nivel objetivo.",
+        "active": "La batalla está en curso.",
+        "battle_started": "La batalla comenzó.",
+        "battle_lost_retrying": "Perdiste; la misma lista continuará en el reintento.",
+        "waiting_for_retry": "La batalla espera el reintento.",
+        "dice_palace_transition": "La batalla continúa durante la transición de Rey Dado.",
+        "won": "La batalla terminó con una victoria.",
+        "battle_won": "La batalla terminó con una victoria.",
+        "cancelled": "La batalla fue cancelada.",
+        "battle_cancelled": "La batalla fue cancelada.",
+        "reset": "La batalla está lista para configurarse de nuevo.",
+        "gift_required": "Selecciona un regalo antes de armar el reclutamiento.",
+        "unknown_gift": "El mod no reconoce el regalo seleccionado.",
+        "items_required": "Activa al menos un ataque antes de armar la batalla.",
+        "roster_incomplete": "Se necesitan cinco participantes para iniciar.",
+        "stream_attacks_allowed": "Los ataques de las reglas del live están permitidos.",
+        "stream_attacks_blocked": "Las reglas del live quedarán bloqueadas durante la batalla.",
+        "battle_active_setting_locked": "Esta configuración queda bloqueada durante la batalla activa.",
+        "invalid_action": "Esta acción no está disponible en el estado actual.",
+        "invalid_setting": "La configuración enviada no es válida.",
+        "unknown_item": "El mod no reconoce uno de los ataques.",
+        "native_assets_unavailable": "No se pudieron preparar los recursos de uno de los ataques.",
+        "spawn_failed": "No se pudo crear uno de los ataques de la batalla.",
+        "battle_active": "La batalla ya está activa."
+      }
     },
     "counters": {
       "received": "Recibidos",
@@ -330,33 +438,10 @@
       "quantityLabel": "Veces",
       "delayLabel": "Espera (s)",
       "action": "Agregar a cola",
-      "testing": "Agregando",
-      "suspended": {
-        "title": "Interacciones en pausa",
-        "description": "Modo Molestoso está activo. Las interacciones nuevas conservarán su lugar, pero no entrarán al juego hasta que lo desactives."
-      },
-      "random": {
-        "title": "Prueba aleatoria",
-        "description": "Lanza elementos del catálogo y nombres al azar con pausas cortas y variables, sólo mientras una partida está activa.",
-        "active": "Activa",
-        "inactive": "Inactiva",
-        "enable": "Activar",
-        "disable": "Desactivar",
-        "switch": {
-          "title": "Modo Molestoso está activo",
-          "description": "¿Quieres desactivarlo y activar la Prueba aleatoria?",
-          "cancel": "Cancelar",
-          "confirm": "Sí, activar"
-        }
-      }
+      "testing": "Agregando"
     },
     "feedback": {
       "ready": "La prueba está lista.",
-      "random_test_enabled": "La prueba aleatoria está activa.",
-      "random_test_disabled": "La prueba aleatoria está inactiva.",
-      "random_test_disabled_by_pesky": "La prueba aleatoria se desactivó porque Modo Molestoso fue activado.",
-      "random_test_enabled": "La prueba aleatoria está activa y esperará a que haya una partida en curso.",
-      "random_test_disabled": "La prueba aleatoria fue desactivada.",
       "phase_transition_protection_enabled": "La protección de transiciones está activa.",
       "phase_transition_protection_disabled": "La protección de transiciones está inactiva durante esta sesión.",
       "unknown_item": "El mod no reconoce este artículo.",
@@ -382,16 +467,12 @@
   "pesky": {
     "title": "Modo Molestoso",
     "description": "Mete ataques aleatorios del catálogo de interacciones durante cualquier pelea, ya sea normal o por ruleta. También puedes configurar nombres para que aparezcan aleatoriamente con los ataques.",
+    "interactionsNotice": "Las interacciones están activadas, por lo que seguirás recibiendo ataques de donaciones además de los ataques de este modo.",
+    "battleBlocked": "Batalla Molestosa tiene el control exclusivo. Termina o cancela esa batalla para volver a activar el modo libre.",
     "control": {
       "title": "Control del modo",
       "enable": "Activar modo",
-      "disable": "Desactivar modo",
-      "switch": {
-        "title": "La Prueba aleatoria está activa",
-        "description": "¿Quieres desactivarla y activar Modo Molestoso?",
-        "cancel": "Cancelar",
-        "confirm": "Sí, activar"
-      }
+      "disable": "Desactivar modo"
     },
     "phaseProtection": {
       "title": "Protección de transiciones",
@@ -405,7 +486,6 @@
       "disabled": "Desactivado",
       "waitingGame": "Esperando batalla",
       "startingBattle": "Iniciando batalla",
-      "waitingInteractions": "Terminando interacciones activas",
       "running": "Molestando ahora"
     },
     "queue": {
@@ -425,10 +505,10 @@
     },
     "names": {
       "title": "Nombres aleatorios",
-      "description": "Escribe un nombre por línea. Se eliminan líneas vacías y duplicados; cada nombre admite hasta 32 caracteres.",
+      "description": "Opcional. Escribe un nombre por línea; se eliminan líneas vacías y duplicados, y cada nombre admite hasta 32 caracteres. Si dejas la lista vacía, los ataques aparecerán sin nombre.",
       "placeholder": "Claudia\nYeiAndPelos\nYerrisito",
       "hint": "Un nombre se elige al azar para cada ataque.",
-      "required": "Necesitas al menos un nombre para activar el modo.",
+      "emptyHint": "Sin nombres: los ataques aparecerán sin nombre.",
       "save": "Guardar nombres"
     },
     "attacks": {
@@ -440,12 +520,12 @@
       "ready": "La configuración está lista.",
       "enabled": "Modo Molestoso está activado.",
       "disabled": "Modo Molestoso está desactivado.",
-      "disabled_by_random_test": "Modo Molestoso se desactivó porque la Prueba aleatoria fue activada.",
       "names_saved": "Los nombres fueron guardados.",
       "items_saved": "La selección de ataques fue guardada.",
-      "names_required": "Agrega y guarda al menos un nombre antes de activar el modo.",
+      "blocked_by_pesky_battle": "Modo Molestoso libre no puede activarse durante Batalla Molestosa.",
+      "disabled_by_pesky_battle": "Modo Molestoso libre se desactivó porque Batalla Molestosa fue armada.",
       "items_required": "Activa al menos un ataque antes de activar el modo.",
-      "disabled_invalid_config": "El modo se desactivó porque necesita nombres y al menos un ataque.",
+      "disabled_invalid_config": "El modo se desactivó porque necesita al menos un ataque habilitado.",
       "invalid_setting": "La configuración enviada no es válida.",
       "unknown_item": "El mod no reconoce este ataque.",
       "native_assets_loading": "Los recursos del ataque todavía se están preparando.",

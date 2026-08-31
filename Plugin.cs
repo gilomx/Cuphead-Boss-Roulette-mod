@@ -2976,6 +2976,10 @@ namespace Gilomx.CupheadBossRoulette
             if (plugin == null)
                 return;
 
+            if (plugin.creatorToolsInteractions != null)
+                plugin.creatorToolsInteractions.PeskyBattleLevelPreWin(
+                    __instance);
+
             var currentLevel = __instance == null
                 ? default(Levels)
                 : __instance.CurrentLevel;

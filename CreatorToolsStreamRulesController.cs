@@ -78,7 +78,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal int Update(
             CreatorToolsServer server,
-            CreatorToolsInteractionController interactions)
+            CreatorToolsInteractionController interactions,
+            bool streamAttacksAllowed)
         {
             if (server != null && server.IsRunning)
             {
@@ -110,7 +111,7 @@ namespace Gilomx.CupheadBossRoulette
             // unfocused. Serialize backlog mutation with evaluation, but
             // keep all gameplay queue access on this main-thread call.
             lock (ruleStateLock)
-                return InteractionsEnabled
+                return InteractionsEnabled && streamAttacksAllowed
                     ? dispatchBacklog.Drain(interactions)
                     : 0;
         }
@@ -172,10 +173,19 @@ namespace Gilomx.CupheadBossRoulette
         /// </summary>
         internal CreatorToolsStreamEvaluation Evaluate(
             CreatorToolsStreamEvent streamEvent,
-            CreatorToolsInteractionController interactions)
+            CreatorToolsInteractionController interactions,
+            bool streamAttacksAllowed)
         {
             lock (ruleStateLock)
+            {
+                if (!streamAttacksAllowed)
+                    return new CreatorToolsStreamEvaluation
+                    {
+                        MessageCode =
+                            "stream_attacks_blocked_by_pesky_battle"
+                    };
                 return EvaluateLocked(streamEvent, interactions);
+            }
         }
 
         /// <summary>
@@ -209,6 +219,23 @@ namespace Gilomx.CupheadBossRoulette
                     (decimal)gift.CoinsPerUnit * streamEvent.Count);
                 streamEvent.Unit = "coin";
                 streamEvent.Currency = string.Empty;
+                return true;
+            }
+        }
+
+        internal bool TryResolveGift(
+            string giftId, out CreatorToolsGiftCatalogEntry resolved)
+        {
+            resolved = null;
+            lock (ruleStateLock)
+            {
+                GiftEntry gift;
+                if (!catalogReady || !gifts.TryGetValue(
+                    giftId ?? string.Empty, out gift))
+                    return false;
+                resolved = new CreatorToolsGiftCatalogEntry(
+                    gift.Id, gift.Name, gift.ImagePath,
+                    gift.CoinsPerUnit);
                 return true;
             }
         }

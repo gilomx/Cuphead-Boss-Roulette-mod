@@ -76,6 +76,44 @@
   Tanto esta lista como los eventos recientes usan scroll interno. El contador
   incluye la cola materializada y el backlog; al final de las filas se indica
   explícitamente cuántas interacciones adicionales siguen esperando.
+- Modo Molestoso funciona fuera del interruptor general de Interacciones y usa
+  su propia cola. Ambas colas se despachan a la vez y aplican por separado el
+  máximo simultáneo; apagar el modo elimina sólo sus ataques pendientes y
+  activos. Si las Interacciones también están activas, el panel avisa que los
+  ataques de donaciones continuarán llegando además de los del modo.
+- Los nombres aleatorios de Modo Molestoso son opcionales. Una lista vacía ya
+  no impide activarlo ni lo desactiva: sus ataques aparecen sin etiqueta de
+  nombre y la selección vacía se conserva al reiniciar el juego.
+- El Dashboard incorpora `Batalla Molestosa`: se elige un regalo de TikTok y
+  los primeros cinco donadores únicos llenan un roster estable con nombre y
+  foto de perfil cuando TikFinity la entrega. Las donaciones repetidas no
+  duplican cupos y el simulador local puede completar el grupo para probarlo
+  sin iniciar un LIVE.
+- La batalla empieza únicamente al solicitarla y entrar al siguiente nivel.
+  Conserva sus cinco participantes y el número de intento al perder o
+  reintentar, queda ligada al primer nivel elegido y termina al vencerlo o al
+  cancelarla. Rey Dado conserva la misma sesión a través de sus casillas.
+- Batalla tiene configuración y ataques propios, pero comparte físicamente la
+  cola de Interacciones mediante orígenes `manual`, `stream` y `pesky_battle`.
+  El master, Pausar y Vaciar sólo controlan entradas manuales/LIVE; Batalla
+  mantiene un lugar reservado incluso si hay 200 canjeos normales esperando.
+  El despacho alterna Batalla y tráfico normal y reserva el último hueco activo
+  al origen ausente, evitando que cualquiera de los dos monopolice la cola.
+  Puede suspender todas las reglas del LIVE sin perder el backlog ya aceptado.
+- Armar Batalla desactiva Modo Molestoso libre, limpia únicamente su cola y
+  bloquea su reactivación hasta que la batalla termine. Nunca se reactiva de
+  manera automática.
+- Se publica un overlay OBS independiente en
+  `/pesky-battle-overlay`. Lee una instantánea local completa, representa los
+  cinco lugares durante reclutamiento, espera, combate y victoria, y usa
+  iniciales si falta una foto. No comparte ni pisa el WebSocket de la ruleta.
+- El contrato TikFinity conserva ahora el handle, el nombre visible y una URL
+  HTTPS opcional de avatar. La normalización acepta variantes planas/anidadas,
+  rechaza direcciones locales o inseguras y mantiene compatibilidad de
+  protocolo v1.
+- El servidor local rechaza hosts, orígenes WebSocket y navegación cross-site
+  ajenos a `127.0.0.1:18081`/`localhost:18081`, limita a cinco segundos la
+  lectura inicial de cabeceras y bloquea el uso del panel dentro de iframes.
 - Crear, editar, duplicar, activar o eliminar reglas ya no depende del foco de
   Cuphead. El servidor procesa únicamente ese CRUD persistente en un bloque
   serializado y devuelve el estado autoritativo en la misma respuesta; la
@@ -161,13 +199,9 @@
   hasta 200 entradas, lotes de 50 y esperas de hasta 3600 segundos; además
   separa cada despacho por al menos 0.35 segundos para evitar apariciones
   exactamente simultáneas.
-- La prueba aleatoria elige entre todos los artículos disponibles del catálogo y
-  seis nombres con intervalos de 1.25 a 3.25 segundos. Su interruptor cambia de
-  estado de forma inmediata aunque el juego esté pausado, pero sólo genera
-  mientras una partida puede recibir interacciones y nunca acumula un backlog
-  automático. Los IDs y ejecutores forman el registro común: todo artículo
-  futuro debe aparecer también en la prueba manual y entra automáticamente al
-  conjunto aleatorio cuando está disponible.
+- Se retiró la prueba aleatoria automática de Interacciones. `Simular evento` y
+  las pruebas manuales por artículo permanecen; Modo Molestoso es ahora el único
+  generador aleatorio visible.
 - Las pruebas aparecen inmediatamente en la tabla aunque Unity esté pausado por
   perder el foco. React las marca como `Esperando al juego` y las sustituye por
   la cola autoritativa cuando el mod incrementa su revisión, sin duplicarlas.

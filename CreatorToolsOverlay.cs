@@ -128,8 +128,9 @@ namespace Gilomx.CupheadBossRoulette
                 "Creator Tools",
                 "InteraccionesActivadas",
                 false,
-                "Permite que eventos, pruebas y Modo Molestoso generen " +
-                "interacciones dentro del juego.");
+                "Permite que eventos y pruebas de Interacciones generen " +
+                "ataques dentro del juego. Modo Molestoso se controla " +
+                "por separado.");
 
             creatorToolsStreamRules = new CreatorToolsStreamRulesController(
                 AssetsDirectory,
@@ -157,6 +158,15 @@ namespace Gilomx.CupheadBossRoulette
                 GetCreatorToolsStreamBacklogCount,
                 ClearCreatorToolsStreamBacklog,
                 ResetCreatorToolsStreamRuntimeState,
+                delegate(
+                    string giftId,
+                    out CreatorToolsGiftCatalogEntry gift)
+                {
+                    gift = null;
+                    return creatorToolsStreamRules != null &&
+                        creatorToolsStreamRules.TryResolveGift(
+                            giftId, out gift);
+                },
                 GetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 SetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 delegate(string message) { Logger.LogInfo(message); },
@@ -513,9 +523,12 @@ namespace Gilomx.CupheadBossRoulette
                 CreatorToolsInteractionStartSafetySeconds;
             ResetCreatorToolsInteractionPhaseTransition();
             if (creatorToolsInteractions != null)
+            {
                 creatorToolsInteractions.BeginGameplayLevel(
                     rearmExistingLevel ||
                     creatorToolsInteractionLevelStartObserved);
+                creatorToolsInteractions.PeskyBattleLevelStarted(level);
+            }
             creatorToolsInteractionLevelStartObserved = false;
             Logger.LogInfo(
                 "Creator Tools interactions registered gameplay level " +
@@ -1045,7 +1058,11 @@ namespace Gilomx.CupheadBossRoulette
                     plugin.Logger.LogWarning(message);
                 });
             if (plugin.creatorToolsInteractions != null)
+            {
+                plugin.creatorToolsInteractions.PeskyBattleLevelEnded(
+                    __instance);
                 plugin.creatorToolsInteractions.SuspendGameplayLevel();
+            }
         }
 
         private static void CreatorToolsInteractionLevelDestroyedPrefix(
@@ -1063,7 +1080,11 @@ namespace Gilomx.CupheadBossRoulette
             plugin.creatorToolsInteractionLevelStartObserved = false;
             plugin.ResetCreatorToolsInteractionPhaseTransition();
             if (plugin.creatorToolsInteractions != null)
+            {
+                plugin.creatorToolsInteractions.PeskyBattleLevelEnded(
+                    __instance);
                 plugin.creatorToolsInteractions.EndGameplayLevel();
+            }
         }
 
         private void OnCreatorToolsInteractionPaused()
@@ -1230,7 +1251,9 @@ namespace Gilomx.CupheadBossRoulette
             var queuedFromStreamBacklog = 0;
             if (creatorToolsStreamRules != null)
                 queuedFromStreamBacklog = creatorToolsStreamRules.Update(
-                    creatorToolsServer, creatorToolsInteractions);
+                    creatorToolsServer, creatorToolsInteractions,
+                    creatorToolsInteractions == null ||
+                    creatorToolsInteractions.StreamAttacksAllowed);
             if (creatorToolsDashboard != null &&
                 queuedFromStreamBacklog > 0)
                 creatorToolsDashboard.AddQueuedInteractions(
@@ -1268,18 +1291,30 @@ namespace Gilomx.CupheadBossRoulette
         private CreatorToolsStreamEvaluation EvaluateCreatorToolsStreamEvent(
             CreatorToolsStreamEvent streamEvent)
         {
+            var battleFeedback = string.Empty;
+            if (creatorToolsInteractions != null)
+                battleFeedback =
+                    creatorToolsInteractions.ObservePeskyBattleEvent(
+                    streamEvent);
             if (creatorToolsStreamRules == null ||
                 creatorToolsInteractions == null)
-                return CreatorToolsStreamEvaluation.None;
-            if (!GetCreatorToolsInteractionsEnabled())
             {
+                if (battleFeedback.Length == 0)
+                    return CreatorToolsStreamEvaluation.None;
                 return new CreatorToolsStreamEvaluation
                 {
-                    MessageCode = "interactions_disabled"
+                    MessageCode = battleFeedback
                 };
             }
-            return creatorToolsStreamRules.Evaluate(
-                streamEvent, creatorToolsInteractions);
+            var result = creatorToolsStreamRules.Evaluate(
+                streamEvent, creatorToolsInteractions,
+                creatorToolsInteractions.StreamAttacksAllowed);
+            // Recruitment is independent from the interactions master. Keep
+            // rule counts/queue results, but surface the lobby result so the
+            // dashboard does not label an accepted recruit as ignored.
+            if (battleFeedback.Length > 0)
+                result.MessageCode = battleFeedback;
+            return result;
         }
 
         private void DisposeCreatorTools()

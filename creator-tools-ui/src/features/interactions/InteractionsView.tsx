@@ -8,10 +8,8 @@ import { StreamRulesView } from "./StreamRulesView";
 export function InteractionsView() {
   const {
     interaction,
-    pesky,
     optimisticInteractionQueue,
     interactionTesting,
-    applyInteractionRandomTest,
     testInteraction,
   } = useConfig();
   const { t } = useLocalization();
@@ -19,9 +17,6 @@ export function InteractionsView() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [delays, setDelays] = useState<Record<string, number>>({});
   const [testingItem, setTestingItem] = useState<string | null>(null);
-  const [confirmingRandomTest, setConfirmingRandomTest] = useState(false);
-  const suspendedByPesky = interaction?.suspendedByPesky ?? false;
-  const randomTestEnabled = interaction?.randomTestEnabled ?? false;
   const maxBatch = interaction?.maxBatch ?? 50;
   const maxDelay = interaction?.maxDelay ?? 3600;
   const testFeedback = optimisticInteractionQueue.length > 0
@@ -33,12 +28,6 @@ export function InteractionsView() {
   useEffect(() => {
     if (!interactionTesting) setTestingItem(null);
   }, [interactionTesting]);
-
-  useEffect(() => {
-    if (confirmingRandomTest && !pesky?.enabled) {
-      setConfirmingRandomTest(false);
-    }
-  }, [confirmingRandomTest, pesky?.enabled]);
 
   return (
     <div className="page page--interactions">
@@ -86,89 +75,6 @@ export function InteractionsView() {
             </div>
           </div>
 
-          {suspendedByPesky ? (
-            <div className="interaction-random-test" data-active="true">
-              <div className="interaction-random-test__copy">
-                <div className="interaction-random-test__title">
-                  <strong>{t("interactions.test.suspended.title")}</strong>
-                </div>
-                <p>{t("interactions.test.suspended.description")}</p>
-              </div>
-            </div>
-          ) : null}
-
-          <div
-            className="interaction-random-test interaction-random-test--switch mode-switch-shell"
-            data-active={randomTestEnabled}
-            data-step={confirmingRandomTest ? "confirm" : "control"}
-          >
-            <div className="mode-switch-stage">
-              <div
-                className="mode-switch-pane mode-switch-pane--primary interaction-random-test__pane"
-                aria-hidden={confirmingRandomTest}
-              >
-                <div className="interaction-random-test__copy">
-                  <div className="interaction-random-test__title">
-                    <strong>{t("interactions.test.random.title")}</strong>
-                    <span data-active={randomTestEnabled}>
-                      {t(`interactions.test.random.${randomTestEnabled ? "active" : "inactive"}`)}
-                    </span>
-                  </div>
-                  <p>{t("interactions.test.random.description")}</p>
-                </div>
-                <button
-                  className="interaction-random-test__toggle"
-                  type="button"
-                  tabIndex={confirmingRandomTest ? -1 : 0}
-                  aria-pressed={randomTestEnabled}
-                  data-active={randomTestEnabled}
-                  disabled={!interaction?.ready}
-                  onClick={() => {
-                    if (randomTestEnabled) {
-                      applyInteractionRandomTest(false);
-                    } else if (pesky?.enabled) {
-                      setConfirmingRandomTest(true);
-                    } else {
-                      applyInteractionRandomTest(true);
-                    }
-                  }}
-                >
-                  {t(`interactions.test.random.${randomTestEnabled ? "disable" : "enable"}`)}
-                </button>
-              </div>
-              <div
-                className="mode-switch-pane mode-switch-pane--confirmation interaction-random-test__pane"
-                aria-hidden={!confirmingRandomTest}
-              >
-                <div className="mode-switch-confirmation__copy">
-                  <strong>{t("interactions.test.random.switch.title")}</strong>
-                  <p>{t("interactions.test.random.switch.description")}</p>
-                </div>
-                <div className="mode-switch-confirmation__actions">
-                  <button
-                    type="button"
-                    className="mode-switch-action mode-switch-action--cancel"
-                    tabIndex={confirmingRandomTest ? 0 : -1}
-                    onClick={() => setConfirmingRandomTest(false)}
-                  >
-                    {t("interactions.test.random.switch.cancel")}
-                  </button>
-                  <button
-                    type="button"
-                    className="mode-switch-action mode-switch-action--confirm"
-                    tabIndex={confirmingRandomTest ? 0 : -1}
-                    onClick={() => {
-                      setConfirmingRandomTest(false);
-                      applyInteractionRandomTest(true);
-                    }}
-                  >
-                    {t("interactions.test.random.switch.confirm")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="interaction-table-wrap">
             <table className="interaction-table test-table">
               <thead>
@@ -184,7 +90,7 @@ export function InteractionsView() {
                   const delay = delays[item.id] ?? 0;
                   const canQueue = (interaction?.ready ?? false) &&
                     (interaction?.interactionsEnabled ?? false) &&
-                    !suspendedByPesky && donor.trim().length > 0;
+                    donor.trim().length > 0;
                   return (
                     <tr key={item.id}>
                       <td>

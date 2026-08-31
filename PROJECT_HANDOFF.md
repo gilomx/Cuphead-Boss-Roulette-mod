@@ -16,6 +16,69 @@ TikFinity/TikTok, Twitch y YouTube están documentados en
 antes de modificar el contrato normalizado, `/dashboard` o la vista de
 Interacciones.
 
+## Creator Tools: Modo Molestoso libre independiente (2026-08-31)
+
+Modo Molestoso libre ya no depende de `InteraccionesActivadas` ni suspende la
+cola de canjeos. `interactionQueue` y `peskyQueue` se procesan en el mismo frame
+con el límite `maxActive` aplicado por cola; incluso con valor 1 puede existir un
+ataque de donación y uno molesto simultáneamente. Pausar o vaciar Interacciones
+afecta sólo sus canjeos. Desactivar Modo Molestoso ejecuta `peskyQueue.Clear()`,
+por lo que cancela sus pendientes y dispone sus actores activos sin tocar
+donaciones. El panel no añade controles redundantes de pausa o vaciado: su
+interruptor es el único control operativo y muestra un aviso cuando ambas
+fuentes están activas.
+
+`peskySettings.Names` puede estar vacío. Ese estado no invalida ni desactiva el
+modo y debe persistir en el JSON; el generador usa `string.Empty` para que
+`CreatorToolsDonorLabel` no cree texto. El panel presenta la lista como opcional
+y permite activar el modo siempre que exista al menos un ataque habilitado.
+
+## Creator Tools: Batalla Molestosa (2026-08-31)
+
+Batalla Molestosa ya está implementada como una sesión en memoria con fases
+`off`, `recruiting`, `ready`, `waiting_level`, `active` y `won`. Se configura
+desde el Dashboard con un regalo exacto del catálogo de TikTok, un pool propio
+de los cinco ataques y la opción `allowStreamAttacks`. Los primeros cinco
+donadores únicos ocupan posiciones estables; `userId` es la identidad primaria
+y el handle es fallback. Repetir el regalo sólo enriquece nombre/avatar y dos
+IDs distintos no se fusionan aunque compartan apodo. Los eventos simulados sí
+pueden reclutar para pruebas.
+
+`action=start` no entra en un nivel ya avanzado: arma el próximo `LevelStart` y
+liga la sesión a ese nivel lógico. `_OnLose`, `_OnLevelEnd` y recreación de
+escena vuelven a `waiting_level` sin perder roster; `_OnPreWin` termina la
+sesión. La cadena de Dice Palace conserva el intento entre casillas y sólo
+finaliza en `DicePalaceMain`. `won` conserva el roster para feedback/overlay,
+pero deja de ser exclusivo. Roster y estado armado no se guardan al cerrar el
+juego; regalo, opción de LIVE y ataques deshabilitados sí se guardan en
+`mx.gilomx.cuphead.bossroulette.pesky-battle.json`.
+
+`interactionQueue` es físicamente compartida y cada entrada publica `source`:
+`manual`, `stream` o `pesky_battle`. El límite activo es combinado. Batalla
+dispone de un único slot pendiente reservado para evitar starvation con 200
+entradas normales. El despachador toma el primer candidato elegible de Batalla
+y del tráfico regular, alterna ambos orígenes y reserva el último hueco activo
+al origen ausente. Conserva FIFO dentro de cada origen; una entrada LIVE pausada
+al frente no bloquea ataques sintéticos. Master,
+Pausar y Vaciar afectan manual/stream; cancelación, derrota o victoria limpian
+sólo `pesky_battle`. El backlog del LIVE se pausa, no se pierde, cuando
+`allowStreamAttacks` es falso.
+
+Armar la sesión desactiva, guarda y limpia Modo Molestoso libre; mientras la
+batalla es exclusiva, un intento de reactivarlo responde
+`blocked_by_pesky_battle`. No se reactiva después. El estado/los comandos viven
+en `/api/config/pesky-battle` y `/api/config/pesky-battle/set`. El overlay OBS
+separado `/pesky-battle-overlay` consulta ese snapshot y no comparte el canal
+de la ruleta.
+
+El protocolo companion/mod v1 se amplió de forma compatible con
+`userDisplayName` y `userAvatarUrl`. El acompañante conserva `userName` como
+handle, prioriza nickname para display y sólo acepta avatares HTTPS públicos.
+Si no hay foto, panel y overlay usan iniciales. La validación automatizada del
+companion quedó en 20/20; todavía es obligatoria una prueba manual dentro del
+juego, especialmente derrota/retry, salida al mapa y la cadena completa de Rey
+Dado.
+
 ## Creator Tools: reglas visibles y canjeos en curso (2026-08-26)
 
 Las pestañas internas de `/config/interactions` fueron retiradas. El catálogo
@@ -27,8 +90,8 @@ imágenes de regalos de esa tabla conservan su opacidad normal.
 En el juego, una interacción creada por una regla muestra el PNG local del
 regalo a la izquierda del nombre del donador con alpha `0.8`.
 La ruta se conserva a través del backlog y la cola; el icono comparte seguimiento,
-fade, snapshot y prioridad de render con la etiqueta. Las entradas manuales,
-Random Test y Modo Molestoso siguen mostrando sólo el nombre.
+fade, snapshot y prioridad de render con la etiqueta. Las entradas manuales y
+Modo Molestoso siguen mostrando sólo el nombre.
 
 La cola se extrajo a `InteractionQueuePanel.tsx`, combina el estado confirmado
 con `optimisticInteractionQueue` y ahora se muestra en `/dashboard`, después de
@@ -123,8 +186,7 @@ generic player-input guard. Phase protection is session-only, defaults to on,
 and its former Modo Molestoso on/off control is hidden from the public panel.
 The JSX, client request path and server implementation remain preserved for a
 future diagnostics build, but normal users cannot disable it. It affects manual
-interaction tests, random test mode, and Pesky Mode through the shared dispatch
-guard.
+interaction tests and Pesky Mode through the shared dispatch guard.
 
 - Devil phase 1→2: `DevilLevelSittingDevil.StartTransform` signals the
   transition. Dispatch remains active for 6 seconds of playable time, then
@@ -342,9 +404,10 @@ commands on its background thread, but it must never instantiate or inspect
 Unity objects there. Keep future catalog items out of `Plugin.cs` and add
 isolated `ICreatorToolsInteractionExecutor` implementations behind the
 controller instead. Public IDs live in `CreatorToolsInteractionIds.All`; that
-same registry feeds the random test. The React `interactionItems` collection
-feeds both catalog cards and manual-test rows. Every future item must be added to
-both paths, with no one-off random-test list.
+same registry feeds Modo Molestoso. The React `interactionItems` collection
+feeds the catalog cards, manual-test rows, and Modo Molestoso configuration.
+Every future item must be added to both the C# registry and this shared React
+catalog.
 
 The first five test items use Cuphead's original runtime mapping:
 `hilda_purple_zeppelin` uses `enemyPrefabA` and its native single shot, while
@@ -541,8 +604,9 @@ order. Maximum-on-screen is persisted and configurable from 1–20, batches are
 capped at 50, delays at 3600 seconds, and active plus pending entries at 200.
 Dispatches remain at least 0.35 seconds apart. An active row remains in the API
 until its generic interaction handle completes, then the next pending row may
-dispatch. The random test chooses any registered and currently available ID at
-varying 1.25–3.25 second intervals without building a backlog. Spawning is
+dispatch. Modo Molestoso chooses registered and currently available IDs on its
+own queue at varying 1.25–3.25 second intervals without building a backlog.
+Spawning is
 blocked during loading, real pause, defeat/end-of-level and the first three
 seconds after `_OnLevelStart`; actors already visible remain frozen on defeat
 and are cleaned when the `Level` is destroyed.
@@ -2063,21 +2127,21 @@ Equip Card in layout, typography, input, animation, sound, and native prompts.
 
 ## Important locations
 
-- Repository:
-  `C:\Users\gilomx\Documents\dev\Cuphead-Boss-Roulette-mod`
 - Git remote: `git@github.com:gilomx/Cuphead-Boss-Roulette-mod.git`
-- Branch: `main`
-- Cuphead: `E:\SteamLibrary\steamapps\common\Cuphead`
-- Installed plugin:
-  `E:\SteamLibrary\steamapps\common\Cuphead\BepInEx\plugins\GilomxBossRoulette`
-- Runtime log:
-  `E:\SteamLibrary\steamapps\common\Cuphead\BepInEx\LogOutput.log`
+- Repository and branch: use the current worktree; do not assume a fixed local
+  path or branch name.
+- Cuphead: detect the Steam library used by the current PC. The project defaults
+  to `C:\Program Files (x86)\Steam\steamapps\common\Cuphead`; pass
+  `-p:CupheadDir="..."` when the game is installed elsewhere.
+- Installed plugin: `<CupheadDir>\BepInEx\plugins\GilomxBossRoulette`
+- Runtime log: `<CupheadDir>\BepInEx\LogOutput.log`
 - BepInEx config:
-  `E:\SteamLibrary\steamapps\common\Cuphead\BepInEx\config\mx.gilomx.cuphead.bossroulette.cfg`
-- Original website archive: `C:\Users\mgtgi\dev\gilomx-website.zip`
-- Website roulette source inside the archive: `src/app/ruleta`
-- Card PSD supplied by the user:
-  `C:\Users\mgtgi\OneDrive\Escritorio\cuphead_mod\originals\ch_equip_front_no_text.psd`
+  `<CupheadDir>\BepInEx\config\mx.gilomx.cuphead.bossroulette.cfg`
+- Website roulette source inside the original archive: `src/app/ruleta`
+
+Developer-only source archives and art files may exist on only one PC. Locate
+them when a task actually needs them instead of relying on a documented absolute
+path.
 
 The PC already has GitHub SSH access. Do not install SSH tooling or unrelated
 dependencies.
@@ -2224,11 +2288,11 @@ functionality remain intact.
 
 ## Build and install
 
-No package installation is needed. Existing references point to the local game.
+No package installation is needed. References use `CupheadDir`, whose default is
+the standard Steam location. Override it for the installation on the current PC.
 
 ```powershell
-dotnet build .\CupheadBossRoulette.csproj -c Release --no-restore `
-  -p:CupheadDir="E:\SteamLibrary\steamapps\common\Cuphead"
+dotnet build .\CupheadBossRoulette.csproj -c Release --no-restore
 ```
 
 Output:
@@ -2238,17 +2302,6 @@ Output:
 To test, close Cuphead, replace only the installed DLL, and restart Cuphead.
 Keep the `assets` directory beside the DLL. Verify the version and errors in
 `BepInEx\LogOutput.log`.
-
-The following command was useful only as a diagnostic because it keeps BepInEx
-in one process:
-
-```powershell
-$env:SteamAppId = "268910"
-$env:SteamGameId = "268910"
-Start-Process `
-  -FilePath "E:\SteamLibrary\steamapps\common\Cuphead\Cuphead.exe" `
-  -WorkingDirectory "E:\SteamLibrary\steamapps\common\Cuphead"
-```
 
 `doorstop_config.ini` was restored to its original
 `ignore_disable_switch = false`; the temporary backup was removed. Do not ship

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Batalla Molestosa</title>
+  <link rel="stylesheet" href="/pesky-battle-overlay.css">
+</head>
+<body>
+  <main id="battle" class="battle" data-visible="false" data-phase="off">
+    <header class="battle__header">
+      <div class="battle__heading">
+        <span class="battle__eyebrow">BATALLA MOLESTOSA</span>
+        <strong id="battle-status" class="battle__status">Esperando reclutamiento</strong>
+      </div>
+      <div id="battle-trigger" class="battle__trigger" hidden>
+        <img id="battle-gift-image" alt="" hidden>
+        <span id="battle-gift-name"></span>
+        <b id="battle-progress">0/5</b>
+      </div>
+    </header>
+
+    <ol id="battle-roster" class="battle__roster" aria-label="Participantes de Batalla Molestosa"></ol>
+  </main>
+
+  <template id="battle-slot-template">
+    <li class="battle-slot" data-filled="false">
+      <div class="battle-slot__portrait">
+        <img class="battle-slot__avatar" alt="" referrerpolicy="no-referrer" hidden>
+        <span class="battle-slot__initial" aria-hidden="true">?</span>
+        <span class="battle-slot__number"></span>
+      </div>
+      <span class="battle-slot__name"></span>
+    </li>
+  </template>
+
+  <script src="/pesky-battle-overlay.js"></script>
+</body>
+</html>

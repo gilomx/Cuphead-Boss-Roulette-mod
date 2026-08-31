@@ -16,6 +16,8 @@ namespace Gilomx.CupheadBossRoulette
         internal string Connector = string.Empty;
         internal string Type = string.Empty;
         internal string UserName = string.Empty;
+        internal string UserDisplayName = string.Empty;
+        internal string UserAvatarUrl = string.Empty;
         internal string UserId = string.Empty;
         internal string ItemId = string.Empty;
         internal string ItemName = string.Empty;

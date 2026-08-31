@@ -312,6 +312,9 @@ namespace Gilomx.CupheadBossRoulette
                 Type = type,
                 UserName = NormalizeText(
                     Value(values, "user"), string.Empty, 80),
+                UserDisplayName = NormalizeText(
+                    Value(values, "user"), string.Empty, 80),
+                UserAvatarUrl = string.Empty,
                 UserId = NormalizeText(
                     Value(values, "userId"), string.Empty, 160),
                 ItemId = giftId,
@@ -480,6 +483,10 @@ namespace Gilomx.CupheadBossRoulette
             entry.Type = NormalizeIdentifier(entry.Type, 24);
             entry.UserName = NormalizeText(
                 entry.UserName, string.Empty, 80);
+            entry.UserDisplayName = NormalizeText(
+                entry.UserDisplayName, entry.UserName, 160);
+            entry.UserAvatarUrl = NormalizeText(
+                entry.UserAvatarUrl, string.Empty, 2048);
             entry.UserId = NormalizeText(entry.UserId, string.Empty, 160);
             entry.ItemId = NormalizeText(entry.ItemId, string.Empty, 160);
             entry.ItemName = NormalizeText(entry.ItemName, string.Empty, 160);

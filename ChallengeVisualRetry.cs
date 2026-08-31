@@ -11,11 +11,17 @@ namespace Gilomx.CupheadBossRoulette
         private bool challengeVisualDefeatUnwindActive;
         private bool challengeVisualRestartWaitingForBlack;
 
-        private static void BeginChallengeVisualDefeatUnwindPrefix()
+        private static void BeginChallengeVisualDefeatUnwindPrefix(
+            Level __instance)
         {
             var plugin = activeInstance;
             if (plugin != null)
+            {
+                if (plugin.creatorToolsInteractions != null)
+                    plugin.creatorToolsInteractions
+                        .PeskyBattleLevelDefeated(__instance);
                 plugin.BeginChallengeVisualDefeatUnwind();
+            }
         }
 
         private void BeginChallengeVisualDefeatUnwind()
