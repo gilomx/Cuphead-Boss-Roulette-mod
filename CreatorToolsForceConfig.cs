@@ -6,6 +6,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     public sealed partial class Plugin
     {
+        private const int CreatorToolsMaximumConfigCommandsPerUpdate = 64;
         private bool creatorToolsForceInitialized;
         private bool creatorToolsForceEnabled;
         private int creatorToolsForceBoss;
@@ -36,10 +37,13 @@ namespace Gilomx.CupheadBossRoulette
 
             string command;
             var changed = false;
-            while (creatorToolsServer.TryTakeConfigCommand(out command))
+            var processed = 0;
+            while (processed < CreatorToolsMaximumConfigCommandsPerUpdate &&
+                   creatorToolsServer.TryTakeConfigCommand(out command))
             {
                 ApplyCreatorToolsForceCommand(command);
                 changed = true;
+                processed++;
             }
             if (changed)
                 PublishCreatorToolsForceConfig(true);

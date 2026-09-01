@@ -9,25 +9,89 @@
   const progress = document.getElementById("battle-progress");
   const roster = document.getElementById("battle-roster");
   const template = document.getElementById("battle-slot-template");
-  let lastRevision = -1;
+  const eyebrow = document.getElementById("battle-eyebrow");
   let lastRosterSignature = "";
-  let requestPending = false;
+
+  const COPY = {
+    es: {
+      title: "Batalla Molestosa",
+      eyebrow: "BATALLA MOLESTOSA",
+      rosterAria: "Participantes de Batalla Molestosa",
+      recruiting: "Reclutando contrincantes",
+      ready: "Equipo completo",
+      waitingAttempt: "Esperando el siguiente intento",
+      waitingLevel: "Esperando el siguiente nivel",
+      active: "Batalla en curso · Intento {attempt}",
+      won: "¡Victoria!",
+      idle: "Esperando reclutamiento",
+      participant: "Participante",
+      slot: "Cupo {slot}",
+      avatar: "Foto de {name}",
+      entryGift: "Regalo de entrada",
+      previewGift: "Rebanada de pastel",
+    },
+    en: {
+      title: "Pesky Battle",
+      eyebrow: "PESKY BATTLE",
+      rosterAria: "Pesky Battle participants",
+      recruiting: "Recruiting opponents",
+      ready: "Roster ready",
+      waitingAttempt: "Waiting for the next attempt",
+      waitingLevel: "Waiting for the next level",
+      active: "Battle in progress · Attempt {attempt}",
+      won: "Victory!",
+      idle: "Waiting for recruitment",
+      participant: "Participant",
+      slot: "Slot {slot}",
+      avatar: "Photo of {name}",
+      entryGift: "Entry gift",
+      previewGift: "Slice of cake",
+    },
+  };
+
+  const normalizeLocale = (value) => {
+    const locale = String(value || "").trim().toLowerCase();
+    if (locale === "en" || locale.startsWith("en-")) return "en";
+    if (locale === "es" || locale.startsWith("es-")) return "es";
+    return "";
+  };
+  const queryLocale = normalizeLocale(
+    new URLSearchParams(window.location.search).get("locale"),
+  );
+  let activeLocale = queryLocale || "es";
+
+  const message = (template, values = {}) => Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+
+  const applyLocale = (locale) => {
+    activeLocale = locale || "es";
+    const text = COPY[activeLocale];
+    document.documentElement.lang = activeLocale;
+    document.title = text.title;
+    eyebrow.textContent = text.eyebrow;
+    roster.setAttribute("aria-label", text.rosterAria);
+  };
 
   const statusText = (state) => {
+    const text = COPY[activeLocale];
     switch (state.phase) {
-      case "recruiting": return "Reclutando contrincantes";
-      case "ready": return "Equipo completo";
+      case "recruiting": return text.recruiting;
+      case "ready": return text.ready;
       case "waiting_level": return state.attempt > 0
-        ? "Esperando el siguiente intento"
-        : "Esperando el siguiente nivel";
-      case "active": return `Batalla en curso · Intento ${Math.max(1, state.attempt || 1)}`;
-      case "won": return "¡Victoria!";
-      default: return "Esperando reclutamiento";
+        ? text.waitingAttempt
+        : text.waitingLevel;
+      case "active": return message(text.active, {
+        attempt: Math.max(1, state.attempt || 1),
+      });
+      case "won": return text.won;
+      default: return text.idle;
     }
   };
 
   const participantName = (participant) => (
-    participant?.displayName || participant?.userName || "Participante"
+    participant?.displayName || participant?.userName || COPY[activeLocale].participant
   ).trim();
 
   const safeAvatar = (participant) => {
@@ -55,7 +119,7 @@
     if (!participant) {
       item.dataset.filled = "false";
       initial.textContent = "?";
-      name.textContent = `Cupo ${slotNumber}`;
+      name.textContent = message(COPY[activeLocale].slot, { slot: slotNumber });
       return fragment;
     }
 
@@ -67,7 +131,7 @@
     item.title = displayName;
     if (avatarUrl) {
       avatar.src = avatarUrl;
-      avatar.alt = `Foto de ${displayName}`;
+      avatar.alt = message(COPY[activeLocale].avatar, { name: displayName });
       avatar.hidden = false;
       avatar.addEventListener("error", () => {
         avatar.hidden = true;
@@ -79,6 +143,8 @@
 
   const render = (state) => {
     if (!state || typeof state !== "object") return;
+    applyLocale(normalizeLocale(state.locale) || queryLocale || "es");
+    const text = COPY[activeLocale];
     const phase = typeof state.phase === "string" ? state.phase : "off";
     const participants = Array.isArray(state.participants) ? state.participants : [];
     const capacity = Math.max(1, Math.min(5, Number(state.capacity) || 5));
@@ -100,7 +166,7 @@
       battleTrigger.giftImagePath || battleTrigger.giftImageUrl || "",
     ).trim();
     trigger.hidden = phase === "off";
-    giftName.textContent = currentGiftName || "Regalo de entrada";
+    giftName.textContent = currentGiftName || text.entryGift;
     if (currentGiftImage) {
       giftImage.src = currentGiftImage;
       giftImage.hidden = false;
@@ -114,6 +180,7 @@
     }
 
     const rosterSignature = JSON.stringify({
+      locale: activeLocale,
       capacity,
       participants: participants.map((participant) => ({
         slot: participant?.slot,
@@ -132,26 +199,32 @@
     }
   };
 
-  const refresh = async () => {
-    if (requestPending) return;
-    requestPending = true;
-    try {
-      const response = await fetch("/api/config/pesky-battle", { cache: "no-store" });
-      if (!response.ok) return;
-      const state = await response.json();
-      const revision = Number(state?.revision);
-      if (!Number.isFinite(revision) || revision !== lastRevision) {
-        lastRevision = Number.isFinite(revision) ? revision : lastRevision;
-        render(state);
-      }
-    } catch {
-      // Keep the last complete snapshot visible through a short reconnect.
-    } finally {
-      requestPending = false;
-    }
-  };
-
-  render({ phase: "off", participants: [], capacity: 5 });
-  void refresh();
-  window.setInterval(refresh, 500);
+  window.LiveEventOverlayRuntime.create({
+    overlay: "pesky-battle",
+    endpoint: "/api/config/pesky-battle",
+    interval: 500,
+    render,
+    initialLiveState: {
+      revision: 0,
+      phase: "off",
+      participants: [],
+      capacity: 5,
+    },
+    initialPreviewState: {
+      revision: 1,
+      phase: "recruiting",
+      locale: activeLocale,
+      attempt: 0,
+      capacity: 5,
+      trigger: {
+        giftName: COPY[activeLocale].previewGift,
+        giftImagePath: "/assets/creator-tools/gifts/images/6784.png",
+      },
+      participants: [
+        { slot: 1, userId: "preview-1", displayName: "La Pichi" },
+        { slot: 2, userId: "preview-2", displayName: "Don Taza" },
+        { slot: 3, userId: "preview-3", displayName: "Señorita Cáliz" },
+      ],
+    },
+  });
 })();

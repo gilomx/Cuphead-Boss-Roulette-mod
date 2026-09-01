@@ -56,7 +56,6 @@ namespace Gilomx.CupheadBossRoulette
             new CreatorToolsStreamEvaluation();
 
         internal int MatchedRules;
-        internal int QueuedInteractions;
         internal long DeferredInteractions;
         internal string RuleNames = string.Empty;
         internal string InteractionIds = string.Empty;

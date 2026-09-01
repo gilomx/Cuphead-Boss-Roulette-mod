@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farmeando taps</title>
+  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css">
+</head>
+<body>
+  <main id="tap-farming" class="tap-farming" data-visible="false" data-phase="off">
+    <header class="tap-farming__header">
+      <div class="tap-farming__identity">
+        <span class="tap-farming__mark" aria-hidden="true">
+          <i></i><i></i><b>TAP</b>
+        </span>
+        <div class="tap-farming__heading">
+          <span id="tap-eyebrow" class="tap-farming__eyebrow">FARMEANDO TAPS</span>
+          <strong id="tap-boss-name" class="tap-farming__boss">Esperando jefe</strong>
+        </div>
+      </div>
+      <div class="tap-farming__header-status">
+        <span id="tap-preview-badge" class="tap-farming__preview-badge" hidden>VISTA PREVIA</span>
+        <strong id="tap-status" class="tap-farming__status">Recolectando taps</strong>
+      </div>
+    </header>
+
+    <section class="tap-farming__journey" aria-labelledby="tap-phase-label">
+      <div class="tap-farming__journey-heading">
+        <div>
+          <span id="tap-journey-label">AVANCE DEL COMBATE</span>
+          <strong id="tap-phase-label">Fase 1 de 1</strong>
+        </div>
+        <b id="tap-overall-progress">0%</b>
+      </div>
+      <ol id="tap-phase-track" class="tap-farming__phase-track" aria-label="Progreso por fases"></ol>
+    </section>
+
+    <footer class="tap-farming__footer">
+      <section id="tap-reserve-card" class="tap-reserve" data-active="false">
+        <div class="tap-reserve__heading">
+          <span id="tap-reserve-label">RESERVA DE TAPS</span>
+          <strong id="tap-reserve-health">+0 puntos</strong>
+        </div>
+        <div class="tap-reserve__meter" aria-hidden="true">
+          <i id="tap-reserve-fill"></i>
+          <span></span><span></span><span></span>
+        </div>
+        <div class="tap-reserve__foot">
+          <span><b id="tap-banked-taps">0</b> <span id="tap-banked-label">taps esperando</span></span>
+          <span id="tap-reserve-equivalence">Sin reserva activa</span>
+        </div>
+      </section>
+
+      <dl class="tap-farming__counters">
+        <div class="tap-counter tap-counter--community">
+          <dt id="tap-total-label">TAPS COMUNITARIOS</dt>
+          <dd id="tap-total">0</dd>
+        </div>
+        <div>
+          <dt id="tap-generated-label">PUNTOS GENERADOS</dt>
+          <dd id="tap-converted-health">0</dd>
+        </div>
+        <div>
+          <dt id="tap-absorbed-label">DAÑO ABSORBIDO</dt>
+          <dd id="tap-spent-health">0</dd>
+        </div>
+        <div class="tap-counter tap-counter--conversion">
+          <dt id="tap-conversion-label">CONVERSIÓN</dt>
+          <dd><b id="tap-conversion">2</b> <span id="tap-conversion-equation">taps = 1 punto</span></dd>
+          <span class="tap-counter__conversion-track" aria-hidden="true"><i id="tap-conversion-progress"></i></span>
+          <small id="tap-conversion-remainder">0 de 2 para el siguiente</small>
+        </div>
+      </dl>
+    </footer>
+  </main>
+
+  <template id="tap-phase-template">
+    <li class="tap-phase" data-status="pending">
+      <div class="tap-phase__label">
+        <span class="tap-phase__number"></span>
+        <b class="tap-phase__status"></b>
+      </div>
+      <div class="tap-phase__meter" aria-hidden="true">
+        <i class="tap-phase__progress"></i>
+        <em class="tap-phase__reserve"></em>
+      </div>
+      <small class="tap-phase__percent"></small>
+    </li>
+  </template>
+
+  <script src="/assets/creator-tools/live-event-overlay-runtime.js"></script>
+  <script src="/assets/creator-tools/tap-farming-overlay.js"></script>
+</body>
+</html>

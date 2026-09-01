@@ -1,14 +1,23 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { DashboardView } from "./features/dashboard/DashboardView";
+import { PeskyBattleDetailView } from "./features/dashboard/PeskyBattleDetailView";
+import { TapFarmingDetailView } from "./features/dashboard/TapFarmingDetailView";
 import { InteractionsView } from "./features/interactions/InteractionsView";
 import { PeskyModeView } from "./features/pesky/PeskyModeView";
 import { RouletteView } from "./features/roulette/RouletteView";
 import { useLocalization } from "./i18n/LocalizationContext";
 
 export type ConfigSection = "dashboard" | "roulette" | "interactions" | "pesky";
+type AppView = ConfigSection | "peskyBattle" | "tapFarming";
 
-function sectionFromPath(): ConfigSection {
+function viewFromPath(): AppView {
+  if (window.location.pathname.startsWith("/config/tap-farming")) {
+    return "tapFarming";
+  }
+  if (window.location.pathname.startsWith("/config/pesky-battle")) {
+    return "peskyBattle";
+  }
   if (window.location.pathname.startsWith("/dashboard")) return "dashboard";
   if (window.location.pathname.startsWith("/config/interactions")) return "interactions";
   if (window.location.pathname.startsWith("/config/pesky")) return "pesky";
@@ -16,33 +25,103 @@ function sectionFromPath(): ConfigSection {
 }
 
 export default function App() {
-  const [section, setSection] = useState<ConfigSection>(sectionFromPath);
+  const [view, setView] = useState<AppView>(viewFromPath);
   const { t } = useLocalization();
 
   useEffect(() => {
-    const handlePopState = () => setSection(sectionFromPath());
+    const handlePopState = () => setView(viewFromPath());
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   useEffect(() => {
-    document.title = t(section === "dashboard" ? "dashboard.documentTitle" : "app.documentTitle");
-  }, [section, t]);
+    document.title = view === "peskyBattle" || view === "tapFarming"
+      ? `${t(view === "peskyBattle"
+        ? "dashboard.peskyBattle.title"
+        : "dashboard.tapFarming.title")} — La Pichi Ruleta`
+      : t(view === "dashboard" ? "dashboard.documentTitle" : "app.documentTitle");
+  }, [t, view]);
 
-  const navigate = (next: ConfigSection) => {
-    if (next === section) return;
-    window.history.pushState(null, "", next === "dashboard" ? "/dashboard" : `/config/${next}`);
-    setSection(next);
+  const navigate = (next: AppView, state: object | null = null) => {
+    if (next === view) return;
+    const path = next === "dashboard"
+      ? "/dashboard"
+      : next === "peskyBattle"
+        ? "/config/pesky-battle"
+        : next === "tapFarming"
+          ? "/config/tap-farming"
+        : `/config/${next}`;
+    window.history.pushState(state, "", path);
+    setView(next);
     window.scrollTo({ top: 0 });
   };
 
+  const openPeskyBattle = () => {
+    const currentState = window.history.state &&
+      typeof window.history.state === "object"
+      ? { ...window.history.state }
+      : {};
+    window.history.replaceState(
+      { ...currentState, focusLiveEvent: "peskyBattle" },
+      "",
+      window.location.href,
+    );
+    navigate("peskyBattle", { fromLiveEvents: true });
+  };
+
+  const openTapFarming = () => {
+    const currentState = window.history.state &&
+      typeof window.history.state === "object"
+      ? { ...window.history.state }
+      : {};
+    window.history.replaceState(
+      { ...currentState, focusLiveEvent: "tapFarming" },
+      "",
+      window.location.href,
+    );
+    navigate("tapFarming", { fromLiveEvents: true });
+  };
+
+  const returnToLiveEvents = (focusLiveEvent: "peskyBattle" | "tapFarming") => {
+    const currentState = window.history.state as {
+      fromLiveEvents?: boolean;
+    } | null;
+    if (currentState?.fromLiveEvents && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.history.pushState(
+      { focusLiveEvent },
+      "",
+      "/dashboard",
+    );
+    setView("dashboard");
+    window.scrollTo({ top: 0 });
+  };
+
+  const activeSection: ConfigSection = view === "peskyBattle" || view === "tapFarming"
+    ? "dashboard"
+    : view;
+
   return (
-    <AppShell activeSection={section} onSectionChange={navigate}>
-      {section === "dashboard"
-        ? <DashboardView onOpenInteractions={() => navigate("interactions")} />
-        : section === "interactions"
+    <AppShell
+      activeSection={activeSection}
+      currentSection={view === "peskyBattle" || view === "tapFarming" ? null : activeSection}
+      onSectionChange={(section) => navigate(section)}
+    >
+      {view === "dashboard"
+        ? <DashboardView
+            onOpenInteractions={() => navigate("interactions")}
+            onOpenPeskyBattle={openPeskyBattle}
+            onOpenTapFarming={openTapFarming}
+          />
+        : view === "peskyBattle"
+          ? <PeskyBattleDetailView onBack={() => returnToLiveEvents("peskyBattle")} />
+        : view === "tapFarming"
+          ? <TapFarmingDetailView onBack={() => returnToLiveEvents("tapFarming")} />
+        : view === "interactions"
         ? <InteractionsView />
-        : section === "pesky"
+        : view === "pesky"
           ? <PeskyModeView />
           : <RouletteView />}
     </AppShell>

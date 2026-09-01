@@ -13,12 +13,14 @@ import type {
   ForceDraft,
   InteractionConfigState,
   InteractionQueueEntry,
+  LiveEventsConfigState,
   PeskyBattleConfigState,
   PeskyModeConfigState,
   RouletteConfigState,
   RouletteSelection,
   StreamRuleDraft,
   StreamRulesConfigState,
+  TapFarmingConfigState,
 } from "../model";
 
 interface ConfigValue {
@@ -27,6 +29,8 @@ interface ConfigValue {
   interaction: InteractionConfigState | null;
   pesky: PeskyModeConfigState | null;
   peskyBattle: PeskyBattleConfigState | null;
+  liveEvents: LiveEventsConfigState | null;
+  tapFarming: TapFarmingConfigState | null;
   streamRules: StreamRulesConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
@@ -50,6 +54,10 @@ interface ConfigValue {
   cancelPeskyBattle: () => void;
   disablePeskyBattle: () => void;
   resetPeskyBattle: () => void;
+  applyTapFarmingRate: (tapsPerHealthPoint: number) => void;
+  activateTapFarming: (tapsPerHealthPoint: number) => void;
+  deactivateTapFarming: () => void;
+  resetTapFarming: () => void;
   saveStreamRule: (draft: StreamRuleDraft) => boolean;
   deleteStreamRule: (id: number) => boolean;
   duplicateStreamRule: (id: number) => void;
@@ -139,6 +147,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [interaction, setInteraction] = useState<InteractionConfigState | null>(null);
   const [pesky, setPesky] = useState<PeskyModeConfigState | null>(null);
   const [peskyBattle, setPeskyBattle] = useState<PeskyBattleConfigState | null>(null);
+  const [liveEvents, setLiveEvents] = useState<LiveEventsConfigState | null>(null);
+  const [tapFarming, setTapFarming] = useState<TapFarmingConfigState | null>(null);
   const [streamRules, setStreamRules] = useState<StreamRulesConfigState | null>(null);
   const [optimisticInteractionQueue, setOptimisticInteractionQueue] = useState<
     InteractionQueueEntry[]
@@ -181,6 +191,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const confirmedPeskyBattleRevisionRef = useRef(0);
   const pendingPeskyBattleChangesRef = useRef<PendingPeskyBattleChange[]>([]);
   const peskyBattleWriteChainRef = useRef<Promise<void>>(Promise.resolve());
+  const tapFarmingWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const streamRulesRevisionRef = useRef<number | null>(null);
   const streamRulesWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
@@ -194,23 +205,31 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         interactionResponse,
         peskyResponse,
         peskyBattleResponse,
+        liveEventsResponse,
+        tapFarmingResponse,
         streamRulesResponse,
       ] = await Promise.all([
         fetch("/api/config", { cache: "no-store" }),
         fetch("/api/config/interactions", { cache: "no-store" }),
         fetch("/api/config/pesky", { cache: "no-store" }),
         fetch("/api/config/pesky-battle", { cache: "no-store" }),
+        fetch("/api/config/live-events", { cache: "no-store" }),
+        fetch("/api/config/tap-farming", { cache: "no-store" }),
         fetch("/api/config/interactions/rules", { cache: "no-store" }),
       ]);
       if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
       if (!interactionResponse.ok) throw new Error(`HTTP ${interactionResponse.status}`);
       if (!peskyResponse.ok) throw new Error(`HTTP ${peskyResponse.status}`);
       if (!peskyBattleResponse.ok) throw new Error(`HTTP ${peskyBattleResponse.status}`);
+      if (!liveEventsResponse.ok) throw new Error(`HTTP ${liveEventsResponse.status}`);
+      if (!tapFarmingResponse.ok) throw new Error(`HTTP ${tapFarmingResponse.status}`);
       if (!streamRulesResponse.ok) throw new Error(`HTTP ${streamRulesResponse.status}`);
       const next = (await configResponse.json()) as RouletteConfigState;
       const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
       const nextPesky = (await peskyResponse.json()) as PeskyModeConfigState;
       const nextPeskyBattle = (await peskyBattleResponse.json()) as PeskyBattleConfigState;
+      const nextLiveEvents = (await liveEventsResponse.json()) as LiveEventsConfigState;
+      const nextTapFarming = (await tapFarmingResponse.json()) as TapFarmingConfigState;
       const nextStreamRules = (await streamRulesResponse.json()) as StreamRulesConfigState;
       if (
         !mountedRef.current ||
@@ -235,15 +254,36 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         masterRevision: nextInteraction.masterRevision ?? 0,
         queuePaused: nextInteraction.queuePaused === true,
         queueControlRevision: nextInteraction.queueControlRevision ?? 0,
+        pendingClearProjected:
+          nextInteraction.pendingClearProjected === true,
         pendingCount: nextInteraction.pendingCount ?? Math.max(
           0,
           (nextInteraction.queueCount ?? 0) -
             (nextInteraction.activeCount ?? 0),
         ),
         backlogCount: nextInteraction.backlogCount ?? 0,
+        deferredTestCount: nextInteraction.deferredTestCount ?? 0,
         showGiftImage: nextInteraction.showGiftImage !== false,
         settingsRevision: nextInteraction.settingsRevision ?? 0,
       };
+      if (visibleInteraction.pendingClearProjected) {
+        visibleInteraction = {
+          ...visibleInteraction,
+          queue: visibleInteraction.queue.filter((entry) => entry.status === "active"),
+          queueCount: visibleInteraction.activeCount,
+          pendingCount: 0,
+        };
+      }
+      if (
+        visibleInteraction.pendingClearProjected ||
+        !visibleInteraction.interactionsEnabled
+      ) {
+        interactionRevisionRef.current = null;
+        setOptimisticInteractionQueue((current) => current.length === 0
+          ? current
+          : []);
+        setInteractionTesting(false);
+      }
       let interactionMasterPending = false;
       const desiredInteractionMaster = desiredInteractionMasterRef.current;
       if (desiredInteractionMaster !== null) {
@@ -274,6 +314,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
               : 0,
             backlogCount: desiredInteractionMaster.enabled
               ? visibleInteraction.backlogCount
+              : 0,
+            deferredTestCount: desiredInteractionMaster.enabled
+              ? visibleInteraction.deferredTestCount
               : 0,
           };
         }
@@ -311,6 +354,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             queueCount: visibleInteraction.activeCount,
             pendingCount: 0,
             backlogCount: 0,
+            deferredTestCount: 0,
           };
         }
       }
@@ -397,6 +441,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       );
       setPeskyBattle(visiblePeskyBattle);
       const peskyBattlePending = pendingPeskyBattleChanges.length > 0;
+      setLiveEvents(nextLiveEvents);
+      setTapFarming(nextTapFarming);
       let streamRulesPending = false;
       const streamRulesRevision = streamRulesRevisionRef.current;
       if (streamRulesRevision !== null) {
@@ -408,7 +454,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       }
       setStreamRules(nextStreamRules);
       if (!next.ready || !nextInteraction.ready || !nextPesky.ready ||
-          !nextPeskyBattle.ready || !nextStreamRules.ready) {
+          !nextPeskyBattle.ready || !nextLiveEvents.ready ||
+          !nextTapFarming.ready || !nextStreamRules.ready) {
         setStatus("connecting");
         return;
       }
@@ -651,6 +698,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             queueCount: enabled ? current.queueCount : current.activeCount,
             pendingCount: enabled ? current.pendingCount : 0,
             backlogCount: enabled ? current.backlogCount : 0,
+            deferredTestCount: enabled ? current.deferredTestCount : 0,
             feedback: enabled ? "interactions_enabled" : "interactions_disabled",
             error: false,
           }
@@ -710,6 +758,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           queueCount: current.activeCount,
           pendingCount: 0,
           backlogCount: 0,
+          deferredTestCount: 0,
           feedback: "pending_cleared",
           error: false,
         }
@@ -988,7 +1037,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const armPeskyBattle = useCallback(
     (giftId: string) => {
-      if (!peskyBattle?.ready || peskyBattle.phase !== "off") return;
+      if (!peskyBattle?.ready || peskyBattle.phase !== "off" ||
+          (liveEvents?.activeEvent && liveEvents.activeEvent !== "pesky_battle")) return;
       setPesky((current) => current
         ? {
             ...current,
@@ -1018,7 +1068,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         }),
       );
     },
-    [peskyBattle, sendPeskyBattleUpdate],
+    [liveEvents, peskyBattle, sendPeskyBattleUpdate],
   );
 
   const startPeskyBattle = useCallback(() => {
@@ -1072,6 +1122,91 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     () => finishPeskyBattle("reset"),
     [finishPeskyBattle],
   );
+
+  const sendTapFarmingUpdate = useCallback(
+    (
+      operation: "activate" | "deactivate" | "finish" | "save",
+      tapsPerHealthPoint?: number,
+    ) => {
+      if (!tapFarming?.ready) return;
+      const query = new URLSearchParams({ operation });
+      if (tapsPerHealthPoint !== undefined) {
+        query.set("tapsPerHealthPoint", String(tapsPerHealthPoint));
+      }
+      setStatus("saving");
+      const send = () => fetch(
+        "/api/config/tap-farming/set?" + query,
+        { cache: "no-store" },
+      )
+        .then((response) => {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (mountedRef.current) setStatus("pending");
+          window.setTimeout(() => void load(), 120);
+        })
+        .catch(() => {
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        });
+      tapFarmingWriteChainRef.current =
+        tapFarmingWriteChainRef.current.then(send, send);
+    },
+    [load, tapFarming],
+  );
+
+  const applyTapFarmingRate = useCallback(
+    (value: number) => {
+      if (!tapFarming?.ready || tapFarming.phase !== "off") return;
+      const tapsPerHealthPoint = Math.max(1, Math.min(100000, Math.floor(value) || 1));
+      setTapFarming((current) => current
+        ? {
+            ...current,
+            conversion: { ...current.conversion, tapsPerHealthPoint },
+            feedback: "settings_saved",
+            error: false,
+          }
+        : current);
+      sendTapFarmingUpdate("save", tapsPerHealthPoint);
+    },
+    [sendTapFarmingUpdate, tapFarming],
+  );
+
+  const activateTapFarming = useCallback(
+    (value: number) => {
+      if (!tapFarming?.ready || tapFarming.phase !== "off" ||
+          (liveEvents?.activeEvent && liveEvents.activeEvent !== "tap_farming")) return;
+      const tapsPerHealthPoint = Math.max(1, Math.min(100000, Math.floor(value) || 1));
+      setTapFarming((current) => current
+        ? {
+            ...current,
+            phase: "collecting",
+            conversion: { ...current.conversion, tapsPerHealthPoint },
+            feedback: "activated",
+            error: false,
+          }
+        : current);
+      setLiveEvents((current) => current
+        ? { ...current, activeEvent: "tap_farming" }
+        : current);
+      sendTapFarmingUpdate("activate", tapsPerHealthPoint);
+    },
+    [liveEvents, sendTapFarmingUpdate, tapFarming],
+  );
+
+  const deactivateTapFarming = useCallback(() => {
+    if (!tapFarming?.ready || tapFarming.phase === "off" ||
+        tapFarming.phase === "stopping") return;
+    setTapFarming((current) => current
+      ? { ...current, phase: "stopping", feedback: "stopping", error: false }
+      : current);
+    sendTapFarmingUpdate("deactivate");
+  }, [sendTapFarmingUpdate, tapFarming]);
+
+  const resetTapFarming = useCallback(() => {
+    if (!tapFarming?.ready || tapFarming.phase !== "completed") return;
+    sendTapFarmingUpdate("finish");
+  }, [sendTapFarmingUpdate, tapFarming]);
 
   const testInteraction = useCallback(
     (item: string, donor: string, quantity: number, delay: number) => {
@@ -1216,6 +1351,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       interaction,
       pesky,
       peskyBattle,
+      liveEvents,
+      tapFarming,
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
@@ -1240,6 +1377,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       cancelPeskyBattle,
       disablePeskyBattle,
       resetPeskyBattle,
+      applyTapFarmingRate,
+      activateTapFarming,
+      deactivateTapFarming,
+      resetTapFarming,
       saveStreamRule,
       deleteStreamRule,
       duplicateStreamRule,
@@ -1251,6 +1392,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       interaction,
       pesky,
       peskyBattle,
+      liveEvents,
+      tapFarming,
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
@@ -1275,6 +1418,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       cancelPeskyBattle,
       disablePeskyBattle,
       resetPeskyBattle,
+      applyTapFarmingRate,
+      activateTapFarming,
+      deactivateTapFarming,
+      resetTapFarming,
       saveStreamRule,
       deleteStreamRule,
       duplicateStreamRule,

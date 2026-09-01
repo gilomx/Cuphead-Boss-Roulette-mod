@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, Swords, Users } from "lucide-react";
+import { AlertTriangle, Check, Copy, Swords, Users } from "lucide-react";
 import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
@@ -40,6 +40,7 @@ function participantsBySlot(participants: PeskyBattleParticipant[]) {
 export function PeskyBattlePanel() {
   const {
     interaction,
+    liveEvents,
     peskyBattle,
     applyPeskyBattleGift,
     applyPeskyBattleStreamAttacks,
@@ -77,9 +78,10 @@ export function PeskyBattlePanel() {
   const slots = participantsBySlot(peskyBattle?.participants ?? []);
   const participantCount = slots.filter(Boolean).length;
   const rosterReady = participantCount === BATTLE_CAPACITY;
+  const blockedByTapFarming = liveEvents?.activeEvent === "tap_farming";
   const canArm = Boolean(
     peskyBattle?.ready && phase === "off" && giftDraft && selectedGift &&
-    enabledItemCount > 0,
+    enabledItemCount > 0 && !blockedByTapFarming,
   );
   const giftPlaceholder = catalogError
     ? t("dashboard.peskyBattle.trigger.catalogError")
@@ -96,7 +98,8 @@ export function PeskyBattlePanel() {
       : t(`dashboard.peskyBattle.phaseDescription.${phase}`);
 
   const copyOverlayUrl = async () => {
-    const overlayUrl = `${window.location.origin}/pesky-battle-overlay`;
+    const localeQuery = locale === "en" ? "?locale=en" : "";
+    const overlayUrl = `${window.location.origin}/pesky-battle-overlay${localeQuery}`;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(overlayUrl);
@@ -116,10 +119,10 @@ export function PeskyBattlePanel() {
       <div className="dashboard-pesky-battle__heading">
         <div>
           <p className="dashboard-eyebrow">{t("dashboard.peskyBattle.eyebrow")}</p>
-          <h2 id="dashboard-pesky-battle-title">
+          <h1 id="dashboard-pesky-battle-title">
             <Swords aria-hidden="true" />
             {t("dashboard.peskyBattle.title")}
-          </h2>
+          </h1>
           <p>{t("dashboard.peskyBattle.description")}</p>
         </div>
         <div className="dashboard-pesky-battle__heading-actions">
@@ -141,6 +144,16 @@ export function PeskyBattlePanel() {
         <strong>{t(`dashboard.peskyBattle.phase.${phase}`)}</strong>
         <span>{phaseDescription}</span>
       </div>
+
+      {blockedByTapFarming ? (
+        <div className="dashboard-live-event-conflict" role="status">
+          <AlertTriangle aria-hidden="true" />
+          <div>
+            <strong>{t("dashboard.liveEvents.conflict.title")}</strong>
+            <span>{t("dashboard.liveEvents.conflict.tapFarmingActive")}</span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="dashboard-pesky-battle__layout">
         <div className="dashboard-pesky-battle__configuration">

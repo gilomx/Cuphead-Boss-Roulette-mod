@@ -3,7 +3,7 @@ import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
-import { PeskyBattlePanel } from "./PeskyBattlePanel";
+import { LiveEventsSection } from "./LiveEventsSection";
 import type {
   DashboardConnection,
   DashboardCounters,
@@ -84,14 +84,40 @@ function normalizedCounter(value: number | undefined) {
 
 interface DashboardViewProps {
   onOpenInteractions: () => void;
+  onOpenPeskyBattle: () => void;
+  onOpenTapFarming: () => void;
 }
 
-export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
+export function DashboardView({
+  onOpenInteractions,
+  onOpenPeskyBattle,
+  onOpenTapFarming,
+}: DashboardViewProps) {
   const { locale, t } = useLocalization();
   const { interaction, applyInteractionsEnabled } = useConfig();
   const [dashboard, setDashboard] = useState<DashboardState>(EMPTY_STATE);
   const [reachable, setReachable] = useState(true);
   const latestDashboardRequest = useRef(0);
+  const peskyBattleCardRef = useRef<HTMLButtonElement>(null);
+  const tapFarmingCardRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const navigationState = window.history.state as {
+      focusLiveEvent?: string;
+      [key: string]: unknown;
+    } | null;
+    if (navigationState?.focusLiveEvent !== "peskyBattle" &&
+        navigationState?.focusLiveEvent !== "tapFarming") return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (navigationState.focusLiveEvent === "tapFarming") {
+        tapFarmingCardRef.current?.focus();
+      } else {
+        peskyBattleCardRef.current?.focus();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const loadDashboard = useCallback(async (signal?: AbortSignal) => {
     const requestId = latestDashboardRequest.current + 1;
@@ -212,7 +238,12 @@ export function DashboardView({ onOpenInteractions }: DashboardViewProps) {
         </button>
       </section>
 
-      <PeskyBattlePanel />
+      <LiveEventsSection
+        onOpenPeskyBattle={onOpenPeskyBattle}
+        onOpenTapFarming={onOpenTapFarming}
+        peskyBattleCardRef={peskyBattleCardRef}
+        tapFarmingCardRef={tapFarmingCardRef}
+      />
 
       <section className="dashboard-connections" aria-labelledby="dashboard-connections-title">
         <div className="dashboard-section-heading">

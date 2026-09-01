@@ -57,6 +57,11 @@ namespace Gilomx.CupheadBossRoulette
         private CreatorToolsDashboardController creatorToolsDashboard;
         private CreatorToolsStreamRulesController creatorToolsStreamRules;
         private TikFinityCompanionHost creatorToolsTikFinityCompanion;
+        private CreatorToolsStreamWorker creatorToolsStreamWorker;
+        private readonly object creatorToolsInteractionsSettingLock =
+            new object();
+        private volatile bool creatorToolsInteractionsEnabled;
+        private bool creatorToolsApplicationFocused = true;
         private bool creatorToolsBattleSessionActive;
         private bool creatorToolsBattleCompleted;
         private bool creatorToolsBattleVisible;
@@ -131,6 +136,8 @@ namespace Gilomx.CupheadBossRoulette
                 "Permite que eventos y pruebas de Interacciones generen " +
                 "ataques dentro del juego. Modo Molestoso se controla " +
                 "por separado.");
+            creatorToolsInteractionsEnabled =
+                creatorToolsInteractionsEnabledSetting.Value;
 
             creatorToolsStreamRules = new CreatorToolsStreamRulesController(
                 AssetsDirectory,
@@ -183,18 +190,23 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsPreviewSetting.Value)
                 creatorToolsPreviewSetting.Value = false;
             StartCreatorToolsServer();
+            StartCreatorToolsStreamWorker();
         }
 
         private bool GetCreatorToolsInteractionsEnabled()
         {
-            return creatorToolsInteractionsEnabledSetting != null &&
-                   creatorToolsInteractionsEnabledSetting.Value;
+            return creatorToolsInteractionsEnabled;
         }
 
         private void SetCreatorToolsInteractionsEnabled(bool enabled)
         {
-            if (creatorToolsInteractionsEnabledSetting != null)
-                creatorToolsInteractionsEnabledSetting.Value = enabled;
+            creatorToolsInteractionsEnabled = enabled;
+            lock (creatorToolsInteractionsSettingLock)
+            {
+                if (creatorToolsInteractionsEnabledSetting != null &&
+                    creatorToolsInteractionsEnabledSetting.Value != enabled)
+                    creatorToolsInteractionsEnabledSetting.Value = enabled;
+            }
             if (creatorToolsStreamRules != null)
                 creatorToolsStreamRules.InvalidateState();
             if (creatorToolsDashboard != null)
@@ -551,6 +563,7 @@ namespace Gilomx.CupheadBossRoulette
         private void InstallCreatorToolsPatches()
         {
             InstallCreatorToolsMenuPatches();
+            InstallCreatorToolsTapFarmingDamagePatches();
             NativeZeppelinCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
@@ -1163,9 +1176,20 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsStreamRules != null)
                 creatorToolsServer.SetStreamRuleCommandHandler(
                     creatorToolsStreamRules.ProcessServerCommand);
+            creatorToolsServer.SetInteractionControlObserver(
+                ObserveCreatorToolsInteractionControl);
+            if (creatorToolsInteractions != null)
+            {
+                creatorToolsServer.SetPeskyBattleCommandHandler(
+                    ObserveCreatorToolsPeskyBattleCommand);
+                creatorToolsServer.SetTapFarmingCommandHandler(
+                    ObserveCreatorToolsTapFarmingCommand);
+            }
             if (creatorToolsDashboard != null)
                 creatorToolsServer.SetDashboardSimulationHandler(
-                    creatorToolsDashboard.ScheduleSimulation);
+                    creatorToolsStreamWorker == null
+                        ? creatorToolsDashboard.ScheduleSimulation
+                        : creatorToolsStreamWorker.ScheduleSimulation);
             if (creatorToolsServer.IsRunning)
                 return true;
 
@@ -1185,8 +1209,151 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
+        private void StartCreatorToolsStreamWorker()
+        {
+            if (creatorToolsStreamWorker != null ||
+                creatorToolsTikFinityCompanion == null ||
+                creatorToolsDashboard == null ||
+                creatorToolsStreamRules == null ||
+                creatorToolsServer == null)
+                return;
+            creatorToolsStreamWorker = new CreatorToolsStreamWorker(
+                creatorToolsTikFinityCompanion,
+                creatorToolsDashboard,
+                creatorToolsStreamRules,
+                creatorToolsServer,
+                EvaluateCreatorToolsStreamEvent,
+                PublishCreatorToolsBackgroundState,
+                delegate(string message) { Logger.LogWarning(message); });
+            creatorToolsServer.SetDashboardSimulationHandler(
+                creatorToolsStreamWorker.ScheduleSimulation);
+            creatorToolsStreamWorker.Start();
+        }
+
+        private bool ObserveCreatorToolsInteractionControl(
+            string query, long commandSequence)
+        {
+            var values = ParseCreatorToolsControlQuery(query);
+            string value;
+            bool enabled;
+            if (values.TryGetValue("interactionsEnabled", out value))
+            {
+                if (!TryParseCreatorToolsSwitch(value, out enabled))
+                    return false;
+                SetCreatorToolsInteractionsEnabled(enabled);
+                if (creatorToolsStreamRules != null)
+                {
+                    if (!enabled)
+                        creatorToolsStreamRules.ResetRuntimeState();
+                    creatorToolsStreamRules.PublishState(
+                        creatorToolsServer);
+                }
+                if (creatorToolsServer != null)
+                {
+                    if (!enabled)
+                    {
+                        creatorToolsServer.ProjectInteractionQueueCleared(
+                            commandSequence);
+                    }
+                    creatorToolsServer.ProjectInteractionMasterState(
+                        enabled, commandSequence);
+                }
+                PublishCreatorToolsBackgroundBacklogCount();
+                return true;
+            }
+            if (!values.ContainsKey("clearPending"))
+                return false;
+            if (creatorToolsStreamRules != null)
+                creatorToolsStreamRules.ClearBacklog();
+            if (creatorToolsServer != null)
+            {
+                creatorToolsServer.ClearPendingInteractionTests();
+                creatorToolsServer.ProjectInteractionQueueCleared(
+                    commandSequence);
+            }
+            PublishCreatorToolsBackgroundBacklogCount();
+            return true;
+        }
+
+        private bool ObserveCreatorToolsPeskyBattleCommand(string query)
+        {
+            var interactions = creatorToolsInteractions;
+            return interactions != null &&
+                interactions.ProcessPeskyBattleCommandInBackground(
+                    query, creatorToolsServer);
+        }
+
+        private bool ObserveCreatorToolsTapFarmingCommand(string query)
+        {
+            var interactions = creatorToolsInteractions;
+            return interactions != null &&
+                interactions.ProcessTapFarmingCommandInBackground(
+                    query, creatorToolsServer);
+        }
+
+        private void PublishCreatorToolsBackgroundBacklogCount()
+        {
+            if (creatorToolsServer != null && creatorToolsStreamRules != null)
+                creatorToolsServer.SetInteractionBacklogCount(
+                    creatorToolsStreamRules.BacklogCount);
+            if (creatorToolsStreamWorker != null)
+                creatorToolsStreamWorker.Signal();
+        }
+
+        private static Dictionary<string, string>
+            ParseCreatorToolsControlQuery(string query)
+        {
+            var values = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(query))
+                return values;
+            var pairs = query.Split('&');
+            for (var i = 0; i < pairs.Length; i++)
+            {
+                var separator = pairs[i].IndexOf('=');
+                var key = separator < 0
+                    ? pairs[i]
+                    : pairs[i].Substring(0, separator);
+                var value = separator < 0
+                    ? string.Empty
+                    : pairs[i].Substring(separator + 1);
+                try
+                {
+                    key = Uri.UnescapeDataString(key.Replace('+', ' '));
+                    value = Uri.UnescapeDataString(value.Replace('+', ' '));
+                }
+                catch { continue; }
+                if (key.Length <= 64 && value.Length <= 2048)
+                    values[key] = value;
+            }
+            return values;
+        }
+
+        private static bool TryParseCreatorToolsSwitch(
+            string value, out bool enabled)
+        {
+            value = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (value == "1" || value == "true" || value == "on")
+            {
+                enabled = true;
+                return true;
+            }
+            if (value == "0" || value == "false" || value == "off")
+            {
+                enabled = false;
+                return true;
+            }
+            enabled = false;
+            return false;
+        }
+
         private void StopCreatorToolsServer()
         {
+            if (creatorToolsStreamWorker != null)
+            {
+                creatorToolsStreamWorker.Dispose();
+                creatorToolsStreamWorker = null;
+            }
             if (creatorToolsTikFinityCompanion != null)
             {
                 creatorToolsTikFinityCompanion.Dispose();
@@ -1246,75 +1413,79 @@ namespace Gilomx.CupheadBossRoulette
                 // draining so disabling or pausing wins on the first frame
                 // after returning focus to Cuphead.
                 RefreshCreatorToolsInteractionGameplayLevel();
-                creatorToolsInteractions.Update(creatorToolsServer);
-            }
-            var queuedFromStreamBacklog = 0;
-            if (creatorToolsStreamRules != null)
-                queuedFromStreamBacklog = creatorToolsStreamRules.Update(
-                    creatorToolsServer, creatorToolsInteractions,
-                    creatorToolsInteractions == null ||
-                    creatorToolsInteractions.StreamAttacksAllowed);
-            if (creatorToolsDashboard != null &&
-                queuedFromStreamBacklog > 0)
-                creatorToolsDashboard.AddQueuedInteractions(
-                    queuedFromStreamBacklog);
-            UpdateTikFinityCompanion();
-            if (creatorToolsDashboard != null)
-                creatorToolsDashboard.Update(
+                creatorToolsInteractions.Update(
                     creatorToolsServer,
-                    EvaluateCreatorToolsStreamEvent);
+                    creatorToolsApplicationFocused);
+            }
+            var drainedStreamInteractions = 0;
+            if (creatorToolsStreamRules != null)
+                drainedStreamInteractions = creatorToolsStreamRules.Update(
+                    creatorToolsServer, creatorToolsInteractions,
+                    creatorToolsApplicationFocused &&
+                    (creatorToolsInteractions == null ||
+                     creatorToolsInteractions.StreamAttacksAllowed));
+            if (drainedStreamInteractions > 0 &&
+                creatorToolsInteractions != null)
+                creatorToolsInteractions.PublishInteractionState(
+                    creatorToolsServer);
+            if (creatorToolsServer != null && creatorToolsStreamRules != null)
+                creatorToolsServer.SetInteractionBacklogCount(
+                    creatorToolsStreamRules.BacklogCount);
+            if (creatorToolsStreamWorker != null)
+                creatorToolsStreamWorker.Signal();
         }
 
-        private void UpdateTikFinityCompanion()
+        private void OnApplicationFocus(bool hasFocus)
         {
-            if (creatorToolsTikFinityCompanion == null)
-                return;
-            creatorToolsTikFinityCompanion.Update();
-            var processed = 0;
-            CreatorToolsStreamMessage message;
-            while (processed < 64 &&
-                   creatorToolsTikFinityCompanion.TryTakeMessage(out message))
-            {
-                if (message.Connection != null &&
-                    creatorToolsDashboard != null)
-                    creatorToolsDashboard.ApplyConnectionUpdate(
-                        message.Connection);
-                if (message.Event != null &&
-                    creatorToolsDashboard != null)
-                    creatorToolsDashboard.ProcessEvent(
-                        message.Event,
-                        EvaluateCreatorToolsStreamEvent);
-                processed++;
-            }
+            creatorToolsApplicationFocused = hasFocus;
+            if (hasFocus && creatorToolsStreamWorker != null)
+                creatorToolsStreamWorker.Signal();
         }
 
         private CreatorToolsStreamEvaluation EvaluateCreatorToolsStreamEvent(
             CreatorToolsStreamEvent streamEvent)
         {
-            var battleFeedback = string.Empty;
-            if (creatorToolsInteractions != null)
-                battleFeedback =
-                    creatorToolsInteractions.ObservePeskyBattleEvent(
+            var battleObservation = creatorToolsInteractions == null
+                ? new CreatorToolsPeskyBattleObservation(
+                    string.Empty, true)
+                : creatorToolsInteractions.ObservePeskyBattleEvent(
                     streamEvent);
-            if (creatorToolsStreamRules == null ||
-                creatorToolsInteractions == null)
+            var battleFeedback = battleObservation.Feedback;
+            var tapObservation = creatorToolsInteractions == null
+                ? new CreatorToolsTapFarmingObservation(string.Empty)
+                : creatorToolsInteractions.ObserveTapFarmingEvent(
+                    streamEvent);
+            var tapFeedback = tapObservation.Feedback;
+            if (creatorToolsStreamRules == null)
             {
-                if (battleFeedback.Length == 0)
+                var directFeedback = battleFeedback.Length > 0
+                    ? battleFeedback
+                    : tapFeedback;
+                if (directFeedback.Length == 0)
                     return CreatorToolsStreamEvaluation.None;
                 return new CreatorToolsStreamEvaluation
                 {
-                    MessageCode = battleFeedback
+                    MessageCode = directFeedback
                 };
             }
             var result = creatorToolsStreamRules.Evaluate(
-                streamEvent, creatorToolsInteractions,
-                creatorToolsInteractions.StreamAttacksAllowed);
+                streamEvent,
+                battleObservation.StreamAttacksAllowed);
             // Recruitment is independent from the interactions master. Keep
             // rule counts/queue results, but surface the lobby result so the
             // dashboard does not label an accepted recruit as ignored.
             if (battleFeedback.Length > 0)
                 result.MessageCode = battleFeedback;
+            else if (tapFeedback.Length > 0)
+                result.MessageCode = tapFeedback;
             return result;
+        }
+
+        private void PublishCreatorToolsBackgroundState()
+        {
+            if (creatorToolsInteractions != null)
+                creatorToolsInteractions.PublishPeskyBattleState(
+                    creatorToolsServer);
         }
 
         private void DisposeCreatorTools()
@@ -1327,9 +1498,15 @@ namespace Gilomx.CupheadBossRoulette
             {
                 creatorToolsServer.SetDashboardSimulationHandler(null);
                 creatorToolsServer.SetStreamRuleCommandHandler(null);
+                creatorToolsServer.SetInteractionControlObserver(null);
+                creatorToolsServer.SetPeskyBattleCommandHandler(null);
+                creatorToolsServer.SetTapFarmingCommandHandler(null);
             }
-            creatorToolsDashboard = null;
-            creatorToolsStreamRules = null;
+            if (creatorToolsStreamWorker != null)
+            {
+                creatorToolsStreamWorker.Dispose();
+                creatorToolsStreamWorker = null;
+            }
             if (creatorToolsTikFinityCompanion != null)
             {
                 creatorToolsTikFinityCompanion.Dispose();
@@ -1340,6 +1517,8 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractions.Dispose();
                 creatorToolsInteractions = null;
             }
+            creatorToolsDashboard = null;
+            creatorToolsStreamRules = null;
             CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
             if (creatorToolsServer == null)
                 return;

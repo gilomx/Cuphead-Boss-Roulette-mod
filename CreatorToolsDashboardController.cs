@@ -24,6 +24,7 @@ namespace Gilomx.CupheadBossRoulette
             new List<CreatorToolsDashboardConnection>();
         private readonly CreatorToolsStreamDeduplicator deduplicator =
             new CreatorToolsStreamDeduplicator();
+        private readonly object stateLock = new object();
         private readonly object simulationLock = new object();
         private readonly List<ScheduledSimulation> scheduledSimulations =
             new List<ScheduledSimulation>();
@@ -75,17 +76,21 @@ namespace Gilomx.CupheadBossRoulette
 
             if (server == null || !server.IsRunning)
                 return;
-            if (!stateDirty)
-                return;
-            var state = BuildState();
-            if (state == lastPublishedState)
+            string state;
+            lock (stateLock)
             {
+                if (!stateDirty)
+                    return;
+                state = BuildState();
+                if (state == lastPublishedState)
+                {
+                    stateDirty = false;
+                    return;
+                }
+                lastPublishedState = state;
                 stateDirty = false;
-                return;
             }
-            lastPublishedState = state;
             server.SetDashboardState(state);
-            stateDirty = false;
         }
 
         /// <summary>
@@ -137,28 +142,31 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (update == null)
                 return;
-            var connection = FindConnectionById(update.ConnectionId) ??
-                FindConnectionByPlatform("tiktok");
-            if (connection == null)
-                return;
-            var status = NormalizeConnectionStatus(update.State);
-            var message = NormalizeText(
-                update.Message, string.Empty, MaximumTextLength);
-            var messageCode = NormalizeIdentifier(
-                update.MessageCode, 64);
-            var retryAttempt = Math.Max(0, update.RetryAttempt);
-            var changed = connection.Status != status ||
-                connection.Message != message ||
-                connection.MessageCode != messageCode ||
-                connection.RetryAttempt != retryAttempt;
-            connection.Status = status;
-            connection.Message = message;
-            connection.MessageCode = messageCode;
-            connection.RetryAttempt = retryAttempt;
-            if (changed)
+            lock (stateLock)
             {
-                revision++;
-                stateDirty = true;
+                var connection = FindConnectionById(update.ConnectionId) ??
+                    FindConnectionByPlatform("tiktok");
+                if (connection == null)
+                    return;
+                var status = NormalizeConnectionStatus(update.State);
+                var message = NormalizeText(
+                    update.Message, string.Empty, MaximumTextLength);
+                var messageCode = NormalizeIdentifier(
+                    update.MessageCode, 64);
+                var retryAttempt = Math.Max(0, update.RetryAttempt);
+                var changed = connection.Status != status ||
+                    connection.Message != message ||
+                    connection.MessageCode != messageCode ||
+                    connection.RetryAttempt != retryAttempt;
+                connection.Status = status;
+                connection.Message = message;
+                connection.MessageCode = messageCode;
+                connection.RetryAttempt = retryAttempt;
+                if (changed)
+                {
+                    revision++;
+                    stateDirty = true;
+                }
             }
         }
 
@@ -173,98 +181,109 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (streamEvent == null)
                 return;
-            NormalizeEvent(streamEvent);
+            lock (stateLock)
+            {
+                NormalizeEvent(streamEvent);
 
-            var record = new CreatorToolsDashboardEventRecord
-            {
-                Event = streamEvent,
-                Sequence = ++eventSequence,
-                LocalId = "evt-" + eventSequence.ToString(
-                    "D10", CultureInfo.InvariantCulture),
-                StreamSessionId = streamSessionId
-            };
+                var record = new CreatorToolsDashboardEventRecord
+                {
+                    Event = streamEvent,
+                    Sequence = ++eventSequence,
+                    LocalId = "evt-" + eventSequence.ToString(
+                        "D10", CultureInfo.InvariantCulture),
+                    StreamSessionId = streamSessionId
+                };
 
-            var connection = FindConnectionById(streamEvent.ConnectionId);
-            var validPlatform = IsValidPlatform(streamEvent.Platform);
-            var validType = IsValidType(streamEvent.Type);
-            if (!deduplicator.TryAccept(streamEvent))
-            {
-                record.Status = "ignored";
-                record.MessageCode = "duplicate_event";
-                ignoredCount++;
-            }
-            else
-            {
-                receivedCount++;
-                if (streamEvent.StreakState == "progress")
+                var connection = FindConnectionById(streamEvent.ConnectionId);
+                var validPlatform = IsValidPlatform(streamEvent.Platform);
+                var validType = IsValidType(streamEvent.Type);
+                if (!deduplicator.TryAccept(streamEvent))
                 {
                     record.Status = "ignored";
-                    record.MessageCode = "streak_progress";
-                    ignoredCount++;
-                }
-                else if (!validPlatform || !validType)
-                {
-                    record.Status = "ignored";
-                    record.MessageCode = !validPlatform && !validType
-                        ? "unsupported_platform_and_type"
-                        : !validPlatform
-                            ? "unsupported_platform"
-                            : "unsupported_event_type";
+                    record.MessageCode = "duplicate_event";
                     ignoredCount++;
                 }
                 else
                 {
-                    var result = evaluate == null
-                        ? CreatorToolsStreamEvaluation.None
-                        : evaluate(streamEvent) ??
-                            CreatorToolsStreamEvaluation.None;
-                    record.RuleNames = result.RuleNames;
-                    record.InteractionIds = result.InteractionIds;
-                    record.MessageCode = result.MessageCode;
-                    if (result.MessageCode == "interactions_disabled")
+                    receivedCount++;
+                    if (streamEvent.StreakState == "progress")
                     {
                         record.Status = "ignored";
+                        record.MessageCode = "streak_progress";
                         ignoredCount++;
                     }
-                    else if (result.MatchedRules > 0)
+                    else if (!validPlatform || !validType)
                     {
-                        matchedCount++;
-                        // The stream backlog is itself a reliable queue. Mark
-                        // accepted deferred work as queued immediately; the
-                        // global counter still advances only as gameplay-queue
-                        // slots are actually assigned.
-                        record.Status = result.QueuedInteractions > 0 ||
-                            result.DeferredInteractions > 0
-                            ? "queued"
-                            : "matched";
+                        record.Status = "ignored";
+                        record.MessageCode = !validPlatform && !validType
+                            ? "unsupported_platform_and_type"
+                            : !validPlatform
+                                ? "unsupported_platform"
+                                : "unsupported_event_type";
+                        ignoredCount++;
                     }
                     else
-                        record.Status = "received";
-                    queuedCount += Math.Max(0, result.QueuedInteractions);
-                    UpdateCounters(streamEvent);
+                    {
+                        try
+                        {
+                            var result = evaluate == null
+                                ? CreatorToolsStreamEvaluation.None
+                                : evaluate(streamEvent) ??
+                                    CreatorToolsStreamEvaluation.None;
+                            record.RuleNames = result.RuleNames;
+                            record.InteractionIds = result.InteractionIds;
+                            record.MessageCode = result.MessageCode;
+                            if (result.MessageCode ==
+                                "interactions_disabled")
+                            {
+                                record.Status = "ignored";
+                                ignoredCount++;
+                            }
+                            else if (result.MatchedRules > 0)
+                            {
+                                matchedCount++;
+                                // The stream backlog is itself a reliable
+                                // queue. Mark deferred work as queued even
+                                // before Unity assigns physical queue slots.
+                                record.Status =
+                                    result.DeferredInteractions > 0
+                                        ? "queued"
+                                        : "matched";
+                                queuedCount = SaturatingAdd(
+                                    queuedCount,
+                                    result.DeferredInteractions);
+                            }
+                            else
+                                record.Status = "received";
+                        }
+                        catch
+                        {
+                            // Dedupe was already committed. Keep a visible
+                            // terminal record so a transient evaluator bug
+                            // cannot silently consume the event forever.
+                            record.Status = "ignored";
+                            record.MessageCode = "evaluation_error";
+                            ignoredCount++;
+                        }
+                        UpdateCounters(streamEvent);
+                    }
                 }
-            }
 
-            if (connection != null)
-                connection.LastEventAt = streamEvent.ReceivedAt;
-            AddRecord(record);
-            revision++;
-            stateDirty = true;
+                if (connection != null)
+                    connection.LastEventAt = streamEvent.ReceivedAt;
+                AddRecord(record);
+                revision++;
+                stateDirty = true;
+            }
         }
 
         internal void InvalidateState()
         {
-            lastPublishedState = null;
-            stateDirty = true;
-        }
-
-        internal void AddQueuedInteractions(int count)
-        {
-            if (count <= 0)
-                return;
-            queuedCount += count;
-            revision++;
-            stateDirty = true;
+            lock (stateLock)
+            {
+                lastPublishedState = null;
+                stateDirty = true;
+            }
         }
 
         private void ProcessDueSimulations(
@@ -350,15 +369,20 @@ namespace Gilomx.CupheadBossRoulette
             Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation>
                 evaluate)
         {
-            var sourceConnection = FindConnectionByPlatform(entry.Platform);
-            var simulationId = Guid.NewGuid().ToString("N");
-            entry.EventId = "sim-" + simulationId;
-            entry.IdempotencyKey = streamSessionId + ":sim:" + simulationId;
-            entry.ConnectionId = sourceConnection == null
-                ? "simulator"
-                : "simulator-" + entry.Platform;
-            entry.Connector = "simulator";
-            entry.ReceivedAt = UtcTimestamp();
+            lock (stateLock)
+            {
+                var sourceConnection = FindConnectionByPlatform(
+                    entry.Platform);
+                var simulationId = Guid.NewGuid().ToString("N");
+                entry.EventId = "sim-" + simulationId;
+                entry.IdempotencyKey = streamSessionId + ":sim:" +
+                    simulationId;
+                entry.ConnectionId = sourceConnection == null
+                    ? "simulator"
+                    : "simulator-" + entry.Platform;
+                entry.Connector = "simulator";
+                entry.ReceivedAt = UtcTimestamp();
+            }
             ProcessEvent(entry, evaluate);
         }
 
@@ -599,6 +623,15 @@ namespace Gilomx.CupheadBossRoulette
                 delay <= 0d)
                 return 0d;
             return Math.Min(MaximumDelaySeconds, delay);
+        }
+
+        private static long SaturatingAdd(long left, long right)
+        {
+            if (right <= 0L)
+                return left;
+            return left > long.MaxValue - right
+                ? long.MaxValue
+                : left + right;
         }
 
         private static bool ComesBefore(

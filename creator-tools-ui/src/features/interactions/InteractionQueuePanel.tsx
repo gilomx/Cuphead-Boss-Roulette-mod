@@ -30,12 +30,21 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
     .filter(Boolean)
     .join(" ");
   const activeCount = interaction?.activeCount ?? 0;
-  const backlogCount = Math.max(0, interaction?.backlogCount ?? 0);
+  const streamBacklogCount = Math.max(0, interaction?.backlogCount ?? 0);
+  const deferredTestCount = Math.max(
+    0,
+    interaction?.deferredTestCount ?? 0,
+  );
+  const hiddenTestCount = Math.max(
+    0,
+    deferredTestCount - optimisticInteractionQueue.length,
+  );
+  const backlogCount = streamBacklogCount + hiddenTestCount;
   const pendingCount = Math.max(
     0,
     (interaction?.pendingCount ?? 0) +
-      backlogCount +
-      optimisticInteractionQueue.length,
+      streamBacklogCount +
+      Math.max(deferredTestCount, optimisticInteractionQueue.length),
   );
   const formatCount = (value: number) =>
     value.toLocaleString(locale === "es" ? "es-MX" : "en-US");

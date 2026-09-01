@@ -1,0 +1,1100 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Text.Json;
+using System.Threading;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class Program
+    {
+        private static readonly List<string> failures = new List<string>();
+
+        private static int Main()
+        {
+            Run("Evaluate creates backlog without Enqueue",
+                TestEvaluateOnlyCreatesBacklog);
+            Run("Explicit drain moves the exact quantity",
+                TestExplicitDrainMovesExactQuantity);
+            Run("Dashboard retains exactly 30 newest events",
+                TestDashboardRetainsThirtyEvents);
+            Run("Server projects the worker backlog into interaction JSON",
+                TestServerBacklogProjection);
+            Run("Server marks controls applied before Unity consumes them",
+                TestBackgroundControlObservation);
+            Run("Server counts and prioritizes deferred manual tests",
+                TestDeferredManualTestCommands);
+            Run("Control projections wait for their exact command sequence",
+                TestExactControlProjectionAcknowledgement);
+            Run("Projected master state governs manual test admission",
+                TestProjectedMasterGovernsTestAdmission);
+            Run("Deferred tests preserve partial materialization remainders",
+                TestDeferredTestRemainder);
+            Run("Clearing deferred tests invalidates in-flight generations",
+                TestDeferredTestGenerationClear);
+            Run("Failed deferred tests release their reservations",
+                TestDeferredTestMaterializationFailure);
+            Run("Worker processes a fake source and Dispose joins its thread",
+                TestWorkerAndDispose);
+            Run("TikFinity pressure coalesces exact per-viewer like totals",
+                TestTikFinityLikePressureCoalescing);
+            Run("TikFinity critical events preserve displaced likes",
+                TestTikFinityCriticalEventPreservesLikes);
+            Run("TikFinity overflow fallback keeps global tap totals",
+                TestTikFinityLikeOverflowFallback);
+
+            Console.WriteLine();
+            if (failures.Count == 0)
+            {
+                Console.WriteLine("All Creator Tools runtime tests passed.");
+                return 0;
+            }
+
+            Console.Error.WriteLine(failures.Count + " test(s) failed:");
+            for (var i = 0; i < failures.Count; i++)
+                Console.Error.WriteLine("  - " + failures[i]);
+            return 1;
+        }
+
+        private static void TestEvaluateOnlyCreatesBacklog()
+        {
+            using (var scope = new TestScope("evaluate"))
+            {
+                var rules = scope.CreateRules(3);
+                var gameplay = new CreatorToolsInteractionController(200);
+                var result = rules.Evaluate(
+                    NewGiftEvent(1, 2), true);
+
+                Equal(1, result.MatchedRules, "matched rules");
+                Equal(6L, result.DeferredInteractions,
+                    "deferred interaction count");
+                Equal(6L, rules.BacklogCount, "backlog count");
+                Equal(0, gameplay.EnqueueCallCount,
+                    "gameplay Enqueue calls before explicit drain");
+            }
+        }
+
+        private static void TestExplicitDrainMovesExactQuantity()
+        {
+            using (var scope = new TestScope("drain"))
+            {
+                var rules = scope.CreateRules(3);
+                rules.Evaluate(
+                    NewGiftEvent(2, 2), true);
+                var gameplay = new CreatorToolsInteractionController(200);
+
+                var drained = rules.Update(null, gameplay, true);
+
+                Equal(6, drained, "drain return value");
+                Equal(1, gameplay.EnqueueCallCount, "Enqueue call count");
+                Equal(6, gameplay.EnqueuedCount, "gameplay queue additions");
+                Equal(0L, rules.BacklogCount, "remaining backlog");
+            }
+        }
+
+        private static void TestDashboardRetainsThirtyEvents()
+        {
+            using (var scope = new TestScope("dashboard"))
+            using (var server = scope.StartServer())
+            {
+                var dashboard = new CreatorToolsDashboardController(null);
+                for (var i = 0; i < 35; i++)
+                {
+                    dashboard.ProcessEvent(
+                        NewLikeEvent(i),
+                        delegate(CreatorToolsStreamEvent ignored)
+                        {
+                            return CreatorToolsStreamEvaluation.None;
+                        });
+                }
+                dashboard.Update(server, null);
+
+                using (var json = GetJson(server, "/api/dashboard"))
+                {
+                    var root = json.RootElement;
+                    var events = root.GetProperty("events");
+                    Equal(30, events.GetArrayLength(), "event array length");
+                    Equal("event-34",
+                        events[0].GetProperty("eventId").GetString(),
+                        "newest retained event");
+                    Equal("event-5",
+                        events[29].GetProperty("eventId").GetString(),
+                        "oldest retained event");
+                    Equal(35L,
+                        root.GetProperty("counters")
+                            .GetProperty("received").GetInt64(),
+                        "received counter");
+                }
+            }
+        }
+
+        private static void TestServerBacklogProjection()
+        {
+            using (var scope = new TestScope("server-backlog"))
+            using (var server = scope.StartServer())
+            {
+                server.SetInteractionsState(
+                    "{\"ready\":true,\"pendingCount\":4," +
+                    "\"backlogCount\":0}");
+                server.SetInteractionBacklogCount(17);
+
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                {
+                    Equal(4,
+                        json.RootElement.GetProperty("pendingCount").GetInt32(),
+                        "materialized pending count");
+                    Equal(17L,
+                        json.RootElement.GetProperty("backlogCount").GetInt64(),
+                        "projected backlog count");
+                }
+            }
+        }
+
+        private static void TestWorkerAndDispose()
+        {
+            using (var scope = new TestScope("worker"))
+            using (var server = scope.StartServer())
+            {
+                server.SetInteractionsState(
+                    "{\"ready\":true,\"pendingCount\":0," +
+                    "\"backlogCount\":0}");
+                var rules = scope.CreateRules(2);
+                var dashboard = new CreatorToolsDashboardController(null);
+                var source = new FakeStreamSource();
+                source.Enqueue(new CreatorToolsStreamMessage
+                {
+                    Event = NewGiftEvent(99, 1)
+                });
+                var backgroundPublications = 0;
+                var worker = new CreatorToolsStreamWorker(
+                    source,
+                    dashboard,
+                    rules,
+                    server,
+                    delegate(CreatorToolsStreamEvent entry)
+                    {
+                        return rules.Evaluate(
+                            entry, true);
+                    },
+                    delegate
+                    {
+                        Interlocked.Increment(ref backgroundPublications);
+                    },
+                    delegate(string warning)
+                    {
+                        throw new InvalidOperationException(warning);
+                    });
+
+                worker.Start();
+                WaitUntil(
+                    delegate
+                    {
+                        return source.TakenCount == 1 &&
+                            rules.BacklogCount == 2;
+                    },
+                    3000,
+                    "worker did not evaluate the fake event");
+                WaitUntil(
+                    delegate
+                    {
+                        using (var json = GetJson(
+                            server, "/api/config/interactions"))
+                            return json.RootElement
+                                .GetProperty("backlogCount").GetInt64() == 2L;
+                    },
+                    3000,
+                    "worker did not publish the backlog projection");
+
+                using (var json = GetJson(server, "/api/dashboard"))
+                {
+                    Equal(1L,
+                        json.RootElement.GetProperty("counters")
+                            .GetProperty("received").GetInt64(),
+                        "worker-published dashboard received count");
+                }
+                True(backgroundPublications > 0,
+                    "background-state callback was not invoked");
+                False(IsUnityAssemblyLoaded(),
+                    "the pure worker harness loaded a Unity assembly");
+
+                worker.Dispose();
+                var updatesAfterDispose = source.UpdateCount;
+                source.Enqueue(new CreatorToolsStreamMessage
+                {
+                    Event = NewGiftEvent(100, 1)
+                });
+                worker.Signal();
+                Thread.Sleep(150);
+                Equal(updatesAfterDispose, source.UpdateCount,
+                    "source updates after Dispose returned");
+                Equal(1, source.TakenCount,
+                    "messages consumed after Dispose returned");
+                worker.Dispose();
+            }
+        }
+
+        private static void TestBackgroundControlObservation()
+        {
+            using (var scope = new TestScope("background-control"))
+            using (var server = scope.StartServer())
+            {
+                server.SetInteractionsState(
+                    "{\"ready\":true,\"interactionsEnabled\":true," +
+                    "\"masterRevision\":5,\"queuePaused\":false," +
+                    "\"queueControlRevision\":7,\"pendingCount\":0," +
+                    "\"backlogCount\":0}", 5, 7);
+                var observed = string.Empty;
+                server.SetInteractionControlObserver(
+                    delegate(string query, long commandSequence)
+                    {
+                        observed = query;
+                        if (query == "interactionsEnabled=0")
+                            server.ProjectInteractionMasterState(
+                                false, commandSequence);
+                        if (query == "clearPending=1")
+                        {
+                            server.ClearPendingInteractionTests();
+                            server.ProjectInteractionQueueCleared(
+                                commandSequence);
+                        }
+                        return true;
+                    });
+                using (var json = GetJson(
+                    server,
+                    "/api/config/interactions/set?interactionsEnabled=0"))
+                {
+                    True(json.RootElement.GetProperty("ok").GetBoolean(),
+                        "control request response");
+                }
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                {
+                    False(json.RootElement
+                            .GetProperty("interactionsEnabled").GetBoolean(),
+                        "projected master state");
+                    Equal(6L, json.RootElement
+                            .GetProperty("masterRevision").GetInt64(),
+                        "projected master revision");
+                }
+
+                string queued;
+                bool backgroundApplied;
+                True(server.TryTakeInteractionCommand(
+                    out queued, out backgroundApplied),
+                    "control command was not queued for Unity cleanup");
+                Equal("interactionsEnabled=0", observed,
+                    "background observer query");
+                Equal("interactionsEnabled=0", queued,
+                    "main-thread cleanup query");
+                True(backgroundApplied,
+                    "background-applied metadata was not preserved");
+            }
+        }
+
+        private static void TestDeferredManualTestCommands()
+        {
+            using (var scope = new TestScope("manual-test-commands"))
+            using (var server = scope.StartServer())
+            {
+                server.SetInteractionsState(
+                    "{\"ready\":true,\"interactionsEnabled\":true," +
+                    "\"masterRevision\":0,\"queuePaused\":false," +
+                    "\"queueControlRevision\":0,\"pendingCount\":0," +
+                    "\"backlogCount\":0,\"deferredTestCount\":0}", 0, 0);
+                using (var json = GetJson(
+                    server,
+                    "/api/config/interactions/test?item=test_attack" +
+                    "&donor=Viewer&quantity=3"))
+                {
+                    True(json.RootElement.GetProperty("ok").GetBoolean(),
+                        "manual test request response");
+                }
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                {
+                    Equal(0L, json.RootElement
+                            .GetProperty("backlogCount").GetInt64(),
+                        "stream backlog remains separate");
+                    Equal(3L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "manual tests included in deferred count");
+                }
+
+                server.SetInteractionControlObserver(
+                    delegate(string ignored, long commandSequence)
+                    {
+                        return commandSequence > 0L;
+                    });
+                using (var json = GetJson(
+                    server,
+                    "/api/config/interactions/set?queuePaused=1"))
+                {
+                    True(json.RootElement.GetProperty("ok").GetBoolean(),
+                        "queue control response");
+                }
+
+                string query;
+                bool backgroundApplied;
+                True(server.TryTakeInteractionCommand(
+                    out query, out backgroundApplied),
+                    "queue control was not available");
+                Equal("queuePaused=1", query,
+                    "controls must take priority over manual tests");
+                True(backgroundApplied,
+                    "control observer metadata");
+                bool isTest;
+                int pendingQuantity;
+                long commandSequence;
+                long testGeneration;
+                True(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "manual test was not available after control");
+                Equal("item=test_attack&donor=Viewer&quantity=3", query,
+                    "deferred manual test query");
+                False(backgroundApplied,
+                    "manual test must remain a main-thread command");
+                True(isTest, "manual test metadata");
+                Equal(3, pendingQuantity, "manual test quantity metadata");
+                Equal(0L, commandSequence, "manual test control sequence");
+                server.ProcessInteractionTestCommand(
+                    query,
+                    pendingQuantity,
+                    testGeneration,
+                    delegate { return 0; });
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                {
+                    Equal(0L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "manual test count after dequeue");
+                }
+            }
+        }
+
+        private static void TestExactControlProjectionAcknowledgement()
+        {
+            using (var scope = new TestScope("exact-control-projection"))
+            using (var server = scope.StartServer())
+            {
+                const string staleState =
+                    "{\"ready\":true,\"available\":true," +
+                    "\"interactionsEnabled\":true,\"masterRevision\":5," +
+                    "\"queuePaused\":false," +
+                    "\"queueControlRevision\":7," +
+                    "\"pendingClearProjected\":false,\"queueCount\":4," +
+                    "\"activeCount\":1,\"pendingCount\":3," +
+                    "\"backlogCount\":0,\"deferredTestCount\":0}";
+                server.SetInteractionsState(staleState, 5, 7, 0);
+                server.SetInteractionControlObserver(
+                    delegate(string query, long commandSequence)
+                    {
+                        if (query == "clearPending=1")
+                            server.ProjectInteractionQueueCleared(
+                                commandSequence);
+                        return true;
+                    });
+
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/set?queuePaused=1"))
+                {
+                }
+                string query;
+                bool backgroundApplied;
+                bool isTest;
+                int pendingQuantity;
+                long firstSequence;
+                long testGeneration;
+                True(server.TryTakeInteractionCommand(
+                    false,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out firstSequence,
+                    out testGeneration),
+                    "first control command was unavailable");
+
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/set?clearPending=1"))
+                {
+                }
+                server.SetInteractionsState(
+                    staleState, 5, 8, firstSequence);
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                {
+                    True(json.RootElement
+                            .GetProperty("pendingClearProjected").GetBoolean(),
+                        "a prior command acknowledged the newer clear");
+                    Equal(0L, json.RootElement
+                            .GetProperty("pendingCount").GetInt64(),
+                        "projected clear pending count");
+                    Equal(1L, json.RootElement
+                            .GetProperty("queueCount").GetInt64(),
+                        "projected clear keeps only active rows");
+                }
+
+                long clearSequence;
+                True(server.TryTakeInteractionCommand(
+                    false,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out clearSequence,
+                    out testGeneration),
+                    "clear control command was unavailable");
+                True(clearSequence > firstSequence,
+                    "control sequence did not advance");
+                server.SetInteractionsState(
+                    "{\"ready\":true,\"available\":true," +
+                    "\"interactionsEnabled\":true,\"masterRevision\":5," +
+                    "\"queuePaused\":true," +
+                    "\"queueControlRevision\":9," +
+                    "\"pendingClearProjected\":false,\"queueCount\":1," +
+                    "\"activeCount\":1,\"pendingCount\":0," +
+                    "\"backlogCount\":0,\"deferredTestCount\":0}",
+                    5, 9, clearSequence);
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                    False(json.RootElement
+                            .GetProperty("pendingClearProjected").GetBoolean(),
+                        "exact clear command did not acknowledge projection");
+            }
+        }
+
+        private static void TestProjectedMasterGovernsTestAdmission()
+        {
+            using (var scope = new TestScope("projected-master-admission"))
+            using (var server = scope.StartServer())
+            {
+                const string enabledState =
+                    "{\"ready\":true,\"interactionsEnabled\":true," +
+                    "\"masterRevision\":1,\"queuePaused\":false," +
+                    "\"queueControlRevision\":1,\"pendingCount\":0," +
+                    "\"backlogCount\":0,\"deferredTestCount\":0}";
+                server.SetInteractionsState(enabledState, 1, 1, 0);
+                server.SetInteractionControlObserver(
+                    delegate(string query, long commandSequence)
+                    {
+                        if (query == "interactionsEnabled=0")
+                            server.ProjectInteractionMasterState(
+                                false, commandSequence);
+                        return true;
+                    });
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/set?interactionsEnabled=0"))
+                {
+                }
+
+                // This mimics a main-thread snapshot built just before the
+                // HTTP disable was projected.
+                server.SetInteractionsState(enabledState, 1, 1, 0);
+                Equal(HttpStatusCode.Conflict,
+                    GetStatusCode(server,
+                        "/api/config/interactions/test?item=test_attack" +
+                        "&donor=Viewer&quantity=1"),
+                    "test admission while projected master is disabled");
+            }
+        }
+
+        private static void TestDeferredTestRemainder()
+        {
+            using (var scope = new TestScope("deferred-test-remainder"))
+            using (var server = scope.StartServer())
+            {
+                EnableInteractionsForTests(server);
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/test?item=test_attack" +
+                    "&donor=Viewer&quantity=3"))
+                {
+                }
+
+                string query;
+                bool backgroundApplied;
+                bool isTest;
+                int pendingQuantity;
+                long commandSequence;
+                long testGeneration;
+                True(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "initial deferred test was unavailable");
+                server.ProcessInteractionTestCommand(
+                    query, pendingQuantity, testGeneration,
+                    delegate { return 2; });
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                    Equal(2L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "deferred remainder count");
+
+                True(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "requeued deferred remainder was unavailable");
+                Equal(2, pendingQuantity, "requeued remainder quantity");
+                server.ProcessInteractionTestCommand(
+                    query, pendingQuantity, testGeneration,
+                    delegate { return 0; });
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                    Equal(0L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "deferred remainder after completion");
+            }
+        }
+
+        private static void TestDeferredTestGenerationClear()
+        {
+            using (var scope = new TestScope("deferred-test-clear"))
+            using (var server = scope.StartServer())
+            {
+                EnableInteractionsForTests(server);
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/test?item=test_attack" +
+                    "&donor=Viewer&quantity=3"))
+                {
+                }
+                string query;
+                bool backgroundApplied;
+                bool isTest;
+                int pendingQuantity;
+                long commandSequence;
+                long testGeneration;
+                True(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "in-flight deferred test was unavailable");
+
+                server.ClearPendingInteractionTests();
+                server.ProcessInteractionTestCommand(
+                    query, pendingQuantity, testGeneration,
+                    delegate { return 2; });
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                    Equal(0L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "cleared generation recreated deferred work");
+                False(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "cleared generation requeued a stale remainder");
+            }
+        }
+
+        private static void TestDeferredTestMaterializationFailure()
+        {
+            using (var scope = new TestScope("deferred-test-failure"))
+            using (var server = scope.StartServer())
+            {
+                EnableInteractionsForTests(server);
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/test?item=test_attack" +
+                    "&donor=Viewer&quantity=2"))
+                {
+                }
+                string query;
+                bool backgroundApplied;
+                bool isTest;
+                int pendingQuantity;
+                long commandSequence;
+                long testGeneration;
+                True(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "failing deferred test was unavailable");
+                server.ProcessInteractionTestCommand(
+                    query, pendingQuantity, testGeneration,
+                    delegate
+                    {
+                        throw new InvalidOperationException("expected");
+                    });
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                    Equal(0L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "failed deferred test kept its reservation");
+            }
+        }
+
+        private static void EnableInteractionsForTests(
+            CreatorToolsServer server)
+        {
+            server.SetInteractionsState(
+                "{\"ready\":true,\"interactionsEnabled\":true," +
+                "\"masterRevision\":0,\"queuePaused\":false," +
+                "\"queueControlRevision\":0,\"pendingCount\":0," +
+                "\"backlogCount\":0,\"deferredTestCount\":0}",
+                0, 0, 0);
+        }
+
+        private static void TestTikFinityLikePressureCoalescing()
+        {
+            using (var host = NewCompanionHost())
+            {
+                FillCompanionQueueWithFollows(host);
+                var first = NewCompanionLike(
+                    "pressure-a", "viewer-pressure", 700000);
+                var second = NewCompanionLike(
+                    "pressure-b", "viewer-pressure", 700000);
+                EnqueueCompanion(host, first);
+                EnqueueCompanion(host, second);
+                // The transport coalescer runs before dashboard dedupe. A
+                // resent source identity must not be added a second time.
+                EnqueueCompanion(host, first);
+
+                long likeCount = 0L;
+                var likeMessages = 0;
+                var aggregateIds = new HashSet<string>(
+                    StringComparer.Ordinal);
+                CreatorToolsStreamMessage message;
+                while (host.TryTakeMessage(out message))
+                {
+                    if (message.Event == null ||
+                        message.Event.Type != "like")
+                        continue;
+                    likeMessages++;
+                    likeCount += message.Event.Count;
+                    True(message.Event.Count <= 1000000,
+                        "coalesced like exceeded dashboard count limit");
+                    Equal("viewer-pressure", message.Event.UserId,
+                        "coalesced viewer identity");
+                    True(aggregateIds.Add(message.Event.IdempotencyKey),
+                        "coalesced chunks reused an idempotency key");
+                }
+
+                Equal(1400000L, likeCount,
+                    "coalesced per-viewer like total");
+                Equal(2, likeMessages,
+                    "coalesced count chunk quantity");
+            }
+        }
+
+        private static void TestTikFinityCriticalEventPreservesLikes()
+        {
+            using (var host = NewCompanionHost())
+            {
+                const int capacity = 1024;
+                for (var i = 0; i < capacity; i++)
+                    EnqueueCompanion(host, NewCompanionLike(
+                        "evicted-" + i.ToString(
+                            CultureInfo.InvariantCulture),
+                        "viewer-" + i.ToString(
+                            CultureInfo.InvariantCulture),
+                        2));
+                EnqueueCompanion(host, new CreatorToolsStreamMessage
+                {
+                    Event = NewEvent(
+                        900000, "gift", 1, "critical-gift")
+                });
+
+                long likeCount = 0L;
+                var criticalGifts = 0;
+                CreatorToolsStreamMessage message;
+                while (host.TryTakeMessage(out message))
+                {
+                    if (message.Event == null)
+                        continue;
+                    if (message.Event.Type == "like")
+                        likeCount += message.Event.Count;
+                    if (message.Event.Type == "gift")
+                        criticalGifts++;
+                }
+
+                Equal(2048L, likeCount,
+                    "likes retained after critical eviction");
+                Equal(1, criticalGifts,
+                    "critical gift retained under pressure");
+            }
+        }
+
+        private static void TestTikFinityLikeOverflowFallback()
+        {
+            using (var host = NewCompanionHost())
+            {
+                FillCompanionQueueWithFollows(host);
+                const int distinctViewers = 4097;
+                for (var i = 0; i < distinctViewers; i++)
+                    EnqueueCompanion(host, NewCompanionLike(
+                        "fallback-" + i.ToString(
+                            CultureInfo.InvariantCulture),
+                        "fallback-viewer-" + i.ToString(
+                            CultureInfo.InvariantCulture),
+                        1));
+
+                long likeCount = 0L;
+                var anonymousLikeCount = 0L;
+                CreatorToolsStreamMessage message;
+                while (host.TryTakeMessage(out message))
+                {
+                    if (message.Event == null ||
+                        message.Event.Type != "like")
+                        continue;
+                    likeCount += message.Event.Count;
+                    if (string.IsNullOrEmpty(message.Event.UserId) &&
+                        string.IsNullOrEmpty(message.Event.UserName))
+                        anonymousLikeCount += message.Event.Count;
+                }
+
+                Equal((long)distinctViewers, likeCount,
+                    "global fallback like total");
+                Equal(1L, anonymousLikeCount,
+                    "anonymous overflow fallback count");
+            }
+        }
+
+        private static TikFinityCompanionHost NewCompanionHost()
+        {
+            return new TikFinityCompanionHost(
+                Path.GetTempPath(), null, null);
+        }
+
+        private static void FillCompanionQueueWithFollows(
+            TikFinityCompanionHost host)
+        {
+            const int capacity = 1024;
+            for (var i = 0; i < capacity; i++)
+                EnqueueCompanion(host, new CreatorToolsStreamMessage
+                {
+                    Event = NewEvent(
+                        800000 + i, "follow", 1, string.Empty)
+                });
+        }
+
+        private static CreatorToolsStreamMessage NewCompanionLike(
+            string identity, string viewerId, int count)
+        {
+            return new CreatorToolsStreamMessage
+            {
+                Event = new CreatorToolsStreamEvent
+                {
+                    EventId = identity,
+                    IdempotencyKey = identity,
+                    ConnectionId = "tikfinity-local",
+                    Platform = "tiktok",
+                    Connector = "tikfinity",
+                    Type = "like",
+                    UserName = viewerId,
+                    UserDisplayName = viewerId,
+                    UserId = viewerId,
+                    Count = count,
+                    StreakState = "none",
+                    ReceivedAt = DateTime.UtcNow.ToString(
+                        "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                        CultureInfo.InvariantCulture),
+                    RawEventType = "like"
+                }
+            };
+        }
+
+        private static void EnqueueCompanion(
+            TikFinityCompanionHost host,
+            CreatorToolsStreamMessage message)
+        {
+            var enqueue = typeof(TikFinityCompanionHost).GetMethod(
+                "Enqueue", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (enqueue == null)
+                throw new InvalidOperationException(
+                    "TikFinity enqueue method was not found");
+            enqueue.Invoke(host, new object[] { message });
+        }
+
+        private static CreatorToolsStreamEvent NewGiftEvent(
+            int sequence, int count)
+        {
+            return NewEvent(sequence, "gift", count, "1");
+        }
+
+        private static CreatorToolsStreamEvent NewLikeEvent(int sequence)
+        {
+            return NewEvent(sequence, "like", 1, string.Empty);
+        }
+
+        private static CreatorToolsStreamEvent NewEvent(
+            int sequence, string type, int count, string itemId)
+        {
+            return new CreatorToolsStreamEvent
+            {
+                EventId = "event-" + sequence.ToString(
+                    CultureInfo.InvariantCulture),
+                IdempotencyKey = "idempotency-" + sequence.ToString(
+                    CultureInfo.InvariantCulture),
+                ConnectionId = "tikfinity-local",
+                Platform = "tiktok",
+                Connector = "tikfinity",
+                Type = type,
+                UserName = "viewer-" + sequence.ToString(
+                    CultureInfo.InvariantCulture),
+                UserDisplayName = "Viewer " + sequence.ToString(
+                    CultureInfo.InvariantCulture),
+                UserId = sequence.ToString(CultureInfo.InvariantCulture),
+                ItemId = itemId,
+                Count = count,
+                StreakState = "none",
+                ReceivedAt = DateTime.UtcNow.ToString(
+                    "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                    CultureInfo.InvariantCulture),
+                RawEventType = "runtime_test"
+            };
+        }
+
+        private static JsonDocument GetJson(
+            CreatorToolsServer server, string path)
+        {
+            using (var client = new HttpClient())
+            {
+                var text = client.GetStringAsync(
+                    "http://127.0.0.1:" +
+                    server.Port.ToString(CultureInfo.InvariantCulture) +
+                    path).GetAwaiter().GetResult();
+                return JsonDocument.Parse(text);
+            }
+        }
+
+        private static HttpStatusCode GetStatusCode(
+            CreatorToolsServer server, string path)
+        {
+            using (var client = new HttpClient())
+            using (var response = client.GetAsync(
+                "http://127.0.0.1:" +
+                server.Port.ToString(CultureInfo.InvariantCulture) +
+                path).GetAwaiter().GetResult())
+                return response.StatusCode;
+        }
+
+        private static bool IsUnityAssemblyLoaded()
+        {
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (var i = 0; i < assemblies.Length; i++)
+            {
+                var name = assemblies[i].GetName().Name ?? string.Empty;
+                if (name.StartsWith("UnityEngine", StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static void WaitUntil(
+            Func<bool> condition, int timeoutMilliseconds, string failure)
+        {
+            var expires = Environment.TickCount64 + timeoutMilliseconds;
+            Exception lastError = null;
+            while (Environment.TickCount64 < expires)
+            {
+                try
+                {
+                    if (condition())
+                        return;
+                }
+                catch (Exception exception)
+                {
+                    lastError = exception;
+                }
+                Thread.Sleep(20);
+            }
+            throw new InvalidOperationException(
+                failure + (lastError == null
+                    ? string.Empty
+                    : ": " + lastError.Message));
+        }
+
+        private static void Run(string name, Action test)
+        {
+            try
+            {
+                test();
+                Console.WriteLine("PASS  " + name);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(name + ": " + exception.Message);
+                Console.WriteLine("FAIL  " + name);
+            }
+        }
+
+        private static void Equal<T>(T expected, T actual, string label)
+        {
+            if (!EqualityComparer<T>.Default.Equals(expected, actual))
+                throw new InvalidOperationException(
+                    label + ": expected " + expected + ", got " + actual);
+        }
+
+        private static void True(bool value, string message)
+        {
+            if (!value)
+                throw new InvalidOperationException(message);
+        }
+
+        private static void False(bool value, string message)
+        {
+            True(!value, message);
+        }
+
+        private sealed class TestScope : IDisposable
+        {
+            private readonly string root;
+            private readonly string assetsDirectory;
+            private readonly string configDirectory;
+
+            internal TestScope(string name)
+            {
+                root = Path.Combine(
+                    Path.GetTempPath(),
+                    "la-pichi-ruleta-runtime-tests",
+                    name + "-" + Guid.NewGuid().ToString("N"));
+                assetsDirectory = Path.Combine(root, "assets");
+                configDirectory = Path.Combine(root, "config");
+                var giftsDirectory = Path.Combine(
+                    assetsDirectory, "creator-tools", "gifts");
+                Directory.CreateDirectory(giftsDirectory);
+                Directory.CreateDirectory(configDirectory);
+                File.WriteAllText(
+                    Path.Combine(giftsDirectory, "catalog.json"),
+                    "{\"catalogVersion\":\"runtime-test\"," +
+                    "\"gifts\":[{\"giftId\":\"1\"," +
+                    "\"name\":\"Rose\",\"coinsPerUnit\":1}]}");
+            }
+
+            internal CreatorToolsStreamRulesController CreateRules(
+                int quantity)
+            {
+                var uniqueConfigDirectory = Path.Combine(
+                    configDirectory, Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(uniqueConfigDirectory);
+                var rules = new CreatorToolsStreamRulesController(
+                    assetsDirectory,
+                    Path.Combine(uniqueConfigDirectory, "plugin.cfg"),
+                    delegate { return true; },
+                    delegate(string ignored) { });
+                var state = rules.ProcessServerCommand(
+                    "action=create&name=Runtime+rule&eventType=gift" +
+                    "&giftId=1&every=1&interaction=test_attack" +
+                    "&quantity=" + quantity.ToString(
+                        CultureInfo.InvariantCulture) +
+                    "&enabled=true");
+                if (state.IndexOf("\"feedback\":\"created\"",
+                        StringComparison.Ordinal) < 0)
+                    throw new InvalidOperationException(
+                        "test rule was not created: " + state);
+                return rules;
+            }
+
+            internal CreatorToolsServer StartServer()
+            {
+                var server = new CreatorToolsServer(
+                    assetsDirectory,
+                    delegate(string ignored) { },
+                    delegate(string ignored) { });
+                var port = ReservePort();
+                if (!server.Start(port))
+                {
+                    server.Dispose();
+                    throw new InvalidOperationException(
+                        "test server could not start on port " + port);
+                }
+                return server;
+            }
+
+            public void Dispose()
+            {
+                try { Directory.Delete(root, true); }
+                catch { }
+            }
+
+            private static int ReservePort()
+            {
+                var listener = new TcpListener(IPAddress.Loopback, 0);
+                listener.Start();
+                var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                listener.Stop();
+                return port;
+            }
+        }
+
+        private sealed class FakeStreamSource : ICreatorToolsStreamSource
+        {
+            private readonly object queueLock = new object();
+            private readonly Queue<CreatorToolsStreamMessage> messages =
+                new Queue<CreatorToolsStreamMessage>();
+            private int updateCount;
+            private int takenCount;
+
+            internal int UpdateCount
+            {
+                get { return Interlocked.CompareExchange(
+                    ref updateCount, 0, 0); }
+            }
+
+            internal int TakenCount
+            {
+                get { return Interlocked.CompareExchange(
+                    ref takenCount, 0, 0); }
+            }
+
+            internal void Enqueue(CreatorToolsStreamMessage message)
+            {
+                lock (queueLock)
+                    messages.Enqueue(message);
+            }
+
+            public void Update()
+            {
+                Interlocked.Increment(ref updateCount);
+            }
+
+            public bool TryTakeMessage(
+                out CreatorToolsStreamMessage message)
+            {
+                lock (queueLock)
+                {
+                    if (messages.Count == 0)
+                    {
+                        message = null;
+                        return false;
+                    }
+                    message = messages.Dequeue();
+                }
+                Interlocked.Increment(ref takenCount);
+                return true;
+            }
+        }
+    }
+}

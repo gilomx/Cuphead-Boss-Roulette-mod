@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- This file is imported before Microsoft.Common.props, early enough for
+         NuGet and MSBuild to agree on the same repository-external paths. -->
+    <BaseIntermediateOutputPath>$(TEMP)\LaPichiRuleta-CreatorToolsRuntimeTests\obj\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>$(TEMP)\LaPichiRuleta-CreatorToolsRuntimeTests\bin\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

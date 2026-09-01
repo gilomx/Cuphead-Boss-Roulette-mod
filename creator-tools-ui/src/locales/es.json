@@ -33,6 +33,21 @@
       "enabledDescription": "Las reglas de stream y las pruebas pueden agregar interacciones a la cola.",
       "disabledDescription": "Los eventos se siguen registrando, pero no generan interacciones ni acumulan progreso. Al desactivar se borra todo lo pendiente."
     },
+    "liveEvents": {
+      "eyebrow": "Dinámicas del stream",
+      "title": "Eventos Live",
+      "description": "Elige una dinámica para configurarla y seguir su estado durante el live.",
+      "back": "Volver a Eventos Live",
+      "peskyBattleDescription": "Reúne cinco participantes y enfrenta sus ataques durante un nivel completo.",
+      "tapFarmingDescription": "Convierte los taps de toda la comunidad en resistencia adicional para alargar al jefe.",
+      "participants": "{count}/{capacity} participantes",
+      "taps": "{count} taps",
+      "conflict": {
+        "title": "Ya hay otro Evento Live activo",
+        "peskyBattleActive": "Batalla Molestosa debe finalizar antes de activar Farmeando taps.",
+        "tapFarmingActive": "Farmeando taps debe finalizar antes de armar Batalla Molestosa."
+      }
+    },
     "peskyBattle": {
       "eyebrow": "Juego del live",
       "title": "Batalla Molestosa",
@@ -139,6 +154,121 @@
         "native_assets_unavailable": "No se pudieron preparar los recursos de uno de los ataques.",
         "spawn_failed": "No se pudo crear uno de los ataques de la batalla.",
         "battle_active": "La batalla ya está activa."
+      }
+    },
+    "tapFarming": {
+      "eyebrow": "Juego del live",
+      "title": "Farmeando taps",
+      "description": "Los taps de toda la comunidad se combinan y agregan una reserva de resistencia que el jugador debe consumir antes de seguir dañando al jefe.",
+      "phase": {
+        "off": "Desactivado",
+        "collecting": "Juntando taps",
+        "active": "Jefe activo",
+        "transition": "Cambio de fase",
+        "completed": "Finalizado",
+        "stopping": "Deteniendo…"
+      },
+      "phaseDescription": {
+        "off": "Configura cuántos taps forman un punto y activa el evento cuando empiece el live.",
+        "collecting": "Todos los taps ya se están guardando para el próximo jefe.",
+        "active": "Los disparos consumen primero la reserva creada por los taps.",
+        "activeBoss": "{boss} · Fase {phase} de {count}. La reserva se consume sin hacer retroceder al jefe.",
+        "transition": "Los taps nuevos se guardan mientras Cuphead prepara la siguiente fase.",
+        "completed": "El jefe fue derrotado. Revisa el resultado antes de cerrar este evento.",
+        "stopping": "Terminando la ronda y liberando el espacio de Eventos Live."
+      },
+      "conversion": {
+        "title": "Conversión de taps",
+        "description": "Elige una equivalencia fácil de explicar a la audiencia.",
+        "preset": "taps = +1 punto",
+        "presetSingular": "tap = +1 punto",
+        "custom": "Cantidad personalizada de taps por punto",
+        "equation": "Cada {taps} taps suma 1 punto de vida",
+        "hint": "El valor se guarda antes de activar y se mantiene durante toda la ronda.",
+        "locked": "La conversión queda congelada hasta finalizar este evento."
+      },
+      "progress": {
+        "waitingBoss": "Esperando jefe",
+        "phase": "Fase {phase} de {count}",
+        "noBoss": "Los taps se acumulan desde ahora",
+        "battle": "Avance total de la batalla",
+        "reserveEquivalent": "La reserva actual equivale a {value}× la vida completa de este jefe.",
+        "reservePercent": "La reserva actual equivale al {value} de la vida completa de este jefe.",
+        "converted": "La comunidad ha convertido {value} puntos de vida."
+      },
+      "counters": {
+        "totalTaps": "Taps totales",
+        "bankedTaps": "Taps guardados",
+        "reserve": "Reserva actual",
+        "absorbed": "Daño absorbido"
+      },
+      "actions": {
+        "activate": "Activar Farmeando taps",
+        "deactivate": "Desactivar evento",
+        "stopping": "Deteniendo…",
+        "finish": "Finalizar evento"
+      },
+      "footer": "Los taps se combinan entre todos los usuarios; los sobrantes también cuentan para el siguiente punto.",
+      "feedback": {
+        "generic": "El estado de Farmeando taps cambió. Revisa los datos antes de continuar.",
+        "ready": "Configura la conversión cuando quieras.",
+        "settings_saved": "La conversión de taps fue guardada.",
+        "activated": "Farmeando taps está juntando actividad de la comunidad.",
+        "collecting": "Los taps se están guardando para el próximo jefe.",
+        "boss_started": "La reserva ya está alargando esta batalla.",
+        "active": "La reserva ya está alargando esta batalla.",
+        "transition": "Los taps se guardan para la siguiente fase.",
+        "completed": "La ronda terminó.",
+        "stopping": "El evento se está deteniendo.",
+        "stopped": "Farmeando taps fue desactivado.",
+        "live_event_conflict": "Finaliza el otro Evento Live antes de activar este.",
+        "invalid_setting": "La cantidad de taps por punto no es válida.",
+        "tap_farming_settings_saved": "La conversión de taps fue guardada.",
+        "tap_farming_activated": "Farmeando taps está juntando actividad de la comunidad.",
+        "tap_farming_counted": "Los taps nuevos se agregaron a la reserva comunitaria.",
+        "tap_farming_battle_started": "La reserva ya está alargando esta batalla.",
+        "tap_farming_damage_absorbed": "La reserva absorbió daño del jugador.",
+        "tap_farming_phase_transition": "Los taps se guardan para la siguiente fase.",
+        "tap_farming_lost_collecting": "El intento terminó; los taps pendientes se conservan y el evento espera otro jefe.",
+        "tap_farming_waiting_for_boss": "Los taps se están guardando para el próximo jefe.",
+        "tap_farming_completed": "La ronda terminó con una victoria.",
+        "tap_farming_stopping": "El evento se está deteniendo.",
+        "tap_farming_deactivated": "Farmeando taps fue desactivado.",
+        "tap_farming_already_off": "Farmeando taps ya estaba desactivado.",
+        "tap_farming_setting_locked": "La conversión queda congelada mientras el evento está activo.",
+        "blocked_by_live_event": "Finaliza el otro Evento Live antes de activar este.",
+        "invalid_taps_per_health_point": "La cantidad de taps por punto no es válida.",
+        "invalid_action": "Esta acción no está disponible en el estado actual."
+      }
+    },
+    "overlayPreview": {
+      "eyebrow": "Diseño del stream",
+      "title": "Vista previa del overlay",
+      "description": "Esta vista usa el mismo overlay que OBS. Cambia de estado para revisar sus animaciones sin activar el evento.",
+      "reload": "Recargar",
+      "state": "Estado de prueba",
+      "background": "Fondo de prueba",
+      "backgrounds": {
+        "alpha": "Transparente",
+        "light": "Claro",
+        "dark": "Oscuro"
+      },
+      "iframeTitle": "Vista previa del overlay del Evento Live",
+      "simulate": "Simular llegada de taps",
+      "resetSimulation": "Restablecer estado",
+      "pesky": {
+        "gift": "Rosa",
+        "recruiting": "Reclutando",
+        "ready": "Equipo completo",
+        "active": "En batalla",
+        "won": "Victoria"
+      },
+      "tapFarming": {
+        "boss": "Rey Dado",
+        "collecting": "Juntando",
+        "active": "Fase activa",
+        "transition": "Transición",
+        "completed": "Finalizado"
       }
     },
     "counters": {

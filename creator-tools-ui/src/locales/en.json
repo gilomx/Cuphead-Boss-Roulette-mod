@@ -33,6 +33,21 @@
       "enabledDescription": "Stream rules and tests can add interactions to the queue.",
       "disabledDescription": "Events are still recorded, but they do not create interactions or accumulate progress. Disabling clears everything pending."
     },
+    "liveEvents": {
+      "eyebrow": "Stream activities",
+      "title": "Live Events",
+      "description": "Choose an activity to configure it and follow its status during the live stream.",
+      "back": "Back to Live Events",
+      "peskyBattleDescription": "Recruit five participants and face their attacks for a full level.",
+      "tapFarmingDescription": "Turn the whole community's taps into extra resistance that makes the boss last longer.",
+      "participants": "{count}/{capacity} participants",
+      "taps": "{count} taps",
+      "conflict": {
+        "title": "Another Live Event is already active",
+        "peskyBattleActive": "Pesky Battle must finish before you can activate Tap Farming.",
+        "tapFarmingActive": "Tap Farming must finish before you can arm Pesky Battle."
+      }
+    },
     "peskyBattle": {
       "eyebrow": "Live game",
       "title": "Pesky Battle",
@@ -139,6 +154,121 @@
         "native_assets_unavailable": "Assets for one of the attacks could not be prepared.",
         "spawn_failed": "One of the battle attacks could not be created.",
         "battle_active": "The battle is already active."
+      }
+    },
+    "tapFarming": {
+      "eyebrow": "Live game",
+      "title": "Tap Farming",
+      "description": "The entire community's taps combine into a resistance reserve that the player must drain before continuing to damage the boss.",
+      "phase": {
+        "off": "Disabled",
+        "collecting": "Collecting taps",
+        "active": "Boss active",
+        "transition": "Phase transition",
+        "completed": "Finished",
+        "stopping": "Stopping…"
+      },
+      "phaseDescription": {
+        "off": "Configure how many taps make one point and activate the event when the stream begins.",
+        "collecting": "Every tap is already being saved for the next boss.",
+        "active": "Shots drain the tap-created reserve before they continue damaging the boss.",
+        "activeBoss": "{boss} · Phase {phase} of {count}. The reserve drains without moving the boss backward.",
+        "transition": "New taps are banked while Cuphead prepares the next phase.",
+        "completed": "The boss was defeated. Review the result before closing this event.",
+        "stopping": "Finishing the round and releasing the Live Events slot."
+      },
+      "conversion": {
+        "title": "Tap conversion",
+        "description": "Choose an equivalence that is easy to explain to the audience.",
+        "preset": "taps = +1 point",
+        "presetSingular": "tap = +1 point",
+        "custom": "Custom taps per point",
+        "equation": "Every {taps} taps adds 1 health point",
+        "hint": "The value is saved before activation and stays fixed for the whole round.",
+        "locked": "The conversion is locked until this event ends."
+      },
+      "progress": {
+        "waitingBoss": "Waiting for a boss",
+        "phase": "Phase {phase} of {count}",
+        "noBoss": "Taps are accumulating from now on",
+        "battle": "Overall battle progress",
+        "reserveEquivalent": "The current reserve equals {value}× this boss's full health.",
+        "reservePercent": "The current reserve equals {value} of this boss's full health.",
+        "converted": "The community has converted {value} health points."
+      },
+      "counters": {
+        "totalTaps": "Total taps",
+        "bankedTaps": "Banked taps",
+        "reserve": "Current reserve",
+        "absorbed": "Damage absorbed"
+      },
+      "actions": {
+        "activate": "Activate Tap Farming",
+        "deactivate": "Disable event",
+        "stopping": "Stopping…",
+        "finish": "Finish event"
+      },
+      "footer": "Taps are pooled across every user; remainders also count toward the next point.",
+      "feedback": {
+        "generic": "Tap Farming changed state. Review the data before continuing.",
+        "ready": "Configure the conversion whenever you are ready.",
+        "settings_saved": "The tap conversion was saved.",
+        "activated": "Tap Farming is collecting community activity.",
+        "collecting": "Taps are being banked for the next boss.",
+        "boss_started": "The reserve is now extending this battle.",
+        "active": "The reserve is now extending this battle.",
+        "transition": "Taps are being banked for the next phase.",
+        "completed": "The round has ended.",
+        "stopping": "The event is stopping.",
+        "stopped": "Tap Farming was disabled.",
+        "live_event_conflict": "Finish the other Live Event before activating this one.",
+        "invalid_setting": "The taps-per-point value is not valid.",
+        "tap_farming_settings_saved": "The tap conversion was saved.",
+        "tap_farming_activated": "Tap Farming is collecting community activity.",
+        "tap_farming_counted": "New taps were added to the community reserve.",
+        "tap_farming_battle_started": "The reserve is now extending this battle.",
+        "tap_farming_damage_absorbed": "The reserve absorbed player damage.",
+        "tap_farming_phase_transition": "Taps are being banked for the next phase.",
+        "tap_farming_lost_collecting": "The attempt ended; pending taps remain and the event is waiting for another boss.",
+        "tap_farming_waiting_for_boss": "Taps are being banked for the next boss.",
+        "tap_farming_completed": "The round ended in victory.",
+        "tap_farming_stopping": "The event is stopping.",
+        "tap_farming_deactivated": "Tap Farming was disabled.",
+        "tap_farming_already_off": "Tap Farming was already disabled.",
+        "tap_farming_setting_locked": "The conversion is locked while the event is active.",
+        "blocked_by_live_event": "Finish the other Live Event before activating this one.",
+        "invalid_taps_per_health_point": "The taps-per-point value is not valid.",
+        "invalid_action": "This action is not available in the current state."
+      }
+    },
+    "overlayPreview": {
+      "eyebrow": "Stream design",
+      "title": "Overlay preview",
+      "description": "This uses the same overlay as OBS. Switch states to inspect its animations without activating the event.",
+      "reload": "Reload",
+      "state": "Test state",
+      "background": "Test background",
+      "backgrounds": {
+        "alpha": "Transparent",
+        "light": "Light",
+        "dark": "Dark"
+      },
+      "iframeTitle": "Live Event overlay preview",
+      "simulate": "Simulate incoming taps",
+      "resetSimulation": "Reset state",
+      "pesky": {
+        "gift": "Rose",
+        "recruiting": "Recruiting",
+        "ready": "Roster ready",
+        "active": "In battle",
+        "won": "Victory"
+      },
+      "tapFarming": {
+        "boss": "King Dice",
+        "collecting": "Collecting",
+        "active": "Active phase",
+        "transition": "Transition",
+        "completed": "Finished"
       }
     },
     "counters": {

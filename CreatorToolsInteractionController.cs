@@ -11,6 +11,7 @@ namespace Gilomx.CupheadBossRoulette
         private const float PeskyMinimumIntervalSeconds = 1.25f;
         private const float PeskyMaximumIntervalSeconds = 3.25f;
         private const float MinimumDispatchSeparationSeconds = 0.35f;
+        private const int MaximumCommandsPerUpdate = 64;
 
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
@@ -34,9 +35,13 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsInteractionQueue peskyQueue =
             new CreatorToolsInteractionQueue();
         private readonly CreatorToolsPeskyModeSettings peskySettings;
+        private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly CreatorToolsPeskyBattleController peskyBattle;
+        private readonly CreatorToolsTapFarmingController tapFarming;
+        private readonly object liveEventsPublishLock = new object();
         private string lastInteractionState;
         private string lastPeskyState;
+        private string lastLiveEventsState;
         private string lastItem = string.Empty;
         private string interactionFeedback = "ready";
         private bool interactionFeedbackError;
@@ -58,6 +63,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool preferPeskyBattleNext = true;
         private int interactionRevision;
         private int peskyRevision;
+        private long lastProcessedInteractionControlSequence;
 
         internal CreatorToolsInteractionController(
             UnityEngine.MonoBehaviour coroutineHost,
@@ -97,6 +103,7 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsDonorLabel.SetGiftImagesVisible(ShowGiftImage);
             peskySettings = CreatorToolsPeskyModeSettings.Load(
                 pluginConfigPath, logWarning);
+            liveEvents = new CreatorToolsLiveEventsCoordinator();
             executors.Add(new ZeppelinInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
                 logInfo, logWarning));
@@ -110,12 +117,20 @@ namespace Gilomx.CupheadBossRoulette
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
                 logInfo, logWarning));
             peskyBattle = new CreatorToolsPeskyBattleController(
-                pluginConfigPath, interactionQueue, resolveGift,
+                pluginConfigPath, interactionQueue, liveEvents, resolveGift,
                 IsItemAvailable, DisableFreePeskyForBattle,
                 logInfo, logWarning);
+            tapFarming = new CreatorToolsTapFarmingController(
+                pluginConfigPath, liveEvents, logInfo, logWarning);
         }
 
-        internal void Update(CreatorToolsServer server)
+        internal CreatorToolsLiveEventsCoordinator LiveEvents
+        {
+            get { return liveEvents; }
+        }
+
+        internal void Update(
+            CreatorToolsServer server, bool gameplayDispatchAllowed)
         {
             for (var i = 0; i < executors.Count; i++)
                 executors[i].Update();
@@ -125,11 +140,59 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             string query;
+            bool backgroundApplied;
+            bool isTest;
+            int deferredTestQuantity;
+            long commandSequence;
+            long testGeneration;
             peskyBattle.ProcessCommands(server);
-            while (server.TryTakeInteractionCommand(out query))
-                ProcessInteractionCommand(ParseQuery(query));
-            while (server.TryTakePeskyCommand(out query))
+            var processedCommands = 0;
+            while (processedCommands < MaximumCommandsPerUpdate &&
+                   server.TryTakeInteractionCommand(
+                       interactionQueue.AvailableCapacity > 0,
+                       out query,
+                       out backgroundApplied,
+                       out isTest,
+                       out deferredTestQuantity,
+                       out commandSequence,
+                       out testGeneration))
+            {
+                var commandQuery = query;
+                var commandValues = ParseQuery(commandQuery);
+                if (isTest)
+                {
+                    var commandQuantity = deferredTestQuantity;
+                    var commandGeneration = testGeneration;
+                    server.ProcessInteractionTestCommand(
+                        commandQuery,
+                        commandQuantity,
+                        commandGeneration,
+                        delegate
+                        {
+                            return ProcessInteractionCommand(
+                                commandValues,
+                                false,
+                                commandQuantity);
+                        });
+                }
+                else
+                {
+                    ProcessInteractionCommand(
+                        commandValues, backgroundApplied, 0);
+                }
+                if (commandSequence >
+                    lastProcessedInteractionControlSequence)
+                    lastProcessedInteractionControlSequence =
+                        commandSequence;
+                processedCommands++;
+            }
+            var processedPeskyCommands = 0;
+            while (processedPeskyCommands < MaximumCommandsPerUpdate &&
+                   server.TryTakePeskyCommand(out query))
+            {
                 ProcessPeskyCommand(ParseQuery(query));
+                processedPeskyCommands++;
+            }
 
             var interactionsEnabled = InteractionsEnabled;
             var gameplayAvailable = AnyItemAvailable();
@@ -138,14 +201,15 @@ namespace Gilomx.CupheadBossRoulette
             if (gameplayLevelActive && gameplayAvailable)
                 gameplayAvailabilityObserved = true;
 
-            var canDispatchInteractions = gameplayAvailable &&
+            var canDispatchInteractions = gameplayDispatchAllowed &&
+                gameplayAvailable &&
                 (peskyBattle.Active ||
                  (interactionsEnabled && !queuePaused));
             if (!canDispatchInteractions)
                 nextInteractionDispatchAt = -1f;
 
             var canDispatchPesky = false;
-            if (peskySettings.Enabled)
+            if (peskySettings.Enabled && gameplayDispatchAllowed)
             {
                 UpdatePeskyMode(gameplayAvailable);
                 canDispatchPesky = gameplayAvailable;
@@ -159,15 +223,12 @@ namespace Gilomx.CupheadBossRoulette
             }
             ProcessReadyQueues(
                 canDispatchInteractions, canDispatchPesky);
-            peskyBattle.Update(server, gameplayAvailable);
+            peskyBattle.Update(
+                server, gameplayAvailable, gameplayDispatchAllowed);
+            tapFarming.Update(server, gameplayLevelActive);
+            PublishLiveEventsState(server);
 
-            var interactionState = BuildInteractionState(
-                interactionsAvailable);
-            if (interactionState != lastInteractionState)
-            {
-                lastInteractionState = interactionState;
-                server.SetInteractionsState(interactionState);
-            }
+            PublishInteractionState(server, interactionsAvailable);
             var peskyState = BuildPeskyState(gameplayAvailable);
             if (peskyState != lastPeskyState)
             {
@@ -180,7 +241,10 @@ namespace Gilomx.CupheadBossRoulette
         {
             lastInteractionState = null;
             lastPeskyState = null;
+            lock (liveEventsPublishLock)
+                lastLiveEventsState = null;
             peskyBattle.InvalidateState();
+            tapFarming.InvalidateState();
         }
 
         internal int StreamQueueAvailableCapacity
@@ -207,30 +271,137 @@ namespace Gilomx.CupheadBossRoulette
             get { return peskyBattle.StreamAttacksAllowed; }
         }
 
-        internal string ObservePeskyBattleEvent(
+        internal CreatorToolsPeskyBattleObservation ObservePeskyBattleEvent(
             CreatorToolsStreamEvent streamEvent)
         {
             return peskyBattle.ObserveStreamEvent(streamEvent);
         }
 
+        internal CreatorToolsTapFarmingObservation ObserveTapFarmingEvent(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            return tapFarming.ObserveStreamEvent(streamEvent);
+        }
+
+        /// <summary>
+        /// Republishes the physical gameplay queue after stream backlog items
+        /// are materialized later in the same Unity frame.
+        /// </summary>
+        internal void PublishInteractionState(CreatorToolsServer server)
+        {
+            if (server == null || !server.IsRunning)
+                return;
+            PublishInteractionState(
+                server, InteractionsEnabled && AnyItemAvailable());
+        }
+
+        private void PublishInteractionState(
+            CreatorToolsServer server, bool interactionsAvailable)
+        {
+            var interactionState = BuildInteractionState(
+                interactionsAvailable);
+            if (interactionState == lastInteractionState)
+                return;
+            lastInteractionState = interactionState;
+            server.SetInteractionsState(
+                interactionState,
+                masterRevision,
+                queueControlRevision,
+                lastProcessedInteractionControlSequence);
+        }
+
+        internal void PublishPeskyBattleState(CreatorToolsServer server)
+        {
+            peskyBattle.PublishState(server);
+            tapFarming.PublishState(server);
+            PublishLiveEventsState(server);
+        }
+
+        internal bool ProcessPeskyBattleCommandInBackground(
+            string query, CreatorToolsServer server)
+        {
+            var handled = peskyBattle.ProcessBackgroundCommand(query);
+            peskyBattle.PublishState(server);
+            PublishLiveEventsState(server);
+            return handled;
+        }
+
+        internal bool ProcessTapFarmingCommandInBackground(
+            string query, CreatorToolsServer server)
+        {
+            var handled = tapFarming.ProcessBackgroundCommand(query);
+            tapFarming.PublishState(server);
+            PublishLiveEventsState(server);
+            return handled;
+        }
+
+        internal void PublishLiveEventsState(CreatorToolsServer server)
+        {
+            if (server == null || !server.IsRunning)
+                return;
+            // Unity, the stream worker and HTTP command handlers can all
+            // publish this projection. Serialize snapshot + write so an
+            // older revision cannot overtake a newer one in the panel.
+            lock (liveEventsPublishLock)
+            {
+                var snapshot = liveEvents.Snapshot;
+                var stoppingEvent = snapshot.Status == "stopping"
+                    ? snapshot.ActiveEvent
+                    : string.Empty;
+                var builder = new StringBuilder(256);
+                builder.Append("{\"ready\":true,\"schemaVersion\":1," +
+                    "\"revision\":")
+                    .Append(snapshot.Revision)
+                    .Append(",\"activeEvent\":\"");
+                CreatorToolsJson.AppendEscaped(
+                    builder, snapshot.ActiveEvent);
+                builder.Append("\",\"status\":\"");
+                CreatorToolsJson.AppendEscaped(builder, snapshot.Status);
+                builder.Append("\",\"stoppingEvent\":\"");
+                CreatorToolsJson.AppendEscaped(builder, stoppingEvent);
+                builder.Append("\",\"feedback\":\"ready\"," +
+                    "\"error\":false}");
+                var state = builder.ToString();
+                if (state == lastLiveEventsState)
+                    return;
+                lastLiveEventsState = state;
+                server.SetLiveEventsState(state);
+            }
+        }
+
         internal void PeskyBattleLevelStarted(Level level)
         {
             peskyBattle.OnLevelStarted(level);
+            tapFarming.OnLevelStarted(level);
         }
 
         internal void PeskyBattleLevelDefeated(Level level)
         {
             peskyBattle.OnLevelDefeated(level);
+            tapFarming.OnLevelDefeated(level);
         }
 
         internal void PeskyBattleLevelPreWin(Level level)
         {
             peskyBattle.OnLevelPreWin(level);
+            tapFarming.OnLevelPreWin(level);
         }
 
         internal void PeskyBattleLevelEnded(Level level)
         {
             peskyBattle.OnLevelEnded(level);
+            tapFarming.OnLevelEnded(level);
+        }
+
+        internal bool PrepareTapFarmingBossDamage(
+            object properties, ref float damage)
+        {
+            return tapFarming.PrepareBossDamage(properties, ref damage);
+        }
+
+        internal void ObserveTapFarmingBossDamage(object properties)
+        {
+            tapFarming.ObserveBossDamage(properties);
         }
 
         /// <summary>
@@ -353,6 +524,7 @@ namespace Gilomx.CupheadBossRoulette
             interactionQueue.ClearActive();
             peskyQueue.Clear();
             peskyBattle.OnPhaseTransition();
+            tapFarming.OnPhaseTransition();
             for (var i = 0; i < executors.Count; i++)
                 executors[i].EndGameplayLevel();
             nextPeskyAt = -1f;
@@ -364,41 +536,44 @@ namespace Gilomx.CupheadBossRoulette
             return cleared;
         }
 
-        private void ProcessInteractionCommand(
-            Dictionary<string, string> values)
+        private int ProcessInteractionCommand(
+            Dictionary<string, string> values,
+            bool backgroundApplied,
+            int deferredTestQuantity)
         {
             if (values.ContainsKey("interactionsEnabled"))
             {
-                SetInteractionsEnabled(values);
-                return;
+                SetInteractionsEnabled(values, backgroundApplied);
+                return 0;
             }
             if (values.ContainsKey("queuePaused"))
             {
                 SetQueuePaused(values);
-                return;
+                return 0;
             }
             if (values.ContainsKey("clearPending"))
             {
-                ClearPendingInteractions();
-                return;
+                ClearPendingInteractions(backgroundApplied);
+                return 0;
             }
             if (values.ContainsKey("maxActive") ||
                 values.ContainsKey("showGiftImage"))
             {
                 SetInteractionSettings(values);
-                return;
+                return 0;
             }
             if (values.ContainsKey(
                 "phaseTransitionProtectionEnabled"))
             {
                 SetPhaseTransitionProtectionEnabled(values);
-                return;
+                return 0;
             }
-            EnqueueInteraction(values);
+            return EnqueueInteraction(values, deferredTestQuantity);
         }
 
         private void SetInteractionsEnabled(
-            Dictionary<string, string> values)
+            Dictionary<string, string> values,
+            bool backgroundApplied)
         {
             string value;
             bool enabled;
@@ -409,7 +584,11 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
-            if (setInteractionsEnabled != null)
+            // A background-applied master command already updated the
+            // authoritative volatile mirror and persisted setting. Replaying
+            // an older command here could otherwise overwrite a newer HTTP
+            // request while the queues are being caught up.
+            if (!backgroundApplied && setInteractionsEnabled != null)
                 setInteractionsEnabled(enabled);
             if (!enabled)
             {
@@ -417,7 +596,7 @@ namespace Gilomx.CupheadBossRoulette
                     CreatorToolsInteractionSource.Manual);
                 interactionQueue.ClearPending(
                     CreatorToolsInteractionSource.Stream);
-                if (resetStreamRuntimeState != null)
+                if (!backgroundApplied && resetStreamRuntimeState != null)
                     resetStreamRuntimeState();
                 queuePaused = false;
                 nextInteractionDispatchAt = -1f;
@@ -454,13 +633,13 @@ namespace Gilomx.CupheadBossRoulette
                 paused ? "queue_paused" : "queue_resumed", false);
         }
 
-        private void ClearPendingInteractions()
+        private void ClearPendingInteractions(bool backgroundApplied)
         {
             var cleared = (long)interactionQueue.ClearPending(
                 CreatorToolsInteractionSource.Manual);
             cleared += interactionQueue.ClearPending(
                 CreatorToolsInteractionSource.Stream);
-            if (clearStreamBacklog != null)
+            if (!backgroundApplied && clearStreamBacklog != null)
             {
                 var backlogBefore = getStreamBacklogCount == null
                     ? 0L
@@ -470,7 +649,9 @@ namespace Gilomx.CupheadBossRoulette
             }
             queueControlRevision++;
             SetInteractionFeedback(
-                cleared > 0L ? "pending_cleared" : "pending_empty",
+                cleared > 0L || backgroundApplied
+                    ? "pending_cleared"
+                    : "pending_empty",
                 false);
         }
 
@@ -665,18 +846,20 @@ namespace Gilomx.CupheadBossRoulette
             InvalidateState();
         }
 
-        private void EnqueueInteraction(Dictionary<string, string> values)
+        private int EnqueueInteraction(
+            Dictionary<string, string> values,
+            int deferredTestQuantity)
         {
             if (!InteractionsEnabled)
             {
                 SetInteractionFeedback("interactions_disabled", false);
-                return;
+                return 0;
             }
             string item;
             if (!values.TryGetValue("item", out item))
             {
                 SetInteractionFeedback("unknown_item", true);
-                return;
+                return 0;
             }
 
             var executor = FindExecutor(item);
@@ -684,18 +867,25 @@ namespace Gilomx.CupheadBossRoulette
             {
                 lastItem = item ?? string.Empty;
                 SetInteractionFeedback("unknown_item", true);
-                return;
+                return 0;
             }
             lastItem = item;
 
             string donor;
             values.TryGetValue("donor", out donor);
             donor = NormalizeDonor(donor);
+            var requested = deferredTestQuantity > 0
+                ? Math.Max(
+                    1,
+                    Math.Min(
+                        CreatorToolsInteractionQueue.MaximumBatchSize,
+                        deferredTestQuantity))
+                : ParseQuantity(values);
             var added = interactionQueue.Enqueue(
                 item,
                 donor,
                 string.Empty,
-                ParseQuantity(values),
+                requested,
                 ParseDelaySeconds(values),
                 CreatorToolsInteractionSource.Manual);
             if (added > 0)
@@ -706,10 +896,19 @@ namespace Gilomx.CupheadBossRoulette
                 if (logInfo != null)
                     logInfo(added + " canje(s) de " + item +
                         " agregados a la cola para " + donor + ".");
-                return;
+                return deferredTestQuantity > 0
+                    ? Math.Max(0, requested - added)
+                    : 0;
             }
 
+            if (deferredTestQuantity > 0)
+            {
+                SetInteractionFeedback(
+                    queuePaused ? "queued_paused" : "queued", false);
+                return requested;
+            }
             SetInteractionFeedback("queue_full", true);
+            return 0;
         }
 
         private void SetInteractionSettings(
@@ -1002,6 +1201,7 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(queuePaused ? "true" : "false")
                 .Append(",\"queueControlRevision\":")
                 .Append(queueControlRevision)
+                .Append(",\"pendingClearProjected\":false")
                 .Append(",\"item\":\"")
                 .Append(CreatorToolsInteractionIds.All[0])
                 .Append("\",\"items\":[");
@@ -1032,6 +1232,7 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(getStreamBacklogCount == null
                     ? 0L
                     : Math.Max(0L, getStreamBacklogCount()))
+                .Append(",\"deferredTestCount\":0")
                 .Append(",\"maxActive\":").Append(MaximumActive)
                 .Append(",\"maxActiveLimit\":").Append(MaximumActiveLimit)
                 .Append(",\"maxBatch\":")

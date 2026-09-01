@@ -60,6 +60,7 @@ export interface InteractionConfigState {
   masterRevision: number;
   queuePaused: boolean;
   queueControlRevision: number;
+  pendingClearProjected: boolean;
   phaseTransitionProtectionEnabled: boolean;
   phaseTransitionProtectionRevision: number;
   showGiftImage?: boolean;
@@ -74,6 +75,7 @@ export interface InteractionConfigState {
   activeCount: number;
   pendingCount: number;
   backlogCount: number;
+  deferredTestCount: number;
   maxActive: number;
   maxActiveLimit: number;
   maxBatch: number;
@@ -142,6 +144,69 @@ export interface PeskyBattleConfigState {
   participants: PeskyBattleParticipant[];
   items: string[];
   disabledItems: string[];
+  feedback: string;
+  error: boolean;
+}
+
+export type LiveEventId = "pesky_battle" | "tap_farming";
+
+export interface LiveEventsConfigState {
+  ready: boolean;
+  schemaVersion?: number;
+  revision: number;
+  activeEvent: LiveEventId | "";
+  status: "idle" | "active" | "stopping";
+  stoppingEvent: LiveEventId | "";
+  feedback: string;
+  error: boolean;
+}
+
+export type TapFarmingPhase =
+  | "off"
+  | "collecting"
+  | "active"
+  | "transition"
+  | "completed"
+  | "stopping";
+
+export interface TapFarmingPhaseProgress {
+  index: number;
+  label?: string;
+  status: "pending" | "active" | "complete";
+  progress: number;
+  reserveHealth?: number;
+}
+
+export interface TapFarmingConfigState {
+  ready: boolean;
+  schemaVersion: number;
+  revision: number;
+  phase: TapFarmingPhase;
+  sessionId: number;
+  blockedByLiveEvent: LiveEventId | "";
+  conversion: {
+    tapsPerHealthPoint: number;
+  };
+  counters: {
+    totalTaps: number;
+    bankedTaps: number;
+    unconvertedTaps: number;
+    convertedHealth: number;
+    reserveHealth: number;
+    spentHealth: number;
+  };
+  bossName: string;
+  levelId: string;
+  attempt: number;
+  boss: {
+    currentHealth: number;
+    totalHealth: number;
+    progress: number;
+  };
+  phaseIndex: number;
+  phaseCount: number;
+  overallProgress: number;
+  phases: TapFarmingPhaseProgress[];
   feedback: string;
   error: boolean;
 }

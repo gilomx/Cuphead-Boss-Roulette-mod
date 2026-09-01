@@ -7,10 +7,16 @@ import { StatusBadge } from "./StatusBadge";
 interface AppShellProps {
   activeSection: ConfigSection;
   children: ReactNode;
+  currentSection?: ConfigSection | null;
   onSectionChange: (section: ConfigSection) => void;
 }
 
-export function AppShell({ activeSection, children, onSectionChange }: AppShellProps) {
+export function AppShell({
+  activeSection,
+  children,
+  currentSection = activeSection,
+  onSectionChange,
+}: AppShellProps) {
   const { locale, setLocale, t } = useLocalization();
   const { status } = useConfig();
   const currentYear = new Date().getFullYear();
@@ -38,7 +44,7 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
           <button
             className={`sidebar__item${activeSection === "dashboard" ? " sidebar__item--active" : ""}`}
             type="button"
-            aria-current={activeSection === "dashboard" ? "page" : undefined}
+            aria-current={currentSection === "dashboard" ? "page" : undefined}
             onClick={() => onSectionChange("dashboard")}
           >
             {t("nav.dashboard")}
@@ -46,7 +52,7 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
           <button
             className={`sidebar__item${activeSection === "roulette" ? " sidebar__item--active" : ""}`}
             type="button"
-            aria-current={activeSection === "roulette" ? "page" : undefined}
+            aria-current={currentSection === "roulette" ? "page" : undefined}
             onClick={() => onSectionChange("roulette")}
           >
             {t("nav.roulette")}
@@ -54,7 +60,7 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
           <button
             className={`sidebar__item${activeSection === "interactions" ? " sidebar__item--active" : ""}`}
             type="button"
-            aria-current={activeSection === "interactions" ? "page" : undefined}
+            aria-current={currentSection === "interactions" ? "page" : undefined}
             onClick={() => onSectionChange("interactions")}
           >
             {t("nav.interactions")}
@@ -62,7 +68,7 @@ export function AppShell({ activeSection, children, onSectionChange }: AppShellP
           <button
             className={`sidebar__item${activeSection === "pesky" ? " sidebar__item--active" : ""}`}
             type="button"
-            aria-current={activeSection === "pesky" ? "page" : undefined}
+            aria-current={currentSection === "pesky" ? "page" : undefined}
             onClick={() => onSectionChange("pesky")}
           >
             {t("nav.pesky")}

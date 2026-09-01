@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NuGetAudit>false</NuGetAudit>
+    <!-- Production protocol fields are intentionally not all populated by
+         this focused harness. -->
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+
+  <!-- The unusual .cs.txt suffix keeps the SDK-style mod project from
+       discovering the harness fakes through its recursive *.cs glob. -->
+  <ItemGroup>
+    <Compile Include="Program.cs.txt" Link="Program.cs" />
+    <Compile Include="RuntimeStubs.cs.txt" Link="RuntimeStubs.cs" />
+
+    <Compile Include="..\CreatorToolsDashboardController.cs"
+             Link="Product\CreatorToolsDashboardController.cs" />
+    <Compile Include="..\CreatorToolsServer.cs"
+             Link="Product\CreatorToolsServer.cs" />
+    <Compile Include="..\CreatorToolsStreamRulesController.cs"
+             Link="Product\CreatorToolsStreamRulesController.cs" />
+    <Compile Include="..\Streaming\CreatorToolsDashboardModels.cs"
+             Link="Product\Streaming\CreatorToolsDashboardModels.cs" />
+    <Compile Include="..\Streaming\CreatorToolsJson.cs"
+             Link="Product\Streaming\CreatorToolsJson.cs" />
+    <Compile Include="..\Streaming\CreatorToolsFlatJson.cs"
+             Link="Product\Streaming\CreatorToolsFlatJson.cs" />
+    <Compile Include="..\Streaming\CreatorToolsStreamDeduplicator.cs"
+             Link="Product\Streaming\CreatorToolsStreamDeduplicator.cs" />
+    <Compile Include="..\Streaming\CreatorToolsStreamDispatchBacklog.cs"
+             Link="Product\Streaming\CreatorToolsStreamDispatchBacklog.cs" />
+    <Compile Include="..\Streaming\CreatorToolsStreamEvent.cs"
+             Link="Product\Streaming\CreatorToolsStreamEvent.cs" />
+    <Compile Include="..\Streaming\CreatorToolsStreamWorker.cs"
+             Link="Product\Streaming\CreatorToolsStreamWorker.cs" />
+    <Compile Include="..\Streaming\TikFinityCompanionProtocol.cs"
+             Link="Product\Streaming\TikFinityCompanionProtocol.cs" />
+    <Compile Include="..\Streaming\TikFinityCompanionHost.cs"
+             Link="Product\Streaming\TikFinityCompanionHost.cs" />
+  </ItemGroup>
+</Project>

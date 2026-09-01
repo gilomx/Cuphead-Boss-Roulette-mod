@@ -19,6 +19,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumRuleNameLength = 64;
         private const int MaximumEvery = 1000000;
         private const int MaximumQuantity = 50;
+        private const int MaximumRuntimeViewerKeys = 100000;
 
         private readonly string settingsPath;
         private readonly Func<bool> getInteractionsEnabled;
@@ -93,19 +94,7 @@ namespace Gilomx.CupheadBossRoulette
                     processed++;
                 }
 
-                lock (ruleStateLock)
-                {
-                    if (stateDirty)
-                    {
-                        var state = BuildState();
-                        if (state != lastPublishedState)
-                        {
-                            lastPublishedState = state;
-                            server.SetStreamRulesState(state);
-                        }
-                        stateDirty = false;
-                    }
-                }
+                PublishState(server);
             }
             // HTTP CRUD can purge runtime state while Unity remains
             // unfocused. Serialize backlog mutation with evaluation, but
@@ -114,6 +103,24 @@ namespace Gilomx.CupheadBossRoulette
                 return InteractionsEnabled && streamAttacksAllowed
                     ? dispatchBacklog.Drain(interactions)
                     : 0;
+        }
+
+        internal void PublishState(CreatorToolsServer server)
+        {
+            if (server == null || !server.IsRunning)
+                return;
+            lock (ruleStateLock)
+            {
+                if (!stateDirty)
+                    return;
+                var state = BuildState();
+                if (state != lastPublishedState)
+                {
+                    lastPublishedState = state;
+                    server.SetStreamRulesState(state);
+                }
+                stateDirty = false;
+            }
         }
 
         internal long BacklogCount
@@ -173,18 +180,26 @@ namespace Gilomx.CupheadBossRoulette
         /// </summary>
         internal CreatorToolsStreamEvaluation Evaluate(
             CreatorToolsStreamEvent streamEvent,
-            CreatorToolsInteractionController interactions,
             bool streamAttacksAllowed)
         {
             lock (ruleStateLock)
             {
+                // Read the volatile master mirror while holding the same lock
+                // used by ResetRuntimeState. A stale snapshot taken before
+                // this lock could otherwise recreate backlog just after the
+                // user disabled and cleared interactions.
+                if (!InteractionsEnabled)
+                    return new CreatorToolsStreamEvaluation
+                    {
+                        MessageCode = "interactions_disabled"
+                    };
                 if (!streamAttacksAllowed)
                     return new CreatorToolsStreamEvaluation
                     {
                         MessageCode =
                             "stream_attacks_blocked_by_pesky_battle"
                     };
-                return EvaluateLocked(streamEvent, interactions);
+                return EvaluateLocked(streamEvent);
             }
         }
 
@@ -241,16 +256,10 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private CreatorToolsStreamEvaluation EvaluateLocked(
-            CreatorToolsStreamEvent streamEvent,
-            CreatorToolsInteractionController interactions)
+            CreatorToolsStreamEvent streamEvent)
         {
             var result = new CreatorToolsStreamEvaluation();
-            if (!InteractionsEnabled)
-            {
-                result.MessageCode = "interactions_disabled";
-                return result;
-            }
-            if (!catalogReady || streamEvent == null || interactions == null ||
+            if (!catalogReady || streamEvent == null ||
                 streamEvent.Platform != "tiktok" ||
                 !IsSupportedEventType(streamEvent.Type))
                 return result;
@@ -275,9 +284,21 @@ namespace Gilomx.CupheadBossRoulette
 
             if (streamEvent.Type == FollowEventType)
             {
+                var hasEnabledFollowRule = false;
+                for (var i = 0; i < rules.Count; i++)
+                {
+                    if (rules[i].Enabled &&
+                        rules[i].EventType == FollowEventType)
+                    {
+                        hasEnabledFollowRule = true;
+                        break;
+                    }
+                }
+                if (!hasEnabledFollowRule)
+                    return result;
                 var followKey = BuildConnectionViewerKey(
                     streamEvent.ConnectionId, viewerKey);
-                if (!followedViewers.Add(followKey))
+                if (!TryRememberFollowViewer(followKey))
                 {
                     result.MessageCode = "follow_already_seen";
                     return result;
@@ -311,7 +332,8 @@ namespace Gilomx.CupheadBossRoulette
                     var total = Math.Min(long.MaxValue - streamEvent.Count,
                         Math.Max(0L, remainder)) + streamEvent.Count;
                     triggers = total / rule.Every;
-                    accumulators[accumulatorKey] = total % rule.Every;
+                    SetAccumulatorRemainder(
+                        accumulatorKey, total % rule.Every);
                 }
                 if (triggers <= 0)
                     continue;
@@ -320,43 +342,29 @@ namespace Gilomx.CupheadBossRoulette
                 matchedNames.Add(rule.Name);
                 interactionIds.Add(rule.Interaction);
                 var requestedLong = triggers * (long)rule.Quantity;
-                var canDispatchImmediately = !dispatchBacklog.HasEntries;
                 var giftImagePath = string.Empty;
                 GiftEntry gift;
                 if (rule.EventType == GiftEventType &&
                     gifts.TryGetValue(rule.GiftId, out gift))
                     giftImagePath = gift.ImagePath;
-                var pending = dispatchBacklog.Add(
+                dispatchBacklog.Add(
                     rule.Id,
                     streamEvent.ConnectionId,
                     rule.Interaction,
                     giftImagePath,
                     streamEvent.UserName,
                     requestedLong);
-                var queuedForRule = 0;
-                if (canDispatchImmediately)
-                {
-                    string feedbackCode;
-                    queuedForRule = dispatchBacklog.DrainEntry(
-                        pending, interactions, out feedbackCode);
-                    dispatchBacklog.RemoveIfComplete(pending);
-                    if (queuedForRule == 0 &&
-                        string.IsNullOrEmpty(result.MessageCode))
-                        result.MessageCode = feedbackCode;
-                }
-                result.QueuedInteractions += queuedForRule;
-                result.DeferredInteractions += Math.Max(
-                    0L, requestedLong - queuedForRule);
+                // Evaluation can run while Unity is suspended. The worker
+                // only records durable in-memory intent here; Update() is the
+                // sole main-thread boundary allowed to drain into the gameplay
+                // queue (which reads UnityEngine.Time).
+                result.DeferredInteractions += Math.Max(0L, requestedLong);
             }
 
             result.RuleNames = string.Join(", ", matchedNames.ToArray());
             result.InteractionIds = string.Join(", ",
                 interactionIds.ToArray());
-            if (result.QueuedInteractions > 0)
-                result.MessageCode = result.DeferredInteractions > 0
-                    ? "rules_partially_queued"
-                    : "rules_queued";
-            else if (result.MatchedRules > 0 &&
+            if (result.MatchedRules > 0 &&
                 result.DeferredInteractions > 0)
                 result.MessageCode = "rules_waiting_queue";
             else if (result.MatchedRules > 0 &&
@@ -365,6 +373,47 @@ namespace Gilomx.CupheadBossRoulette
             else if (thresholdObserved)
                 result.MessageCode = "threshold_pending";
             return result;
+        }
+
+        private bool TryRememberFollowViewer(string key)
+        {
+            if (followedViewers.Contains(key))
+                return false;
+            if (followedViewers.Count >= MaximumRuntimeViewerKeys)
+            {
+                string expired = null;
+                foreach (var candidate in followedViewers)
+                {
+                    expired = candidate;
+                    break;
+                }
+                if (expired != null)
+                    followedViewers.Remove(expired);
+            }
+            followedViewers.Add(key);
+            return true;
+        }
+
+        private void SetAccumulatorRemainder(string key, long remainder)
+        {
+            if (remainder <= 0L)
+            {
+                accumulators.Remove(key);
+                return;
+            }
+            if (!accumulators.ContainsKey(key) &&
+                accumulators.Count >= MaximumRuntimeViewerKeys)
+            {
+                string expired = null;
+                foreach (var candidate in accumulators.Keys)
+                {
+                    expired = candidate;
+                    break;
+                }
+                if (expired != null)
+                    accumulators.Remove(expired);
+            }
+            accumulators[key] = remainder;
         }
 
         private void ProcessCommand(Dictionary<string, string> values)

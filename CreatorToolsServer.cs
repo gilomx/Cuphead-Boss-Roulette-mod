@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -16,9 +17,15 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumHeaderBytes = 65536;
         private const int HttpHeaderReadTimeoutMilliseconds = 5000;
         private const int MaximumClientPayloadBytes = 1024 * 1024;
+        private const int MaximumConfigCommands = 256;
         private const int MaximumDashboardQueryLength = 4096;
+        private const int MaximumInteractionControlCommands = 256;
+        private const int MaximumInteractionTestCommands = 128;
+        private const int MaximumQueuedInteractionTests = 200;
+        private const int MaximumPeskyCommands = 256;
         private const int MaximumPeskyBattleQueryLength = 4096;
         private const int MaximumPeskyBattleCommands = 128;
+        private const int MaximumTapFarmingQueryLength = 4096;
         private const int MaximumStreamRuleCommands = 256;
         private const int MaximumStreamRuleQueryLength = 4096;
 
@@ -30,15 +37,22 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Queue<string> configCommands =
             new Queue<string>();
         private readonly object interactionsLock = new object();
-        private readonly Queue<string> interactionCommands =
-            new Queue<string>();
+        private readonly object interactionsProcessingLock = new object();
+        private readonly Queue<InteractionCommand> interactionControlCommands =
+            new Queue<InteractionCommand>();
+        private readonly Queue<InteractionCommand> interactionTestCommands =
+            new Queue<InteractionCommand>();
         private readonly object dashboardLock = new object();
         private readonly object peskyLock = new object();
         private readonly Queue<string> peskyCommands =
             new Queue<string>();
         private readonly object peskyBattleLock = new object();
+        private readonly object peskyBattleProcessingLock = new object();
         private readonly Queue<string> peskyBattleCommands =
             new Queue<string>();
+        private readonly object tapFarmingLock = new object();
+        private readonly object tapFarmingProcessingLock = new object();
+        private readonly object liveEventsLock = new object();
         private readonly object streamRulesLock = new object();
         private readonly object streamRulesProcessingLock = new object();
         private readonly Queue<string> streamRuleCommands =
@@ -55,6 +69,9 @@ namespace Gilomx.CupheadBossRoulette
         private volatile bool running;
         private Func<string, string> streamRuleCommandHandler;
         private Func<string, string> dashboardSimulationHandler;
+        private Func<string, long, bool> interactionControlObserver;
+        private Func<string, bool> peskyBattleCommandHandler;
+        private Func<string, bool> tapFarmingCommandHandler;
         private string latestMessage = "{\"type\":\"state\",\"active\":false}";
         private long latestRevision;
         private byte[] challengeLabelPng;
@@ -65,8 +82,25 @@ namespace Gilomx.CupheadBossRoulette
             "{\"ready\":false,\"available\":false," +
             "\"interactionsEnabled\":false,\"masterRevision\":0," +
             "\"queuePaused\":false,\"queueControlRevision\":0," +
+            "\"pendingClearProjected\":false," +
             "\"pendingCount\":0,\"backlogCount\":0," +
+            "\"deferredTestCount\":0," +
             "\"showGiftImage\":true,\"settingsRevision\":0}";
+        private long latestInteractionBacklogCount;
+        private long pendingInteractionTestCount;
+        private int inFlightInteractionTestCommands;
+        private bool latestInteractionsEnabled;
+        private long latestInteractionMasterRevision;
+        private long latestInteractionQueueControlRevision;
+        private bool hasInteractionMasterProjection;
+        private bool projectedInteractionsEnabled;
+        private long projectedInteractionMasterRevision;
+        private long projectedInteractionMasterCommandSequence;
+        private bool hasInteractionQueueControlProjection;
+        private long projectedInteractionQueueControlRevision;
+        private long projectedInteractionQueueCommandSequence;
+        private long nextInteractionControlSequence;
+        private long interactionTestGeneration = 1L;
         private string latestDashboardState =
             "{\"ready\":false,\"schemaVersion\":2,\"revision\":0," +
             "\"engineStatus\":\"starting\",\"connections\":[]," +
@@ -88,6 +122,28 @@ namespace Gilomx.CupheadBossRoulette
             "\"allowStreamAttacks\":true,\"participants\":[]," +
             "\"items\":[],\"disabledItems\":[]," +
             "\"feedback\":\"starting\",\"error\":false}";
+        private string latestTapFarmingState =
+            "{\"ready\":false,\"schemaVersion\":1," +
+            "\"revision\":0,\"phase\":\"off\"," +
+            "\"sessionId\":0,\"attempt\":0,\"enabled\":false," +
+            "\"isLiveEventOwner\":false," +
+            "\"blockedByLiveEvent\":\"\"," +
+            "\"gameplayAvailable\":false,\"levelId\":\"\"," +
+            "\"bossName\":\"\"," +
+            "\"conversion\":{\"tapsPerHealthPoint\":2}," +
+            "\"counters\":{\"totalTaps\":0,\"bankedTaps\":0," +
+            "\"unconvertedTaps\":0,\"convertedHealth\":0," +
+            "\"reserveHealth\":0,\"spentHealth\":0}," +
+            "\"boss\":{\"currentHealth\":0,\"totalHealth\":0," +
+            "\"progress\":0},\"phaseIndex\":0," +
+            "\"phaseCount\":0,\"overallProgress\":0," +
+            "\"phases\":[],\"feedback\":\"starting\"," +
+            "\"error\":false}";
+        private string latestLiveEventsState =
+            "{\"ready\":false,\"schemaVersion\":1,\"revision\":0," +
+            "\"activeEvent\":\"\",\"status\":\"idle\"," +
+            "\"stoppingEvent\":\"\",\"feedback\":\"starting\"," +
+            "\"error\":false}";
         private string latestStreamRulesState =
             "{\"ready\":false,\"schemaVersion\":1,\"revision\":0," +
             "\"engineActive\":false,\"rules\":[]}";
@@ -211,23 +267,251 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void SetInteractionsState(string json)
         {
+            SetInteractionsState(json, -1L, -1L, -1L);
+        }
+
+        internal void SetInteractionsState(
+            string json, long masterRevision, long queueControlRevision)
+        {
+            SetInteractionsState(
+                json, masterRevision, queueControlRevision, -1L);
+        }
+
+        internal void SetInteractionsState(
+            string json,
+            long masterRevision,
+            long queueControlRevision,
+            long processedControlSequence)
+        {
             if (string.IsNullOrEmpty(json))
                 return;
             lock (interactionsLock)
+            {
                 latestInteractionsState = json;
+                var masterProjectionAcknowledged =
+                    hasInteractionMasterProjection &&
+                    processedControlSequence >=
+                        projectedInteractionMasterCommandSequence;
+                bool enabled;
+                if (TryReadBooleanProperty(
+                        json, "interactionsEnabled", out enabled) &&
+                    (!hasInteractionMasterProjection ||
+                     masterProjectionAcknowledged))
+                    latestInteractionsEnabled = enabled;
+                if (masterRevision >= 0L)
+                {
+                    latestInteractionMasterRevision = masterRevision;
+                }
+                if (queueControlRevision >= 0L)
+                {
+                    latestInteractionQueueControlRevision =
+                        queueControlRevision;
+                }
+                if (processedControlSequence >= 0L)
+                {
+                    if (masterProjectionAcknowledged)
+                        hasInteractionMasterProjection = false;
+                    if (hasInteractionQueueControlProjection &&
+                        processedControlSequence >=
+                            projectedInteractionQueueCommandSequence)
+                        hasInteractionQueueControlProjection = false;
+                }
+            }
         }
 
-        internal bool TryTakeInteractionCommand(out string command)
+        /// <summary>
+        /// Publishes the worker-owned stream backlog without reading or
+        /// serializing Unity's gameplay queue from a background thread.
+        /// </summary>
+        internal void SetInteractionBacklogCount(long count)
+        {
+            lock (interactionsLock)
+                latestInteractionBacklogCount = Math.Max(0L, count);
+        }
+
+        internal void ProjectInteractionMasterState(
+            bool enabled, long commandSequence)
         {
             lock (interactionsLock)
             {
-                if (interactionCommands.Count == 0)
+                latestInteractionsEnabled = enabled;
+                projectedInteractionsEnabled = enabled;
+                projectedInteractionMasterRevision = Math.Max(
+                    latestInteractionMasterRevision,
+                    projectedInteractionMasterRevision) + 1L;
+                projectedInteractionMasterCommandSequence = Math.Max(
+                    0L, commandSequence);
+                hasInteractionMasterProjection = true;
+                if (!enabled)
+                {
+                    AdvanceInteractionTestGenerationLocked();
+                    interactionTestCommands.Clear();
+                    pendingInteractionTestCount = 0L;
+                    inFlightInteractionTestCommands = 0;
+                }
+            }
+        }
+
+        internal void ProjectInteractionQueueCleared(long commandSequence)
+        {
+            lock (interactionsLock)
+            {
+                projectedInteractionQueueControlRevision = Math.Max(
+                    latestInteractionQueueControlRevision,
+                    projectedInteractionQueueControlRevision) + 1L;
+                projectedInteractionQueueCommandSequence = Math.Max(
+                    0L, commandSequence);
+                hasInteractionQueueControlProjection = true;
+            }
+        }
+
+        internal void ClearPendingInteractionTests()
+        {
+            lock (interactionsLock)
+            {
+                AdvanceInteractionTestGenerationLocked();
+                interactionTestCommands.Clear();
+                pendingInteractionTestCount = 0L;
+                inFlightInteractionTestCommands = 0;
+            }
+        }
+
+        private void AdvanceInteractionTestGenerationLocked()
+        {
+            interactionTestGeneration++;
+            if (interactionTestGeneration <= 0L)
+                interactionTestGeneration = 1L;
+        }
+
+        internal void SetInteractionControlObserver(
+            Func<string, long, bool> observer)
+        {
+            if (observer != null)
+            {
+                lock (interactionsLock)
+                    interactionControlObserver = observer;
+                return;
+            }
+            lock (interactionsProcessingLock)
+            {
+                lock (interactionsLock)
+                    interactionControlObserver = null;
+            }
+        }
+
+        internal bool TryTakeInteractionCommand(
+            out string command, out bool backgroundApplied)
+        {
+            bool isTest;
+            int pendingQuantity;
+            long commandSequence;
+            long testGeneration;
+            return TryTakeInteractionCommand(
+                true,
+                out command,
+                out backgroundApplied,
+                out isTest,
+                out pendingQuantity,
+                out commandSequence,
+                out testGeneration);
+        }
+
+        internal bool TryTakeInteractionCommand(
+            bool includeTests,
+            out string command,
+            out bool backgroundApplied,
+            out bool isTest,
+            out int pendingQuantity,
+            out long commandSequence,
+            out long testGeneration)
+        {
+            lock (interactionsLock)
+            {
+                InteractionCommand entry;
+                if (interactionControlCommands.Count > 0)
+                    entry = interactionControlCommands.Dequeue();
+                else if (includeTests && interactionTestCommands.Count > 0)
+                    entry = interactionTestCommands.Dequeue();
+                else
                 {
                     command = null;
+                    backgroundApplied = false;
+                    isTest = false;
+                    pendingQuantity = 0;
+                    commandSequence = 0L;
+                    testGeneration = 0L;
                     return false;
                 }
-                command = interactionCommands.Dequeue();
+                if (entry.IsTest)
+                    inFlightInteractionTestCommands++;
+                command = entry.Query;
+                backgroundApplied = entry.BackgroundApplied;
+                isTest = entry.IsTest;
+                pendingQuantity = entry.PendingQuantity;
+                commandSequence = entry.Sequence;
+                testGeneration = entry.TestGeneration;
                 return true;
+            }
+        }
+
+        internal void ProcessInteractionTestCommand(
+            string query,
+            int pendingQuantity,
+            long testGeneration,
+            Func<int> materialize)
+        {
+            lock (interactionsProcessingLock)
+            {
+                lock (interactionsLock)
+                {
+                    if (testGeneration != interactionTestGeneration)
+                    {
+                        inFlightInteractionTestCommands = Math.Max(
+                            0, inFlightInteractionTestCommands - 1);
+                        return;
+                    }
+                }
+
+                pendingQuantity = Math.Max(0, pendingQuantity);
+                var remainder = 0;
+                Exception failure = null;
+                try
+                {
+                    if (materialize == null)
+                        throw new InvalidOperationException(
+                            "The interaction test materializer is missing.");
+                    remainder = Math.Max(
+                        0, Math.Min(pendingQuantity, materialize()));
+                }
+                catch (Exception exception)
+                {
+                    // A broken test request must not poison the Unity update
+                    // loop or leave the deferred counters permanently stuck.
+                    // Drop this command; a user can submit a fresh test after
+                    // the underlying problem is corrected.
+                    failure = exception;
+                    remainder = 0;
+                }
+                lock (interactionsLock)
+                {
+                    inFlightInteractionTestCommands = Math.Max(
+                        0, inFlightInteractionTestCommands - 1);
+                    if (testGeneration != interactionTestGeneration)
+                        return;
+                    pendingInteractionTestCount = Math.Max(
+                        0L,
+                        pendingInteractionTestCount -
+                            (pendingQuantity - remainder));
+                    if (remainder > 0)
+                        interactionTestCommands.Enqueue(
+                            new InteractionCommand(
+                                query, false, true, remainder, 0L,
+                                testGeneration));
+                }
+                if (failure != null && logWarning != null)
+                    logWarning("Creator Tools dropped a deferred interaction " +
+                        "test after it failed to materialize: " +
+                        failure.Message);
             }
         }
 
@@ -294,6 +578,62 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal void SetPeskyBattleCommandHandler(
+            Func<string, bool> handler)
+        {
+            if (handler != null)
+            {
+                lock (peskyBattleLock)
+                    peskyBattleCommandHandler = handler;
+                return;
+            }
+            lock (peskyBattleProcessingLock)
+            {
+                lock (peskyBattleLock)
+                    peskyBattleCommandHandler = null;
+            }
+        }
+
+        internal void ApplyPeskyBattleMainThreadActions(Action action)
+        {
+            if (action == null)
+                return;
+            lock (peskyBattleProcessingLock)
+                action();
+        }
+
+        internal void SetTapFarmingState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (tapFarmingLock)
+                latestTapFarmingState = json;
+        }
+
+        internal void SetTapFarmingCommandHandler(
+            Func<string, bool> handler)
+        {
+            if (handler != null)
+            {
+                lock (tapFarmingLock)
+                    tapFarmingCommandHandler = handler;
+                return;
+            }
+            lock (tapFarmingProcessingLock)
+            {
+                lock (tapFarmingLock)
+                    tapFarmingCommandHandler = null;
+            }
+        }
+
+        internal void SetLiveEventsState(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return;
+            lock (liveEventsLock)
+                latestLiveEventsState = json;
+        }
+
         internal void SetStreamRulesState(string json)
         {
             if (string.IsNullOrEmpty(json))
@@ -310,8 +650,17 @@ namespace Gilomx.CupheadBossRoulette
         internal void SetStreamRuleCommandHandler(
             Func<string, string> handler)
         {
-            lock (streamRulesLock)
-                streamRuleCommandHandler = handler;
+            if (handler != null)
+            {
+                lock (streamRulesLock)
+                    streamRuleCommandHandler = handler;
+                return;
+            }
+            lock (streamRulesProcessingLock)
+            {
+                lock (streamRulesLock)
+                    streamRuleCommandHandler = null;
+            }
         }
 
         internal bool TryTakeStreamRuleCommand(out string command)
@@ -545,7 +894,15 @@ namespace Gilomx.CupheadBossRoulette
         {
             while (running)
             {
-                var stateChanged = broadcastWake.WaitOne(10000, false);
+                bool stateChanged;
+                try
+                {
+                    stateChanged = broadcastWake.WaitOne(10000, false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
                 if (!running)
                     break;
 
@@ -704,6 +1061,9 @@ namespace Gilomx.CupheadBossRoulette
                 path == "/config/pesky-battle" ||
                 path == "/config/pesky-battle/" ||
                 path == "/config/pesky-battle.html" ||
+                path == "/config/tap-farming" ||
+                path == "/config/tap-farming/" ||
+                path == "/config/tap-farming.html" ||
                 path == "/dashboard" ||
                 path == "/dashboard/" ||
                 path == "/dashboard.html")
@@ -719,7 +1079,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\pesky-battle-overlay.html"),
-                    "text/html; charset=utf-8", false);
+                    "text/html; charset=utf-8", false, true);
                 return;
             }
             if (path == "/pesky-battle-overlay.css")
@@ -763,40 +1123,198 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/api/config/roulette/set" ||
                 path == "/api/config/set")
             {
+                var accepted = false;
                 lock (configLock)
-                    configCommands.Enqueue(request.Query ?? string.Empty);
-                WriteResponse(stream, 202, "Accepted",
+                {
+                    if (configCommands.Count < MaximumConfigCommands)
+                    {
+                        configCommands.Enqueue(request.Query ?? string.Empty);
+                        accepted = true;
+                    }
+                }
+                WriteResponse(stream, accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
                     "application/json; charset=utf-8",
-                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}"
+                        : "{\"ok\":false,\"error\":" +
+                          "\"config_command_queue_full\"}"), false);
                 return;
             }
             if (path == "/api/config/interactions")
             {
                 string json;
                 lock (interactionsLock)
-                    json = latestInteractionsState;
+                {
+                    json = ReplaceNonnegativeIntegerProperty(
+                        latestInteractionsState,
+                        "backlogCount",
+                        latestInteractionBacklogCount);
+                    json = ReplaceNonnegativeIntegerProperty(
+                        json,
+                        "deferredTestCount",
+                        pendingInteractionTestCount);
+                    if (hasInteractionMasterProjection)
+                    {
+                        json = ReplaceBooleanProperty(
+                            json,
+                            "interactionsEnabled",
+                            projectedInteractionsEnabled);
+                        json = ReplaceNonnegativeIntegerProperty(
+                            json,
+                            "masterRevision",
+                            projectedInteractionMasterRevision);
+                        if (!projectedInteractionsEnabled)
+                        {
+                            json = ReplaceBooleanProperty(
+                                json, "queuePaused", false);
+                            json = ReplaceBooleanProperty(
+                                json, "available", false);
+                        }
+                    }
+                    if (hasInteractionQueueControlProjection)
+                    {
+                        json = ReplaceNonnegativeIntegerProperty(
+                            json,
+                            "queueControlRevision",
+                            projectedInteractionQueueControlRevision);
+                        json = ReplaceBooleanProperty(
+                            json, "pendingClearProjected", true);
+                        json = ReplaceNonnegativeIntegerProperty(
+                            json, "pendingCount", 0L);
+                        long activeCount;
+                        if (TryReadNonnegativeIntegerProperty(
+                                json, "activeCount", out activeCount))
+                            json = ReplaceNonnegativeIntegerProperty(
+                                json, "queueCount", activeCount);
+                    }
+                }
                 WriteResponse(stream, 200, "OK",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes(json), false);
                 return;
             }
+            if (path == "/tap-farming-overlay" ||
+                path == "/tap-farming-overlay/" ||
+                path == "/tap-farming-overlay.html")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\tap-farming-overlay.html"),
+                    "text/html; charset=utf-8", false, true);
+                return;
+            }
+            if (path == "/tap-farming-overlay.css")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\tap-farming-overlay.css"),
+                    "text/css; charset=utf-8", false);
+                return;
+            }
+            if (path == "/tap-farming-overlay.js")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\tap-farming-overlay.js"),
+                    "application/javascript; charset=utf-8", false);
+                return;
+            }
             if (path == "/api/config/interactions/test")
             {
-                lock (interactionsLock)
-                    interactionCommands.Enqueue(request.Query ?? string.Empty);
-                WriteResponse(stream, 202, "Accepted",
+                var query = request.Query ?? string.Empty;
+                var quantity = ParseInteractionTestQuantity(query);
+                var accepted = false;
+                var enabled = false;
+                lock (interactionsProcessingLock)
+                {
+                    lock (interactionsLock)
+                    {
+                        enabled = hasInteractionMasterProjection
+                            ? projectedInteractionsEnabled
+                            : latestInteractionsEnabled;
+                        if (enabled && interactionTestCommands.Count +
+                                inFlightInteractionTestCommands <
+                                MaximumInteractionTestCommands &&
+                            pendingInteractionTestCount + quantity <=
+                                MaximumQueuedInteractionTests)
+                        {
+                            interactionTestCommands.Enqueue(
+                                new InteractionCommand(
+                                    query, false, true, quantity, 0L,
+                                    interactionTestGeneration));
+                            pendingInteractionTestCount += quantity;
+                            accepted = true;
+                        }
+                    }
+                }
+                WriteResponse(stream,
+                    accepted ? 202 : enabled ? 429 : 409,
+                    accepted ? "Accepted" : enabled
+                        ? "Too Many Requests"
+                        : "Conflict",
                     "application/json; charset=utf-8",
-                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}"
+                        : enabled
+                            ? "{\"ok\":false,\"error\":" +
+                              "\"interaction_command_queue_full\"}"
+                            : "{\"ok\":false,\"error\":" +
+                              "\"interactions_disabled\"}"), false);
                 return;
             }
             if (path == "/api/config/interactions/set")
             {
                 var query = request.Query ?? string.Empty;
-                lock (interactionsLock)
-                    interactionCommands.Enqueue(query);
-                WriteResponse(stream, 202, "Accepted",
+                var backgroundApplied = false;
+                var accepted = false;
+                var commandSequence = 0L;
+                lock (interactionsProcessingLock)
+                {
+                    lock (interactionsLock)
+                    {
+                        accepted = interactionControlCommands.Count <
+                            MaximumInteractionControlCommands;
+                        if (accepted)
+                        {
+                            nextInteractionControlSequence++;
+                            if (nextInteractionControlSequence <= 0L)
+                                nextInteractionControlSequence = 1L;
+                            commandSequence =
+                                nextInteractionControlSequence;
+                        }
+                    }
+                    if (accepted)
+                    {
+                        Func<string, long, bool> observer;
+                        lock (interactionsLock)
+                            observer = interactionControlObserver;
+                        if (observer != null)
+                        {
+                            try
+                            {
+                                backgroundApplied = observer(
+                                    query, commandSequence);
+                            }
+                            catch (Exception exception)
+                            {
+                                if (logWarning != null)
+                                    logWarning("Creator Tools could not apply " +
+                                        "an interaction control in the " +
+                                        "background: " + exception.Message);
+                            }
+                        }
+                        lock (interactionsLock)
+                            interactionControlCommands.Enqueue(
+                                new InteractionCommand(
+                                    query, backgroundApplied, false, 0,
+                                    commandSequence, 0L));
+                    }
+                }
+                WriteResponse(stream, accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
                     "application/json; charset=utf-8",
-                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}"
+                        : "{\"ok\":false,\"error\":" +
+                          "\"interaction_control_queue_full\"}"), false);
                 return;
             }
             if (path == "/api/config/interactions/rules")
@@ -949,11 +1467,22 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/api/config/pesky/set")
             {
                 var query = request.Query ?? string.Empty;
+                var accepted = false;
                 lock (peskyLock)
-                    peskyCommands.Enqueue(query);
-                WriteResponse(stream, 202, "Accepted",
+                {
+                    if (peskyCommands.Count < MaximumPeskyCommands)
+                    {
+                        peskyCommands.Enqueue(query);
+                        accepted = true;
+                    }
+                }
+                WriteResponse(stream, accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
                     "application/json; charset=utf-8",
-                    Encoding.UTF8.GetBytes("{\"ok\":true}"), false);
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}"
+                        : "{\"ok\":false,\"error\":" +
+                          "\"pesky_command_queue_full\"}"), false);
                 return;
             }
             if (path == "/api/config/pesky-battle")
@@ -973,13 +1502,34 @@ namespace Gilomx.CupheadBossRoulette
                     query = query.Substring(0,
                         MaximumPeskyBattleQueryLength);
                 var accepted = false;
+                Func<string, bool> handler;
                 lock (peskyBattleLock)
+                    handler = peskyBattleCommandHandler;
+                if (handler != null)
                 {
-                    if (peskyBattleCommands.Count <
-                        MaximumPeskyBattleCommands)
+                    try
                     {
-                        peskyBattleCommands.Enqueue(query);
-                        accepted = true;
+                        lock (peskyBattleProcessingLock)
+                            accepted = handler(query);
+                    }
+                    catch (Exception exception)
+                    {
+                        if (logWarning != null)
+                            logWarning("Creator Tools could not process a " +
+                                "Pesky Battle command in the background: " +
+                                exception.Message);
+                    }
+                }
+                else
+                {
+                    lock (peskyBattleLock)
+                    {
+                        if (peskyBattleCommands.Count <
+                            MaximumPeskyBattleCommands)
+                        {
+                            peskyBattleCommands.Enqueue(query);
+                            accepted = true;
+                        }
                     }
                 }
                 WriteResponse(stream, accepted ? 202 : 429,
@@ -989,6 +1539,68 @@ namespace Gilomx.CupheadBossRoulette
                         ? "{\"ok\":true}"
                         : "{\"ok\":false,\"error\":" +
                           "\"battle_command_queue_full\"}"), false);
+                return;
+            }
+            if (path == "/api/config/tap-farming")
+            {
+                string json;
+                lock (tapFarmingLock)
+                    json = latestTapFarmingState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/config/tap-farming/set")
+            {
+                var query = request.Query ?? string.Empty;
+                if (query.Length > MaximumTapFarmingQueryLength)
+                    query = query.Substring(
+                        0, MaximumTapFarmingQueryLength);
+                Func<string, bool> handler;
+                lock (tapFarmingLock)
+                    handler = tapFarmingCommandHandler;
+                if (handler == null)
+                {
+                    WriteResponse(stream, 503, "Service Unavailable",
+                        "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes(
+                            "{\"ok\":false,\"error\":" +
+                            "\"tap_farming_unavailable\"}"), false);
+                    return;
+                }
+
+                var accepted = false;
+                try
+                {
+                    lock (tapFarmingProcessingLock)
+                        accepted = handler(query);
+                }
+                catch (Exception exception)
+                {
+                    if (logWarning != null)
+                        logWarning("Creator Tools could not process a " +
+                            "Tap Farming command in the background: " +
+                            exception.Message);
+                }
+                WriteResponse(stream,
+                    accepted ? 202 : 409,
+                    accepted ? "Accepted" : "Conflict",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(accepted
+                        ? "{\"ok\":true}"
+                        : "{\"ok\":false,\"error\":" +
+                          "\"tap_farming_command_rejected\"}"), false);
+                return;
+            }
+            if (path == "/api/config/live-events")
+            {
+                string json;
+                lock (liveEventsLock)
+                    json = latestLiveEventsState;
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(json), false);
                 return;
             }
             if (path == "/generated/challenge.png")
@@ -1059,7 +1671,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static void ServeFile(
             NetworkStream stream, string path, string contentType,
-            bool cache)
+            bool cache, bool allowSameOriginFrame = false)
         {
             if (!File.Exists(path))
             {
@@ -1077,7 +1689,8 @@ namespace Gilomx.CupheadBossRoulette
                         "Unable to read file."), false);
                 return;
             }
-            WriteResponse(stream, 200, "OK", contentType, body, cache);
+            WriteResponse(stream, 200, "OK", contentType, body, cache,
+                null, allowSameOriginFrame);
         }
 
         private static void WriteResponse(
@@ -1087,7 +1700,8 @@ namespace Gilomx.CupheadBossRoulette
             string contentType,
             byte[] body,
             bool cache,
-            string additionalHeaders = null)
+            string additionalHeaders = null,
+            bool allowSameOriginFrame = false)
         {
             body = body ?? new byte[0];
             var header = "HTTP/1.1 " + statusCode + " " + statusText +
@@ -1098,13 +1712,160 @@ namespace Gilomx.CupheadBossRoulette
                              ? "Cache-Control: public, max-age=3600\r\n"
                              : "Cache-Control: no-store\r\n") +
                          "X-Content-Type-Options: nosniff\r\n" +
-                         "X-Frame-Options: DENY\r\n" +
-                         "Content-Security-Policy: frame-ancestors 'none'\r\n" +
+                         (allowSameOriginFrame
+                             ? "X-Frame-Options: SAMEORIGIN\r\n" +
+                               "Content-Security-Policy: " +
+                               "frame-ancestors 'self'\r\n"
+                             : "X-Frame-Options: DENY\r\n" +
+                               "Content-Security-Policy: " +
+                               "frame-ancestors 'none'\r\n") +
                          (additionalHeaders ?? string.Empty) + "\r\n";
             var headerBytes = Encoding.ASCII.GetBytes(header);
             stream.Write(headerBytes, 0, headerBytes.Length);
             stream.Write(body, 0, body.Length);
             stream.Flush();
+        }
+
+        private static string ReplaceNonnegativeIntegerProperty(
+            string json, string property, long value)
+        {
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(property))
+                return json ?? string.Empty;
+            var marker = "\"" + property + "\":";
+            var markerIndex = json.IndexOf(
+                marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+                return json;
+            var start = markerIndex + marker.Length;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+                start++;
+            var end = start;
+            while (end < json.Length && char.IsDigit(json[end]))
+                end++;
+            if (end == start)
+                return json;
+            return json.Substring(0, start) +
+                Math.Max(0L, value).ToString(CultureInfo.InvariantCulture) +
+                json.Substring(end);
+        }
+
+        private static string ReplaceBooleanProperty(
+            string json, string property, bool value)
+        {
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(property))
+                return json ?? string.Empty;
+            var marker = "\"" + property + "\":";
+            var markerIndex = json.IndexOf(
+                marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+                return json;
+            var start = markerIndex + marker.Length;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+                start++;
+            var length = json.IndexOf(
+                    "true", start, StringComparison.Ordinal) == start
+                ? 4
+                : json.IndexOf(
+                    "false", start, StringComparison.Ordinal) == start
+                    ? 5
+                    : 0;
+            if (length == 0)
+                return json;
+            return json.Substring(0, start) +
+                (value ? "true" : "false") +
+                json.Substring(start + length);
+        }
+
+        private static bool TryReadBooleanProperty(
+            string json, string property, out bool value)
+        {
+            value = false;
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(property))
+                return false;
+            var marker = "\"" + property + "\":";
+            var markerIndex = json.IndexOf(
+                marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+                return false;
+            var start = markerIndex + marker.Length;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+                start++;
+            if (json.IndexOf(
+                    "true", start, StringComparison.Ordinal) == start)
+            {
+                value = true;
+                return true;
+            }
+            return json.IndexOf(
+                "false", start, StringComparison.Ordinal) == start;
+        }
+
+        private static bool TryReadNonnegativeIntegerProperty(
+            string json, string property, out long value)
+        {
+            value = 0L;
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(property))
+                return false;
+            var marker = "\"" + property + "\":";
+            var markerIndex = json.IndexOf(
+                marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+                return false;
+            var start = markerIndex + marker.Length;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+                start++;
+            var end = start;
+            while (end < json.Length && char.IsDigit(json[end]))
+                end++;
+            return end > start && long.TryParse(
+                json.Substring(start, end - start),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out value);
+        }
+
+        private static int ParseInteractionTestQuantity(string query)
+        {
+            if (string.IsNullOrEmpty(query))
+                return 1;
+            var pairs = query.Split('&');
+            for (var i = 0; i < pairs.Length; i++)
+            {
+                var separator = pairs[i].IndexOf('=');
+                if (separator < 0)
+                    continue;
+                string key;
+                string value;
+                try
+                {
+                    key = Uri.UnescapeDataString(
+                        pairs[i].Substring(0, separator).Replace('+', ' '));
+                    value = Uri.UnescapeDataString(
+                        pairs[i].Substring(separator + 1).Replace('+', ' '));
+                }
+                catch
+                {
+                    continue;
+                }
+                if (!string.Equals(
+                        key, "quantity", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                int quantity;
+                if (!int.TryParse(
+                        value, NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out quantity))
+                    return 1;
+                return Math.Max(
+                    1,
+                    Math.Min(
+                        CreatorToolsInteractionQueue.MaximumBatchSize,
+                        quantity));
+            }
+            return 1;
         }
 
         private static string MimeType(string path)
@@ -1202,6 +1963,32 @@ namespace Gilomx.CupheadBossRoulette
                 offset += read;
             }
             return result;
+        }
+
+        private sealed class InteractionCommand
+        {
+            internal readonly string Query;
+            internal readonly bool BackgroundApplied;
+            internal readonly bool IsTest;
+            internal readonly int PendingQuantity;
+            internal readonly long Sequence;
+            internal readonly long TestGeneration;
+
+            internal InteractionCommand(
+                string query,
+                bool backgroundApplied,
+                bool isTest,
+                int pendingQuantity,
+                long sequence,
+                long testGeneration)
+            {
+                Query = query ?? string.Empty;
+                BackgroundApplied = backgroundApplied;
+                IsTest = isTest;
+                PendingQuantity = Math.Max(0, pendingQuantity);
+                Sequence = Math.Max(0L, sequence);
+                TestGeneration = Math.Max(0L, testGeneration);
+            }
         }
 
         private sealed class HttpRequest

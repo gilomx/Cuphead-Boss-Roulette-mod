@@ -9,12 +9,13 @@
     <RestoreAdditionalProjectSources>https://api.nuget.org/v3/index.json;https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
     <!-- Keep the modern, self-contained companion (including its publish
          output) completely outside the .NET 3.5 reference candidate set. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);TikFinityCompanion\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);TikFinityCompanion\**;CreatorToolsRuntimeTests\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="tools\unity-shader\**\*.cs" />
     <Compile Remove="TikFinityCompanion\**\*.cs" />
+    <Compile Remove="CreatorToolsRuntimeTests\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,67 @@
+using System;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    // Unity owns the real implementation. The linked backlog only needs this
+    // narrow main-thread dispatch contract, so the harness records every call.
+    internal sealed class CreatorToolsInteractionController
+    {
+        private int availableCapacity;
+
+        internal CreatorToolsInteractionController(int availableCapacity)
+        {
+            this.availableCapacity = Math.Max(0, availableCapacity);
+        }
+
+        internal int EnqueueCallCount { get; private set; }
+        internal int EnqueuedCount { get; private set; }
+
+        internal int StreamQueueAvailableCapacity
+        {
+            get { return availableCapacity; }
+        }
+
+        internal int EnqueueStreamInteraction(
+            string item,
+            string donor,
+            string giftImagePath,
+            int quantity,
+            out string feedbackCode)
+        {
+            EnqueueCallCount++;
+            var accepted = Math.Max(
+                0, Math.Min(Math.Max(0, quantity), availableCapacity));
+            availableCapacity -= accepted;
+            EnqueuedCount += accepted;
+            feedbackCode = accepted > 0 ? "queued" : "queue_full";
+            return accepted;
+        }
+    }
+
+    internal static class CreatorToolsInteractionQueue
+    {
+        internal const int MaximumBatchSize = 50;
+    }
+
+    internal static class CreatorToolsInteractionIds
+    {
+        internal static readonly string[] All = { "test_attack" };
+    }
+
+    internal sealed class CreatorToolsGiftCatalogEntry
+    {
+        internal readonly string Id;
+        internal readonly string Name;
+        internal readonly string ImagePath;
+        internal readonly int CoinsPerUnit;
+
+        internal CreatorToolsGiftCatalogEntry(
+            string id, string name, string imagePath, int coinsPerUnit)
+        {
+            Id = id ?? string.Empty;
+            Name = name ?? string.Empty;
+            ImagePath = imagePath ?? string.Empty;
+            CoinsPerUnit = Math.Max(0, coinsPerUnit);
+        }
+    }
+}

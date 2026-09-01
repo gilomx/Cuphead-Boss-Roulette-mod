@@ -3,20 +3,26 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 
 namespace Gilomx.CupheadBossRoulette
 {
     /// <summary>
-    /// Owns the hidden TikFinity adapter process. Background callbacks only
-    /// parse and enqueue bounded messages; Unity consumes them from Update.
+    /// Owns the hidden TikFinity adapter process. Background callbacks parse
+    /// and enqueue bounded messages; CreatorToolsStreamWorker consumes them.
     /// </summary>
-    internal sealed class TikFinityCompanionHost : IDisposable
+    internal sealed class TikFinityCompanionHost : IDisposable,
+        ICreatorToolsStreamSource
     {
         internal const string RelativeExecutablePath =
             "companion\\LaPichiRuleta.TikFinity.exe";
         private const int MaximumPendingMessages = 1024;
+        private const int MaximumOverflowLikeViewers = 4096;
+        private const int MaximumRememberedLikeIdentities = 65536;
+        private const int MaximumLikeCountPerMessage = 1000000;
         private const int MaximumRestarts = 1000000;
         private const int QueuePressureReportDelaySeconds = 2;
+        private const int OutputDrainTimeoutMilliseconds = 250;
 
         private readonly string executablePath;
         private readonly string workingDirectory;
@@ -25,13 +31,33 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object queueLock = new object();
         private readonly LinkedList<CreatorToolsStreamMessage> pending =
             new LinkedList<CreatorToolsStreamMessage>();
+        private readonly LinkedList<LikeAccumulator> overflowLikes =
+            new LinkedList<LikeAccumulator>();
+        private readonly Dictionary<string, LinkedListNode<LikeAccumulator>>
+            overflowLikesByViewer =
+                new Dictionary<string, LinkedListNode<LikeAccumulator>>(
+                    StringComparer.Ordinal);
+        private readonly HashSet<string> rememberedLikeIdentities =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly Queue<string> rememberedLikeIdentityOrder =
+            new Queue<string>();
+        private readonly ManualResetEvent outputEof =
+            new ManualResetEvent(true);
+        private readonly ManualResetEvent errorEof =
+            new ManualResetEvent(true);
 
-        private Process process;
+        private volatile Process process;
+        private LinkedListNode<LikeAccumulator> syntheticLikeAccumulator;
         private DateTime nextStartAt = DateTime.MinValue;
         private DateTime queuePressureReportAt = DateTime.MaxValue;
         private int restartAttempt;
         private int queueHighWaterMark;
         private long coalescedConnectionUpdates;
+        private long coalescedLikeEvents;
+        private long coalescedLikeCount;
+        private long deduplicatedLikeEvents;
+        private long syntheticLikeCount;
+        private long saturatedLikeAccumulators;
         private long droppedConnectionUpdates;
         private long droppedGiftProgressEvents;
         private long droppedLikeEvents;
@@ -39,6 +65,7 @@ namespace Gilomx.CupheadBossRoulette
         private long droppedPriorityEvents;
         private long preservedPriorityEvents;
         private bool disposed;
+        private bool outputDrainWarningReported;
         private string lastLocalStatus = string.Empty;
 
         internal TikFinityCompanionHost(
@@ -60,7 +87,7 @@ namespace Gilomx.CupheadBossRoulette
             get { return executablePath; }
         }
 
-        internal void Update()
+        public void Update()
         {
             if (disposed)
                 return;
@@ -71,6 +98,8 @@ namespace Gilomx.CupheadBossRoulette
                     if (!process.HasExited)
                         return;
                     var exitCode = process.ExitCode;
+                    if (!WaitForRedirectedOutput(process))
+                        return;
                     CleanupProcess(false);
                     ScheduleRestart("companion_exited", "El acompañante de " +
                         "TikFinity terminó (código " + exitCode + ").");
@@ -88,11 +117,12 @@ namespace Gilomx.CupheadBossRoulette
             TryStart();
         }
 
-        internal bool TryTakeMessage(out CreatorToolsStreamMessage message)
+        public bool TryTakeMessage(out CreatorToolsStreamMessage message)
         {
             string pressureReport;
             lock (queueLock)
             {
+                RefillOnePendingLike();
                 if (pending.Count == 0)
                 {
                     message = null;
@@ -103,6 +133,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     message = pending.First.Value;
                     pending.RemoveFirst();
+                    RefillOnePendingLike();
                     pressureReport = TakeQueuePressureReport(
                         DateTime.UtcNow, pending.Count == 0);
                 }
@@ -139,14 +170,17 @@ namespace Gilomx.CupheadBossRoulette
                 var candidate = new Process { StartInfo = info };
                 candidate.OutputDataReceived += OnOutputDataReceived;
                 candidate.ErrorDataReceived += OnErrorDataReceived;
+                outputEof.Reset();
+                errorEof.Reset();
+                outputDrainWarningReported = false;
                 if (!candidate.Start())
                     throw new InvalidOperationException(
                         "El proceso no pudo iniciarse.");
                 process = candidate;
-                candidate.BeginOutputReadLine();
-                candidate.BeginErrorReadLine();
                 PublishLocalStatus("starting", "companion_starting",
                     "Iniciando el acompañante de TikFinity.");
+                candidate.BeginOutputReadLine();
+                candidate.BeginErrorReadLine();
                 if (logInfo != null)
                     logInfo("TikFinity companion started (PID " +
                         candidate.Id + ").");
@@ -162,7 +196,14 @@ namespace Gilomx.CupheadBossRoulette
         private void OnOutputDataReceived(
             object sender, DataReceivedEventArgs args)
         {
-            if (disposed || string.IsNullOrEmpty(args.Data))
+            if (!ReferenceEquals(sender, process))
+                return;
+            if (args.Data == null)
+            {
+                SignalEof(outputEof);
+                return;
+            }
+            if (disposed || args.Data.Length == 0)
                 return;
             CreatorToolsStreamMessage message;
             if (!TikFinityCompanionProtocol.TryParse(args.Data, out message))
@@ -184,8 +225,14 @@ namespace Gilomx.CupheadBossRoulette
         private void OnErrorDataReceived(
             object sender, DataReceivedEventArgs args)
         {
-            if (disposed || string.IsNullOrEmpty(args.Data) ||
-                logWarning == null)
+            if (!ReferenceEquals(sender, process))
+                return;
+            if (args.Data == null)
+            {
+                SignalEof(errorEof);
+                return;
+            }
+            if (disposed || args.Data.Length == 0 || logWarning == null)
                 return;
             var text = args.Data.Trim();
             if (text.Length > 512)
@@ -232,6 +279,13 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (disposed)
                     return;
+                if (IsLikeMessage(message) &&
+                    !TryRememberLikeIdentity(message.Event))
+                {
+                    IncrementSaturated(ref deduplicatedLikeEvents);
+                    ScheduleQueuePressureReport();
+                    return;
+                }
                 if (pending.Count < MaximumPendingMessages)
                 {
                     pending.AddLast(message);
@@ -249,18 +303,243 @@ namespace Gilomx.CupheadBossRoulette
                 var candidate = FindEvictionCandidate(incomingPriority);
                 if (candidate == null)
                 {
+                    if (incomingPriority == QueuePriority.Low &&
+                        IsLikeMessage(message))
+                    {
+                        PreserveLikeMessage(message, true);
+                        return;
+                    }
                     RecordDroppedMessage(message);
                     return;
                 }
 
                 var evicted = candidate.Value;
                 pending.Remove(candidate);
-                RecordDroppedMessage(evicted);
+                if (IsLikeMessage(evicted))
+                    PreserveLikeMessage(evicted,
+                        !IsCoalescedLikeMessage(evicted));
+                else
+                    RecordDroppedMessage(evicted);
                 if (incomingPriority == QueuePriority.Critical)
                     IncrementSaturated(ref preservedPriorityEvents);
                 pending.AddLast(message);
                 TrackQueueHighWaterMark();
             }
+        }
+
+        /// <summary>
+        /// Likes are the only high-volume actionable event. When the bounded
+        /// transport queue is full, retain their quantity in a bounded set of
+        /// per-viewer accumulators. This keeps every normal burst exact while
+        /// preserving the per-viewer semantics used by "cada X likes" rules.
+        /// An explicit anonymous accumulator is the defensive last resort for
+        /// more simultaneous viewer identities than the bounded map allows;
+        /// it still reaches global tap farming/dashboard counters, but cannot
+        /// be attributed to a viewer rule.
+        /// </summary>
+        private void PreserveLikeMessage(
+            CreatorToolsStreamMessage message, bool recordCoalescing)
+        {
+            if (!IsLikeMessage(message))
+                return;
+
+            var streamEvent = message.Event;
+            var count = Math.Max(1, streamEvent.Count);
+            var viewerKey = LikeViewerKey(streamEvent);
+            LinkedListNode<LikeAccumulator> node;
+            if (viewerKey.Length > 0 &&
+                overflowLikesByViewer.TryGetValue(viewerKey, out node))
+            {
+                AddLikeCount(node.Value, count);
+            }
+            else if (viewerKey.Length > 0 &&
+                     overflowLikesByViewer.Count <
+                        MaximumOverflowLikeViewers)
+            {
+                var accumulator = new LikeAccumulator
+                {
+                    ViewerKey = viewerKey,
+                    Template = CloneLikeEvent(streamEvent, false),
+                    Count = count
+                };
+                node = overflowLikes.AddLast(accumulator);
+                overflowLikesByViewer.Add(viewerKey, node);
+            }
+            else
+            {
+                node = syntheticLikeAccumulator;
+                if (node == null)
+                {
+                    var accumulator = new LikeAccumulator
+                    {
+                        ViewerKey = string.Empty,
+                        Template = CloneLikeEvent(streamEvent, true),
+                        Count = count,
+                        Synthetic = true
+                    };
+                    node = overflowLikes.AddLast(accumulator);
+                    syntheticLikeAccumulator = node;
+                }
+                else
+                    AddLikeCount(node.Value, count);
+                AddSaturated(ref syntheticLikeCount, count);
+            }
+
+            if (recordCoalescing)
+            {
+                IncrementSaturated(ref coalescedLikeEvents);
+                AddSaturated(ref coalescedLikeCount, count);
+            }
+            ScheduleQueuePressureReport();
+        }
+
+        private void AddLikeCount(LikeAccumulator accumulator, int count)
+        {
+            if (accumulator.Count > long.MaxValue - count)
+            {
+                accumulator.Count = long.MaxValue;
+                IncrementSaturated(ref saturatedLikeAccumulators);
+                return;
+            }
+            accumulator.Count += count;
+        }
+
+        private void RefillOnePendingLike()
+        {
+            if (pending.Count >= MaximumPendingMessages ||
+                overflowLikes.Count == 0)
+                return;
+
+            var node = overflowLikes.First;
+            var accumulator = node.Value;
+            var count = (int)Math.Min(
+                (long)MaximumLikeCountPerMessage, accumulator.Count);
+            accumulator.Count -= count;
+            overflowLikes.Remove(node);
+            if (accumulator.ViewerKey.Length > 0)
+                overflowLikesByViewer.Remove(accumulator.ViewerKey);
+            else if (accumulator.Synthetic)
+                syntheticLikeAccumulator = null;
+            if (accumulator.Count > 0L)
+            {
+                var replacement = overflowLikes.AddLast(accumulator);
+                if (accumulator.ViewerKey.Length > 0)
+                    overflowLikesByViewer[accumulator.ViewerKey] =
+                        replacement;
+                else if (accumulator.Synthetic)
+                    syntheticLikeAccumulator = replacement;
+            }
+
+            var streamEvent = CloneLikeEvent(
+                accumulator.Template, accumulator.Synthetic);
+            var aggregateId = "host-like-" +
+                Guid.NewGuid().ToString("N");
+            streamEvent.EventId = aggregateId;
+            streamEvent.IdempotencyKey = aggregateId;
+            streamEvent.Count = count;
+            streamEvent.RawEventType = accumulator.Synthetic
+                ? "host_coalesced_like_overflow"
+                : "host_coalesced_like";
+            pending.AddLast(new CreatorToolsStreamMessage
+            {
+                Event = streamEvent
+            });
+            TrackQueueHighWaterMark();
+        }
+
+        private bool TryRememberLikeIdentity(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            if (streamEvent == null)
+                return true;
+            var identity = (streamEvent.ConnectionId ?? string.Empty) +
+                ":" + (streamEvent.IdempotencyKey ?? string.Empty);
+            if (identity == ":")
+                identity = (streamEvent.ConnectionId ?? string.Empty) +
+                    ":event:" + (streamEvent.EventId ?? string.Empty);
+            if (identity == ":event:")
+                return true;
+            if (!rememberedLikeIdentities.Add(identity))
+                return false;
+            rememberedLikeIdentityOrder.Enqueue(identity);
+            while (rememberedLikeIdentityOrder.Count >
+                   MaximumRememberedLikeIdentities)
+                rememberedLikeIdentities.Remove(
+                    rememberedLikeIdentityOrder.Dequeue());
+            return true;
+        }
+
+        private static string LikeViewerKey(
+            CreatorToolsStreamEvent streamEvent)
+        {
+            if (streamEvent == null)
+                return string.Empty;
+            var connectionId = (streamEvent.ConnectionId ?? string.Empty)
+                .Trim();
+            var userId = (streamEvent.UserId ?? string.Empty).Trim();
+            if (userId.Length > 0)
+                return connectionId + "\n" + "id:" + userId;
+            var userName = (streamEvent.UserName ?? string.Empty).Trim();
+            return userName.Length == 0
+                ? string.Empty
+                : connectionId + "\n" + "name:" +
+                    userName.ToLowerInvariant();
+        }
+
+        private static CreatorToolsStreamEvent CloneLikeEvent(
+            CreatorToolsStreamEvent source, bool anonymous)
+        {
+            return new CreatorToolsStreamEvent
+            {
+                EventId = source.EventId ?? string.Empty,
+                IdempotencyKey = source.IdempotencyKey ?? string.Empty,
+                ConnectionId = source.ConnectionId ?? string.Empty,
+                Platform = source.Platform ?? string.Empty,
+                Connector = source.Connector ?? string.Empty,
+                Type = "like",
+                UserName = anonymous
+                    ? string.Empty
+                    : source.UserName ?? string.Empty,
+                UserDisplayName = anonymous
+                    ? string.Empty
+                    : source.UserDisplayName ?? string.Empty,
+                UserAvatarUrl = anonymous
+                    ? string.Empty
+                    : source.UserAvatarUrl ?? string.Empty,
+                UserId = anonymous
+                    ? string.Empty
+                    : source.UserId ?? string.Empty,
+                ItemId = string.Empty,
+                ItemName = string.Empty,
+                ItemImageUrl = string.Empty,
+                Count = Math.Max(1, source.Count),
+                UnitValue = 0m,
+                TotalValue = 0m,
+                Unit = source.Unit ?? string.Empty,
+                Currency = source.Currency ?? string.Empty,
+                StreakId = string.Empty,
+                StreakState = "none",
+                ReceivedAt = source.ReceivedAt ?? string.Empty,
+                Simulated = source.Simulated,
+                RawEventType = source.RawEventType ?? string.Empty
+            };
+        }
+
+        private static bool IsLikeMessage(
+            CreatorToolsStreamMessage message)
+        {
+            return message != null && message.Event != null &&
+                message.Event.Type == "like";
+        }
+
+        private static bool IsCoalescedLikeMessage(
+            CreatorToolsStreamMessage message)
+        {
+            if (!IsLikeMessage(message))
+                return false;
+            var rawType = message.Event.RawEventType ?? string.Empty;
+            return rawType == "host_coalesced_like" ||
+                rawType == "host_coalesced_like_overflow";
         }
 
         private bool TryCoalesceConnectionUpdate(
@@ -372,7 +651,13 @@ namespace Gilomx.CupheadBossRoulette
                 droppedLikeEvents == 0L &&
                 droppedOtherEvents == 0L &&
                 droppedPriorityEvents == 0L &&
-                coalescedConnectionUpdates == 0L)
+                preservedPriorityEvents == 0L &&
+                coalescedConnectionUpdates == 0L &&
+                coalescedLikeEvents == 0L &&
+                coalescedLikeCount == 0L &&
+                deduplicatedLikeEvents == 0L &&
+                syntheticLikeCount == 0L &&
+                saturatedLikeAccumulators == 0L)
                 return null;
             if (!force && now < queuePressureReportAt)
                 return null;
@@ -385,6 +670,20 @@ namespace Gilomx.CupheadBossRoulette
                     CultureInfo.InvariantCulture) +
                 ", coalesced_status=" + coalescedConnectionUpdates.ToString(
                     CultureInfo.InvariantCulture) +
+                ", coalesced_like_events=" + coalescedLikeEvents.ToString(
+                    CultureInfo.InvariantCulture) +
+                ", coalesced_like_count=" + coalescedLikeCount.ToString(
+                    CultureInfo.InvariantCulture) +
+                ", deduplicated_like=" + deduplicatedLikeEvents.ToString(
+                    CultureInfo.InvariantCulture) +
+                ", synthetic_like_count=" + syntheticLikeCount.ToString(
+                    CultureInfo.InvariantCulture) +
+                ", saturated_like_accumulators=" +
+                    saturatedLikeAccumulators.ToString(
+                        CultureInfo.InvariantCulture) +
+                ", overflow_like_viewers=" +
+                    overflowLikesByViewer.Count.ToString(
+                        CultureInfo.InvariantCulture) +
                 ", dropped_status=" + droppedConnectionUpdates.ToString(
                     CultureInfo.InvariantCulture) +
                 ", dropped_gift_progress=" +
@@ -400,6 +699,11 @@ namespace Gilomx.CupheadBossRoulette
                     CultureInfo.InvariantCulture) + ".";
 
             coalescedConnectionUpdates = 0L;
+            coalescedLikeEvents = 0L;
+            coalescedLikeCount = 0L;
+            deduplicatedLikeEvents = 0L;
+            syntheticLikeCount = 0L;
+            saturatedLikeAccumulators = 0L;
             droppedConnectionUpdates = 0L;
             droppedGiftProgressEvents = 0L;
             droppedLikeEvents = 0L;
@@ -423,6 +727,15 @@ namespace Gilomx.CupheadBossRoulette
                 value++;
         }
 
+        private static void AddSaturated(ref long value, long amount)
+        {
+            if (amount <= 0L)
+                return;
+            value = value > long.MaxValue - amount
+                ? long.MaxValue
+                : value + amount;
+        }
+
         private void LogQueuePressure(string report)
         {
             if (string.IsNullOrEmpty(report) || logWarning == null)
@@ -431,12 +744,76 @@ namespace Gilomx.CupheadBossRoulette
             catch { }
         }
 
+        private bool WaitForRedirectedOutput(Process current)
+        {
+            var timer = Stopwatch.StartNew();
+            try
+            {
+                current.WaitForExit(RemainingDrainMilliseconds(timer));
+            }
+            catch
+            {
+            }
+
+            var outputFinished = WaitForEof(outputEof,
+                RemainingDrainMilliseconds(timer));
+            var errorFinished = WaitForEof(errorEof,
+                RemainingDrainMilliseconds(timer));
+            if (outputFinished && errorFinished)
+            {
+                outputDrainWarningReported = false;
+                return true;
+            }
+            // Keep the exited process and its handlers attached. The worker
+            // retries this bounded wait on the next cycle, so no final NDJSON
+            // line is discarded merely because a burst took over 250 ms to
+            // deliver through Process.OutputDataReceived.
+            if (!outputDrainWarningReported && logWarning != null)
+            {
+                outputDrainWarningReported = true;
+                try
+                {
+                    logWarning("TikFinity companion is still draining output " +
+                        "(stdout_eof=" + outputFinished + ", stderr_eof=" +
+                        errorFinished + ").");
+                }
+                catch
+                {
+                }
+            }
+            return false;
+        }
+
+        private static int RemainingDrainMilliseconds(Stopwatch timer)
+        {
+            var remaining = OutputDrainTimeoutMilliseconds -
+                timer.ElapsedMilliseconds;
+            return remaining > 0L ? (int)remaining : 0;
+        }
+
+        private static bool WaitForEof(
+            ManualResetEvent signal, int milliseconds)
+        {
+            try { return signal.WaitOne(milliseconds, false); }
+            catch (ObjectDisposedException) { return true; }
+        }
+
+        private static void SignalEof(ManualResetEvent signal)
+        {
+            try { signal.Set(); }
+            catch (ObjectDisposedException) { }
+        }
+
         private void CleanupProcess(bool kill)
         {
             var current = process;
             process = null;
             if (current == null)
+            {
+                SignalEof(outputEof);
+                SignalEof(errorEof);
                 return;
+            }
             try
             {
                 current.OutputDataReceived -= OnOutputDataReceived;
@@ -447,6 +824,8 @@ namespace Gilomx.CupheadBossRoulette
             catch
             {
             }
+            SignalEof(outputEof);
+            SignalEof(errorEof);
             try { current.Dispose(); }
             catch { }
         }
@@ -463,8 +842,17 @@ namespace Gilomx.CupheadBossRoulette
                 pressureReport = TakeQueuePressureReport(
                     DateTime.UtcNow, true);
                 pending.Clear();
+                overflowLikes.Clear();
+                overflowLikesByViewer.Clear();
+                syntheticLikeAccumulator = null;
+                rememberedLikeIdentities.Clear();
+                rememberedLikeIdentityOrder.Clear();
             }
             LogQueuePressure(pressureReport);
+            try { outputEof.Close(); }
+            catch { }
+            try { errorEof.Close(); }
+            catch { }
         }
 
         private enum QueuePriority
@@ -473,6 +861,14 @@ namespace Gilomx.CupheadBossRoulette
             Low = 1,
             Normal = 2,
             Critical = 3
+        }
+
+        private sealed class LikeAccumulator
+        {
+            internal string ViewerKey = string.Empty;
+            internal CreatorToolsStreamEvent Template;
+            internal long Count;
+            internal bool Synthetic;
         }
     }
 }

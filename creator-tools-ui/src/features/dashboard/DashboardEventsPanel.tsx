@@ -26,16 +26,14 @@ export function DashboardEventsPanel({
   const [view, setView] = useState<DashboardEventsView>("events");
   const [submittedDelaySeconds, setSubmittedDelaySeconds] = useState<number | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const initialView = useRef(true);
+  const previousView = useRef<DashboardEventsView>(view);
   const confirmationTimer = useRef<number | null>(null);
   const simulatorActive = view === "simulator";
   const recentEvents = events.slice(0, MAXIMUM_VISIBLE_EVENT_COUNT);
 
   useEffect(() => {
-    if (initialView.current) {
-      initialView.current = false;
-      return;
-    }
+    if (previousView.current === view) return;
+    previousView.current = view;
     titleRef.current?.focus({ preventScroll: true });
   }, [view]);
 
