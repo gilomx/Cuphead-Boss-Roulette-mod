@@ -57,9 +57,11 @@ de una instalación local de Cuphead.
 3. Selecciona, por ejemplo,
    `generated/aligned/02_movimiento/mugman_run`.
 4. El script crea un grupo por frame con `Gorra`, `Barba` y el original
-   bloqueado.
-5. Abre `Ventana > Línea de tiempo`, crea una animación de cuadros y usa
-   `Crear cuadros a partir de capas`.
+   bloqueado. También construye automáticamente un cuadro de animación por
+   grupo.
+5. Abre `Ventana > Línea de tiempo` para reproducir o cambiar la duración. No
+   uses `Make Frames From Layers`: Photoshop convertiría también las tres capas
+   internas de cada grupo en cuadros independientes.
 6. Guarda el PSD fuera de `generated/`, preferentemente en
    `MugmanSkinMod/photoshop-work/`.
 7. Ejecuta `photoshop/ExportarGruposComoPNG.jsx` para exportar todos los grupos

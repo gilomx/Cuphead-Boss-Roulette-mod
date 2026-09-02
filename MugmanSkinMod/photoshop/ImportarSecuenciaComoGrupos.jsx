@@ -3,13 +3,59 @@
  *
  * 1. Ejecuta Archivo > Secuencias de comandos > Examinar.
  * 2. Selecciona una carpeta dentro de generated/aligned/<accion>/<secuencia>.
- * 3. El script crea un documento con un grupo por frame y tres capas:
- *    Gorra, Barba y Original.
+ * 3. El script crea un documento con un grupo por frame, tres capas
+ *    (Gorra, Barba y Original) y un cuadro de animación por grupo.
  */
 
 #target photoshop
 
 (function () {
+    function duplicateCurrentAnimationFrame() {
+        var duplicate = charIDToTypeID("Dplc");
+        var descriptor = new ActionDescriptor();
+        var reference = new ActionReference();
+        reference.putEnumerated(
+            stringIDToTypeID("animationFrameClass"),
+            charIDToTypeID("Ordn"),
+            charIDToTypeID("Trgt")
+        );
+        descriptor.putReference(charIDToTypeID("null"), reference);
+        executeAction(duplicate, descriptor, DialogModes.NO);
+    }
+
+    function selectAnimationFrame(frameNumber) {
+        var descriptor = new ActionDescriptor();
+        var reference = new ActionReference();
+        reference.putIndex(
+            stringIDToTypeID("animationFrameClass"),
+            frameNumber
+        );
+        descriptor.putReference(charIDToTypeID("null"), reference);
+        executeAction(charIDToTypeID("slct"), descriptor, DialogModes.NO);
+    }
+
+    function createAnimationFromGroups(groups) {
+        var index;
+        for (index = 0; index < groups.length; index++) {
+            groups[index].visible = false;
+        }
+        groups[0].visible = true;
+
+        executeAction(
+            stringIDToTypeID("makeFrameAnimation"),
+            undefined,
+            DialogModes.NO
+        );
+
+        for (index = 1; index < groups.length; index++) {
+            duplicateCurrentAnimationFrame();
+            groups[index - 1].visible = false;
+            groups[index].visible = true;
+        }
+
+        selectAnimationFrame(1);
+    }
+
     var folder = Folder.selectDialog("Selecciona una secuencia alineada de Mugman");
     if (!folder) {
         return;
@@ -61,6 +107,7 @@
         NewDocumentMode.RGB,
         DocumentFill.TRANSPARENT
     );
+    var frameGroups = [];
 
     for (var i = 0; i < files.length; i++) {
         var source = app.open(files[i]);
@@ -74,6 +121,7 @@
         app.activeDocument = target;
         var group = target.layerSets.add();
         group.name = decodeURI(files[i].name).replace(/\.png$/i, "");
+        frameGroups.push(group);
         imported.move(group, ElementPlacement.INSIDE);
         imported.name = "Original (bloqueado)";
         imported.allLocked = true;
@@ -84,9 +132,18 @@
         cap.name = "Gorra";
     }
 
-    alert(
-        "Secuencia importada: " + files.length + " frames.\n\n" +
-        "Cada grupo conserva el nombre original. Usa la línea de tiempo de " +
-        "Photoshop y 'Crear cuadros a partir de capas'."
-    );
+    try {
+        createAnimationFromGroups(frameGroups);
+        alert(
+            "Secuencia importada: " + files.length + " frames.\n\n" +
+            "La línea de tiempo ya contiene un cuadro por grupo. No uses " +
+            "'Make Frames From Layers', porque separaría también Gorra, " +
+            "Barba y Original."
+        );
+    } catch (error) {
+        alert(
+            "Los grupos se importaron, pero Photoshop no pudo construir " +
+            "automáticamente la línea de tiempo.\n\nDetalle: " + error.message
+        );
+    }
 }());
