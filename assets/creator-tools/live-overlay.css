@@ -60,8 +60,9 @@ body {
   min-width: 1px;
   min-height: 1px;
   overflow: visible;
-  opacity: 1;
+  opacity: var(--component-opacity, 1);
   visibility: visible;
+  transition: opacity 120ms ease;
 }
 
 .live-overlay__component[hidden],

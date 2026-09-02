@@ -115,6 +115,7 @@
         enabled: true,
         locked: false,
         layer: placements[componentId].layer ?? 20 + index,
+        opacity: 100,
         variant: "default",
         showTitle: componentId !== "tap_farming",
         showDetails: componentId !== "tap_farming",
@@ -243,6 +244,10 @@
       entry.host.style.setProperty("--component-y", `${y}%`);
       entry.host.style.setProperty("--component-width", `${Math.max(0.1, width)}%`);
       entry.host.style.setProperty("--component-height", `${Math.max(0.1, height)}%`);
+      entry.host.style.setProperty(
+        "--component-opacity",
+        String(clamp(finiteNumber(config.opacity, 100), 0, 100) / 100),
+      );
       entry.host.style.zIndex = String(Math.round(finiteNumber(config.layer, 1)));
       const forceDesignerVisible = Boolean(designer && solo && solo === id);
       entry.host.dataset.enabled = String(forceDesignerVisible || config.enabled !== false);

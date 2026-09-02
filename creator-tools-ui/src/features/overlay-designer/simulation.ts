@@ -103,7 +103,7 @@ export function createTapSimulation(
     revision: 1,
     phase: scenario,
     bossName: "Rey Dado",
-    levelId: "preview-level",
+    levelId: "DicePalaceMain",
     attempt: 2,
     conversion: {
       tapsPerConversion: 2,

@@ -60,6 +60,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsOverlayComposer;
         private TikFinityCompanionHost creatorToolsTikFinityCompanion;
         private CreatorToolsStreamWorker creatorToolsStreamWorker;
+        private bool creatorToolsShuttingDown;
         private readonly object creatorToolsInteractionsSettingLock =
             new object();
         private volatile bool creatorToolsInteractionsEnabled;
@@ -1174,6 +1175,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool StartCreatorToolsServer()
         {
+            if (creatorToolsShuttingDown)
+                return false;
             creatorToolsServerError = null;
             if (creatorToolsServer == null)
             {
@@ -1375,6 +1378,13 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsLastPublishedState = null;
         }
 
+        private void ShutdownCreatorTools()
+        {
+            creatorToolsShuttingDown = true;
+            StopCreatorToolsServer();
+            DisposeCreatorTools();
+        }
+
         private void SetCreatorToolsEnabled(bool enabled)
         {
             if (creatorToolsEnabledSetting.Value != enabled)
@@ -1408,7 +1418,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateCreatorTools()
         {
-            if (creatorToolsEnabledSetting == null)
+            if (creatorToolsEnabledSetting == null ||
+                creatorToolsShuttingDown)
                 return;
 
             if ((creatorToolsServer == null ||

@@ -142,6 +142,7 @@ function defaultOverlayProfiles() {
           enabled: true,
           locked: false,
           layer: 20,
+          opacity: 100,
           variant: "default",
           showTitle: false,
           showDetails: false,
@@ -160,6 +161,7 @@ function defaultOverlayProfiles() {
           enabled: true,
           locked: false,
           layer: 10,
+          opacity: 100,
           variant: "default",
           showTitle: true,
           showDetails: true,
@@ -184,6 +186,7 @@ function defaultOverlayProfiles() {
           enabled: true,
           locked: false,
           layer: 20,
+          opacity: 100,
           variant: "default",
           showTitle: false,
           showDetails: false,
@@ -202,6 +205,7 @@ function defaultOverlayProfiles() {
           enabled: true,
           locked: false,
           layer: 10,
+          opacity: 100,
           variant: "default",
           showTitle: true,
           showDetails: true,
@@ -721,6 +725,10 @@ function normalizeOverlayComponent(component, canvas) {
     Math.min(canvas.height - component.height, Math.round(Number(component.y) || 0)),
   );
   component.layer = Math.max(0, Math.min(100, Math.round(Number(component.layer) || 0)));
+  const opacity = Number(component.opacity ?? 100);
+  component.opacity = Number.isFinite(opacity)
+    ? Math.max(0, Math.min(100, Math.round(opacity)))
+    : 100;
   component.enabled = component.enabled !== false;
   component.locked = component.locked === true;
   component.showTitle = component.showTitle !== false;
@@ -796,6 +804,7 @@ function applyOverlayComposerCommand(command, res) {
     }
     for (const key of [
       "x", "y", "width", "height", "enabled", "locked", "layer",
+      "opacity",
       "variant", "showTitle", "showDetails", "motion",
       "liquidColor", "collectingColor", "textColor", "outlineColor",
     ]) {

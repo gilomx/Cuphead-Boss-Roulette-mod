@@ -156,11 +156,15 @@ html[data-overlay-mode="embedded"] body {
   overflow: visible;
 }
 
+.tap-heart__visual {
+  transform: scale(0.85);
+  transform-box: view-box;
+  transform-origin: center;
+}
+
 .tap-heart__base {
-  fill: #1f222a;
-  stroke: #3a3f4a;
-  stroke-linejoin: round;
-  stroke-width: 5;
+  fill: transparent;
+  stroke: none;
 }
 
 .tap-heart__liquid-level {
@@ -212,7 +216,26 @@ html[data-overlay-mode="embedded"] body {
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.42));
   transition:
     fill 560ms ease,
+    opacity 560ms ease,
     font-size 560ms cubic-bezier(.2, .85, .25, 1);
+}
+
+.tap-farming[data-value-mode="percent"] .tap-heart__percent {
+  opacity: 0.9;
+}
+
+.tap-heart__boss-image {
+  opacity: 0;
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.36));
+  pointer-events: none;
+  transform: translateY(10px) scale(0.5);
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.tap-heart__boss-image[data-visible="true"] {
+  animation: tap-boss-image-pop 620ms cubic-bezier(.2, .9, .28, 1.22) both;
 }
 
 .tap-heart__delta {
@@ -341,6 +364,11 @@ html[data-overlay-mode="embedded"] body {
   transform: translateY(0) scale(1);
 }
 
+.tap-farming[data-motion="false"] .tap-heart__boss-image[data-visible="true"] {
+  opacity: 0.85;
+  transform: none;
+}
+
 @keyframes tap-delta-pop {
   0% {
     opacity: 0;
@@ -354,6 +382,28 @@ html[data-overlay-mode="embedded"] body {
   100% {
     opacity: 0;
     transform: translateY(-30px) scale(0.9);
+  }
+}
+
+@keyframes tap-boss-image-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.5);
+  }
+
+  52% {
+    opacity: 0.85;
+    transform: translateY(-2px) scale(1.09);
+  }
+
+  76% {
+    opacity: 0.85;
+    transform: translateY(1px) scale(0.97);
+  }
+
+  100% {
+    opacity: 0.85;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -415,5 +465,10 @@ html[data-overlay-mode="embedded"] body {
   .tap-farming .tap-heart__delta[data-active="true"] {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+
+  .tap-farming .tap-heart__boss-image[data-visible="true"] {
+    opacity: 0.85;
+    transform: none;
   }
 }

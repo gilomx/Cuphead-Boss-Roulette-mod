@@ -618,6 +618,79 @@
   opacity: 0.5;
 }
 
+.overlay-designer-properties__alignment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem;
+  padding: 0 0.85rem 0.8rem;
+}
+
+.overlay-designer-properties__alignment > strong {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-size: 0.52rem;
+  font-weight: 900;
+}
+
+.overlay-designer-properties__alignment button {
+  display: flex;
+  min-width: 0;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  background: var(--color-control);
+  font-size: 0.55rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.overlay-designer-properties__alignment button:hover:not(:disabled) {
+  border-color: rgb(196 138 233 / 50%);
+  background: var(--color-control-hover);
+}
+
+.overlay-designer-properties__alignment button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.overlay-designer-properties__alignment button > span {
+  color: var(--color-focus);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.overlay-designer-properties__opacity {
+  padding: 0 0.85rem 0.8rem;
+}
+
+.overlay-designer-properties__opacity-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.overlay-designer-properties__opacity-control input[type="range"] {
+  min-height: 1.6rem;
+  padding: 0;
+  accent-color: var(--color-focus);
+  cursor: pointer;
+}
+
+.overlay-designer-properties__opacity-control output {
+  color: var(--color-text);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  text-align: right;
+}
+
 .overlay-designer-properties__select {
   padding: 0 0.85rem 0.75rem;
 }

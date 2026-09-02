@@ -16,6 +16,7 @@ namespace Gilomx.CupheadBossRoulette
         internal bool Enabled;
         internal bool Locked;
         internal int Layer;
+        internal int Opacity;
         internal string Variant;
         internal bool ShowTitle;
         internal bool ShowDetails;
@@ -416,6 +417,8 @@ namespace Gilomx.CupheadBossRoulette
                 profile.CanvasHeight - component.Height, component.Y));
             component.Layer = Math.Max(0,
                 Math.Min(MaximumLayer, component.Layer));
+            component.Opacity = Math.Max(0,
+                Math.Min(100, component.Opacity));
             component.Variant = "default";
             var liquidColor = NormalizeColor(component.LiquidColor);
             component.LiquidColor = liquidColor.Length == 0
@@ -480,6 +483,7 @@ namespace Gilomx.CupheadBossRoulette
                     .Append(",\"locked\":")
                     .Append(component.Locked ? "true" : "false")
                     .Append(",\"layer\":").Append(component.Layer)
+                    .Append(",\"opacity\":").Append(component.Opacity)
                     .Append(",\"variant\":\"");
                 CreatorToolsJson.AppendEscaped(builder, component.Variant);
                 builder.Append("\",\"showTitle\":")
@@ -526,6 +530,7 @@ namespace Gilomx.CupheadBossRoulette
                     Enabled = true,
                     Locked = false,
                     Layer = 20,
+                    Opacity = 100,
                     Variant = "default",
                     ShowTitle = false,
                     ShowDetails = false,
@@ -546,6 +551,7 @@ namespace Gilomx.CupheadBossRoulette
                     Enabled = true,
                     Locked = false,
                     Layer = 10,
+                    Opacity = 100,
                     Variant = "default",
                     ShowTitle = true,
                     ShowDetails = true,
@@ -571,11 +577,13 @@ namespace Gilomx.CupheadBossRoulette
             destination.Enabled = source.Enabled;
             destination.Locked = source.Locked;
             destination.Layer = source.Layer;
+            destination.Opacity = source.Opacity;
             destination.Variant = source.Variant;
             destination.ShowTitle = source.ShowTitle;
             destination.ShowDetails = source.ShowDetails;
             destination.Motion = source.Motion;
             destination.LiquidColor = source.LiquidColor;
+            destination.CollectingColor = source.CollectingColor;
             destination.TextColor = source.TextColor;
             destination.OutlineColor = source.OutlineColor;
         }
@@ -659,7 +667,7 @@ namespace Gilomx.CupheadBossRoulette
             JsonValue node,
             CreatorToolsOverlayComposerComponent component)
         {
-            int x, y, width, height, layer;
+            int x, y, width, height, layer, opacity;
             bool enabled, locked, showTitle, showDetails, motion;
             var variant = NormalizeVariant(node.String("variant"));
             if (node.ObjectValue == null ||
@@ -682,6 +690,9 @@ namespace Gilomx.CupheadBossRoulette
             component.Enabled = enabled;
             component.Locked = locked;
             component.Layer = layer;
+            component.Opacity = node.TryInteger("opacity", out opacity)
+                ? opacity
+                : 100;
             component.Variant = variant;
             component.ShowTitle = showTitle;
             component.ShowDetails = showDetails;

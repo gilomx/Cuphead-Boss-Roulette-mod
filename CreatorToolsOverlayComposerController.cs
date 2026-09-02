@@ -335,6 +335,11 @@ namespace Gilomx.CupheadBossRoulette
                 if (!TryReadInt(values, "layer", out number)) return false;
                 component.Layer = number; changed = true;
             }
+            if (values.ContainsKey("opacity"))
+            {
+                if (!TryReadInt(values, "opacity", out number)) return false;
+                component.Opacity = number; changed = true;
+            }
             if (values.ContainsKey("enabled"))
             {
                 if (!TryReadBoolean(values, "enabled", out boolean))

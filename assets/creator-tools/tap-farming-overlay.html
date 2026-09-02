@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Farmeando taps</title>
-  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css?v=liquid-5">
+  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css?v=liquid-8">
 </head>
 <body>
   <main
@@ -56,57 +56,70 @@
             </linearGradient>
           </defs>
 
-          <use href="#tap-heart-shape" class="tap-heart__base"></use>
+          <g class="tap-heart__visual">
+            <use href="#tap-heart-shape" class="tap-heart__base"></use>
 
-          <g clip-path="url(#tap-heart-clip)">
-            <g id="tap-liquid-level" class="tap-heart__liquid-level">
-              <path
-                id="tap-body-wave"
-                class="tap-heart__wave tap-heart__wave--body"
-                d="M-130 18 C-75 10 -20 27 35 18 S145 10 200 18 S310 27 365 18 S455 10 520 18 L520 365 L-130 365 Z"
-                fill="url(#tap-main-gradient)">
-              </path>
+            <g clip-path="url(#tap-heart-clip)">
+              <g id="tap-liquid-level" class="tap-heart__liquid-level">
+                <path
+                  id="tap-body-wave"
+                  class="tap-heart__wave tap-heart__wave--body"
+                  d="M-130 18 C-75 10 -20 27 35 18 S145 10 200 18 S310 27 365 18 S455 10 520 18 L520 365 L-130 365 Z"
+                  fill="url(#tap-main-gradient)">
+                </path>
 
-              <path
-                id="tap-middle-wave"
-                class="tap-heart__wave"
-                d="M-140 17 C-88 6 -36 27 16 17 S120 6 172 17 S276 27 328 17 S432 6 510 17 L510 118 L-140 118 Z"
-                fill="url(#tap-middle-gradient)">
-              </path>
+                <path
+                  id="tap-middle-wave"
+                  class="tap-heart__wave"
+                  d="M-140 17 C-88 6 -36 27 16 17 S120 6 172 17 S276 27 328 17 S432 6 510 17 L510 118 L-140 118 Z"
+                  fill="url(#tap-middle-gradient)">
+                </path>
 
-              <path
-                id="tap-front-wave"
-                class="tap-heart__wave"
-                d="M-140 19 C-88 29 -36 9 16 19 S120 29 172 19 S276 9 328 19 S432 29 510 19 L510 145 L-140 145 Z"
-                fill="url(#tap-front-gradient)">
-              </path>
+                <path
+                  id="tap-front-wave"
+                  class="tap-heart__wave"
+                  d="M-140 19 C-88 29 -36 9 16 19 S120 29 172 19 S276 9 328 19 S432 29 510 19 L510 145 L-140 145 Z"
+                  fill="url(#tap-front-gradient)">
+                </path>
 
-              <g id="tap-bubbles" class="tap-heart__bubbles">
-                <circle class="tap-heart__bubble" cx="52" cy="36" r="1.8"></circle>
-                <circle class="tap-heart__bubble" cx="72" cy="55" r="2.7"></circle>
-                <circle class="tap-heart__bubble" cx="92" cy="74" r="1.6"></circle>
-                <circle class="tap-heart__bubble" cx="108" cy="93" r="2.1"></circle>
-                <circle class="tap-heart__bubble" cx="126" cy="112" r="3"></circle>
-                <circle class="tap-heart__bubble" cx="143" cy="131" r="1.5"></circle>
-                <circle class="tap-heart__bubble" cx="159" cy="150" r="2.4"></circle>
-                <circle class="tap-heart__bubble" cx="177" cy="169" r="1.8"></circle>
-                <circle class="tap-heart__bubble" cx="194" cy="188" r="2.8"></circle>
-                <circle class="tap-heart__bubble" cx="210" cy="207" r="1.5"></circle>
-                <circle class="tap-heart__bubble" cx="228" cy="226" r="2.1"></circle>
-                <circle class="tap-heart__bubble" cx="246" cy="66" r="3.1"></circle>
-                <circle class="tap-heart__bubble" cx="264" cy="118" r="1.7"></circle>
-                <circle class="tap-heart__bubble" cx="280" cy="174" r="2.3"></circle>
+                <g id="tap-bubbles" class="tap-heart__bubbles">
+                  <circle class="tap-heart__bubble" cx="52" cy="36" r="1.8"></circle>
+                  <circle class="tap-heart__bubble" cx="72" cy="55" r="2.7"></circle>
+                  <circle class="tap-heart__bubble" cx="92" cy="74" r="1.6"></circle>
+                  <circle class="tap-heart__bubble" cx="108" cy="93" r="2.1"></circle>
+                  <circle class="tap-heart__bubble" cx="126" cy="112" r="3"></circle>
+                  <circle class="tap-heart__bubble" cx="143" cy="131" r="1.5"></circle>
+                  <circle class="tap-heart__bubble" cx="159" cy="150" r="2.4"></circle>
+                  <circle class="tap-heart__bubble" cx="177" cy="169" r="1.8"></circle>
+                  <circle class="tap-heart__bubble" cx="194" cy="188" r="2.8"></circle>
+                  <circle class="tap-heart__bubble" cx="210" cy="207" r="1.5"></circle>
+                  <circle class="tap-heart__bubble" cx="228" cy="226" r="2.1"></circle>
+                  <circle class="tap-heart__bubble" cx="246" cy="66" r="3.1"></circle>
+                  <circle class="tap-heart__bubble" cx="264" cy="118" r="1.7"></circle>
+                  <circle class="tap-heart__bubble" cx="280" cy="174" r="2.3"></circle>
+                </g>
               </g>
             </g>
+
+            <use href="#tap-heart-shape" class="tap-heart__outline"></use>
           </g>
 
-          <use href="#tap-heart-shape" class="tap-heart__outline"></use>
+          <image
+            id="tap-boss-image"
+            class="tap-heart__boss-image"
+            x="132"
+            y="105"
+            width="56"
+            height="50"
+            preserveAspectRatio="xMidYMid meet"
+            aria-hidden="true">
+          </image>
 
           <text
             id="tap-percent"
             class="tap-heart__percent"
             x="160"
-            y="155"
+            y="184"
             text-anchor="middle"
             dominant-baseline="middle">0%</text>
         </svg>
@@ -139,6 +152,6 @@
   </main>
 
   <script src="/assets/creator-tools/live-event-overlay-runtime.js?v=composer-1"></script>
-  <script src="/assets/creator-tools/tap-farming-overlay.js?v=liquid-5"></script>
+  <script src="/assets/creator-tools/tap-farming-overlay.js?v=liquid-8"></script>
 </body>
 </html>

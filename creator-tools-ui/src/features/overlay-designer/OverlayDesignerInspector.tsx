@@ -120,6 +120,53 @@ export function OverlayDesignerInspector({
           ))}
         </div>
 
+        <div
+          className="overlay-designer-properties__alignment"
+          role="group"
+          aria-label={t("overlayDesigner.inspector.alignment.title")}
+        >
+          <strong>{t("overlayDesigner.inspector.alignment.title")}</strong>
+          <button
+            type="button"
+            disabled={geometryDisabled}
+            onClick={() => onChange({
+              x: Math.round((profile.canvas.width - component.width) / 2),
+            })}
+          >
+            <span aria-hidden="true">↔</span>
+            {t("overlayDesigner.inspector.alignment.horizontal")}
+          </button>
+          <button
+            type="button"
+            disabled={geometryDisabled}
+            onClick={() => onChange({
+              y: Math.round((profile.canvas.height - component.height) / 2),
+            })}
+          >
+            <span aria-hidden="true">↕</span>
+            {t("overlayDesigner.inspector.alignment.vertical")}
+          </button>
+        </div>
+
+        <label className="overlay-designer-properties__opacity">
+          <span>{t("overlayDesigner.inspector.opacity")}</span>
+          <span className="overlay-designer-properties__opacity-control">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={component.opacity}
+              disabled={disabled}
+              onInput={(event) => onChange({
+                opacity: Number((event.currentTarget as HTMLInputElement).value),
+              })}
+              onChange={(event) => onChange({ opacity: Number(event.target.value) })}
+            />
+            <output>{component.opacity}%</output>
+          </span>
+        </label>
+
         {component.id === "tap_farming" && (
           <div className="overlay-designer-properties__colors">
             <strong>{t("overlayDesigner.inspector.colors.title")}</strong>

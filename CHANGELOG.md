@@ -2,6 +2,18 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El retrato del jefe en Farmeo de taps queda más abajo dentro del corazón,
+  con mayor separación de la hendidura superior. Al cerrar Cuphead, Creator
+  Tools entra en un apagado definitivo e idempotente para impedir que vuelva
+  a abrir el puerto 18081 durante los últimos frames de salida.
+- El overlay de Farmeando taps deja transparente la parte vacía del corazón y
+  reduce su silueta 15 % sin encoger el porcentaje ni los textos. Al entrar un
+  jefe, su retrato aparece sobre el porcentaje 300 ms después con un rebote
+  suave, tamaño reducido 30 % y opacidad de 85 %; sólo el porcentaje usa 90 %
+  de opacidad. Las ondas y burbujas avanzan ligeramente más rápido. El
+  diseñador de overlays añade acciones para centrar horizontal o verticalmente
+  la capa seleccionada dentro del lienzo y un slider de opacidad global de
+  0–100 % para cada overlay.
 - La Equip Card nativa reemplaza la entrada de contratos por una ranura
   `Reto`. Reutiliza la cara de selección del equipamiento, sus cursores,
   sonidos y animación, y muestra los 12 retos visibles en una única cuadrícula

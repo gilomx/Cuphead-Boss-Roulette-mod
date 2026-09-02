@@ -465,6 +465,12 @@
       "y": "Y",
       "width": "Ancho",
         "height": "Alto",
+        "alignment": {
+          "title": "Centrar capa",
+          "horizontal": "Horizontalmente",
+          "vertical": "Verticalmente"
+        },
+        "opacity": "Opacidad del overlay",
         "colors": {
           "title": "Colores del corazón",
           "liquidColor": "Líquido",

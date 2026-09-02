@@ -10,6 +10,7 @@
   const middleWave = document.getElementById("tap-middle-wave");
   const frontWave = document.getElementById("tap-front-wave");
   const bubbles = Array.from(document.querySelectorAll(".tap-heart__bubble"));
+  const bossImage = document.getElementById("tap-boss-image");
   const percent = document.getElementById("tap-percent");
   const delta = document.getElementById("tap-delta");
   const heartLabel = document.getElementById("tap-heart-label");
@@ -35,6 +36,36 @@
     collectingColor: "#f4c95d",
     textColor: "#ffffff",
     outlineColor: "#f5f5f7",
+  });
+
+  const BOSS_IMAGES = Object.freeze({
+    Frogs: "hoscoytosco.png",
+    Veggies: "pandillaraiz.png",
+    Slime: "goopylegrande.png",
+    FlyingBlimp: "hilda.png",
+    Flower: "claveldecagney.png",
+    Baroness: "baronesa.png",
+    FlyingGenie: "djimmi.png",
+    Clown: "beppi.png",
+    FlyingBird: "titi.png",
+    Dragon: "fosforo.png",
+    Bee: "abejita.png",
+    Mouse: "werner.png",
+    Pirate: "capitan.png",
+    FlyingMermaid: "calamaria.png",
+    SallyStagePlay: "sally.png",
+    Robot: "robot.png",
+    Train: "expreso.png",
+    DicePalace: "dado.png",
+    DicePalaceMain: "dado.png",
+    Devil: "diablo.png",
+    RumRunners: "alimanas.png",
+    FlyingCowboy: "vaca.png",
+    Airplane: "perritos.png",
+    Graveyard: "angelydemonio.png",
+    SnowCult: "genovevo.png",
+    OldMan: "granito.png",
+    Saltbaker: "salero.png",
   });
 
   const COPY = {
@@ -95,6 +126,8 @@
   let numberFormat = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 });
   let lastTapSample = null;
   let deltaTimer = 0;
+  let bossImageTimer = 0;
+  let activeBossImageKey = "";
   let motionEnabled = true;
   let animationFrame = 0;
   let staticMotionApplied = false;
@@ -286,6 +319,8 @@
         ? progressValue(state.overallProgress)
         : derivedOverall,
       bossName: String(state.bossName || boss.name || "").trim(),
+      levelId: String(state.levelId || boss.levelId || "").trim(),
+      attempt: Math.max(0, Math.round(firstNumber(state.attempt))),
       sessionKey: String(
         state.overlayPreviewKey ||
         state.sessionId ||
@@ -352,6 +387,48 @@
     lastTapSample = nextSample;
   };
 
+  const bossImagePath = (snapshot) => {
+    const rawLevel = snapshot.levelId || snapshot.bossName;
+    const normalizedLevel = String(rawLevel || "")
+      .replace(/^level_/i, "")
+      .replace(/^level/i, "");
+    const level = Object.keys(BOSS_IMAGES).find(
+      (key) => key.toLowerCase() === normalizedLevel.toLowerCase(),
+    );
+    if (level) return `/assets/bosses/${BOSS_IMAGES[level]}`;
+    if (/^dicepalace/i.test(normalizedLevel)) return "/assets/bosses/dado.png";
+    return "";
+  };
+
+  const updateBossImage = (snapshot, pointsMode) => {
+    const eligiblePhase = ["active", "transition", "completed"]
+      .includes(snapshot.phase);
+    const path = !pointsMode && eligiblePhase ? bossImagePath(snapshot) : "";
+    const key = path
+      ? `${snapshot.levelId}|${snapshot.attempt}|${path}`
+      : "";
+    if (!path) {
+      if (bossImageTimer) window.clearTimeout(bossImageTimer);
+      bossImageTimer = 0;
+      activeBossImageKey = "";
+      bossImage.dataset.visible = "false";
+      bossImage.removeAttribute("href");
+      return false;
+    }
+    if (key === activeBossImageKey) return true;
+
+    if (bossImageTimer) window.clearTimeout(bossImageTimer);
+    activeBossImageKey = key;
+    bossImage.dataset.visible = "false";
+    bossImage.setAttribute("href", path);
+    bossImageTimer = window.setTimeout(() => {
+      bossImageTimer = 0;
+      if (activeBossImageKey !== key) return;
+      bossImage.dataset.visible = "true";
+    }, 300);
+    return true;
+  };
+
   const metricFontSize = (value, pointsMode) => {
     if (!pointsMode) return 52;
     const length = Array.from(String(value || "").replace(/\s/g, "")).length;
@@ -392,6 +469,8 @@
     root.style.setProperty("--metric-font-size", `${metricFontSize(metricValue, pointsMode)}px`);
 
     liquidLevel.style.transform = `translateY(${258 - healthRatio * 245}px)`;
+    const hasBossImage = updateBossImage(snapshot, pointsMode);
+    percent.setAttribute("y", hasBossImage ? "184" : "155");
     percent.textContent = metricValue;
     health.textContent = pointsMode
       ? `+${collectedPoints} ${text.healthPointsShort}`
@@ -426,7 +505,7 @@
     bubble,
     cycle: Math.max(16, Number(bubble.getAttribute("cy")) - 22),
     offset: index * 19.7,
-    speed: 0.012 + index % 5 * 0.0025,
+    speed: 0.014 + index % 5 * 0.003,
     sway: 1.4 + index % 3,
   }));
 
@@ -454,13 +533,13 @@
       return;
     }
     staticMotionApplied = false;
-    bodyWave.style.transform = `translate3d(${Math.sin(now / 1700) * 28}px, ${Math.sin(now / 920) * 1.4}px, 0)`;
-    middleWave.style.transform = `translate3d(${Math.sin(now / 1280 + 1.7) * 34}px, ${Math.cos(now / 810) * 1.8}px, 0)`;
-    frontWave.style.transform = `translate3d(${Math.sin(now / 980 + 3.2) * 42}px, ${Math.sin(now / 690) * 2.1}px, 0)`;
+    bodyWave.style.transform = `translate3d(${Math.sin(now / 1450) * 28}px, ${Math.sin(now / 780) * 1.4}px, 0)`;
+    middleWave.style.transform = `translate3d(${Math.sin(now / 1090 + 1.7) * 34}px, ${Math.cos(now / 690) * 1.8}px, 0)`;
+    frontWave.style.transform = `translate3d(${Math.sin(now / 835 + 3.2) * 42}px, ${Math.sin(now / 585) * 2.1}px, 0)`;
     for (const seed of bubbleSeeds) {
       const travel = (now * seed.speed + seed.offset) % seed.cycle;
       const life = travel / seed.cycle;
-      const x = Math.sin(now / 620 + seed.offset) * seed.sway;
+      const x = Math.sin(now / 525 + seed.offset) * seed.sway;
       seed.bubble.style.transform = `translate3d(${x}px, ${-travel}px, 0)`;
       seed.bubble.style.opacity = String(Math.sin(life * Math.PI) * 0.92);
     }
@@ -508,7 +587,7 @@
       phase: "active",
       locale: activeLocale,
       bossName: activeLocale === "en" ? "Captain Brineybeard" : "Capitán Barbasalada",
-      levelId: "level_pirate",
+      levelId: "Pirate",
       attempt: 2,
       counters: {
         totalTaps: 12486,

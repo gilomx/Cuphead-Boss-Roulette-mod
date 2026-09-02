@@ -465,6 +465,12 @@
       "y": "Y",
       "width": "Width",
         "height": "Height",
+        "alignment": {
+          "title": "Center layer",
+          "horizontal": "Horizontally",
+          "vertical": "Vertically"
+        },
+        "opacity": "Overlay opacity",
         "colors": {
           "title": "Heart colors",
           "liquidColor": "Liquid",

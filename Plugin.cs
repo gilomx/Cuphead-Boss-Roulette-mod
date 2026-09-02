@@ -3630,12 +3630,13 @@ namespace Gilomx.CupheadBossRoulette
         private void OnApplicationQuit()
         {
             RestoreOriginalTestLanguage();
-            StopCreatorToolsServer();
+            ShutdownCreatorTools();
         }
 
         private void OnDestroy()
         {
             RestoreOriginalTestLanguage();
+            creatorToolsShuttingDown = true;
             SceneLoader.OnFadeInEndEvent -=
                 CompleteChallengeVisualRestartOnFadeInEnd;
             if (harmony != null)
@@ -3647,7 +3648,7 @@ namespace Gilomx.CupheadBossRoulette
             DisposeManualChallengeEquipment();
             DestroyBattleResultHud();
             CloseCreatorToolsMenu(false);
-            DisposeCreatorTools();
+            ShutdownCreatorTools();
             ClearChallengeVisualRetryGate();
             ResetRgbShiftChallenge();
             ResetUpsideDownChallenge();

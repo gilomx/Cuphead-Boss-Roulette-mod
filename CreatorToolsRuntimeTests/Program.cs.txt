@@ -28,6 +28,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestServerBacklogProjection);
             Run("Server marks controls applied before Unity consumes them",
                 TestBackgroundControlObservation);
+            Run("Server Stop releases its listening port immediately",
+                TestServerStopReleasesPort);
             Run("Server counts and prioritizes deferred manual tests",
                 TestDeferredManualTestCommands);
             Run("Control projections wait for their exact command sequence",
@@ -164,6 +166,32 @@ namespace Gilomx.CupheadBossRoulette
                         json.RootElement.GetProperty("backlogCount").GetInt64(),
                         "projected backlog count");
                 }
+            }
+        }
+
+        private static void TestServerStopReleasesPort()
+        {
+            using (var scope = new TestScope("server-stop-port"))
+            using (var server = scope.StartServer())
+            {
+                var port = server.Port;
+                server.Stop();
+
+                var replacement = new TcpListener(
+                    IPAddress.Loopback, port);
+                try
+                {
+                    replacement.Start();
+                    Equal(port,
+                        ((IPEndPoint)replacement.LocalEndpoint).Port,
+                        "replacement listener port");
+                }
+                finally
+                {
+                    replacement.Stop();
+                }
+
+                server.Stop();
             }
         }
 
@@ -811,6 +839,9 @@ namespace Gilomx.CupheadBossRoulette
                     Equal("#f5f5f7",
                         component.GetProperty("outlineColor").GetString(),
                         "default tap outline color");
+                    Equal(100,
+                        component.GetProperty("opacity").GetInt32(),
+                        "default overlay opacity");
                     Equal("default",
                         component.GetProperty("variant").GetString(),
                         "tap presentation is fixed");
@@ -826,6 +857,7 @@ namespace Gilomx.CupheadBossRoulette
                     "\"profileId\":\"vertical\"," +
                     "\"componentId\":\"tap_farming\"," +
                     "\"x\":9999,\"width\":400," +
+                    "\"opacity\":37," +
                     "\"variant\":\"compact\"," +
                     "\"showDetails\":true," +
                     "\"liquidColor\":\"#12ABef\"," +
@@ -848,6 +880,8 @@ namespace Gilomx.CupheadBossRoulette
                         "legacy component variant is normalized");
                     True(component.GetProperty("showDetails").GetBoolean(),
                         "saved detail switch");
+                    Equal(37, component.GetProperty("opacity").GetInt32(),
+                        "saved overlay opacity");
                     Equal("#12abef",
                         component.GetProperty("liquidColor").GetString(),
                         "canonical liquid color");
@@ -897,6 +931,8 @@ namespace Gilomx.CupheadBossRoulette
                     Equal("#12abef",
                         component.GetProperty("liquidColor").GetString(),
                         "persisted liquid color");
+                    Equal(37, component.GetProperty("opacity").GetInt32(),
+                        "persisted overlay opacity");
                 }
 
                 var second = reloaded.ProcessConfigCommand(
@@ -1100,6 +1136,10 @@ namespace Gilomx.CupheadBossRoulette
                         json.RootElement.GetProperty("layout"),
                         "pesky_battle").GetProperty("liquidColor").GetString(),
                         "legacy layout component receives color defaults");
+                    Equal(100, FindProfileComponent(
+                        json.RootElement.GetProperty("layout"),
+                        "pesky_battle").GetProperty("opacity").GetInt32(),
+                        "legacy layout component receives full opacity");
                 }
                 using (var json = JsonDocument.Parse(
                     controller.GetConfigState()))

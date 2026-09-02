@@ -16,6 +16,7 @@ export interface OverlayComposerComponent {
   enabled: boolean;
   locked: boolean;
   layer: number;
+  opacity: number;
   variant: OverlayVariant;
   showTitle: boolean;
   showDetails: boolean;
@@ -57,6 +58,7 @@ export interface OverlayComposerCommand {
   enabled?: boolean;
   locked?: boolean;
   layer?: number;
+  opacity?: number;
   variant?: OverlayVariant;
   showTitle?: boolean;
   showDetails?: boolean;
