@@ -56,6 +56,8 @@ namespace Gilomx.CupheadBossRoulette
         private CreatorToolsInteractionController creatorToolsInteractions;
         private CreatorToolsDashboardController creatorToolsDashboard;
         private CreatorToolsStreamRulesController creatorToolsStreamRules;
+        private CreatorToolsOverlayComposerController
+            creatorToolsOverlayComposer;
         private TikFinityCompanionHost creatorToolsTikFinityCompanion;
         private CreatorToolsStreamWorker creatorToolsStreamWorker;
         private readonly object creatorToolsInteractionsSettingLock =
@@ -144,6 +146,13 @@ namespace Gilomx.CupheadBossRoulette
                 Config.ConfigFilePath,
                 GetCreatorToolsInteractionsEnabled,
                 delegate(string message) { Logger.LogWarning(message); });
+            creatorToolsOverlayComposer =
+                new CreatorToolsOverlayComposerController(
+                    Config.ConfigFilePath,
+                    delegate(string message)
+                    {
+                        Logger.LogWarning(message);
+                    });
             creatorToolsDashboard = new CreatorToolsDashboardController(
                 creatorToolsStreamRules.TryResolveSimulationGift);
             creatorToolsTikFinityCompanion = new TikFinityCompanionHost(
@@ -1176,6 +1185,8 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsStreamRules != null)
                 creatorToolsServer.SetStreamRuleCommandHandler(
                     creatorToolsStreamRules.ProcessServerCommand);
+            creatorToolsServer.SetOverlayComposerController(
+                creatorToolsOverlayComposer);
             creatorToolsServer.SetInteractionControlObserver(
                 ObserveCreatorToolsInteractionControl);
             if (creatorToolsInteractions != null)
@@ -1501,6 +1512,7 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsServer.SetInteractionControlObserver(null);
                 creatorToolsServer.SetPeskyBattleCommandHandler(null);
                 creatorToolsServer.SetTapFarmingCommandHandler(null);
+                creatorToolsServer.SetOverlayComposerController(null);
             }
             if (creatorToolsStreamWorker != null)
             {
@@ -1519,6 +1531,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             creatorToolsDashboard = null;
             creatorToolsStreamRules = null;
+            creatorToolsOverlayComposer = null;
             CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
             if (creatorToolsServer == null)
                 return;

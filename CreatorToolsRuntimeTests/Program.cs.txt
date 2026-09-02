@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 
@@ -39,6 +40,16 @@ namespace Gilomx.CupheadBossRoulette
                 TestDeferredTestGenerationClear);
             Run("Failed deferred tests release their reservations",
                 TestDeferredTestMaterializationFailure);
+            Run("Overlay composer persists clamped revisions atomically",
+                TestOverlayComposerPersistenceAndRevision);
+            Run("Overlay composer serves POST config and preview routes",
+                TestOverlayComposerHttpRoutes);
+            Run("Overlay preview expires and stops without gameplay state",
+                TestOverlayComposerPreviewLifetime);
+            Run("Tap Farming migrates exact conversion settings to v2",
+                TestTapFarmingSettingsMigration);
+            Run("Tap Farming projects reserve as effective boss health",
+                TestTapFarmingEffectiveHealth);
             Run("Worker processes a fake source and Dispose joins its thread",
                 TestWorkerAndDispose);
             Run("TikFinity pressure coalesces exact per-viewer like totals",
@@ -154,6 +165,115 @@ namespace Gilomx.CupheadBossRoulette
                         "projected backlog count");
                 }
             }
+        }
+
+        private static void TestTapFarmingSettingsMigration()
+        {
+            var directory = Path.Combine(
+                Path.GetTempPath(),
+                "la-pichi-ruleta-tap-settings-" +
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var pluginConfigPath = Path.Combine(
+                    directory, "BepInEx.cfg");
+                var settingsPath = Path.Combine(directory,
+                    "mx.gilomx.cuphead.bossroulette.tap-farming.json");
+                File.WriteAllText(settingsPath,
+                    "{\n  \"version\": 1,\n" +
+                    "  \"tapsPerHealthPoint\": 7\n}\n");
+
+                var settings = CreatorToolsTapFarmingSettings.Load(
+                    pluginConfigPath, null);
+
+                Equal(7, settings.TapsPerConversion,
+                    "migrated taps per conversion");
+                Equal(1, settings.HealthPointsPerConversion,
+                    "migrated health points per conversion");
+                using (var json = JsonDocument.Parse(
+                    File.ReadAllText(settingsPath)))
+                {
+                    Equal(2,
+                        json.RootElement.GetProperty("version").GetInt32(),
+                        "migrated settings version");
+                    Equal(7,
+                        json.RootElement.GetProperty(
+                            "tapsPerConversion").GetInt32(),
+                        "persisted taps per conversion");
+                    Equal(1,
+                        json.RootElement.GetProperty(
+                            "healthPointsPerConversion").GetInt32(),
+                        "persisted health points per conversion");
+                    False(json.RootElement.TryGetProperty(
+                        "tapsPerHealthPoint", out _),
+                        "v2 settings must not persist the legacy key");
+                }
+
+                settings.SetConversion(3, 5);
+                settings.Save();
+                var reloaded = CreatorToolsTapFarmingSettings.Load(
+                    pluginConfigPath, null);
+                Equal(3, reloaded.TapsPerConversion,
+                    "reloaded taps per conversion");
+                Equal(5, reloaded.HealthPointsPerConversion,
+                    "reloaded health points per conversion");
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, true);
+            }
+        }
+
+        private static void TestTapFarmingEffectiveHealth()
+        {
+            var collecting =
+                CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                    "collecting", 0d, 0d, 500d, 0d);
+            False(collecting.Available,
+                "collecting has no percentage denominator");
+            Equal(500d, collecting.Current,
+                "collecting exposes accumulated health points");
+
+            var initial =
+                CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                    "active", 1000d, 1000d, 500d, 0d);
+            True(initial.Available, "active health is available");
+            Equal(1500d, initial.Current,
+                "initial effective current health");
+            Equal(1500d, initial.Total,
+                "initial effective total health");
+            Equal(1d, initial.Ratio,
+                "initial effective ratio");
+
+            var absorbed =
+                CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                    "active", 1000d, 1000d, 400d, 100d);
+            Equal(1400d, absorbed.Current,
+                "absorbed damage reduces effective current health");
+            Equal(1500d, absorbed.Total,
+                "absorbed damage preserves effective total health");
+            True(Math.Abs(absorbed.Ratio - (1400d / 1500d)) < 0.000001d,
+                "absorbed damage changes the ratio before native health");
+
+            var nativeDamage =
+                CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                    "active", 900d, 1000d, 0d, 500d);
+            Equal(900d, nativeDamage.Current,
+                "native damage continues reducing effective health");
+            Equal(1500d, nativeDamage.Total,
+                "effective total includes consumed reserve");
+
+            var completed =
+                CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                    "completed", 0d, 1000d, 125d, 375d);
+            True(completed.Available,
+                "completed state keeps a percentage result");
+            Equal(0d, completed.Current,
+                "completed state ignores leftover reserve");
+            Equal(0d, completed.Ratio,
+                "completed state is empty");
         }
 
         private static void TestWorkerAndDispose()
@@ -666,6 +786,472 @@ namespace Gilomx.CupheadBossRoulette
                 0, 0, 0);
         }
 
+        private static void TestOverlayComposerPersistenceAndRevision()
+        {
+            using (var scope = new TestScope("overlay-composer-persist"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                using (var initial = JsonDocument.Parse(
+                    controller.GetConfigState()))
+                {
+                    Equal(0, initial.RootElement
+                        .GetProperty("revision").GetInt32(),
+                        "initial composer revision");
+                    var component = FindComposerComponent(
+                        initial.RootElement, "vertical", "tap_farming");
+                    Equal("#ff4f92",
+                        component.GetProperty("liquidColor").GetString(),
+                        "default tap liquid color");
+                    Equal("#f4c95d",
+                        component.GetProperty("collectingColor").GetString(),
+                        "default tap collecting color");
+                    Equal("#ffffff",
+                        component.GetProperty("textColor").GetString(),
+                        "default tap text color");
+                    Equal("#f5f5f7",
+                        component.GetProperty("outlineColor").GetString(),
+                        "default tap outline color");
+                    Equal("default",
+                        component.GetProperty("variant").GetString(),
+                        "tap presentation is fixed");
+                    False(component.GetProperty("showTitle").GetBoolean(),
+                        "default tap title is hidden");
+                    False(component.GetProperty("showDetails").GetBoolean(),
+                        "default tap details are hidden");
+                }
+
+                var updated = controller.ProcessConfigCommand(
+                    "{\"operation\":\"update\"," +
+                    "\"expectedRevision\":0," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"x\":9999,\"width\":400," +
+                    "\"variant\":\"compact\"," +
+                    "\"showDetails\":true," +
+                    "\"liquidColor\":\"#12ABef\"," +
+                    "\"collectingColor\":\"#FEDCBA\"," +
+                    "\"textColor\":\"#112233\"," +
+                    "\"outlineColor\":\"#ABCDEF\"}");
+                Equal(200, updated.StatusCode,
+                    "composer update status");
+                using (var json = JsonDocument.Parse(updated.Json))
+                {
+                    Equal(1, json.RootElement
+                        .GetProperty("revision").GetInt32(),
+                        "composer update revision");
+                    var component = FindComposerComponent(
+                        json.RootElement, "vertical", "tap_farming");
+                    Equal(680, component.GetProperty("x").GetInt32(),
+                        "clamped component x");
+                    Equal("default",
+                        component.GetProperty("variant").GetString(),
+                        "legacy component variant is normalized");
+                    True(component.GetProperty("showDetails").GetBoolean(),
+                        "saved detail switch");
+                    Equal("#12abef",
+                        component.GetProperty("liquidColor").GetString(),
+                        "canonical liquid color");
+                    Equal("#fedcba",
+                        component.GetProperty("collectingColor").GetString(),
+                        "canonical collecting color");
+                    Equal("#112233",
+                        component.GetProperty("textColor").GetString(),
+                        "saved text color");
+                    Equal("#abcdef",
+                        component.GetProperty("outlineColor").GetString(),
+                        "canonical outline color");
+                }
+
+                var invalidColor = controller.ProcessConfigCommand(
+                    "{\"operation\":\"update\"," +
+                    "\"expectedRevision\":1," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"liquidColor\":\"url(evil)\"}");
+                Equal(400, invalidColor.StatusCode,
+                    "invalid composer color status");
+                using (var json = JsonDocument.Parse(
+                    controller.GetConfigState()))
+                    Equal(1, json.RootElement
+                        .GetProperty("revision").GetInt32(),
+                        "invalid color keeps composer revision");
+
+                var stale = controller.ProcessConfigCommand(
+                    "{\"operation\":\"reset\"," +
+                    "\"expectedRevision\":0," +
+                    "\"profileId\":\"vertical\"}");
+                Equal(409, stale.StatusCode,
+                    "stale composer revision status");
+
+                var reloaded = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(
+                    reloaded.GetConfigState()))
+                {
+                    Equal(1, json.RootElement
+                        .GetProperty("revision").GetInt32(),
+                        "reloaded composer revision");
+                    var component = FindComposerComponent(
+                        json.RootElement, "vertical", "tap_farming");
+                    Equal(680, component.GetProperty("x").GetInt32(),
+                        "persisted component x");
+                    Equal("#12abef",
+                        component.GetProperty("liquidColor").GetString(),
+                        "persisted liquid color");
+                }
+
+                var second = reloaded.ProcessConfigCommand(
+                    "{\"operation\":\"update\"," +
+                    "\"expectedRevision\":1," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"y\":900}");
+                Equal(200, second.StatusCode,
+                    "second composer update status");
+                var settingsPath = Path.Combine(scope.ConfigDirectory,
+                    "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var backupPath = settingsPath + ".bak";
+                var validBackup = File.ReadAllText(backupPath);
+                File.WriteAllText(settingsPath, "{corrupt");
+
+                var recovered = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(
+                    recovered.GetConfigState()))
+                    Equal(1, json.RootElement
+                        .GetProperty("revision").GetInt32(),
+                        "backup recovery revision");
+                Equal(validBackup, File.ReadAllText(backupPath),
+                    "backup remains valid after recovery");
+                using (var json = JsonDocument.Parse(
+                    scope.CreateOverlayComposer(null).GetConfigState()))
+                    Equal(1, json.RootElement
+                        .GetProperty("revision").GetInt32(),
+                        "restored primary revision");
+            }
+        }
+
+        private static void TestOverlayComposerHttpRoutes()
+        {
+            using (var scope = new TestScope("overlay-composer-http"))
+            using (var server = scope.StartServer())
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                server.SetOverlayComposerController(controller);
+
+                using (var json = GetJson(
+                    server, "/api/overlay-composer/config"))
+                    Equal(2, json.RootElement.GetProperty("profiles")
+                        .GetArrayLength(), "composer profile count");
+
+                HttpStatusCode status;
+                using (var json = PostJson(
+                    server, "/api/overlay-composer/config/set",
+                    "{\"operation\":\"update\"," +
+                    "\"expectedRevision\":0," +
+                    "\"profileId\":\"horizontal\"," +
+                    "\"componentId\":\"pesky_battle\"," +
+                    "\"x\":100,\"locked\":true}", out status))
+                {
+                    Equal(HttpStatusCode.OK, status,
+                        "composer POST status");
+                    var component = FindComposerComponent(
+                        json.RootElement, "horizontal", "pesky_battle");
+                    Equal(100, component.GetProperty("x").GetInt32(),
+                        "HTTP-updated component x");
+                    True(component.GetProperty("locked").GetBoolean(),
+                        "HTTP-updated component lock");
+                }
+
+                Equal(HttpStatusCode.UnsupportedMediaType,
+                    PostStatus(server,
+                        "/api/overlay-composer/config/set",
+                        "{}", "text/plain"),
+                    "composer media type rejection");
+                Equal(HttpStatusCode.OK,
+                    GetStatusCode(server, "/overlay/vertical"),
+                    "vertical overlay route");
+                Equal(HttpStatusCode.OK,
+                    GetStatusCode(server, "/overlay/horizontal"),
+                    "horizontal overlay route");
+                Equal(HttpStatusCode.OK,
+                    GetStatusCode(server, "/live-overlay"),
+                    "live overlay route");
+                Equal(HttpStatusCode.OK,
+                    GetStatusCode(server, "/config/overlay-designer"),
+                    "overlay designer SPA route");
+
+                using (var preview = PostJson(
+                    server, "/api/overlay-composer/preview/set",
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"http-preview\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"scenario\":\"transition\"," +
+                    "\"tapDelta\":500}", out status))
+                {
+                    Equal(HttpStatusCode.OK, status,
+                        "preview POST status");
+                    True(preview.RootElement
+                        .GetProperty("active").GetBoolean(),
+                        "preview active through HTTP");
+                }
+                using (var preview = GetJson(server,
+                    "/api/overlay-composer/preview?profile=vertical"))
+                {
+                    Equal("transition", preview.RootElement
+                        .GetProperty("scenario").GetString(),
+                        "preview scenario through GET");
+                    Equal(500L, preview.RootElement
+                        .GetProperty("tapDelta").GetInt64(),
+                        "preview tap delta through GET");
+                }
+            }
+        }
+
+        private static void TestOverlayComposerPreviewLifetime()
+        {
+            using (var scope = new TestScope("overlay-preview-lifetime"))
+            {
+                var now = new MutableClock(
+                    new DateTime(2026, 9, 1, 12, 0, 0,
+                        DateTimeKind.Utc));
+                var controller = scope.CreateOverlayComposer(
+                    delegate { return now.UtcNow; });
+                var started = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"vertical-preview\"," +
+                    "\"scenario\":\"active\"}");
+                Equal(200, started.StatusCode,
+                    "direct preview start status");
+                using (var json = JsonDocument.Parse(started.Json))
+                    True(json.RootElement.GetProperty("active").GetBoolean(),
+                        "direct preview start active");
+
+                now.UtcNow = now.UtcNow.AddMinutes(11);
+                using (var json = JsonDocument.Parse(
+                    controller.GetPreviewState("vertical").Json))
+                {
+                    False(json.RootElement
+                        .GetProperty("active").GetBoolean(),
+                        "expired preview active flag");
+                    Equal("expired", json.RootElement
+                        .GetProperty("feedback").GetString(),
+                        "expired preview feedback");
+                }
+
+                var closeBeforeStart = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"stop\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"closed-before-start\"}");
+                Equal(409, closeBeforeStart.StatusCode,
+                    "early close records a guarded cancellation");
+                var delayedStart = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"closed-before-start\"}");
+                Equal(409, delayedStart.StatusCode,
+                    "delayed start cannot survive a closed editor");
+                using (var json = JsonDocument.Parse(
+                    controller.GetPreviewState("vertical").Json))
+                    False(json.RootElement.GetProperty("active").GetBoolean(),
+                        "cancelled delayed start remains inactive");
+
+                var verticalLayout =
+                    "{\"id\":\"vertical\"," +
+                    "\"canvas\":{\"width\":1080,\"height\":1920}," +
+                    "\"components\":[" +
+                    "{\"id\":\"tap_farming\",\"x\":321,\"y\":1010," +
+                    "\"width\":640,\"height\":720,\"enabled\":true," +
+                    "\"locked\":false,\"layer\":20,\"variant\":\"default\"," +
+                    "\"showTitle\":true,\"showDetails\":true,\"motion\":true," +
+                    "\"liquidColor\":\"#336699\",\"textColor\":\"#ffeecc\"," +
+                    "\"outlineColor\":\"#123456\"}," +
+                    "{\"id\":\"pesky_battle\",\"x\":60,\"y\":1260," +
+                    "\"width\":960,\"height\":560,\"enabled\":true," +
+                    "\"locked\":false,\"layer\":10,\"variant\":\"default\"," +
+                    "\"showTitle\":true,\"showDetails\":true,\"motion\":true}]}";
+                var liveLayoutPreview = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"live-layout-editor\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"simulationActive\":false," +
+                    "\"layoutJson\":" +
+                    JsonSerializer.Serialize(verticalLayout) + "}");
+                Equal(200, liveLayoutPreview.StatusCode,
+                    "live layout preview start status");
+                int liveLayoutRevision;
+                using (var json = JsonDocument.Parse(liveLayoutPreview.Json))
+                {
+                    liveLayoutRevision = json.RootElement
+                        .GetProperty("revision").GetInt32();
+                    False(json.RootElement
+                        .GetProperty("simulationActive").GetBoolean(),
+                        "live layout does not force synthetic data");
+                    Equal(321, FindProfileComponent(
+                        json.RootElement.GetProperty("layout"),
+                        "tap_farming").GetProperty("x").GetInt32(),
+                        "live layout carries draft position");
+                    Equal("#336699", FindProfileComponent(
+                        json.RootElement.GetProperty("layout"),
+                        "tap_farming").GetProperty("liquidColor").GetString(),
+                        "live layout carries draft color");
+                    Equal("#ff4f92", FindProfileComponent(
+                        json.RootElement.GetProperty("layout"),
+                        "pesky_battle").GetProperty("liquidColor").GetString(),
+                        "legacy layout component receives color defaults");
+                }
+                using (var json = JsonDocument.Parse(
+                    controller.GetConfigState()))
+                    Equal(220, FindComposerComponent(
+                        json.RootElement, "vertical", "tap_farming")
+                        .GetProperty("x").GetInt32(),
+                        "live layout does not persist draft position");
+
+                var invalidLayoutPreview = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"update\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"live-layout-editor\"," +
+                    "\"expectedRevision\":" + liveLayoutRevision + "," +
+                    "\"layoutJson\":\"{}\"}");
+                Equal(400, invalidLayoutPreview.StatusCode,
+                    "malformed live layout is rejected");
+                var stoppedLiveLayout = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"stop\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"live-layout-editor\"," +
+                    "\"expectedRevision\":" + liveLayoutRevision + "}");
+                Equal(200, stoppedLiveLayout.StatusCode,
+                    "live layout preview stop status");
+                using (var json = JsonDocument.Parse(stoppedLiveLayout.Json))
+                {
+                    False(json.RootElement.GetProperty("active").GetBoolean(),
+                        "stopped live layout is inactive");
+                    True(json.RootElement.GetProperty("layout").ValueKind ==
+                        JsonValueKind.Null,
+                        "stopped live layout releases draft");
+                }
+
+                var legacyLayout = verticalLayout.Replace(
+                    ",\"liquidColor\":\"#336699\"," +
+                    "\"textColor\":\"#ffeecc\"," +
+                    "\"outlineColor\":\"#123456\"", string.Empty);
+                var legacyLayoutPreview = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"sessionId\":\"legacy-layout-editor\"," +
+                    "\"layoutJson\":" +
+                    JsonSerializer.Serialize(legacyLayout) + "}");
+                Equal(200, legacyLayoutPreview.StatusCode,
+                    "legacy colorless layout preview status");
+                using (var json = JsonDocument.Parse(
+                    legacyLayoutPreview.Json))
+                {
+                    var migrated = FindProfileComponent(
+                        json.RootElement.GetProperty("layout"),
+                        "tap_farming");
+                    Equal("default",
+                        migrated.GetProperty("variant").GetString(),
+                        "legacy tap layout migrates to the fixed presentation");
+                    False(migrated.GetProperty("showTitle").GetBoolean(),
+                        "legacy tap layout hides the old title");
+                    Equal("#ff4f92",
+                        migrated.GetProperty("liquidColor").GetString(),
+                        "legacy tap layout receives the new color default");
+                }
+                var stoppedLegacyLayout =
+                    controller.ProcessPreviewCommand(
+                        "{\"operation\":\"stop\"," +
+                        "\"profileId\":\"vertical\"," +
+                        "\"sessionId\":\"legacy-layout-editor\"}");
+                Equal(200, stoppedLegacyLayout.StatusCode,
+                    "legacy layout preview stop status");
+
+                var firstBattlePreview = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"horizontal\"," +
+                    "\"sessionId\":\"battle-editor-a\"," +
+                    "\"componentId\":\"pesky_battle\"}");
+                int firstBattleRevision;
+                int firstBattleRunId;
+                using (var json = JsonDocument.Parse(
+                    firstBattlePreview.Json))
+                {
+                    firstBattleRevision = json.RootElement
+                        .GetProperty("revision").GetInt32();
+                    firstBattleRunId = json.RootElement
+                        .GetProperty("runId").GetInt32();
+                }
+                var replacementPreview = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"start\"," +
+                    "\"profileId\":\"horizontal\"," +
+                    "\"sessionId\":\"battle-editor-b\"," +
+                    "\"componentId\":\"pesky_battle\"}");
+                int replacementRevision;
+                int replacementRunId;
+                using (var json = JsonDocument.Parse(
+                    replacementPreview.Json))
+                {
+                    replacementRevision = json.RootElement
+                        .GetProperty("revision").GetInt32();
+                    replacementRunId = json.RootElement
+                        .GetProperty("runId").GetInt32();
+                }
+                True(replacementRunId > firstBattleRunId,
+                    "replacement preview receives a new run id");
+                var staleStop = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"stop\"," +
+                    "\"profileId\":\"horizontal\"," +
+                    "\"sessionId\":\"battle-editor-a\"," +
+                    "\"expectedRevision\":" + firstBattleRevision + "}");
+                Equal(409, staleStop.StatusCode,
+                    "stale preview cannot stop replacement");
+                var stopped = controller.ProcessPreviewCommand(
+                    "{\"operation\":\"stop\"," +
+                    "\"profileId\":\"horizontal\"," +
+                    "\"sessionId\":\"battle-editor-b\"," +
+                    "\"expectedRevision\":" + replacementRevision + "}");
+                using (var json = JsonDocument.Parse(stopped.Json))
+                {
+                    False(json.RootElement
+                        .GetProperty("active").GetBoolean(),
+                        "stopped preview active flag");
+                    Equal("stopped", json.RootElement
+                        .GetProperty("feedback").GetString(),
+                        "stopped preview feedback");
+                }
+            }
+        }
+
+        private static JsonElement FindComposerComponent(
+            JsonElement root, string profileId, string componentId)
+        {
+            foreach (var profile in root.GetProperty("profiles")
+                         .EnumerateArray())
+            {
+                if (profile.GetProperty("id").GetString() != profileId)
+                    continue;
+                foreach (var component in profile
+                             .GetProperty("components").EnumerateArray())
+                    if (component.GetProperty("id").GetString() ==
+                        componentId)
+                        return component;
+            }
+            throw new InvalidOperationException(
+                "composer component was not found");
+        }
+
+        private static JsonElement FindProfileComponent(
+            JsonElement profile, string componentId)
+        {
+            foreach (var component in profile.GetProperty("components")
+                         .EnumerateArray())
+                if (component.GetProperty("id").GetString() == componentId)
+                    return component;
+            throw new InvalidOperationException(
+                "profile component was not found");
+        }
+
         private static void TestTikFinityLikePressureCoalescing()
         {
             using (var host = NewCompanionHost())
@@ -889,6 +1475,47 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private static JsonDocument PostJson(
+            CreatorToolsServer server,
+            string path,
+            string body,
+            out HttpStatusCode status)
+        {
+            using (var client = new HttpClient())
+            using (var content = new StringContent(
+                body, Encoding.UTF8, "application/json"))
+            using (var response = client.PostAsync(
+                "http://127.0.0.1:" +
+                server.Port.ToString(CultureInfo.InvariantCulture) + path,
+                content).GetAwaiter().GetResult())
+            {
+                status = response.StatusCode;
+                var text = response.Content.ReadAsStringAsync()
+                    .GetAwaiter().GetResult();
+                return JsonDocument.Parse(text);
+            }
+        }
+
+        private static HttpStatusCode PostStatus(
+            CreatorToolsServer server,
+            string path,
+            string body,
+            string contentType)
+        {
+            using (var client = new HttpClient())
+            using (var content = new StringContent(body, Encoding.UTF8))
+            {
+                content.Headers.ContentType =
+                    new System.Net.Http.Headers.MediaTypeHeaderValue(
+                        contentType);
+                using (var response = client.PostAsync(
+                    "http://127.0.0.1:" +
+                    server.Port.ToString(CultureInfo.InvariantCulture) +
+                    path, content).GetAwaiter().GetResult())
+                    return response.StatusCode;
+            }
+        }
+
         private static HttpStatusCode GetStatusCode(
             CreatorToolsServer server, string path)
         {
@@ -991,6 +1618,12 @@ namespace Gilomx.CupheadBossRoulette
                     "{\"catalogVersion\":\"runtime-test\"," +
                     "\"gifts\":[{\"giftId\":\"1\"," +
                     "\"name\":\"Rose\",\"coinsPerUnit\":1}]}");
+                File.WriteAllText(Path.Combine(
+                    assetsDirectory, "creator-tools", "live-overlay.html"),
+                    "<!doctype html><title>Live overlay</title>");
+                File.WriteAllText(Path.Combine(
+                    assetsDirectory, "creator-tools", "config.html"),
+                    "<!doctype html><title>Config</title>");
             }
 
             internal CreatorToolsStreamRulesController CreateRules(
@@ -1015,6 +1648,23 @@ namespace Gilomx.CupheadBossRoulette
                     throw new InvalidOperationException(
                         "test rule was not created: " + state);
                 return rules;
+            }
+
+            internal string ConfigDirectory
+            {
+                get { return configDirectory; }
+            }
+
+            internal CreatorToolsOverlayComposerController
+                CreateOverlayComposer(Func<DateTime> utcNow)
+            {
+                var configPath = Path.Combine(
+                    configDirectory, "plugin.cfg");
+                return utcNow == null
+                    ? new CreatorToolsOverlayComposerController(
+                        configPath, delegate(string ignored) { })
+                    : new CreatorToolsOverlayComposerController(
+                        configPath, delegate(string ignored) { }, utcNow);
             }
 
             internal CreatorToolsServer StartServer()
@@ -1046,6 +1696,16 @@ namespace Gilomx.CupheadBossRoulette
                 var port = ((IPEndPoint)listener.LocalEndpoint).Port;
                 listener.Stop();
                 return port;
+            }
+        }
+
+        private sealed class MutableClock
+        {
+            internal DateTime UtcNow;
+
+            internal MutableClock(DateTime utcNow)
+            {
+                UtcNow = utcNow;
             }
         }
 

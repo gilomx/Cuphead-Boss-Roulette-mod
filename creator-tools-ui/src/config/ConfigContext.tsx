@@ -54,8 +54,14 @@ interface ConfigValue {
   cancelPeskyBattle: () => void;
   disablePeskyBattle: () => void;
   resetPeskyBattle: () => void;
-  applyTapFarmingRate: (tapsPerHealthPoint: number) => void;
-  activateTapFarming: (tapsPerHealthPoint: number) => void;
+  applyTapFarmingRate: (
+    tapsPerConversion: number,
+    healthPointsPerConversion: number,
+  ) => void;
+  activateTapFarming: (
+    tapsPerConversion: number,
+    healthPointsPerConversion: number,
+  ) => void;
   deactivateTapFarming: () => void;
   resetTapFarming: () => void;
   saveStreamRule: (draft: StreamRuleDraft) => boolean;
@@ -139,6 +145,30 @@ function queryFor(draft: ForceDraft) {
     charm: String(draft.charm),
     modifier: String(draft.modifier),
   });
+}
+
+function normalizeTapFarmingConversionValue(
+  value: number | undefined,
+  fallback: number,
+) {
+  const candidate = Number.isFinite(value) ? Math.floor(value ?? fallback) : fallback;
+  return Math.max(1, Math.min(100000, candidate));
+}
+
+function normalizeTapFarmingConversion(
+  conversion: Partial<TapFarmingConfigState["conversion"]> | null | undefined,
+): TapFarmingConfigState["conversion"] {
+  return {
+    ...conversion,
+    tapsPerConversion: normalizeTapFarmingConversionValue(
+      conversion?.tapsPerConversion ?? conversion?.tapsPerHealthPoint,
+      2,
+    ),
+    healthPointsPerConversion: normalizeTapFarmingConversionValue(
+      conversion?.healthPointsPerConversion,
+      1,
+    ),
+  };
 }
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -229,7 +259,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const nextPesky = (await peskyResponse.json()) as PeskyModeConfigState;
       const nextPeskyBattle = (await peskyBattleResponse.json()) as PeskyBattleConfigState;
       const nextLiveEvents = (await liveEventsResponse.json()) as LiveEventsConfigState;
-      const nextTapFarming = (await tapFarmingResponse.json()) as TapFarmingConfigState;
+      const nextTapFarmingPayload = (await tapFarmingResponse.json()) as TapFarmingConfigState;
+      const nextTapFarming: TapFarmingConfigState = {
+        ...nextTapFarmingPayload,
+        conversion: normalizeTapFarmingConversion(nextTapFarmingPayload.conversion),
+      };
       const nextStreamRules = (await streamRulesResponse.json()) as StreamRulesConfigState;
       if (
         !mountedRef.current ||
@@ -1126,12 +1160,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const sendTapFarmingUpdate = useCallback(
     (
       operation: "activate" | "deactivate" | "finish" | "save",
-      tapsPerHealthPoint?: number,
+      tapsPerConversion?: number,
+      healthPointsPerConversion?: number,
     ) => {
       if (!tapFarming?.ready) return;
       const query = new URLSearchParams({ operation });
-      if (tapsPerHealthPoint !== undefined) {
-        query.set("tapsPerHealthPoint", String(tapsPerHealthPoint));
+      if (tapsPerConversion !== undefined) {
+        query.set("tapsPerConversion", String(tapsPerConversion));
+      }
+      if (healthPointsPerConversion !== undefined) {
+        query.set("healthPointsPerConversion", String(healthPointsPerConversion));
       }
       setStatus("saving");
       const send = () => fetch(
@@ -1156,32 +1194,52 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyTapFarmingRate = useCallback(
-    (value: number) => {
+    (tapsValue: number, healthValue: number) => {
       if (!tapFarming?.ready || tapFarming.phase !== "off") return;
-      const tapsPerHealthPoint = Math.max(1, Math.min(100000, Math.floor(value) || 1));
+      const tapsPerConversion = normalizeTapFarmingConversionValue(tapsValue, 1);
+      const healthPointsPerConversion = normalizeTapFarmingConversionValue(
+        healthValue,
+        1,
+      );
       setTapFarming((current) => current
         ? {
             ...current,
-            conversion: { ...current.conversion, tapsPerHealthPoint },
+            conversion: {
+              ...current.conversion,
+              tapsPerConversion,
+              healthPointsPerConversion,
+            },
             feedback: "settings_saved",
             error: false,
           }
         : current);
-      sendTapFarmingUpdate("save", tapsPerHealthPoint);
+      sendTapFarmingUpdate(
+        "save",
+        tapsPerConversion,
+        healthPointsPerConversion,
+      );
     },
     [sendTapFarmingUpdate, tapFarming],
   );
 
   const activateTapFarming = useCallback(
-    (value: number) => {
+    (tapsValue: number, healthValue: number) => {
       if (!tapFarming?.ready || tapFarming.phase !== "off" ||
           (liveEvents?.activeEvent && liveEvents.activeEvent !== "tap_farming")) return;
-      const tapsPerHealthPoint = Math.max(1, Math.min(100000, Math.floor(value) || 1));
+      const tapsPerConversion = normalizeTapFarmingConversionValue(tapsValue, 1);
+      const healthPointsPerConversion = normalizeTapFarmingConversionValue(
+        healthValue,
+        1,
+      );
       setTapFarming((current) => current
         ? {
             ...current,
             phase: "collecting",
-            conversion: { ...current.conversion, tapsPerHealthPoint },
+            conversion: {
+              ...current.conversion,
+              tapsPerConversion,
+              healthPointsPerConversion,
+            },
             feedback: "activated",
             error: false,
           }
@@ -1189,7 +1247,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       setLiveEvents((current) => current
         ? { ...current, activeEvent: "tap_farming" }
         : current);
-      sendTapFarmingUpdate("activate", tapsPerHealthPoint);
+      sendTapFarmingUpdate(
+        "activate",
+        tapsPerConversion,
+        healthPointsPerConversion,
+      );
     },
     [liveEvents, sendTapFarmingUpdate, tapFarming],
   );

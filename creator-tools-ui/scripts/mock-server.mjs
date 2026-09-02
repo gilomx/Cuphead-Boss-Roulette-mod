@@ -87,6 +87,20 @@ let peskyBattleDisabledItems = [];
 let peskyBattleFeedback = "ready";
 let peskyBattleError = false;
 let peskyBattleTargetLevel = "";
+let tapFarmingRevision = 1;
+let tapFarmingPhase = "off";
+let tapFarmingSessionId = 0;
+let tapFarmingAttempt = 0;
+let tapFarmingTapsPerConversion = 2;
+let tapFarmingHealthPointsPerConversion = 1;
+let tapFarmingFeedback = "ready";
+let tapFarmingError = false;
+let overlayComposerRevision = 1;
+const overlayComposerPreviews = new Map([
+  ["vertical", { profileId: "vertical", revision: 0, runId: 0, sessionId: "", active: false }],
+  ["horizontal", { profileId: "horizontal", revision: 0, runId: 0, sessionId: "", active: false }],
+]);
+const overlayComposerPreviewCancellations = new Map();
 let dashboardRevision = 1;
 let dashboardNextSequence = 1;
 const dashboardSessionId = "mock-session";
@@ -112,6 +126,147 @@ let dashboardEvents = [];
 let dashboardNextScheduleId = 1;
 const dashboardScheduledTimers = new Map();
 const dashboardMaximumScheduled = 1024;
+
+function defaultOverlayProfiles() {
+  return [
+    {
+      id: "vertical",
+      canvas: { width: 1080, height: 1920 },
+      components: [
+        {
+          id: "tap_farming",
+          x: 220,
+          y: 1010,
+          width: 640,
+          height: 720,
+          enabled: true,
+          locked: false,
+          layer: 20,
+          variant: "default",
+          showTitle: false,
+          showDetails: false,
+          motion: true,
+          liquidColor: "#ff4f92",
+          collectingColor: "#f4c95d",
+          textColor: "#ffffff",
+          outlineColor: "#f5f5f7",
+        },
+        {
+          id: "pesky_battle",
+          x: 60,
+          y: 1260,
+          width: 960,
+          height: 560,
+          enabled: true,
+          locked: false,
+          layer: 10,
+          variant: "default",
+          showTitle: true,
+          showDetails: true,
+          motion: true,
+          liquidColor: "#ff4f92",
+          collectingColor: "#f4c95d",
+          textColor: "#ffffff",
+          outlineColor: "#f5f5f7",
+        },
+      ],
+    },
+    {
+      id: "horizontal",
+      canvas: { width: 1920, height: 1080 },
+      components: [
+        {
+          id: "tap_farming",
+          x: 1290,
+          y: 430,
+          width: 570,
+          height: 570,
+          enabled: true,
+          locked: false,
+          layer: 20,
+          variant: "default",
+          showTitle: false,
+          showDetails: false,
+          motion: true,
+          liquidColor: "#ff4f92",
+          collectingColor: "#f4c95d",
+          textColor: "#ffffff",
+          outlineColor: "#f5f5f7",
+        },
+        {
+          id: "pesky_battle",
+          x: 80,
+          y: 720,
+          width: 1760,
+          height: 300,
+          enabled: true,
+          locked: false,
+          layer: 10,
+          variant: "default",
+          showTitle: true,
+          showDetails: true,
+          motion: true,
+          liquidColor: "#ff4f92",
+          collectingColor: "#f4c95d",
+          textColor: "#ffffff",
+          outlineColor: "#f5f5f7",
+        },
+      ],
+    },
+  ];
+}
+
+let overlayComposerProfiles = defaultOverlayProfiles();
+
+function overlayComposerState() {
+  return {
+    ready: true,
+    schemaVersion: 1,
+    revision: overlayComposerRevision,
+    profiles: overlayComposerProfiles,
+    feedback: "ready",
+    error: false,
+  };
+}
+
+function tapFarmingState() {
+  return {
+    ready: true,
+    schemaVersion: 2,
+    revision: tapFarmingRevision,
+    phase: tapFarmingPhase,
+    sessionId: tapFarmingSessionId,
+    attempt: tapFarmingAttempt,
+    enabled: tapFarmingPhase !== "off",
+    isLiveEventOwner: tapFarmingPhase !== "off",
+    blockedByLiveEvent: peskyBattleIsExclusive() ? "pesky_battle" : "",
+    gameplayAvailable: true,
+    levelId: "",
+    bossName: "",
+    conversion: {
+      tapsPerConversion: tapFarmingTapsPerConversion,
+      healthPointsPerConversion: tapFarmingHealthPointsPerConversion,
+      tapsPerHealthPoint:
+        tapFarmingTapsPerConversion / tapFarmingHealthPointsPerConversion,
+    },
+    counters: {
+      totalTaps: 0,
+      bankedTaps: 0,
+      unconvertedTaps: 0,
+      convertedHealth: 0,
+      reserveHealth: 0,
+      spentHealth: 0,
+    },
+    boss: { currentHealth: 0, totalHealth: 0, progress: 0 },
+    effectiveHealth: { available: false, current: 0, total: 0, ratio: 0 },
+    phaseIndex: 0,
+    phaseCount: 0,
+    overallProgress: 0,
+    phases: [],
+    feedback: tapFarmingFeedback,
+    error: tapFarmingError,
+  };
+}
 
 const interactionItems = [
   "hilda_green_zeppelin",
@@ -523,6 +678,138 @@ function json(res, body, status = 200) {
   res.end(value);
 }
 
+function readJsonBody(req, res, callback) {
+  const chunks = [];
+  let length = 0;
+  req.on("data", (chunk) => {
+    length += chunk.length;
+    if (length > 65536) {
+      json(res, { ok: false, error: "payload_too_large" }, 413);
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (res.writableEnded) return;
+    try {
+      const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+      callback(parsed && typeof parsed === "object" ? parsed : {});
+    } catch {
+      json(res, { ok: false, error: "invalid_json" }, 400);
+    }
+  });
+}
+
+function normalizeOverlayComponent(component, canvas) {
+  const minimumWidth = component.id === "pesky_battle" ? 320 : 220;
+  const minimumHeight = component.id === "pesky_battle" ? 180 : 220;
+  component.width = Math.max(
+    minimumWidth,
+    Math.min(canvas.width, Math.round(Number(component.width) || minimumWidth)),
+  );
+  component.height = Math.max(
+    minimumHeight,
+    Math.min(canvas.height, Math.round(Number(component.height) || minimumHeight)),
+  );
+  component.x = Math.max(
+    0,
+    Math.min(canvas.width - component.width, Math.round(Number(component.x) || 0)),
+  );
+  component.y = Math.max(
+    0,
+    Math.min(canvas.height - component.height, Math.round(Number(component.y) || 0)),
+  );
+  component.layer = Math.max(0, Math.min(100, Math.round(Number(component.layer) || 0)));
+  component.enabled = component.enabled !== false;
+  component.locked = component.locked === true;
+  component.showTitle = component.showTitle !== false;
+  component.showDetails = component.showDetails !== false;
+  component.motion = component.motion !== false;
+  component.variant = "default";
+  component.liquidColor = /^#[0-9a-fA-F]{6}$/.test(String(component.liquidColor ?? ""))
+    ? String(component.liquidColor).toLowerCase()
+    : "#ff4f92";
+  component.collectingColor = /^#[0-9a-fA-F]{6}$/.test(String(component.collectingColor ?? ""))
+    ? String(component.collectingColor).toLowerCase()
+    : "#f4c95d";
+  component.textColor = /^#[0-9a-fA-F]{6}$/.test(String(component.textColor ?? ""))
+    ? String(component.textColor).toLowerCase()
+    : "#ffffff";
+  component.outlineColor = /^#[0-9a-fA-F]{6}$/.test(String(component.outlineColor ?? ""))
+    ? String(component.outlineColor).toLowerCase()
+    : "#f5f5f7";
+}
+
+function applyOverlayComposerCommand(command, res) {
+  if (Number(command.schemaVersion ?? 1) !== 1) {
+    json(res, { ok: false, error: "unsupported_schema" }, 400);
+    return;
+  }
+  if (Number(command.expectedRevision) !== overlayComposerRevision) {
+    json(res, overlayComposerState(), 409);
+    return;
+  }
+  const operation = String(command.operation ?? "update");
+  const profile = overlayComposerProfiles.find((entry) => entry.id === command.profileId);
+  if (!profile) {
+    json(res, { ok: false, error: "unknown_profile" }, 400);
+    return;
+  }
+
+  if (operation === "reset") {
+    const defaults = defaultOverlayProfiles().find((entry) => entry.id === profile.id);
+    overlayComposerProfiles = overlayComposerProfiles.map((entry) =>
+      entry.id === profile.id ? defaults : entry);
+  } else if (operation === "copy") {
+    const source = overlayComposerProfiles.find((entry) => entry.id === command.sourceProfileId);
+    if (!source) {
+      json(res, { ok: false, error: "unknown_source_profile" }, 400);
+      return;
+    }
+    const copied = profile.components.map((target) => {
+      const sourceComponent = source.components.find((entry) => entry.id === target.id);
+      if (!sourceComponent) return target;
+      const next = {
+        ...sourceComponent,
+        x: Math.round(sourceComponent.x * profile.canvas.width / source.canvas.width),
+        y: Math.round(sourceComponent.y * profile.canvas.height / source.canvas.height),
+        width: Math.round(sourceComponent.width * profile.canvas.width / source.canvas.width),
+        height: Math.round(sourceComponent.height * profile.canvas.height / source.canvas.height),
+      };
+      normalizeOverlayComponent(next, profile.canvas);
+      return next;
+    });
+    profile.components = copied;
+  } else if (operation === "update") {
+    const component = profile.components.find((entry) => entry.id === command.componentId);
+    if (!component) {
+      json(res, { ok: false, error: "unknown_component" }, 400);
+      return;
+    }
+    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor"]) {
+      if (Object.prototype.hasOwnProperty.call(command, key) &&
+          !/^#[0-9a-fA-F]{6}$/.test(String(command[key] ?? ""))) {
+        json(res, { ok: false, error: "invalid_color" }, 400);
+        return;
+      }
+    }
+    for (const key of [
+      "x", "y", "width", "height", "enabled", "locked", "layer",
+      "variant", "showTitle", "showDetails", "motion",
+      "liquidColor", "collectingColor", "textColor", "outlineColor",
+    ]) {
+      if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];
+    }
+    normalizeOverlayComponent(component, profile.canvas);
+  } else {
+    json(res, { ok: false, error: "invalid_operation" }, 400);
+    return;
+  }
+  overlayComposerRevision += 1;
+  json(res, overlayComposerState());
+}
+
 function serveAsset(pathname, res) {
   const file = resolve(assetsRoot, pathname.slice("/assets/".length));
   if (!file.startsWith(assetsRoot) || !existsSync(file)) {
@@ -532,6 +819,16 @@ function serveAsset(pathname, res) {
   const extension = extname(file);
   const type = extension === ".png"
     ? "image/png"
+    : extension === ".webp"
+      ? "image/webp"
+      : extension === ".svg"
+        ? "image/svg+xml"
+        : extension === ".css"
+          ? "text/css; charset=utf-8"
+          : extension === ".js"
+            ? "text/javascript; charset=utf-8"
+            : extension === ".html"
+              ? "text/html; charset=utf-8"
     : extension === ".json"
       ? "application/json; charset=utf-8"
       : "application/octet-stream";
@@ -554,6 +851,65 @@ function serveCreatorToolFile(fileName, contentType, res) {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
+  if (url.pathname === "/config" || url.pathname.startsWith("/config/")) {
+    serveCreatorToolFile(
+      "config.html",
+      "text/html; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if (url.pathname === "/config.js" || url.pathname === "/config.css") {
+    serveCreatorToolFile(
+      url.pathname.slice(1),
+      url.pathname.endsWith(".js")
+        ? "text/javascript; charset=utf-8"
+        : "text/css; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if ([
+    "/overlay/vertical",
+    "/overlay/horizontal",
+    "/live-overlay",
+    "/live-overlay/",
+  ].includes(url.pathname)) {
+    serveCreatorToolFile(
+      "live-overlay.html",
+      "text/html; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if ([
+    "/tap-farming-overlay",
+    "/tap-farming-overlay/",
+    "/tap-farming-overlay.html",
+  ].includes(url.pathname)) {
+    serveCreatorToolFile(
+      "tap-farming-overlay.html",
+      "text/html; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if (url.pathname === "/tap-farming-overlay.css") {
+    serveCreatorToolFile(
+      "tap-farming-overlay.css",
+      "text/css; charset=utf-8",
+      res,
+    );
+    return;
+  }
+  if (url.pathname === "/tap-farming-overlay.js") {
+    serveCreatorToolFile(
+      "tap-farming-overlay.js",
+      "text/javascript; charset=utf-8",
+      res,
+    );
+    return;
+  }
   if ([
     "/pesky-battle-overlay",
     "/pesky-battle-overlay/",
@@ -580,6 +936,227 @@ createServer((req, res) => {
       "text/javascript; charset=utf-8",
       res,
     );
+    return;
+  }
+  if (url.pathname === "/api/overlay-composer/config") {
+    json(res, overlayComposerState());
+    return;
+  }
+  if (url.pathname === "/api/overlay-composer/config/set") {
+    if (req.method !== "POST") {
+      json(res, { ok: false, error: "method_not_allowed" }, 405);
+      return;
+    }
+    readJsonBody(req, res, (command) => applyOverlayComposerCommand(command, res));
+    return;
+  }
+  if (url.pathname === "/api/overlay-composer/preview") {
+    const profileId = url.searchParams.get("profile") ?? "horizontal";
+    let preview = overlayComposerPreviews.get(profileId);
+    if (!preview) {
+      preview = { profileId, revision: 0, active: false };
+      overlayComposerPreviews.set(profileId, preview);
+    }
+    if (preview.active && preview.expiresAt <= Date.now()) {
+      preview = {
+        ...preview,
+        revision: preview.revision + 1,
+        active: false,
+        expiresAt: 0,
+        feedback: "expired",
+      };
+      overlayComposerPreviews.set(profileId, preview);
+    }
+    if (!preview.active) {
+      json(res, {
+        ready: true,
+        schemaVersion: 1,
+        revision: preview.revision,
+        runId: preview.runId ?? 0,
+        active: false,
+        simulationActive: false,
+        layout: null,
+        profileId,
+        sessionId: preview.sessionId ?? "",
+        componentId: "",
+        scenario: "",
+        expiresAtUtc: null,
+        feedback: preview.feedback ?? "ready",
+        error: false,
+      });
+      return;
+    }
+    json(res, {
+      ready: true,
+      schemaVersion: 1,
+      revision: preview.revision,
+      runId: preview.runId ?? 0,
+      active: true,
+      simulationActive: preview.simulationActive === true,
+      layout: preview.layout ?? null,
+      profileId,
+      sessionId: preview.sessionId ?? "",
+      componentId: preview.componentId,
+      scenario: preview.scenario,
+      expiresAtUtc: new Date(preview.expiresAt).toISOString(),
+      totalTaps: Number(preview.totalTaps) || 0,
+      tapDelta: Number(preview.tapDelta) || 0,
+      damageDelta: Number(preview.damageDelta) || 0,
+      reserveHealth: Number(preview.reserveHealth) || 0,
+      spentHealth: Number(preview.spentHealth) || 0,
+      currentHealth: Number(preview.currentHealth) || 0,
+      totalHealth: Number(preview.totalHealth) || 0,
+      overallProgress: Number(preview.overallProgress) || 0,
+      phaseIndex: Number(preview.phaseIndex) || 0,
+      phaseCount: Number(preview.phaseCount) || 0,
+      attempt: Number(preview.attempt) || 0,
+      participantCount: Number(preview.participantCount) || 0,
+      capacity: Number(preview.capacity) || 5,
+      feedback: "preview_active",
+      error: false,
+    });
+    return;
+  }
+  if (url.pathname === "/api/overlay-composer/preview/set") {
+    if (req.method !== "POST") {
+      json(res, { ok: false, error: "method_not_allowed" }, 405);
+      return;
+    }
+    readJsonBody(req, res, (command) => {
+      const profileId = String(command.profileId ?? "");
+      if (!["vertical", "horizontal"].includes(profileId)) {
+        json(res, { ok: false, error: "unknown_profile" }, 400);
+        return;
+      }
+      const current = overlayComposerPreviews.get(profileId) ?? {
+        profileId,
+        revision: 0,
+        runId: 0,
+        sessionId: "",
+        active: false,
+      };
+      const sessionId = String(command.sessionId ?? "").trim().toLowerCase();
+      if (!/^[a-z0-9_-]{1,96}$/.test(sessionId)) {
+        json(res, { ok: false, error: "invalid_preview_session" }, 400);
+        return;
+      }
+      const cancellationKey = `${profileId}\n${sessionId}`;
+      for (const [key, expiresAt] of overlayComposerPreviewCancellations) {
+        if (expiresAt <= Date.now()) overlayComposerPreviewCancellations.delete(key);
+      }
+      if (command.operation === "start" &&
+          overlayComposerPreviewCancellations.has(cancellationKey)) {
+        json(res, {
+          ready: true,
+          active: current.active,
+          revision: current.revision,
+          sessionId: current.sessionId ?? "",
+          componentId: current.componentId ?? "",
+          feedback: "preview_session_cancelled",
+          error: true,
+        }, 409);
+        return;
+      }
+      if (command.operation !== "start" && sessionId !== current.sessionId) {
+        overlayComposerPreviewCancellations.set(
+          cancellationKey,
+          Date.now() + 2 * 60 * 1000,
+        );
+        json(res, {
+          ready: true,
+          active: current.active,
+          revision: current.revision,
+          sessionId: current.sessionId ?? "",
+          componentId: current.componentId ?? "",
+          feedback: "preview_session_conflict",
+          error: true,
+        }, 409);
+        return;
+      }
+      if (command.expectedRevision !== undefined &&
+          Number(command.expectedRevision) !== current.revision) {
+        json(res, {
+          ready: true,
+          active: current.active,
+          revision: current.revision,
+          sessionId: current.sessionId ?? "",
+          componentId: current.componentId ?? "",
+          feedback: "revision_conflict",
+          error: true,
+        }, 409);
+        return;
+      }
+      if (command.operation === "stop") {
+        overlayComposerPreviewCancellations.set(
+          cancellationKey,
+          Date.now() + 2 * 60 * 1000,
+        );
+        const stopped = {
+          ...current,
+          active: false,
+          revision: current.revision + 1,
+          expiresAt: 0,
+          feedback: "stopped",
+        };
+        overlayComposerPreviews.set(profileId, stopped);
+        json(res, {
+          ok: true,
+          active: false,
+          revision: stopped.revision,
+          sessionId: stopped.sessionId,
+        });
+        return;
+      }
+      if (!["tap_farming", "pesky_battle"].includes(command.componentId)) {
+        json(res, { ok: false, error: "unknown_component" }, 400);
+        return;
+      }
+      let layout;
+      try {
+        layout = JSON.parse(String(command.layoutJson ?? ""));
+      } catch {
+        layout = null;
+      }
+      if (!layout || layout.id !== profileId ||
+          !Array.isArray(layout.components) || layout.components.length !== 2) {
+        json(res, { ok: false, error: "invalid_preview_layout" }, 400);
+        return;
+      }
+      if (command.operation === "update" && !current.active) {
+        json(res, {
+          ready: true,
+          active: false,
+          revision: current.revision,
+          sessionId: current.sessionId ?? "",
+          componentId: current.componentId ?? "",
+          feedback: "preview_not_active",
+          error: true,
+        }, 409);
+        return;
+      }
+      const next = {
+        ...current,
+        ...command,
+        simulationActive: command.simulationActive === true,
+        layout,
+        sessionId,
+        active: true,
+        revision: current.revision + 1,
+        runId: command.operation === "start"
+          ? (current.runId ?? 0) + 1
+          : current.runId ?? 0,
+        expiresAt: Date.now() + 2 * 60 * 1000,
+      };
+      overlayComposerPreviews.set(profileId, next);
+      json(res, {
+        ok: true,
+        active: true,
+        revision: next.revision,
+        runId: next.runId,
+        sessionId: next.sessionId,
+        expiresAtUtc: new Date(next.expiresAt).toISOString(),
+      });
+    });
     return;
   }
   if (url.pathname === "/api/dashboard") {
@@ -810,6 +1387,80 @@ createServer((req, res) => {
     interactionFeedback = nextFeedback;
     interactionRevision += 1;
     json(res, { ok: true }, 202);
+    return;
+  }
+  if (url.pathname === "/api/config/live-events") {
+    const activeEvent = tapFarmingPhase !== "off"
+      ? "tap_farming"
+      : peskyBattleIsExclusive()
+        ? "pesky_battle"
+        : "";
+    json(res, {
+      ready: true,
+      schemaVersion: 1,
+      revision: tapFarmingRevision + peskyBattleRevision,
+      activeEvent,
+      status: activeEvent ? "active" : "idle",
+      stoppingEvent: "",
+      feedback: "ready",
+      error: false,
+    });
+    return;
+  }
+  if (url.pathname === "/api/config/tap-farming") {
+    json(res, tapFarmingState());
+    return;
+  }
+  if (url.pathname === "/api/config/tap-farming/set") {
+    const action = (url.searchParams.get("operation") ??
+      url.searchParams.get("action") ?? "").trim().toLowerCase();
+    const hasCanonicalTaps = url.searchParams.has("tapsPerConversion");
+    const hasCanonicalHealth = url.searchParams.has("healthPointsPerConversion");
+    const hasLegacyRate = url.searchParams.has("tapsPerHealthPoint");
+    const tapsPerConversion = Number(hasCanonicalTaps
+      ? url.searchParams.get("tapsPerConversion")
+      : hasLegacyRate
+        ? url.searchParams.get("tapsPerHealthPoint")
+        : tapFarmingTapsPerConversion);
+    const healthPointsPerConversion = Number(hasCanonicalHealth
+      ? url.searchParams.get("healthPointsPerConversion")
+      : hasLegacyRate && !hasCanonicalTaps && !hasCanonicalHealth
+        ? 1
+        : tapFarmingHealthPointsPerConversion);
+    const validConversion = Number.isInteger(tapsPerConversion) &&
+      tapsPerConversion >= 1 && tapsPerConversion <= 100000 &&
+      Number.isInteger(healthPointsPerConversion) &&
+      healthPointsPerConversion >= 1 && healthPointsPerConversion <= 100000;
+    tapFarmingError = false;
+    if (!validConversion) {
+      tapFarmingFeedback = "invalid_taps_per_health_point";
+      tapFarmingError = true;
+      tapFarmingRevision += 1;
+      json(res, tapFarmingState(), 202);
+      return;
+    }
+    if (tapFarmingPhase === "off") {
+      tapFarmingTapsPerConversion = tapsPerConversion;
+      tapFarmingHealthPointsPerConversion = healthPointsPerConversion;
+      tapFarmingFeedback = "settings_saved";
+    }
+    if (["activate", "arm", "start"].includes(action)) {
+      if (peskyBattleIsExclusive()) {
+        tapFarmingFeedback = "blocked_by_live_event";
+        tapFarmingError = true;
+      } else {
+        tapFarmingSessionId += 1;
+        tapFarmingAttempt = 0;
+        tapFarmingPhase = "collecting";
+        tapFarmingFeedback = "tap_farming_activated";
+      }
+    } else if (["deactivate", "disable", "off", "cancel", "finish", "reset"].includes(action)) {
+      tapFarmingPhase = "off";
+      tapFarmingAttempt = 0;
+      tapFarmingFeedback = "tap_farming_deactivated";
+    }
+    tapFarmingRevision += 1;
+    json(res, tapFarmingState(), 202);
     return;
   }
   if (url.pathname === "/api/config/pesky-battle") {

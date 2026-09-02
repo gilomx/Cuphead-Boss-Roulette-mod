@@ -1,7 +1,6 @@
 import {
   Activity,
   AlertTriangle,
-  Copy,
   HeartPulse,
   Layers3,
   MousePointerClick,
@@ -10,7 +9,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 
-const RATE_PRESETS = [1, 2, 5] as const;
+const CONVERSION_PRESETS = [
+  { taps: 1, healthPoints: 1 },
+  { taps: 2, healthPoints: 1 },
+  { taps: 5, healthPoints: 1 },
+  { taps: 1, healthPoints: 2 },
+] as const;
+
+function normalizeConversionValue(value: number | undefined, fallback = 1) {
+  const candidate = Number.isFinite(value) ? Math.floor(value ?? fallback) : fallback;
+  return Math.max(1, Math.min(100000, candidate));
+}
 
 function normalized(value: number | undefined) {
   return Number.isFinite(value) ? Math.max(0, value ?? 0) : 0;
@@ -26,21 +35,33 @@ export function TapFarmingPanel() {
     resetTapFarming,
   } = useConfig();
   const { locale, t } = useLocalization();
-  const configuredRate = Math.max(
-    1,
-    Math.floor(tapFarming?.conversion?.tapsPerHealthPoint ?? 2),
+  const configuredTapsPerConversion = normalizeConversionValue(
+    tapFarming?.conversion?.tapsPerConversion ??
+      tapFarming?.conversion?.tapsPerHealthPoint,
+    2,
   );
-  const [rateDraft, setRateDraft] = useState(configuredRate);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
+  const configuredHealthPointsPerConversion = normalizeConversionValue(
+    tapFarming?.conversion?.healthPointsPerConversion,
+    1,
+  );
+  const [tapsDraft, setTapsDraft] = useState(configuredTapsPerConversion);
+  const [healthPointsDraft, setHealthPointsDraft] = useState(
+    configuredHealthPointsPerConversion,
+  );
   const phase = tapFarming?.phase ?? "off";
   const locked = phase !== "off";
   const blockedByPeskyBattle = liveEvents?.activeEvent === "pesky_battle";
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
 
-  useEffect(() => setRateDraft(configuredRate), [configuredRate]);
   useEffect(() => {
-    if (locked) setRateDraft(configuredRate);
-  }, [configuredRate, locked]);
+    setTapsDraft(configuredTapsPerConversion);
+    setHealthPointsDraft(configuredHealthPointsPerConversion);
+  }, [configuredHealthPointsPerConversion, configuredTapsPerConversion]);
+  useEffect(() => {
+    if (!locked) return;
+    setTapsDraft(configuredTapsPerConversion);
+    setHealthPointsDraft(configuredHealthPointsPerConversion);
+  }, [configuredHealthPointsPerConversion, configuredTapsPerConversion, locked]);
 
   const counters = tapFarming?.counters;
   const totalTaps = normalized(counters?.totalTaps);
@@ -50,10 +71,30 @@ export function TapFarmingPanel() {
   const spentHealth = normalized(counters?.spentHealth);
   const phaseIndex = Math.max(0, Math.floor(tapFarming?.phaseIndex ?? 0));
   const phaseCount = Math.max(0, Math.floor(tapFarming?.phaseCount ?? 0));
-  const overallProgress = Math.min(1, Math.max(0, tapFarming?.overallProgress ?? 0));
   const bossTotalHealth = normalized(tapFarming?.boss?.totalHealth);
+  const effectiveHealth = tapFarming?.effectiveHealth;
+  const healthAvailable = effectiveHealth?.available ?? (
+    (phase === "active" || phase === "transition" || phase === "completed") &&
+    bossTotalHealth > 0
+  );
+  const effectiveCurrent = healthAvailable
+    ? normalized(effectiveHealth?.current ?? tapFarming?.boss?.currentHealth)
+    : reserveHealth;
+  const effectiveTotal = healthAvailable
+    ? normalized(effectiveHealth?.total ?? bossTotalHealth)
+    : 0;
+  const healthRatio = healthAvailable && effectiveTotal > 0
+    ? Math.min(1, Math.max(0, effectiveHealth?.ratio ?? effectiveCurrent / effectiveTotal))
+    : 0;
+  const healthPercent = Math.round(healthRatio * 100);
+  const healthMetric = healthAvailable
+    ? `${healthPercent}%`
+    : `+${reserveHealth.toLocaleString(numberLocale)} ${t("dashboard.tapFarming.progress.healthPointsShort")}`;
   const reserveEquivalent = bossTotalHealth > 0 ? reserveHealth / bossTotalHealth : 0;
-  const reserveDescription = reserveEquivalent >= 1
+  const reserveDescription = !healthAvailable
+    ? t("dashboard.tapFarming.progress.collected")
+      .replace("{value}", reserveHealth.toLocaleString(numberLocale))
+    : reserveEquivalent >= 1
     ? t("dashboard.tapFarming.progress.reserveEquivalent")
       .replace("{value}", reserveEquivalent.toLocaleString(numberLocale, {
         maximumSignificantDigits: 3,
@@ -77,24 +118,12 @@ export function TapFarmingPanel() {
     return t(`dashboard.tapFarming.phaseDescription.${phase}`);
   }, [phase, phaseCount, phaseIndex, t, tapFarming?.bossName]);
 
-  const copyOverlayUrl = async () => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
-      const localeQuery = locale === "en" ? "?locale=en" : "";
-      await navigator.clipboard.writeText(
-        `${window.location.origin}/tap-farming-overlay${localeQuery}`,
-      );
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("error");
-    }
-    window.setTimeout(() => setCopyStatus("idle"), 2600);
-  };
-
-  const saveRate = (value: number) => {
-    const next = Math.max(1, Math.min(100000, Math.floor(value) || 1));
-    setRateDraft(next);
-    applyTapFarmingRate(next);
+  const saveConversion = (tapsValue: number, healthPointsValue: number) => {
+    const nextTaps = normalizeConversionValue(tapsValue);
+    const nextHealthPoints = normalizeConversionValue(healthPointsValue);
+    setTapsDraft(nextTaps);
+    setHealthPointsDraft(nextHealthPoints);
+    applyTapFarmingRate(nextTaps, nextHealthPoints);
   };
 
   return (
@@ -116,14 +145,6 @@ export function TapFarmingPanel() {
           <span className="dashboard-pesky-battle__status" data-phase={phase}>
             {t(`dashboard.tapFarming.phase.${phase}`)}
           </span>
-          <button
-            className="dashboard-pesky-battle__copy"
-            type="button"
-            onClick={() => void copyOverlayUrl()}
-          >
-            <Copy aria-hidden="true" />
-            {t(`dashboard.peskyBattle.overlay.${copyStatus}`)}
-          </button>
         </div>
       </header>
 
@@ -149,42 +170,76 @@ export function TapFarmingPanel() {
             <p>{t("dashboard.tapFarming.conversion.description")}</p>
           </div>
           <div className="dashboard-tap-farming__rate-presets">
-            {RATE_PRESETS.map((rate) => (
-              <button
-                type="button"
-                data-active={rateDraft === rate}
-                aria-pressed={rateDraft === rate}
-                disabled={locked || !tapFarming?.ready}
-                key={rate}
-                onClick={() => saveRate(rate)}
-              >
-                <strong>{rate}</strong>
-                <span>{t(rate === 1
-                  ? "dashboard.tapFarming.conversion.presetSingular"
-                  : "dashboard.tapFarming.conversion.preset")}</span>
-              </button>
-            ))}
+            {CONVERSION_PRESETS.map((preset) => {
+              const active = tapsDraft === preset.taps &&
+                healthPointsDraft === preset.healthPoints;
+              const label = t("dashboard.tapFarming.conversion.equation")
+                .replace("{taps}", String(preset.taps))
+                .replace("{health}", String(preset.healthPoints));
+              return (
+                <button
+                  type="button"
+                  data-active={active}
+                  aria-label={label}
+                  aria-pressed={active}
+                  disabled={locked || !tapFarming?.ready}
+                  key={`${preset.taps}-${preset.healthPoints}`}
+                  onClick={() => saveConversion(preset.taps, preset.healthPoints)}
+                >
+                  <strong>{preset.taps} → +{preset.healthPoints}</strong>
+                  <span>{t("dashboard.tapFarming.conversion.preset")}</span>
+                </button>
+              );
+            })}
           </div>
-          <label className="dashboard-tap-farming__custom-rate">
-            <span>{t("dashboard.tapFarming.conversion.custom")}</span>
-            <input
-              type="number"
-              min="1"
-              max="100000"
-              step="1"
-              value={rateDraft}
-              disabled={locked || !tapFarming?.ready}
-              onChange={(event) => setRateDraft(Math.max(1, Number(event.target.value) || 1))}
-              onBlur={() => saveRate(rateDraft)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-              }}
-            />
-          </label>
-          <div className="dashboard-tap-farming__equation">
+          <div
+            className="dashboard-tap-farming__equation"
+            role="group"
+            aria-label={t("dashboard.tapFarming.conversion.custom")}
+            onBlur={(event) => {
+              const nextTarget = event.relatedTarget;
+              if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+                return;
+              }
+              saveConversion(tapsDraft, healthPointsDraft);
+            }}
+          >
             <MousePointerClick aria-hidden="true" />
-            <span>{t("dashboard.tapFarming.conversion.equation")
-              .replace("{taps}", rateDraft.toLocaleString(numberLocale))}</span>
+            <div className="dashboard-tap-farming__equation-fields">
+              <span>{t("dashboard.tapFarming.conversion.every")}</span>
+              <input
+                type="number"
+                min="1"
+                max="100000"
+                step="1"
+                value={tapsDraft}
+                aria-label={t("dashboard.tapFarming.conversion.tapsInput")}
+                disabled={locked || !tapFarming?.ready}
+                onChange={(event) => setTapsDraft(
+                  normalizeConversionValue(Number(event.target.value)),
+                )}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+              />
+              <span>{t("dashboard.tapFarming.conversion.tapsAdd")}</span>
+              <input
+                type="number"
+                min="1"
+                max="100000"
+                step="1"
+                value={healthPointsDraft}
+                aria-label={t("dashboard.tapFarming.conversion.healthInput")}
+                disabled={locked || !tapFarming?.ready}
+                onChange={(event) => setHealthPointsDraft(
+                  normalizeConversionValue(Number(event.target.value)),
+                )}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+              />
+              <span>{t("dashboard.tapFarming.conversion.healthPoints")}</span>
+            </div>
             <HeartPulse aria-hidden="true" />
           </div>
           <small>{t(locked
@@ -203,21 +258,22 @@ export function TapFarmingPanel() {
                   .replace("{count}", String(phaseCount))
                 : t("dashboard.tapFarming.progress.noBoss")}</small>
             </div>
-            <span>{Math.round(overallProgress * 100)}%</span>
+            <span data-mode={healthAvailable ? "percent" : "points"}>{healthMetric}</span>
           </div>
 
           <div
             className="dashboard-tap-farming__battle-progress"
-            role="progressbar"
-            aria-label={t("dashboard.tapFarming.progress.battle")}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(overallProgress * 100)}
+            data-mode={healthAvailable ? "percent" : "points"}
+            role={healthAvailable ? "progressbar" : "status"}
+            aria-label={healthAvailable
+              ? t("dashboard.tapFarming.progress.battle")
+              : t("dashboard.tapFarming.progress.collected")
+                .replace("{value}", reserveHealth.toLocaleString(numberLocale))}
+            aria-valuemin={healthAvailable ? 0 : undefined}
+            aria-valuemax={healthAvailable ? 100 : undefined}
+            aria-valuenow={healthAvailable ? healthPercent : undefined}
           >
-            <i style={{ width: `${overallProgress * 100}%` }} />
-            {Array.from({ length: Math.max(0, phaseCount - 1) }, (_, index) => (
-              <b key={index} style={{ left: `${(index + 1) / phaseCount * 100}%` }} />
-            ))}
+            <i style={{ width: `${healthRatio * 100}%` }} />
           </div>
 
           <div className="dashboard-tap-farming__counter-grid">
@@ -265,7 +321,7 @@ export function TapFarmingPanel() {
               className="dashboard-pesky-battle__primary"
               type="button"
               disabled={!tapFarming?.ready || blockedByPeskyBattle}
-              onClick={() => activateTapFarming(rateDraft)}
+              onClick={() => activateTapFarming(tapsDraft, healthPointsDraft)}
             >
               {t("dashboard.tapFarming.actions.activate")}
             </button>

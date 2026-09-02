@@ -8,6 +8,8 @@ interface AppShellProps {
   activeSection: ConfigSection;
   children: ReactNode;
   currentSection?: ConfigSection | null;
+  workspace?: boolean;
+  onOpenOverlays: () => void;
   onSectionChange: (section: ConfigSection) => void;
 }
 
@@ -15,6 +17,8 @@ export function AppShell({
   activeSection,
   children,
   currentSection = activeSection,
+  workspace = false,
+  onOpenOverlays,
   onSectionChange,
 }: AppShellProps) {
   const { locale, setLocale, t } = useLocalization();
@@ -22,7 +26,7 @@ export function AppShell({
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-workspace={workspace}>
       <div className="locale-switch locale-switch--floating" aria-label={t("app.language")}>
         <button type="button" data-active={locale === "es"} aria-pressed={locale === "es"} onClick={() => setLocale("es")}>
           ES
@@ -66,6 +70,13 @@ export function AppShell({
             {t("nav.interactions")}
           </button>
           <button
+            className="sidebar__item"
+            type="button"
+            onClick={onOpenOverlays}
+          >
+            {t("nav.overlays")}
+          </button>
+          <button
             className={`sidebar__item${activeSection === "pesky" ? " sidebar__item--active" : ""}`}
             type="button"
             aria-current={currentSection === "pesky" ? "page" : undefined}
@@ -88,7 +99,7 @@ export function AppShell({
           </p>
         </div>
       </aside>
-      <main className="main-content">{children}</main>
+      <main className="main-content" data-workspace={workspace}>{children}</main>
     </div>
   );
 }

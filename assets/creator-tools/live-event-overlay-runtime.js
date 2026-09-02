@@ -13,6 +13,14 @@
       mode === "preview";
   };
 
+  const embeddedRequested = () => {
+    const query = new URLSearchParams(window.location.search);
+    const embedded = String(query.get("embedded") || "").trim().toLowerCase();
+    const mode = String(query.get("mode") || "").trim().toLowerCase();
+    return embedded === "1" || embedded === "true" || embedded === "on" ||
+      mode === "embedded";
+  };
+
   const sameParentOrigin = (event) => {
     if (event.source !== window.parent) return false;
     const ownOrigin = window.location.origin;
@@ -33,21 +41,26 @@
     }
 
     const preview = previewRequested();
+    // Preview retains its original semantics when both flags are present.
+    // Embedded is the compositor bridge: the parent owns transport but the
+    // widget must still render as live output (no preview-only badges).
+    const embedded = !preview && embeddedRequested();
+    const mode = preview ? "preview" : embedded ? "embedded" : "live";
     let requestPending = false;
     let lastRevision = null;
     let timer = 0;
     let disposed = false;
 
-    document.documentElement.dataset.overlayMode = preview ? "preview" : "live";
-    document.body.dataset.overlayMode = preview ? "preview" : "live";
+    document.documentElement.dataset.overlayMode = mode;
+    document.body.dataset.overlayMode = mode;
 
     const draw = (state) => {
       if (disposed || !state || typeof state !== "object") return;
-      render(state, { preview });
+      render(state, { preview, embedded, mode });
     };
 
     const refresh = async () => {
-      if (preview || requestPending || disposed || !endpoint) return;
+      if (mode !== "live" || requestPending || disposed || !endpoint) return;
       requestPending = true;
       try {
         const response = await fetch(endpoint, { cache: "no-store" });
@@ -66,7 +79,8 @@
     };
 
     const receivePreview = (event) => {
-      if (!preview || !sameParentOrigin(event)) return;
+      if ((mode !== "preview" && mode !== "embedded") ||
+          !sameParentOrigin(event)) return;
       const message = event.data;
       if (!message || typeof message !== "object" ||
           message.type !== PREVIEW_MESSAGE ||
@@ -77,12 +91,14 @@
     };
 
     const announceReady = () => {
-      if (!preview || window.parent === window) return;
+      if ((mode !== "preview" && mode !== "embedded") ||
+          window.parent === window) return;
       const ownOrigin = window.location.origin;
       window.parent.postMessage({
         type: PREVIEW_READY_MESSAGE,
         version: MESSAGE_VERSION,
         overlay,
+        mode,
       }, ownOrigin === "null" ? "*" : ownOrigin);
     };
 
@@ -94,8 +110,8 @@
     };
 
     window.addEventListener("pagehide", dispose, { once: true });
-    if (preview) {
-      draw(initialPreviewState);
+    if (mode === "preview" || mode === "embedded") {
+      draw(mode === "preview" ? initialPreviewState : initialLiveState);
       window.addEventListener("message", receivePreview);
       announceReady();
     } else {
@@ -104,7 +120,7 @@
       timer = window.setInterval(refresh, Math.max(250, Number(interval) || 500));
     }
 
-    return Object.freeze({ preview, refresh, dispose, draw });
+    return Object.freeze({ preview, embedded, mode, refresh, dispose, draw });
   };
 
   window.LiveEventOverlayRuntime = Object.freeze({

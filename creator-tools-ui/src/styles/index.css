@@ -3589,7 +3589,7 @@ textarea:focus-visible {
 
 .dashboard-tap-farming__rate-presets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.42rem;
 }
 
@@ -3661,6 +3661,33 @@ textarea:focus-visible {
   color: #73dec4;
 }
 
+.dashboard-tap-farming__equation-fields {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.dashboard-tap-farming__equation-fields input {
+  width: 4.5rem;
+  min-height: 2.2rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgb(116 222 196 / 32%);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  font: inherit;
+  text-align: center;
+  background: var(--color-control);
+}
+
+.dashboard-tap-farming__equation-fields input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .dashboard-tap-farming__progress-panel {
   display: grid;
   align-content: start;
@@ -3704,6 +3731,10 @@ textarea:focus-visible {
   font-weight: 900;
 }
 
+.dashboard-tap-farming__boss-heading > span[data-mode="points"] {
+  color: #f4c95d;
+}
+
 .dashboard-tap-farming__battle-progress {
   position: relative;
   height: 0.75rem;
@@ -3720,14 +3751,6 @@ textarea:focus-visible {
   background: linear-gradient(90deg, #44bba4, #8aeacb);
   box-shadow: 0 0 1rem rgb(116 222 196 / 42%);
   transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.dashboard-tap-farming__battle-progress b {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgb(5 16 19 / 62%);
 }
 
 .dashboard-tap-farming__counter-grid {
@@ -4791,7 +4814,7 @@ textarea:focus-visible {
   .dashboard-pesky-battle__actions button { width: 100%; }
   .dashboard-live-event-conflict { margin-inline: 1rem; }
   .dashboard-tap-farming__rate-presets {
-    grid-template-columns: repeat(3, minmax(4.5rem, 1fr));
+    grid-template-columns: repeat(4, minmax(4.5rem, 1fr));
     overflow-x: auto;
   }
   .live-overlay-preview__heading { padding: 1rem; }

@@ -8,15 +8,18 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsTapFarmingSettings
     {
-        private const int CurrentVersion = 1;
-        internal const int DefaultTapsPerHealthPoint = 2;
-        internal const int MinimumTapsPerHealthPoint = 1;
-        internal const int MaximumTapsPerHealthPoint = 100000;
+        private const int CurrentVersion = 2;
+        internal const int DefaultTapsPerConversion = 2;
+        internal const int DefaultHealthPointsPerConversion = 1;
+        internal const int MinimumConversionValue = 1;
+        internal const int MaximumConversionValue = 100000;
 
         private readonly string path;
         private readonly Action<string> logWarning;
 
-        internal int TapsPerHealthPoint = DefaultTapsPerHealthPoint;
+        internal int TapsPerConversion = DefaultTapsPerConversion;
+        internal int HealthPointsPerConversion =
+            DefaultHealthPointsPerConversion;
 
         private CreatorToolsTapFarmingSettings(
             string path, Action<string> logWarning)
@@ -39,9 +42,14 @@ namespace Gilomx.CupheadBossRoulette
                 Path.Combine(directory,
                     "mx.gilomx.cuphead.bossroulette.tap-farming.json"),
                 logWarning);
-            if (settings.TryLoad(settings.path))
+            bool migrated;
+            if (settings.TryLoad(settings.path, out migrated))
+            {
+                if (migrated)
+                    settings.Save();
                 return settings;
-            if (settings.TryLoad(settings.path + ".bak"))
+            }
+            if (settings.TryLoad(settings.path + ".bak", out migrated))
             {
                 settings.Warn(
                     "La configuracion de Farmeando taps se recupero " +
@@ -57,9 +65,13 @@ namespace Gilomx.CupheadBossRoulette
             return settings;
         }
 
-        internal void SetTapsPerHealthPoint(int value)
+        internal void SetConversion(
+            int tapsPerConversion, int healthPointsPerConversion)
         {
-            TapsPerHealthPoint = NormalizeTapsPerHealthPoint(value);
+            TapsPerConversion = NormalizeConversionValue(
+                tapsPerConversion);
+            HealthPointsPerConversion = NormalizeConversionValue(
+                healthPointsPerConversion);
         }
 
         internal void Save()
@@ -95,29 +107,53 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        internal static int NormalizeTapsPerHealthPoint(int value)
+        internal static int NormalizeConversionValue(int value)
         {
-            return Math.Max(MinimumTapsPerHealthPoint,
-                Math.Min(MaximumTapsPerHealthPoint, value));
+            return Math.Max(MinimumConversionValue,
+                Math.Min(MaximumConversionValue, value));
         }
 
-        private bool TryLoad(string candidatePath)
+        private bool TryLoad(string candidatePath, out bool migrated)
         {
+            migrated = false;
             if (!File.Exists(candidatePath))
                 return false;
             try
             {
                 var json = File.ReadAllText(candidatePath, Encoding.UTF8);
                 int version;
-                int tapsPerHealthPoint;
-                if (!TryReadInt(json, "version", out version) ||
-                    version != CurrentVersion ||
-                    !TryReadInt(json, "tapsPerHealthPoint",
-                        out tapsPerHealthPoint) ||
-                    tapsPerHealthPoint < MinimumTapsPerHealthPoint ||
-                    tapsPerHealthPoint > MaximumTapsPerHealthPoint)
+                if (!TryReadInt(json, "version", out version))
                     return false;
-                TapsPerHealthPoint = tapsPerHealthPoint;
+
+                if (version == CurrentVersion)
+                {
+                    int tapsPerConversion;
+                    int healthPointsPerConversion;
+                    if (!TryReadConversionValue(json,
+                            "tapsPerConversion",
+                            out tapsPerConversion) ||
+                        !TryReadConversionValue(json,
+                            "healthPointsPerConversion",
+                            out healthPointsPerConversion))
+                        return false;
+                    TapsPerConversion = tapsPerConversion;
+                    HealthPointsPerConversion =
+                        healthPointsPerConversion;
+                    return true;
+                }
+
+                // Version 1 expressed the same exact ratio as "N taps =
+                // 1 health point". Preserve it losslessly and immediately
+                // rewrite the primary file in the canonical v2 shape.
+                int legacyTapsPerHealthPoint;
+                if (version != 1 ||
+                    !TryReadConversionValue(json,
+                        "tapsPerHealthPoint",
+                        out legacyTapsPerHealthPoint))
+                    return false;
+                TapsPerConversion = legacyTapsPerHealthPoint;
+                HealthPointsPerConversion = 1;
+                migrated = true;
                 return true;
             }
             catch
@@ -130,9 +166,21 @@ namespace Gilomx.CupheadBossRoulette
         {
             return "{\n  \"version\": " +
                 CurrentVersion.ToString(CultureInfo.InvariantCulture) +
-                ",\n  \"tapsPerHealthPoint\": " +
-                TapsPerHealthPoint.ToString(CultureInfo.InvariantCulture) +
+                ",\n  \"tapsPerConversion\": " +
+                TapsPerConversion.ToString(
+                    CultureInfo.InvariantCulture) +
+                ",\n  \"healthPointsPerConversion\": " +
+                HealthPointsPerConversion.ToString(
+                    CultureInfo.InvariantCulture) +
                 "\n}\n";
+        }
+
+        private static bool TryReadConversionValue(
+            string json, string property, out int value)
+        {
+            return TryReadInt(json, property, out value) &&
+                value >= MinimumConversionValue &&
+                value <= MaximumConversionValue;
         }
 
         private static bool TryReadInt(

@@ -3,15 +3,20 @@ import { AppShell } from "./components/AppShell";
 import { DashboardView } from "./features/dashboard/DashboardView";
 import { PeskyBattleDetailView } from "./features/dashboard/PeskyBattleDetailView";
 import { TapFarmingDetailView } from "./features/dashboard/TapFarmingDetailView";
+import { OverlayDesignerView } from "./features/overlay-designer/OverlayDesignerView";
+import type { OverlayComponentId } from "./features/overlay-designer/model";
 import { InteractionsView } from "./features/interactions/InteractionsView";
 import { PeskyModeView } from "./features/pesky/PeskyModeView";
 import { RouletteView } from "./features/roulette/RouletteView";
 import { useLocalization } from "./i18n/LocalizationContext";
 
 export type ConfigSection = "dashboard" | "roulette" | "interactions" | "pesky";
-type AppView = ConfigSection | "peskyBattle" | "tapFarming";
+type AppView = ConfigSection | "peskyBattle" | "tapFarming" | "overlayDesigner";
 
 function viewFromPath(): AppView {
+  if (window.location.pathname.startsWith("/config/overlay-designer")) {
+    return "overlayDesigner";
+  }
   if (window.location.pathname.startsWith("/config/tap-farming")) {
     return "tapFarming";
   }
@@ -35,7 +40,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = view === "peskyBattle" || view === "tapFarming"
+    document.title = view === "overlayDesigner"
+      ? `${t("overlayDesigner.title")} — La Pichi Ruleta`
+      : view === "peskyBattle" || view === "tapFarming"
       ? `${t(view === "peskyBattle"
         ? "dashboard.peskyBattle.title"
         : "dashboard.tapFarming.title")} — La Pichi Ruleta`
@@ -50,6 +57,8 @@ export default function App() {
         ? "/config/pesky-battle"
         : next === "tapFarming"
           ? "/config/tap-farming"
+        : next === "overlayDesigner"
+          ? "/config/overlay-designer"
         : `/config/${next}`;
     window.history.pushState(state, "", path);
     setView(next);
@@ -99,14 +108,42 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  const activeSection: ConfigSection = view === "peskyBattle" || view === "tapFarming"
+  const openOverlayDesigner = (component: OverlayComponentId) => {
+    window.history.pushState(
+      { overlayDesignerFrom: component },
+      "",
+      `/config/overlay-designer?component=${component}&profile=vertical`,
+    );
+    setView("overlayDesigner");
+    window.scrollTo({ top: 0 });
+  };
+
+  const closeOverlayDesigner = () => {
+    const state = window.history.state as { overlayDesignerFrom?: OverlayComponentId } | null;
+    if (state?.overlayDesignerFrom && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    const component = new URLSearchParams(window.location.search).get("component");
+    const next: AppView = component === "pesky_battle" ? "peskyBattle" : "tapFarming";
+    const path = next === "peskyBattle" ? "/config/pesky-battle" : "/config/tap-farming";
+    window.history.pushState(null, "", path);
+    setView(next);
+    window.scrollTo({ top: 0 });
+  };
+
+  const activeSection: ConfigSection = view === "peskyBattle" || view === "tapFarming" ||
+    view === "overlayDesigner"
     ? "dashboard"
     : view;
 
   return (
     <AppShell
       activeSection={activeSection}
-      currentSection={view === "peskyBattle" || view === "tapFarming" ? null : activeSection}
+      currentSection={view === "peskyBattle" || view === "tapFarming" ||
+        view === "overlayDesigner" ? null : activeSection}
+      workspace={view === "overlayDesigner"}
+      onOpenOverlays={() => openOverlayDesigner("tap_farming")}
       onSectionChange={(section) => navigate(section)}
     >
       {view === "dashboard"
@@ -116,9 +153,17 @@ export default function App() {
             onOpenTapFarming={openTapFarming}
           />
         : view === "peskyBattle"
-          ? <PeskyBattleDetailView onBack={() => returnToLiveEvents("peskyBattle")} />
+          ? <PeskyBattleDetailView
+              onBack={() => returnToLiveEvents("peskyBattle")}
+              onOpenOverlayDesigner={() => openOverlayDesigner("pesky_battle")}
+            />
         : view === "tapFarming"
-          ? <TapFarmingDetailView onBack={() => returnToLiveEvents("tapFarming")} />
+          ? <TapFarmingDetailView
+              onBack={() => returnToLiveEvents("tapFarming")}
+              onOpenOverlayDesigner={() => openOverlayDesigner("tap_farming")}
+            />
+        : view === "overlayDesigner"
+          ? <OverlayDesignerView onBack={closeOverlayDesigner} />
         : view === "interactions"
         ? <InteractionsView />
         : view === "pesky"

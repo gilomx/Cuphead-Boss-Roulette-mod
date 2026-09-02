@@ -15,6 +15,7 @@ namespace Gilomx.CupheadBossRoulette
         private const string WebSocketMagic =
             "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         private const int MaximumHeaderBytes = 65536;
+        private const int MaximumHttpBodyBytes = 65536;
         private const int HttpHeaderReadTimeoutMilliseconds = 5000;
         private const int MaximumClientPayloadBytes = 1024 * 1024;
         private const int MaximumConfigCommands = 256;
@@ -57,6 +58,8 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object streamRulesProcessingLock = new object();
         private readonly Queue<string> streamRuleCommands =
             new Queue<string>();
+        private readonly object overlayComposerLock = new object();
+        private readonly object overlayComposerProcessingLock = new object();
         private readonly object clientsLock = new object();
         private readonly List<WebSocketClient> clients =
             new List<WebSocketClient>();
@@ -72,6 +75,8 @@ namespace Gilomx.CupheadBossRoulette
         private Func<string, long, bool> interactionControlObserver;
         private Func<string, bool> peskyBattleCommandHandler;
         private Func<string, bool> tapFarmingCommandHandler;
+        private CreatorToolsOverlayComposerController
+            overlayComposerController;
         private string latestMessage = "{\"type\":\"state\",\"active\":false}";
         private long latestRevision;
         private byte[] challengeLabelPng;
@@ -123,19 +128,23 @@ namespace Gilomx.CupheadBossRoulette
             "\"items\":[],\"disabledItems\":[]," +
             "\"feedback\":\"starting\",\"error\":false}";
         private string latestTapFarmingState =
-            "{\"ready\":false,\"schemaVersion\":1," +
+            "{\"ready\":false,\"schemaVersion\":2," +
             "\"revision\":0,\"phase\":\"off\"," +
             "\"sessionId\":0,\"attempt\":0,\"enabled\":false," +
             "\"isLiveEventOwner\":false," +
             "\"blockedByLiveEvent\":\"\"," +
             "\"gameplayAvailable\":false,\"levelId\":\"\"," +
             "\"bossName\":\"\"," +
-            "\"conversion\":{\"tapsPerHealthPoint\":2}," +
+            "\"conversion\":{\"tapsPerConversion\":2," +
+            "\"healthPointsPerConversion\":1," +
+            "\"tapsPerHealthPoint\":2}," +
             "\"counters\":{\"totalTaps\":0,\"bankedTaps\":0," +
             "\"unconvertedTaps\":0,\"convertedHealth\":0," +
             "\"reserveHealth\":0,\"spentHealth\":0}," +
             "\"boss\":{\"currentHealth\":0,\"totalHealth\":0," +
-            "\"progress\":0},\"phaseIndex\":0," +
+            "\"progress\":0},\"effectiveHealth\":{" +
+            "\"available\":false,\"current\":0," +
+            "\"total\":0,\"ratio\":0},\"phaseIndex\":0," +
             "\"phaseCount\":0,\"overallProgress\":0," +
             "\"phases\":[],\"feedback\":\"starting\"," +
             "\"error\":false}";
@@ -173,6 +182,16 @@ namespace Gilomx.CupheadBossRoulette
                 assetsDirectory ?? string.Empty);
             this.logInfo = logInfo;
             this.logWarning = logWarning;
+        }
+
+        internal CreatorToolsServer(
+            string assetsDirectory,
+            Action<string> logInfo,
+            Action<string> logWarning,
+            CreatorToolsOverlayComposerController overlayComposerController)
+            : this(assetsDirectory, logInfo, logWarning)
+        {
+            this.overlayComposerController = overlayComposerController;
         }
 
         internal bool Start(int port)
@@ -626,6 +645,22 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal void SetOverlayComposerController(
+            CreatorToolsOverlayComposerController controller)
+        {
+            if (controller != null)
+            {
+                lock (overlayComposerLock)
+                    overlayComposerController = controller;
+                return;
+            }
+            lock (overlayComposerProcessingLock)
+            {
+                lock (overlayComposerLock)
+                    overlayComposerController = null;
+            }
+        }
+
         internal void SetLiveEventsState(string json)
         {
             if (string.IsNullOrEmpty(json))
@@ -790,8 +825,38 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
 
+                if (request.ErrorStatusCode != 0)
+                {
+                    WriteResponse(stream, request.ErrorStatusCode,
+                        request.ErrorStatusText,
+                        "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes(
+                            "{\"ok\":false,\"error\":\"" +
+                            request.ErrorCode + "\"}"), false);
+                    return;
+                }
+                if (request.Method != "GET" && request.Method != "POST")
+                {
+                    WriteResponse(stream, 405, "Method Not Allowed",
+                        "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes(
+                            "{\"ok\":false,\"error\":" +
+                            "\"method_not_allowed\"}"), false,
+                        "Allow: GET, POST\r\n");
+                    return;
+                }
+
                 if (request.Path == "/ws" && request.IsWebSocket)
                 {
+                    if (request.Method != "GET")
+                    {
+                        WriteResponse(stream, 405,
+                            "Method Not Allowed", "text/plain",
+                            Encoding.UTF8.GetBytes(
+                                "WebSocket upgrades require GET."), false,
+                            "Allow: GET\r\n");
+                        return;
+                    }
                     if (!CompleteWebSocketHandshake(stream, request))
                         return;
                     connection.ReceiveTimeout = 0;
@@ -965,10 +1030,12 @@ namespace Gilomx.CupheadBossRoulette
                 return null;
 
             var requestParts = lines[0].Split(' ');
-            if (requestParts.Length < 2 || requestParts[0] != "GET")
+            if (requestParts.Length < 2 ||
+                string.IsNullOrEmpty(requestParts[0]))
                 return null;
 
             var request = new HttpRequest();
+            request.Method = requestParts[0].Trim().ToUpperInvariant();
             request.Path = requestParts[1];
             var queryIndex = request.Path.IndexOf('?');
             if (queryIndex >= 0)
@@ -995,6 +1062,56 @@ namespace Gilomx.CupheadBossRoulette
                 request.Headers.TryGetValue("Upgrade", out upgrade) &&
                 string.Equals(upgrade, "websocket",
                     StringComparison.OrdinalIgnoreCase);
+
+            if (request.Method == "POST")
+            {
+                string transferEncoding;
+                if (request.Headers.TryGetValue(
+                        "Transfer-Encoding", out transferEncoding) &&
+                    !string.IsNullOrEmpty(transferEncoding) &&
+                    !string.Equals(transferEncoding.Trim(), "identity",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    request.SetError(400, "Bad Request",
+                        "chunked_body_not_supported");
+                    return request;
+                }
+                string contentLengthValue;
+                int contentLength;
+                if (!request.Headers.TryGetValue(
+                        "Content-Length", out contentLengthValue) ||
+                    !int.TryParse(contentLengthValue,
+                        NumberStyles.None, CultureInfo.InvariantCulture,
+                        out contentLength) || contentLength < 0)
+                {
+                    request.SetError(400, "Bad Request",
+                        "invalid_content_length");
+                    return request;
+                }
+                if (contentLength > MaximumHttpBodyBytes)
+                {
+                    request.SetError(413, "Payload Too Large",
+                        "body_too_large");
+                    return request;
+                }
+                var body = new byte[contentLength];
+                var offset = 0;
+                while (offset < body.Length)
+                {
+                    var read = stream.Read(
+                        body, offset, body.Length - offset);
+                    if (read <= 0)
+                    {
+                        request.SetError(400, "Bad Request",
+                            "incomplete_body");
+                        return request;
+                    }
+                    offset += read;
+                }
+                request.Body = Encoding.UTF8.GetString(body);
+            }
+            else
+                request.Body = string.Empty;
             return request;
         }
 
@@ -1026,6 +1143,13 @@ namespace Gilomx.CupheadBossRoulette
         private void ServeHttp(NetworkStream stream, HttpRequest request)
         {
             var path = request.Path;
+            if (request.Method == "POST" &&
+                path != "/api/overlay-composer/config/set" &&
+                path != "/api/overlay-composer/preview/set")
+            {
+                WriteMethodNotAllowed(stream, "GET");
+                return;
+            }
             if (path == "/" || path == "/index.html")
             {
                 ServeFile(stream, Path.Combine(assetsDirectory,
@@ -1047,6 +1171,23 @@ namespace Gilomx.CupheadBossRoulette
                     "application/javascript; charset=utf-8", false);
                 return;
             }
+            if (path == "/overlay/vertical" ||
+                path == "/overlay/vertical/" ||
+                path == "/overlay/horizontal" ||
+                path == "/overlay/horizontal/" ||
+                path == "/live-overlay" ||
+                path == "/live-overlay/")
+            {
+                if (request.Method != "GET")
+                {
+                    WriteMethodNotAllowed(stream, "GET");
+                    return;
+                }
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\live-overlay.html"),
+                    "text/html; charset=utf-8", false, true);
+                return;
+            }
             if (path == "/config" || path == "/config/" ||
                 path == "/config.html" ||
                 path == "/config/roulette" ||
@@ -1064,6 +1205,9 @@ namespace Gilomx.CupheadBossRoulette
                 path == "/config/tap-farming" ||
                 path == "/config/tap-farming/" ||
                 path == "/config/tap-farming.html" ||
+                path == "/config/overlay-designer" ||
+                path == "/config/overlay-designer/" ||
+                path == "/config/overlay-designer.html" ||
                 path == "/dashboard" ||
                 path == "/dashboard/" ||
                 path == "/dashboard.html")
@@ -1108,6 +1252,105 @@ namespace Gilomx.CupheadBossRoulette
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\config.js"),
                     "application/javascript; charset=utf-8", false);
+                return;
+            }
+            if (path == "/api/overlay-composer/config")
+            {
+                if (request.Method != "GET")
+                {
+                    WriteMethodNotAllowed(stream, "GET");
+                    return;
+                }
+                CreatorToolsOverlayComposerController controller;
+                lock (overlayComposerLock)
+                    controller = overlayComposerController;
+                if (controller == null)
+                {
+                    WriteOverlayComposerUnavailable(stream);
+                    return;
+                }
+                WriteResponse(stream, 200, "OK",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(controller.GetConfigState()),
+                    false);
+                return;
+            }
+            if (path == "/api/overlay-composer/config/set")
+            {
+                if (request.Method != "POST")
+                {
+                    WriteMethodNotAllowed(stream, "POST");
+                    return;
+                }
+                if (!HasJsonContentType(request))
+                {
+                    WriteUnsupportedMediaType(stream);
+                    return;
+                }
+                CreatorToolsOverlayComposerResponse response;
+                lock (overlayComposerProcessingLock)
+                {
+                    CreatorToolsOverlayComposerController controller;
+                    lock (overlayComposerLock)
+                        controller = overlayComposerController;
+                    if (controller == null)
+                    {
+                        WriteOverlayComposerUnavailable(stream);
+                        return;
+                    }
+                    response = controller.ProcessConfigCommand(
+                        request.Body ?? string.Empty);
+                }
+                WriteOverlayComposerResponse(stream, response);
+                return;
+            }
+            if (path == "/api/overlay-composer/preview")
+            {
+                if (request.Method != "GET")
+                {
+                    WriteMethodNotAllowed(stream, "GET");
+                    return;
+                }
+                CreatorToolsOverlayComposerController controller;
+                lock (overlayComposerLock)
+                    controller = overlayComposerController;
+                if (controller == null)
+                {
+                    WriteOverlayComposerUnavailable(stream);
+                    return;
+                }
+                WriteOverlayComposerResponse(stream,
+                    controller.GetPreviewState(
+                        ReadQueryValue(request.Query, "profile")));
+                return;
+            }
+            if (path == "/api/overlay-composer/preview/set")
+            {
+                if (request.Method != "POST")
+                {
+                    WriteMethodNotAllowed(stream, "POST");
+                    return;
+                }
+                if (!HasJsonContentType(request))
+                {
+                    WriteUnsupportedMediaType(stream);
+                    return;
+                }
+                CreatorToolsOverlayComposerResponse response;
+                lock (overlayComposerProcessingLock)
+                {
+                    CreatorToolsOverlayComposerController controller;
+                    lock (overlayComposerLock)
+                        controller = overlayComposerController;
+                    if (controller == null)
+                    {
+                        WriteOverlayComposerUnavailable(stream);
+                        return;
+                    }
+                    response = controller.ProcessPreviewCommand(
+                        request.Body ?? string.Empty);
+                }
+                WriteOverlayComposerResponse(stream, response);
                 return;
             }
             if (path == "/api/config/roulette" || path == "/api/config")
@@ -1726,6 +1969,105 @@ namespace Gilomx.CupheadBossRoulette
             stream.Flush();
         }
 
+        private static void WriteOverlayComposerResponse(
+            NetworkStream stream,
+            CreatorToolsOverlayComposerResponse response)
+        {
+            if (response == null)
+            {
+                WriteResponse(stream, 500, "Internal Server Error",
+                    "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(
+                        "{\"ready\":false,\"feedback\":" +
+                        "\"empty_response\",\"error\":true}"), false);
+                return;
+            }
+            WriteResponse(stream, response.StatusCode,
+                response.StatusText,
+                "application/json; charset=utf-8",
+                Encoding.UTF8.GetBytes(response.Json), false);
+        }
+
+        private static void WriteOverlayComposerUnavailable(
+            NetworkStream stream)
+        {
+            WriteResponse(stream, 503, "Service Unavailable",
+                "application/json; charset=utf-8",
+                Encoding.UTF8.GetBytes(
+                    "{\"ready\":false,\"feedback\":" +
+                    "\"overlay_composer_unavailable\"," +
+                    "\"error\":true}"), false);
+        }
+
+        private static void WriteUnsupportedMediaType(NetworkStream stream)
+        {
+            WriteResponse(stream, 415, "Unsupported Media Type",
+                "application/json; charset=utf-8",
+                Encoding.UTF8.GetBytes(
+                    "{\"ready\":false,\"feedback\":" +
+                    "\"application_json_required\"," +
+                    "\"error\":true}"), false);
+        }
+
+        private static void WriteMethodNotAllowed(
+            NetworkStream stream, string allowed)
+        {
+            WriteResponse(stream, 405, "Method Not Allowed",
+                "application/json; charset=utf-8",
+                Encoding.UTF8.GetBytes(
+                    "{\"ready\":false,\"feedback\":" +
+                    "\"method_not_allowed\",\"error\":true}"), false,
+                "Allow: " + (allowed ?? "GET") + "\r\n");
+        }
+
+        private static bool HasJsonContentType(HttpRequest request)
+        {
+            string contentType;
+            if (request == null || request.Headers == null ||
+                !request.Headers.TryGetValue(
+                    "Content-Type", out contentType))
+                return false;
+            contentType = (contentType ?? string.Empty).Trim();
+            var separator = contentType.IndexOf(';');
+            if (separator >= 0)
+                contentType = contentType.Substring(0, separator).Trim();
+            return string.Equals(contentType, "application/json",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ReadQueryValue(string query, string key)
+        {
+            if (string.IsNullOrEmpty(query) || string.IsNullOrEmpty(key))
+                return string.Empty;
+            var pairs = query.Split('&');
+            for (var i = 0; i < pairs.Length; i++)
+            {
+                var separator = pairs[i].IndexOf('=');
+                var rawKey = separator < 0
+                    ? pairs[i]
+                    : pairs[i].Substring(0, separator);
+                var rawValue = separator < 0
+                    ? string.Empty
+                    : pairs[i].Substring(separator + 1);
+                try
+                {
+                    rawKey = Uri.UnescapeDataString(
+                        rawKey.Replace('+', ' '));
+                    rawValue = Uri.UnescapeDataString(
+                        rawValue.Replace('+', ' '));
+                }
+                catch
+                {
+                    continue;
+                }
+                if (string.Equals(rawKey, key,
+                        StringComparison.OrdinalIgnoreCase))
+                    return rawValue.Length <= 128
+                        ? rawValue : rawValue.Substring(0, 128);
+            }
+            return string.Empty;
+        }
+
         private static string ReplaceNonnegativeIntegerProperty(
             string json, string property, long value)
         {
@@ -1993,10 +2335,23 @@ namespace Gilomx.CupheadBossRoulette
 
         private sealed class HttpRequest
         {
+            internal string Method;
             internal string Path;
             internal string Query;
+            internal string Body;
             internal Dictionary<string, string> Headers;
             internal bool IsWebSocket;
+            internal int ErrorStatusCode;
+            internal string ErrorStatusText;
+            internal string ErrorCode;
+
+            internal void SetError(
+                int statusCode, string statusText, string errorCode)
+            {
+                ErrorStatusCode = statusCode;
+                ErrorStatusText = statusText ?? string.Empty;
+                ErrorCode = errorCode ?? string.Empty;
+            }
         }
 
         private sealed class WebSocketClient

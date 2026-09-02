@@ -25,7 +25,7 @@ namespace Gilomx.CupheadBossRoulette
     /// </summary>
     internal sealed class CreatorToolsTapFarmingController
     {
-        private const int SchemaVersion = 1;
+        private const int SchemaVersion = 2;
         private const double MaximumReserveHealth = 1000000000000d;
         private const float BossSnapshotIntervalSeconds = 0.1f;
         private const int DicePalaceProgressSegmentCount = 4;
@@ -52,6 +52,7 @@ namespace Gilomx.CupheadBossRoulette
         private long convertedHealth;
         private double reserveHealth;
         private double spentHealth;
+        private double spentHealthAtAttemptStart;
         private float bossCurrentHealth;
         private float bossTotalHealth;
         private float currentPhaseProgress;
@@ -121,10 +122,12 @@ namespace Gilomx.CupheadBossRoulette
                 var incoming = (long)entry.Count;
                 totalTaps = SaturatingAdd(totalTaps, incoming);
                 var combined = SaturatingAdd(unconvertedTaps, incoming);
-                var tapsPerPoint = Math.Max(1,
-                    settings.TapsPerHealthPoint);
-                var points = combined / tapsPerPoint;
-                unconvertedTaps = combined % tapsPerPoint;
+                var tapsPerConversion = Math.Max(1,
+                    settings.TapsPerConversion);
+                var conversions = combined / tapsPerConversion;
+                unconvertedTaps = combined % tapsPerConversion;
+                var points = SaturatingMultiply(conversions,
+                    settings.HealthPointsPerConversion);
                 if (points > 0L)
                 {
                     convertedHealth = SaturatingAdd(
@@ -155,7 +158,9 @@ namespace Gilomx.CupheadBossRoulette
                 return BeginStop();
             if (action == "save" || action == "configure" ||
                 (action.Length == 0 &&
-                 values.ContainsKey("tapsPerHealthPoint")))
+                 (values.ContainsKey("tapsPerConversion") ||
+                  values.ContainsKey("healthPointsPerConversion") ||
+                  values.ContainsKey("tapsPerHealthPoint"))))
                 return SaveSettings(values);
 
             SetFeedback("invalid_action", true);
@@ -247,6 +252,7 @@ namespace Gilomx.CupheadBossRoulette
                     attempt++;
                     if (attempt <= 0)
                         attempt = 1;
+                    spentHealthAtAttemptStart = spentHealth;
                     dicePalaceAttemptActive = isDicePalace;
                     dicePalaceMainActive = isDicePalaceMain;
                     dicePalaceCompletedSegments = 0;
@@ -463,9 +469,13 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool TryActivate(Dictionary<string, string> values)
         {
-            int tapsPerPoint;
-            if (!TryReadTapsPerPoint(values,
-                    settings.TapsPerHealthPoint, out tapsPerPoint))
+            int tapsPerConversion;
+            int healthPointsPerConversion;
+            if (!TryReadConversion(values,
+                    settings.TapsPerConversion,
+                    settings.HealthPointsPerConversion,
+                    out tapsPerConversion,
+                    out healthPointsPerConversion))
             {
                 SetFeedback("invalid_taps_per_health_point", true);
                 return true;
@@ -493,7 +503,8 @@ namespace Gilomx.CupheadBossRoulette
             var committed = false;
             try
             {
-                settings.SetTapsPerHealthPoint(tapsPerPoint);
+                settings.SetConversion(
+                    tapsPerConversion, healthPointsPerConversion);
                 settings.Save();
                 lock (stateLock)
                 {
@@ -516,16 +527,24 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (committed && logInfo != null)
                 logInfo("Farmeando taps activado: cada " +
-                    tapsPerPoint.ToString(CultureInfo.InvariantCulture) +
-                    " taps suma 1 punto de vida.");
+                    tapsPerConversion.ToString(
+                        CultureInfo.InvariantCulture) +
+                    " taps suma " +
+                    healthPointsPerConversion.ToString(
+                        CultureInfo.InvariantCulture) +
+                    " puntos de vida.");
             return true;
         }
 
         private bool SaveSettings(Dictionary<string, string> values)
         {
-            int tapsPerPoint;
-            if (!TryReadTapsPerPoint(values,
-                    settings.TapsPerHealthPoint, out tapsPerPoint))
+            int tapsPerConversion;
+            int healthPointsPerConversion;
+            if (!TryReadConversion(values,
+                    settings.TapsPerConversion,
+                    settings.HealthPointsPerConversion,
+                    out tapsPerConversion,
+                    out healthPointsPerConversion))
             {
                 SetFeedback("invalid_taps_per_health_point", true);
                 return true;
@@ -538,7 +557,8 @@ namespace Gilomx.CupheadBossRoulette
                         "tap_farming_setting_locked", true);
                     return true;
                 }
-                settings.SetTapsPerHealthPoint(tapsPerPoint);
+                settings.SetConversion(
+                    tapsPerConversion, healthPointsPerConversion);
                 SetFeedbackLocked("tap_farming_settings_saved", false);
             }
             settings.Save();
@@ -778,9 +798,22 @@ namespace Gilomx.CupheadBossRoulette
             var blockedBy = liveSnapshot.ActiveEvent;
             if (ownsEvent)
                 blockedBy = string.Empty;
+            var tapsPerConversion = Math.Max(1,
+                settings.TapsPerConversion);
+            var healthPointsPerConversion = Math.Max(1,
+                settings.HealthPointsPerConversion);
             var bankedTaps = Math.Max(0d,
-                reserveHealth * settings.TapsPerHealthPoint +
-                unconvertedTaps);
+                reserveHealth * tapsPerConversion /
+                healthPointsPerConversion + unconvertedTaps);
+            var legacyTapsPerHealthPoint =
+                (double)tapsPerConversion /
+                healthPointsPerConversion;
+            var spentDuringAttempt = Math.Max(0d,
+                spentHealth - spentHealthAtAttemptStart);
+            var effectiveHealth =
+                CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                    phase, bossCurrentHealth, bossTotalHealth,
+                    reserveHealth, spentDuringAttempt);
 
             var builder = new StringBuilder(3072);
             builder.Append("{\"ready\":true,\"schemaVersion\":")
@@ -802,12 +835,17 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJson.AppendEscaped(builder, levelId);
             builder.Append("\",\"bossName\":\"");
             CreatorToolsJson.AppendEscaped(builder, bossName);
-            builder.Append("\",\"conversion\":{\"tapsPerHealthPoint\":")
-                .Append(settings.TapsPerHealthPoint)
+            builder.Append("\",\"conversion\":{\"tapsPerConversion\":")
+                .Append(tapsPerConversion)
+                .Append(",\"healthPointsPerConversion\":")
+                .Append(healthPointsPerConversion)
+                .Append(",\"tapsPerHealthPoint\":")
+                .Append(FormatNumber(
+                    legacyTapsPerHealthPoint, "0.##########"))
                 .Append("},\"counters\":{\"totalTaps\":")
                 .Append(totalTaps)
                 .Append(",\"bankedTaps\":")
-                .Append(FormatNumber(bankedTaps, "0"))
+                .Append(FormatNumber(bankedTaps, "0.###"))
                 .Append(",\"unconvertedTaps\":")
                 .Append(unconvertedTaps)
                 .Append(",\"convertedHealth\":")
@@ -822,6 +860,14 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(FormatNumber(bossTotalHealth, "0.###"))
                 .Append(",\"progress\":")
                 .Append(FormatNumber(currentPhaseProgress, "0.####"))
+                .Append("},\"effectiveHealth\":{\"available\":")
+                .Append(effectiveHealth.Available ? "true" : "false")
+                .Append(",\"current\":")
+                .Append(FormatNumber(effectiveHealth.Current, "0.###"))
+                .Append(",\"total\":")
+                .Append(FormatNumber(effectiveHealth.Total, "0.###"))
+                .Append(",\"ratio\":")
+                .Append(FormatNumber(effectiveHealth.Ratio, "0.####"))
                 .Append("},\"phaseIndex\":").Append(phaseIndex)
                 .Append(",\"phaseCount\":").Append(phaseCount)
                 .Append(",\"overallProgress\":")
@@ -856,6 +902,7 @@ namespace Gilomx.CupheadBossRoulette
             convertedHealth = 0L;
             reserveHealth = 0d;
             spentHealth = 0d;
+            spentHealthAtAttemptStart = 0d;
             attempt = 0;
             dicePalaceTransition = false;
             dicePalaceTransitionLevelInstanceId = -1;
@@ -935,29 +982,80 @@ namespace Gilomx.CupheadBossRoulette
                 : left + right;
         }
 
-        private static bool TryReadTapsPerPoint(
-            Dictionary<string, string> values,
-            int fallback,
-            out int result)
+        private static long SaturatingMultiply(long value, int factor)
         {
-            string value;
-            if (!values.TryGetValue("tapsPerHealthPoint", out value))
+            if (value <= 0L || factor <= 0)
+                return 0L;
+            return value > long.MaxValue / factor
+                ? long.MaxValue
+                : value * factor;
+        }
+
+        private static bool TryReadConversion(
+            Dictionary<string, string> values,
+            int fallbackTapsPerConversion,
+            int fallbackHealthPointsPerConversion,
+            out int tapsPerConversion,
+            out int healthPointsPerConversion)
+        {
+            var hasCanonicalTaps =
+                values.ContainsKey("tapsPerConversion");
+            var hasCanonicalHealth =
+                values.ContainsKey("healthPointsPerConversion");
+            if (!hasCanonicalTaps && !hasCanonicalHealth)
             {
-                result = fallback;
+                string legacyValue;
+                if (!values.TryGetValue("tapsPerHealthPoint",
+                        out legacyValue))
+                {
+                    tapsPerConversion = fallbackTapsPerConversion;
+                    healthPointsPerConversion =
+                        fallbackHealthPointsPerConversion;
+                    return true;
+                }
+                if (!TryParseConversionValue(
+                        legacyValue, out tapsPerConversion))
+                {
+                    tapsPerConversion = fallbackTapsPerConversion;
+                    healthPointsPerConversion =
+                        fallbackHealthPointsPerConversion;
+                    return false;
+                }
+                healthPointsPerConversion = 1;
                 return true;
             }
-            int parsed;
+
+            tapsPerConversion = fallbackTapsPerConversion;
+            healthPointsPerConversion =
+                fallbackHealthPointsPerConversion;
+            string value;
+            if (hasCanonicalTaps &&
+                (!values.TryGetValue("tapsPerConversion", out value) ||
+                 !TryParseConversionValue(
+                    value, out tapsPerConversion)))
+                return false;
+            if (hasCanonicalHealth &&
+                (!values.TryGetValue("healthPointsPerConversion",
+                    out value) ||
+                 !TryParseConversionValue(
+                    value, out healthPointsPerConversion)))
+                return false;
+            return true;
+        }
+
+        private static bool TryParseConversionValue(
+            string value, out int result)
+        {
             if (!int.TryParse(value, NumberStyles.Integer,
-                    CultureInfo.InvariantCulture, out parsed) ||
-                parsed < CreatorToolsTapFarmingSettings
-                    .MinimumTapsPerHealthPoint ||
-                parsed > CreatorToolsTapFarmingSettings
-                    .MaximumTapsPerHealthPoint)
+                    CultureInfo.InvariantCulture, out result) ||
+                result < CreatorToolsTapFarmingSettings
+                    .MinimumConversionValue ||
+                result > CreatorToolsTapFarmingSettings
+                    .MaximumConversionValue)
             {
-                result = fallback;
+                result = 0;
                 return false;
             }
-            result = parsed;
             return true;
         }
 

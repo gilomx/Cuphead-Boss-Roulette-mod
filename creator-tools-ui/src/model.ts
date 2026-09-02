@@ -185,7 +185,9 @@ export interface TapFarmingConfigState {
   sessionId: number;
   blockedByLiveEvent: LiveEventId | "";
   conversion: {
-    tapsPerHealthPoint: number;
+    tapsPerConversion: number;
+    healthPointsPerConversion: number;
+    tapsPerHealthPoint?: number;
   };
   counters: {
     totalTaps: number;
@@ -202,6 +204,12 @@ export interface TapFarmingConfigState {
     currentHealth: number;
     totalHealth: number;
     progress: number;
+  };
+  effectiveHealth?: {
+    available: boolean;
+    current: number;
+    total: number;
+    ratio: number;
   };
   phaseIndex: number;
   phaseCount: number;

@@ -1,7 +1,11 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, ".", "CREATOR_TOOLS_");
+  const proxyTarget = env.CREATOR_TOOLS_PROXY_TARGET || "http://127.0.0.1:18081";
+
+  return {
   base: "/",
   plugins: [
     react(),
@@ -18,7 +22,9 @@ export default defineConfig({
             pathname === "/config/" ||
             pathname.startsWith("/config/roulette") ||
             pathname.startsWith("/config/interactions") ||
-            pathname.startsWith("/config/pesky");
+            pathname.startsWith("/config/pesky") ||
+            pathname.startsWith("/config/tap-farming") ||
+            pathname.startsWith("/config/overlay-designer");
           const isDashboardRoute = pathname === "/dashboard" ||
             pathname === "/dashboard/" ||
             pathname === "/dashboard.html";
@@ -48,8 +54,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:18081",
-      "/assets": "http://127.0.0.1:18081",
+      "/api": proxyTarget,
+      "/assets": proxyTarget,
+      "/overlay": proxyTarget,
+      "/live-overlay": proxyTarget,
+      "/tap-farming-overlay": proxyTarget,
+      "/pesky-battle-overlay": proxyTarget,
     },
   },
+  };
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Copy, Swords, Users } from "lucide-react";
+import { AlertTriangle, Check, Swords, Users } from "lucide-react";
 import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
@@ -54,7 +54,6 @@ export function PeskyBattlePanel() {
   const { locale, t } = useLocalization();
   const { catalog, error: catalogError } = useTikTokGiftCatalog();
   const [giftDraft, setGiftDraft] = useState("");
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
 
   const phase = peskyBattle?.phase ?? "off";
   const configurationLocked = phase !== "off";
@@ -97,19 +96,6 @@ export function PeskyBattlePanel() {
         .replace("{attempt}", String(Math.max(1, peskyBattle?.attempt ?? 1)))
       : t(`dashboard.peskyBattle.phaseDescription.${phase}`);
 
-  const copyOverlayUrl = async () => {
-    const localeQuery = locale === "en" ? "?locale=en" : "";
-    const overlayUrl = `${window.location.origin}/pesky-battle-overlay${localeQuery}`;
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(overlayUrl);
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("error");
-    }
-    window.setTimeout(() => setCopyStatus("idle"), 2600);
-  };
-
   return (
     <section
       className="dashboard-pesky-battle"
@@ -129,14 +115,6 @@ export function PeskyBattlePanel() {
           <span className="dashboard-pesky-battle__status" data-phase={phase}>
             {t(`dashboard.peskyBattle.phase.${phase}`)}
           </span>
-          <button
-            className="dashboard-pesky-battle__copy"
-            type="button"
-            onClick={() => void copyOverlayUrl()}
-          >
-            <Copy aria-hidden="true" />
-            {t(`dashboard.peskyBattle.overlay.${copyStatus}`)}
-          </button>
         </div>
       </div>
 

@@ -1,0 +1,87 @@
+:root {
+  color-scheme: only light;
+  --canvas-width: 1920;
+  --canvas-height: 1080;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  pointer-events: none;
+}
+
+.live-overlay {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  background: transparent;
+}
+
+.live-overlay[data-designer-background="alpha"] {
+  background-color: #c6c9cf;
+  background-image:
+    linear-gradient(45deg, #e2e4e8 25%, transparent 25%),
+    linear-gradient(-45deg, #e2e4e8 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e2e4e8 75%),
+    linear-gradient(-45deg, transparent 75%, #e2e4e8 75%);
+  background-position: 0 0, 0 24px, 24px -24px, -24px 0;
+  background-size: 48px 48px;
+}
+
+.live-overlay[data-designer-background="light"] {
+  background: linear-gradient(135deg, #f9edd7, #d9ecf0);
+}
+
+.live-overlay[data-designer-background="dark"] {
+  background:
+    radial-gradient(circle at 72% 18%, #24364d, transparent 32%),
+    linear-gradient(145deg, #091116, #111d29);
+}
+
+.live-overlay__component {
+  position: absolute;
+  left: var(--component-x, 0%);
+  top: var(--component-y, 0%);
+  width: var(--component-width, 100%);
+  height: var(--component-height, 100%);
+  min-width: 1px;
+  min-height: 1px;
+  overflow: visible;
+  opacity: 1;
+  visibility: visible;
+}
+
+.live-overlay__component[hidden],
+.live-overlay__component[data-enabled="false"],
+.live-overlay__component[data-solo-hidden="true"] {
+  display: none;
+}
+
+.live-overlay__component iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-overlay__component {
+    transition: none;
+  }
+}

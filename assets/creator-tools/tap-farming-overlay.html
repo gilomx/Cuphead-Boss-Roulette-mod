@@ -4,91 +4,141 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Farmeando taps</title>
-  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css">
+  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css?v=liquid-5">
 </head>
 <body>
-  <main id="tap-farming" class="tap-farming" data-visible="false" data-phase="off">
-    <header class="tap-farming__header">
-      <div class="tap-farming__identity">
-        <span class="tap-farming__mark" aria-hidden="true">
-          <i></i><i></i><b>TAP</b>
-        </span>
-        <div class="tap-farming__heading">
-          <span id="tap-eyebrow" class="tap-farming__eyebrow">FARMEANDO TAPS</span>
-          <strong id="tap-boss-name" class="tap-farming__boss">Esperando jefe</strong>
-        </div>
-      </div>
-      <div class="tap-farming__header-status">
-        <span id="tap-preview-badge" class="tap-farming__preview-badge" hidden>VISTA PREVIA</span>
-        <strong id="tap-status" class="tap-farming__status">Recolectando taps</strong>
-      </div>
+  <main
+    id="tap-farming"
+    class="tap-farming"
+    data-visible="false"
+    data-phase="off"
+    data-value-mode="percent"
+    data-variant="default"
+    data-show-title="false"
+    data-show-details="false"
+    data-motion="true"
+  >
+    <header class="tap-farming__title">
+      <span id="tap-eyebrow" class="tap-farming__eyebrow">FARMEANDO TAPS</span>
+      <strong id="tap-boss-name" class="tap-farming__boss">Esperando jefe</strong>
+      <span id="tap-preview-badge" class="tap-farming__preview" hidden>VISTA PREVIA</span>
     </header>
 
-    <section class="tap-farming__journey" aria-labelledby="tap-phase-label">
-      <div class="tap-farming__journey-heading">
-        <div>
-          <span id="tap-journey-label">AVANCE DEL COMBATE</span>
-          <strong id="tap-phase-label">Fase 1 de 1</strong>
-        </div>
-        <b id="tap-overall-progress">0%</b>
+    <section class="tap-heart-stage">
+      <div class="tap-heart" role="img" aria-labelledby="tap-heart-label">
+        <span id="tap-heart-label" class="sr-only">Porcentaje de vida restante</span>
+
+        <svg class="tap-heart__art" viewBox="0 0 320 300" aria-hidden="true">
+          <defs>
+            <path
+              id="tap-heart-shape"
+              d="M160 274 C142 248 58 196 34 143 C11 91 38 45 84 39 C116 35 143 53 160 79 C177 53 204 35 236 39 C282 45 309 91 286 143 C262 196 178 248 160 274 Z">
+            </path>
+
+            <clipPath id="tap-heart-clip">
+              <use href="#tap-heart-shape"></use>
+            </clipPath>
+
+            <linearGradient id="tap-main-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop id="tap-main-top" offset="0%" stop-color="#ff80b1"></stop>
+              <stop id="tap-main-bottom" offset="100%" stop-color="#d14178"></stop>
+            </linearGradient>
+
+            <linearGradient id="tap-middle-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop id="tap-middle-top" offset="0%" stop-color="#ff9ec3" stop-opacity="0.22"></stop>
+              <stop id="tap-middle-bottom" offset="100%" stop-color="#ff9ec3" stop-opacity="0.025"></stop>
+            </linearGradient>
+
+            <linearGradient id="tap-front-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop id="tap-front-top" offset="0%" stop-color="#fa4d8f" stop-opacity="0.48"></stop>
+              <stop id="tap-front-middle" offset="42%" stop-color="#fa4d8f" stop-opacity="0.18"></stop>
+              <stop id="tap-front-bottom" offset="100%" stop-color="#fa4d8f" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+
+          <use href="#tap-heart-shape" class="tap-heart__base"></use>
+
+          <g clip-path="url(#tap-heart-clip)">
+            <g id="tap-liquid-level" class="tap-heart__liquid-level">
+              <path
+                id="tap-body-wave"
+                class="tap-heart__wave tap-heart__wave--body"
+                d="M-130 18 C-75 10 -20 27 35 18 S145 10 200 18 S310 27 365 18 S455 10 520 18 L520 365 L-130 365 Z"
+                fill="url(#tap-main-gradient)">
+              </path>
+
+              <path
+                id="tap-middle-wave"
+                class="tap-heart__wave"
+                d="M-140 17 C-88 6 -36 27 16 17 S120 6 172 17 S276 27 328 17 S432 6 510 17 L510 118 L-140 118 Z"
+                fill="url(#tap-middle-gradient)">
+              </path>
+
+              <path
+                id="tap-front-wave"
+                class="tap-heart__wave"
+                d="M-140 19 C-88 29 -36 9 16 19 S120 29 172 19 S276 9 328 19 S432 29 510 19 L510 145 L-140 145 Z"
+                fill="url(#tap-front-gradient)">
+              </path>
+
+              <g id="tap-bubbles" class="tap-heart__bubbles">
+                <circle class="tap-heart__bubble" cx="52" cy="36" r="1.8"></circle>
+                <circle class="tap-heart__bubble" cx="72" cy="55" r="2.7"></circle>
+                <circle class="tap-heart__bubble" cx="92" cy="74" r="1.6"></circle>
+                <circle class="tap-heart__bubble" cx="108" cy="93" r="2.1"></circle>
+                <circle class="tap-heart__bubble" cx="126" cy="112" r="3"></circle>
+                <circle class="tap-heart__bubble" cx="143" cy="131" r="1.5"></circle>
+                <circle class="tap-heart__bubble" cx="159" cy="150" r="2.4"></circle>
+                <circle class="tap-heart__bubble" cx="177" cy="169" r="1.8"></circle>
+                <circle class="tap-heart__bubble" cx="194" cy="188" r="2.8"></circle>
+                <circle class="tap-heart__bubble" cx="210" cy="207" r="1.5"></circle>
+                <circle class="tap-heart__bubble" cx="228" cy="226" r="2.1"></circle>
+                <circle class="tap-heart__bubble" cx="246" cy="66" r="3.1"></circle>
+                <circle class="tap-heart__bubble" cx="264" cy="118" r="1.7"></circle>
+                <circle class="tap-heart__bubble" cx="280" cy="174" r="2.3"></circle>
+              </g>
+            </g>
+          </g>
+
+          <use href="#tap-heart-shape" class="tap-heart__outline"></use>
+
+          <text
+            id="tap-percent"
+            class="tap-heart__percent"
+            x="160"
+            y="155"
+            text-anchor="middle"
+            dominant-baseline="middle">0%</text>
+        </svg>
+
+        <span id="tap-delta" class="tap-heart__delta" aria-live="polite"></span>
       </div>
-      <ol id="tap-phase-track" class="tap-farming__phase-track" aria-label="Progreso por fases"></ol>
     </section>
 
-    <footer class="tap-farming__footer">
-      <section id="tap-reserve-card" class="tap-reserve" data-active="false">
-        <div class="tap-reserve__heading">
-          <span id="tap-reserve-label">RESERVA DE TAPS</span>
-          <strong id="tap-reserve-health">+0 puntos</strong>
-        </div>
-        <div class="tap-reserve__meter" aria-hidden="true">
-          <i id="tap-reserve-fill"></i>
-          <span></span><span></span><span></span>
-        </div>
-        <div class="tap-reserve__foot">
-          <span><b id="tap-banked-taps">0</b> <span id="tap-banked-label">taps esperando</span></span>
-          <span id="tap-reserve-equivalence">Sin reserva activa</span>
-        </div>
-      </section>
-
-      <dl class="tap-farming__counters">
-        <div class="tap-counter tap-counter--community">
-          <dt id="tap-total-label">TAPS COMUNITARIOS</dt>
-          <dd id="tap-total">0</dd>
-        </div>
-        <div>
-          <dt id="tap-generated-label">PUNTOS GENERADOS</dt>
-          <dd id="tap-converted-health">0</dd>
-        </div>
-        <div>
-          <dt id="tap-absorbed-label">DAÑO ABSORBIDO</dt>
-          <dd id="tap-spent-health">0</dd>
-        </div>
-        <div class="tap-counter tap-counter--conversion">
-          <dt id="tap-conversion-label">CONVERSIÓN</dt>
-          <dd><b id="tap-conversion">2</b> <span id="tap-conversion-equation">taps = 1 punto</span></dd>
-          <span class="tap-counter__conversion-track" aria-hidden="true"><i id="tap-conversion-progress"></i></span>
-          <small id="tap-conversion-remainder">0 de 2 para el siguiente</small>
-        </div>
-      </dl>
+    <footer class="tap-farming__details">
+      <span class="tap-farming__state">
+        <b id="tap-status">Evento desactivado</b>
+      </span>
+      <span>
+        <b id="tap-total-label">TAPS</b>
+        <strong id="tap-total">0</strong>
+      </span>
+      <span>
+        <b id="tap-health-label">VIDA</b>
+        <strong id="tap-health">0 / 0</strong>
+      </span>
+      <span>
+        <b id="tap-reserve-label">RESERVA</b>
+        <strong id="tap-reserve">+0</strong>
+      </span>
+      <span>
+        <b id="tap-phase-label">Fase 1 de 1</b>
+        <strong id="tap-overall-progress">0%</strong>
+      </span>
     </footer>
   </main>
 
-  <template id="tap-phase-template">
-    <li class="tap-phase" data-status="pending">
-      <div class="tap-phase__label">
-        <span class="tap-phase__number"></span>
-        <b class="tap-phase__status"></b>
-      </div>
-      <div class="tap-phase__meter" aria-hidden="true">
-        <i class="tap-phase__progress"></i>
-        <em class="tap-phase__reserve"></em>
-      </div>
-      <small class="tap-phase__percent"></small>
-    </li>
-  </template>
-
-  <script src="/assets/creator-tools/live-event-overlay-runtime.js"></script>
-  <script src="/assets/creator-tools/tap-farming-overlay.js"></script>
+  <script src="/assets/creator-tools/live-event-overlay-runtime.js?v=composer-1"></script>
+  <script src="/assets/creator-tools/tap-farming-overlay.js?v=liquid-5"></script>
 </body>
 </html>

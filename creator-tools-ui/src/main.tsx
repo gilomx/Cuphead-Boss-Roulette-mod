@@ -4,6 +4,7 @@ import App from "./App";
 import { ConfigProvider } from "./config/ConfigContext";
 import { LocalizationProvider } from "./i18n/LocalizationContext";
 import "./styles/index.css";
+import "./styles/overlay-designer.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

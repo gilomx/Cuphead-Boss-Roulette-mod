@@ -14,6 +14,7 @@
     "dashboard": "Dashboard",
     "roulette": "Roulette",
     "interactions": "Interactions",
+    "overlays": "Overlays",
     "pesky": "Pesky Mode"
   },
   "dashboard": {
@@ -169,7 +170,7 @@
         "stopping": "Stopping…"
       },
       "phaseDescription": {
-        "off": "Configure how many taps make one point and activate the event when the stream begins.",
+        "off": "Configure the tap-to-health equivalence and activate the event when the stream begins.",
         "collecting": "Every tap is already being saved for the next boss.",
         "active": "Shots drain the tap-created reserve before they continue damaging the boss.",
         "activeBoss": "{boss} · Phase {phase} of {count}. The reserve drains without moving the boss backward.",
@@ -180,18 +181,25 @@
       "conversion": {
         "title": "Tap conversion",
         "description": "Choose an equivalence that is easy to explain to the audience.",
-        "preset": "taps = +1 point",
-        "presetSingular": "tap = +1 point",
-        "custom": "Custom taps per point",
-        "equation": "Every {taps} taps adds 1 health point",
-        "hint": "The value is saved before activation and stays fixed for the whole round.",
+        "preset": "taps → health points",
+        "presetSingular": "tap → health point",
+        "custom": "Custom tap-to-health equivalence",
+        "equation": "Every {taps} taps adds {health} health points",
+        "every": "Every",
+        "tapsInput": "Taps per conversion",
+        "tapsAdd": "taps adds",
+        "healthInput": "Health points per conversion",
+        "healthPoints": "health points",
+        "hint": "The equivalence is saved before activation and stays fixed for the whole round.",
         "locked": "The conversion is locked until this event ends."
       },
       "progress": {
         "waitingBoss": "Waiting for a boss",
         "phase": "Phase {phase} of {count}",
         "noBoss": "Taps are accumulating from now on",
-        "battle": "Overall battle progress",
+        "battle": "Effective health remaining across the boss and reserve",
+        "collected": "The community has collected {value} health points for the next boss.",
+        "healthPointsShort": "HP",
         "reserveEquivalent": "The current reserve equals {value}× this boss's full health.",
         "reservePercent": "The current reserve equals {value} of this boss's full health.",
         "converted": "The community has converted {value} health points."
@@ -208,7 +216,7 @@
         "stopping": "Stopping…",
         "finish": "Finish event"
       },
-      "footer": "Taps are pooled across every user; remainders also count toward the next point.",
+      "footer": "Taps are pooled across every user; remainders also count toward the next conversion.",
       "feedback": {
         "generic": "Tap Farming changed state. Review the data before continuing.",
         "ready": "Configure the conversion whenever you are ready.",
@@ -222,7 +230,7 @@
         "stopping": "The event is stopping.",
         "stopped": "Tap Farming was disabled.",
         "live_event_conflict": "Finish the other Live Event before activating this one.",
-        "invalid_setting": "The taps-per-point value is not valid.",
+        "invalid_setting": "The tap-to-health equivalence is not valid.",
         "tap_farming_settings_saved": "The tap conversion was saved.",
         "tap_farming_activated": "Tap Farming is collecting community activity.",
         "tap_farming_counted": "New taps were added to the community reserve.",
@@ -237,7 +245,7 @@
         "tap_farming_already_off": "Tap Farming was already disabled.",
         "tap_farming_setting_locked": "The conversion is locked while the event is active.",
         "blocked_by_live_event": "Finish the other Live Event before activating this one.",
-        "invalid_taps_per_health_point": "The taps-per-point value is not valid.",
+        "invalid_taps_per_health_point": "The tap-to-health equivalence is not valid.",
         "invalid_action": "This action is not available in the current state."
       }
     },
@@ -379,6 +387,163 @@
     },
     "time": {
       "never": "No events"
+    }
+  },
+  "overlayDesigner": {
+    "eyebrow": "Stream composition",
+    "title": "Overlay designer",
+    "description": "Arrange every overlay on one canvas. Vertical and horizontal profiles are saved independently.",
+    "actions": {
+      "back": "Back",
+      "retry": "Retry",
+      "copyUrl": "Copy OBS URL",
+      "urlCopied": "URL copied",
+      "copyProfile": "Copy other profile",
+      "resetProfile": "Reset profile",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
+    },
+    "profiles": {
+      "title": "Stream format",
+      "vertical": "Vertical",
+      "horizontal": "Horizontal"
+    },
+    "status": {
+      "loading": "Loading compositor…",
+      "ready": "Local edits",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "error": "Could not sync"
+    },
+    "confirmation": {
+      "reset": {
+        "title": "Reset this profile?",
+        "description": "{target} will return to its default arrangement."
+      },
+      "copy": {
+        "title": "Copy the other profile?",
+        "description": "The {source} arrangement will replace {target}."
+      }
+    },
+    "components": {
+      "tap_farming": "Tap Farming",
+      "pesky_battle": "Pesky Battle"
+    },
+    "canvas": {
+      "title": "Overlay canvas",
+      "zoom": "Canvas zoom",
+      "fit": "Fit",
+      "background": "Test background",
+      "backgrounds": {
+        "alpha": "Transparent",
+        "light": "Light",
+        "dark": "Dark"
+      },
+      "iframeTitle": "Live overlay compositor",
+      "resize": {
+        "nw": "Resize from top left",
+        "ne": "Resize from top right",
+        "sw": "Resize from bottom left",
+        "se": "Resize from bottom right"
+      }
+    },
+    "layers": {
+      "eyebrow": "Scene",
+      "title": "Layers",
+      "hide": "Hide layer",
+      "show": "Show layer",
+      "lock": "Lock layer",
+      "unlock": "Unlock layer",
+      "raise": "Raise layer",
+      "lower": "Lower layer",
+      "hint": "Select a layer here or directly on the canvas. Use arrow keys to move it 1 px and Shift + arrow to move it 10 px."
+    },
+    "inspector": {
+      "eyebrow": "Selection",
+      "x": "X",
+      "y": "Y",
+      "width": "Width",
+        "height": "Height",
+        "colors": {
+          "title": "Heart colors",
+          "liquidColor": "Liquid",
+          "collectingColor": "Collected health",
+          "textColor": "Text",
+          "outlineColor": "Outline"
+        },
+        "options": {
+        "enabled": "Visible",
+        "enabledHint": "Appears in this profile.",
+        "locked": "Locked",
+        "lockedHint": "Prevents accidental movement.",
+        "showTitle": "Show title",
+        "showTitleHint": "Includes the event name.",
+        "showDetails": "Show details",
+        "showDetailsHint": "Includes secondary information.",
+        "motion": "Animations",
+        "motionHint": "Plays movement and pulses."
+      }
+    },
+    "simulation": {
+      "eyebrow": "Design mode",
+      "title": "Simulation",
+      "scenario": "Scenario",
+      "reset": "Reset simulation",
+      "tap": {
+        "phases": {
+          "collecting": "Collecting taps",
+          "active": "Boss active",
+          "transition": "Phase transition",
+          "completed": "Victory"
+        },
+        "addTaps": "Add taps",
+        "damage": "Simulate damage",
+        "nextPhase": "Next phase",
+        "retry": "Lose and retry"
+      },
+      "battle": {
+        "phases": {
+          "recruiting": "Recruiting",
+          "ready": "Team ready",
+          "waiting_level": "Waiting for level",
+          "active": "Battle active",
+          "won": "Victory"
+        },
+        "participants": "Participants",
+        "attempt": "Attempt"
+      }
+    },
+    "preview": {
+      "title": "Show simulation in OBS",
+      "active": "The live source is showing this test data.",
+      "inactive": "Position and size already sync live; this switch only enables test data.",
+      "pending": "Syncing the OBS source…",
+      "conflict": "Another designer took control of this OBS source. Close the other editor to continue here.",
+      "error": "OBS could not receive the live design. Check the mod connection."
+    },
+    "empty": {
+      "loading": "Preparing the canvas…",
+      "error": "The compositor configuration could not be loaded."
+    },
+    "feedback": {
+      "generic": "The compositor state changed.",
+      "loading": "Loading profiles…",
+      "ready": "The compositor is ready.",
+      "saved": "Changes were saved.",
+      "saving": "Saving changes…",
+      "resetting": "Resetting profile…",
+      "copying": "Copying arrangement…",
+      "connection_error": "Cuphead did not respond.",
+      "save_error": "Changes could not be saved; your draft is still here.",
+      "reset_error": "The profile could not be reset.",
+      "copy_error": "The profile could not be copied."
+    },
+    "callout": {
+      "eyebrow": "OBS overlay",
+      "title": "Configure the scene in the designer",
+      "description": "Position, size, layers, vertical or horizontal format, and simulations now live in one workspace.",
+      "action": "Configure overlay"
     }
   },
   "interactions": {

@@ -23,6 +23,7 @@
       waitingLevel: "Esperando el siguiente nivel",
       active: "Batalla en curso · Intento {attempt}",
       won: "¡Victoria!",
+      stopping: "Cerrando batalla",
       idle: "Esperando reclutamiento",
       participant: "Participante",
       slot: "Cupo {slot}",
@@ -40,6 +41,7 @@
       waitingLevel: "Waiting for the next level",
       active: "Battle in progress · Attempt {attempt}",
       won: "Victory!",
+      stopping: "Closing battle",
       idle: "Waiting for recruitment",
       participant: "Participant",
       slot: "Slot {slot}",
@@ -86,13 +88,24 @@
         attempt: Math.max(1, state.attempt || 1),
       });
       case "won": return text.won;
+      case "stopping": return text.stopping;
       default: return text.idle;
     }
   };
 
-  const participantName = (participant) => (
-    participant?.displayName || participant?.userName || COPY[activeLocale].participant
+  const participantName = (participant) => String(
+    participant?.displayName || participant?.userName || COPY[activeLocale].participant,
   ).trim();
+
+  const normalizedPresentation = (value) => {
+    const presentation = value && typeof value === "object" ? value : {};
+    return {
+      variant: "default",
+      showTitle: presentation.showTitle !== false,
+      showDetails: presentation.showDetails !== false,
+      motion: presentation.motion !== false,
+    };
+  };
 
   const safeAvatar = (participant) => {
     const value = String(participant?.avatarUrl || "").trim();
@@ -148,6 +161,7 @@
     const phase = typeof state.phase === "string" ? state.phase : "off";
     const participants = Array.isArray(state.participants) ? state.participants : [];
     const capacity = Math.max(1, Math.min(5, Number(state.capacity) || 5));
+    const presentation = normalizedPresentation(state.presentation);
     const bySlot = new Map(participants.map((participant, index) => [
       Math.max(1, Number(participant?.slot) || index + 1),
       participant,
@@ -155,6 +169,10 @@
 
     root.dataset.phase = phase;
     root.dataset.visible = String(phase !== "off");
+    root.dataset.variant = presentation.variant;
+    root.dataset.showTitle = String(presentation.showTitle);
+    root.dataset.showDetails = String(presentation.showDetails);
+    root.dataset.motion = String(presentation.motion);
     status.textContent = statusText(state);
     progress.textContent = `${Math.min(participants.length, capacity)}/${capacity}`;
 

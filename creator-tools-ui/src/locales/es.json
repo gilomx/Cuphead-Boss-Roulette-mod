@@ -14,6 +14,7 @@
     "dashboard": "Dashboard",
     "roulette": "Ruleta",
     "interactions": "Interacciones",
+    "overlays": "Overlays",
     "pesky": "Modo Molestoso"
   },
   "dashboard": {
@@ -169,7 +170,7 @@
         "stopping": "Deteniendo…"
       },
       "phaseDescription": {
-        "off": "Configura cuántos taps forman un punto y activa el evento cuando empiece el live.",
+        "off": "Configura la equivalencia entre taps y puntos de vida, y activa el evento cuando empiece el live.",
         "collecting": "Todos los taps ya se están guardando para el próximo jefe.",
         "active": "Los disparos consumen primero la reserva creada por los taps.",
         "activeBoss": "{boss} · Fase {phase} de {count}. La reserva se consume sin hacer retroceder al jefe.",
@@ -180,18 +181,25 @@
       "conversion": {
         "title": "Conversión de taps",
         "description": "Elige una equivalencia fácil de explicar a la audiencia.",
-        "preset": "taps = +1 punto",
-        "presetSingular": "tap = +1 punto",
-        "custom": "Cantidad personalizada de taps por punto",
-        "equation": "Cada {taps} taps suma 1 punto de vida",
-        "hint": "El valor se guarda antes de activar y se mantiene durante toda la ronda.",
+        "preset": "taps → puntos de vida",
+        "presetSingular": "tap → punto de vida",
+        "custom": "Equivalencia personalizada de taps y vida",
+        "equation": "Cada {taps} taps suma {health} puntos de vida",
+        "every": "Cada",
+        "tapsInput": "Taps por conversión",
+        "tapsAdd": "taps suma",
+        "healthInput": "Puntos de vida por conversión",
+        "healthPoints": "puntos de vida",
+        "hint": "La equivalencia se guarda antes de activar y se mantiene durante toda la ronda.",
         "locked": "La conversión queda congelada hasta finalizar este evento."
       },
       "progress": {
         "waitingBoss": "Esperando jefe",
         "phase": "Fase {phase} de {count}",
         "noBoss": "Los taps se acumulan desde ahora",
-        "battle": "Avance total de la batalla",
+        "battle": "Vida efectiva restante del jefe y la reserva",
+        "collected": "La comunidad ha reunido {value} puntos de vida para el próximo jefe.",
+        "healthPointsShort": "PV",
         "reserveEquivalent": "La reserva actual equivale a {value}× la vida completa de este jefe.",
         "reservePercent": "La reserva actual equivale al {value} de la vida completa de este jefe.",
         "converted": "La comunidad ha convertido {value} puntos de vida."
@@ -208,7 +216,7 @@
         "stopping": "Deteniendo…",
         "finish": "Finalizar evento"
       },
-      "footer": "Los taps se combinan entre todos los usuarios; los sobrantes también cuentan para el siguiente punto.",
+      "footer": "Los taps se combinan entre todos los usuarios; los sobrantes también cuentan para la siguiente conversión.",
       "feedback": {
         "generic": "El estado de Farmeando taps cambió. Revisa los datos antes de continuar.",
         "ready": "Configura la conversión cuando quieras.",
@@ -222,7 +230,7 @@
         "stopping": "El evento se está deteniendo.",
         "stopped": "Farmeando taps fue desactivado.",
         "live_event_conflict": "Finaliza el otro Evento Live antes de activar este.",
-        "invalid_setting": "La cantidad de taps por punto no es válida.",
+        "invalid_setting": "La equivalencia entre taps y puntos de vida no es válida.",
         "tap_farming_settings_saved": "La conversión de taps fue guardada.",
         "tap_farming_activated": "Farmeando taps está juntando actividad de la comunidad.",
         "tap_farming_counted": "Los taps nuevos se agregaron a la reserva comunitaria.",
@@ -237,7 +245,7 @@
         "tap_farming_already_off": "Farmeando taps ya estaba desactivado.",
         "tap_farming_setting_locked": "La conversión queda congelada mientras el evento está activo.",
         "blocked_by_live_event": "Finaliza el otro Evento Live antes de activar este.",
-        "invalid_taps_per_health_point": "La cantidad de taps por punto no es válida.",
+        "invalid_taps_per_health_point": "La equivalencia entre taps y puntos de vida no es válida.",
         "invalid_action": "Esta acción no está disponible en el estado actual."
       }
     },
@@ -379,6 +387,163 @@
     },
     "time": {
       "never": "Sin eventos"
+    }
+  },
+  "overlayDesigner": {
+    "eyebrow": "Composición del stream",
+    "title": "Diseñador de overlays",
+    "description": "Acomoda todos los overlays en un solo lienzo. Los perfiles vertical y horizontal se guardan por separado.",
+    "actions": {
+      "back": "Volver",
+      "retry": "Reintentar",
+      "copyUrl": "Copiar URL para OBS",
+      "urlCopied": "URL copiada",
+      "copyProfile": "Copiar otro perfil",
+      "resetProfile": "Restablecer perfil",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "confirm": "Confirmar"
+    },
+    "profiles": {
+      "title": "Formato del stream",
+      "vertical": "Vertical",
+      "horizontal": "Horizontal"
+    },
+    "status": {
+      "loading": "Cargando compositor…",
+      "ready": "Edición local",
+      "saving": "Guardando…",
+      "saved": "Guardado",
+      "error": "No se pudo sincronizar"
+    },
+    "confirmation": {
+      "reset": {
+        "title": "¿Restablecer este perfil?",
+        "description": "{target} volverá a la distribución predeterminada."
+      },
+      "copy": {
+        "title": "¿Copiar el otro perfil?",
+        "description": "La distribución de {source} reemplazará la de {target}."
+      }
+    },
+    "components": {
+      "tap_farming": "Farmeando taps",
+      "pesky_battle": "Batalla Molestosa"
+    },
+    "canvas": {
+      "title": "Lienzo del overlay",
+      "zoom": "Zoom del lienzo",
+      "fit": "Ajustar",
+      "background": "Fondo de prueba",
+      "backgrounds": {
+        "alpha": "Transparente",
+        "light": "Claro",
+        "dark": "Oscuro"
+      },
+      "iframeTitle": "Compositor real del overlay",
+      "resize": {
+        "nw": "Redimensionar desde arriba a la izquierda",
+        "ne": "Redimensionar desde arriba a la derecha",
+        "sw": "Redimensionar desde abajo a la izquierda",
+        "se": "Redimensionar desde abajo a la derecha"
+      }
+    },
+    "layers": {
+      "eyebrow": "Escena",
+      "title": "Capas",
+      "hide": "Ocultar capa",
+      "show": "Mostrar capa",
+      "lock": "Bloquear capa",
+      "unlock": "Desbloquear capa",
+      "raise": "Subir capa",
+      "lower": "Bajar capa",
+      "hint": "Selecciona una capa aquí o directamente en el lienzo. Usa las flechas para moverla 1 px y Shift + flecha para moverla 10 px."
+    },
+    "inspector": {
+      "eyebrow": "Selección",
+      "x": "X",
+      "y": "Y",
+      "width": "Ancho",
+        "height": "Alto",
+        "colors": {
+          "title": "Colores del corazón",
+          "liquidColor": "Líquido",
+          "collectingColor": "Vida reunida",
+          "textColor": "Texto",
+          "outlineColor": "Contorno"
+        },
+        "options": {
+        "enabled": "Visible",
+        "enabledHint": "Aparece en este perfil.",
+        "locked": "Bloqueado",
+        "lockedHint": "Evita movimientos accidentales.",
+        "showTitle": "Mostrar título",
+        "showTitleHint": "Incluye el nombre del evento.",
+        "showDetails": "Mostrar detalles",
+        "showDetailsHint": "Incluye información secundaria.",
+        "motion": "Animaciones",
+        "motionHint": "Reproduce movimiento y pulsos."
+      }
+    },
+    "simulation": {
+      "eyebrow": "Modo diseño",
+      "title": "Simulación",
+      "scenario": "Escenario",
+      "reset": "Reiniciar simulación",
+      "tap": {
+        "phases": {
+          "collecting": "Juntando taps",
+          "active": "Jefe activo",
+          "transition": "Cambio de fase",
+          "completed": "Victoria"
+        },
+        "addTaps": "Agregar taps",
+        "damage": "Simular daño",
+        "nextPhase": "Siguiente fase",
+        "retry": "Perder y reintentar"
+      },
+      "battle": {
+        "phases": {
+          "recruiting": "Reclutando",
+          "ready": "Equipo completo",
+          "waiting_level": "Esperando nivel",
+          "active": "Batalla activa",
+          "won": "Victoria"
+        },
+        "participants": "Participantes",
+        "attempt": "Intento"
+      }
+    },
+    "preview": {
+      "title": "Mostrar simulación en OBS",
+      "active": "La fuente real está mostrando estos datos de prueba.",
+      "inactive": "La posición y el tamaño ya se sincronizan en vivo; aquí sólo activas los datos de prueba.",
+      "pending": "Sincronizando la fuente de OBS…",
+      "conflict": "Otro diseñador tomó el control de esta fuente de OBS. Cierra el otro editor para continuar aquí.",
+      "error": "OBS no pudo recibir el diseño en vivo. Revisa la conexión con el mod."
+    },
+    "empty": {
+      "loading": "Preparando el lienzo…",
+      "error": "No se pudo cargar la configuración del compositor."
+    },
+    "feedback": {
+      "generic": "El estado del compositor cambió.",
+      "loading": "Cargando perfiles…",
+      "ready": "El compositor está listo.",
+      "saved": "Los cambios fueron guardados.",
+      "saving": "Guardando cambios…",
+      "resetting": "Restableciendo el perfil…",
+      "copying": "Copiando la distribución…",
+      "connection_error": "Cuphead no respondió.",
+      "save_error": "No se pudieron guardar los cambios; tu borrador sigue aquí.",
+      "reset_error": "No se pudo restablecer el perfil.",
+      "copy_error": "No se pudo copiar el perfil."
+    },
+    "callout": {
+      "eyebrow": "Overlay para OBS",
+      "title": "Configura la escena en el diseñador",
+      "description": "Posición, tamaño, capas, formato vertical u horizontal y simulaciones ahora viven en un solo espacio.",
+      "action": "Configurar overlay"
     }
   },
   "interactions": {
