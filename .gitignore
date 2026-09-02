@@ -23,6 +23,11 @@ Thumbs.db
 *.pdb
 *.zip
 
+# Mugman skin working files are extracted from the locally installed game.
+# Keep the reproducible tools/metadata in Git, not the generated PNG/PSD output.
+MugmanSkinMod/generated/
+MugmanSkinMod/photoshop-work/
+
 # Unity shader build cache/output (the distributable bundle is under assets/)
 tools/unity-shader/AssetBundles/
 tools/unity-shader/Library/
