@@ -160,7 +160,7 @@
     "tapFarming": {
       "eyebrow": "Live game",
       "title": "Tap Farming",
-      "description": "The entire community's taps combine into a resistance reserve that the player must drain before continuing to damage the boss.",
+      "description": "The entire community's taps combine to increase the boss's health. The more taps they get, the longer the fight will last.",
       "phase": {
         "off": "Disabled",
         "collecting": "Accumulating health",
@@ -179,10 +179,7 @@
         "stopping": "Finishing the round and releasing the Live Events slot."
       },
       "conversion": {
-        "title": "Tap conversion",
-        "description": "Choose an equivalence that is easy to explain to the audience.",
-        "preset": "taps → health points",
-        "presetSingular": "tap → health point",
+        "description": "Define how many taps increase the boss's health. Use an amount that is easy to explain to your audience.",
         "custom": "Custom tap-to-health equivalence",
         "equation": "Every {taps} taps adds {health} health points",
         "every": "Every",
@@ -206,9 +203,9 @@
       },
       "counters": {
         "totalTaps": "Total taps",
-        "bankedTaps": "Banked taps",
-        "reserve": "Current reserve",
-        "absorbed": "Damage absorbed"
+        "bankedTaps": "Accumulated taps",
+        "reserve": "Current extra health",
+        "absorbed": "Extra health removed"
       },
       "actions": {
         "activate": "Activate Tap Farming",

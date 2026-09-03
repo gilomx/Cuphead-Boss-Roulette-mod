@@ -212,7 +212,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: var(--color-text);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 900;
   white-space: nowrap;
   cursor: pointer;
@@ -335,7 +335,7 @@ textarea:focus-visible {
 
 .pesky-names__footer span {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.35;
 }
 
@@ -399,7 +399,7 @@ textarea:focus-visible {
 
 .pesky-attack small {
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -414,7 +414,7 @@ textarea:focus-visible {
 .pesky-attacks__required {
   margin: 0;
   padding: 0.75rem 0.85rem;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
 }
 
 .pesky-feedback {
@@ -628,7 +628,7 @@ textarea:focus-visible {
   border: 1px solid rgb(255 255 255 / 13%);
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -1050,7 +1050,7 @@ textarea:focus-visible {
   display: block;
   margin-bottom: 0.35rem;
   color: var(--color-focus);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1076,7 +1076,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: white;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 900;
   white-space: nowrap;
   background: var(--color-control-active);
@@ -1240,7 +1240,7 @@ textarea:focus-visible {
 .stream-rule-table__gift small,
 .stream-rule-table__interaction small {
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.3;
 }
 
@@ -1461,7 +1461,7 @@ textarea:focus-visible {
 
 .stream-rule-form__enabled strong {
   color: var(--color-text-soft);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
 }
 
 .stream-rule-form__enabled input {
@@ -1848,12 +1848,12 @@ textarea:focus-visible {
 
 .interaction-settings__number strong {
   color: var(--color-text-soft);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
 }
 
 .interaction-settings__number small {
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   line-height: 1.3;
 }
 
@@ -2095,7 +2095,7 @@ textarea:focus-visible {
 
 .interaction-queue__clear-confirmation span {
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   line-height: 1.3;
 }
 
@@ -2154,7 +2154,7 @@ textarea:focus-visible {
   gap: 0.35rem;
   margin-left: 0.45rem;
   color: var(--color-focus);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
@@ -2228,7 +2228,7 @@ textarea:focus-visible {
 .interaction-table th {
   padding: 0.68rem var(--space-3);
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   font-weight: 900;
   text-align: left;
   text-transform: uppercase;
@@ -2341,7 +2341,7 @@ textarea:focus-visible {
 .interaction-phase-protection__copy p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.35;
 }
 
@@ -2351,7 +2351,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: var(--color-text);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 900;
   background: var(--color-control-active);
   cursor: pointer;
@@ -2569,7 +2569,7 @@ textarea:focus-visible {
   max-width: 50rem;
   margin: 0.28rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.4;
 }
 
@@ -2650,7 +2650,7 @@ textarea:focus-visible {
 .dashboard-live-events__heading > div > p:last-child {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.45;
 }
 
@@ -2747,7 +2747,7 @@ textarea:focus-visible {
 
 .dashboard-live-event-card__copy small {
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   line-height: 1.35;
 }
 
@@ -3010,7 +3010,7 @@ textarea:focus-visible {
   display: block;
   margin-top: 0.35rem;
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.35;
 }
 
@@ -3037,12 +3037,12 @@ textarea:focus-visible {
 }
 
 .dashboard-pesky-battle__stream-toggle strong {
-  font-size: 0.72rem;
+  font-size: 0.88rem;
 }
 
 .dashboard-pesky-battle__stream-toggle small {
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.3;
 }
 
@@ -3107,7 +3107,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__attacks-heading strong,
 .dashboard-pesky-battle__roster-heading strong {
   color: var(--color-text-soft);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
 }
 
 .dashboard-pesky-battle__roster-heading strong {
@@ -3301,7 +3301,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__slot > strong {
   width: 100%;
   overflow: hidden;
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.25;
   text-align: center;
   text-overflow: ellipsis;
@@ -3478,7 +3478,7 @@ textarea:focus-visible {
 
 .dashboard-live-event-conflict span {
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.35;
 }
 
@@ -3525,8 +3525,8 @@ textarea:focus-visible {
 }
 
 .dashboard-tap-farming__heading h1 svg {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 1.55rem;
+  height: 1.55rem;
   color: #73dec4;
 }
 
@@ -3534,7 +3534,7 @@ textarea:focus-visible {
   max-width: 52rem;
   margin: 0.38rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.73rem;
+  font-size: 0.88rem;
   line-height: 1.45;
 }
 
@@ -3574,51 +3574,13 @@ textarea:focus-visible {
   gap: 0.2rem;
 }
 
-.dashboard-tap-farming__configuration > div:first-child strong {
-  color: var(--color-text-soft);
-  font-size: 0.74rem;
-}
-
 .dashboard-tap-farming__configuration > div:first-child p,
 .dashboard-tap-farming__configuration > small {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.4;
 }
-
-.dashboard-tap-farming__rate-presets {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.42rem;
-}
-
-.dashboard-tap-farming__rate-presets button {
-  display: grid;
-  min-height: 3.5rem;
-  place-content: center;
-  gap: 0.15rem;
-  padding: 0.4rem;
-  border: 1px solid rgb(255 255 255 / 8%);
-  border-radius: var(--radius-small);
-  color: var(--color-text-muted);
-  background: rgb(255 255 255 / 2.5%);
-  cursor: pointer;
-}
-
-.dashboard-tap-farming__rate-presets button[data-active="true"] {
-  border-color: rgb(116 222 196 / 45%);
-  color: var(--color-text);
-  background: rgb(116 222 196 / 9%);
-}
-
-.dashboard-tap-farming__rate-presets button:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-.dashboard-tap-farming__rate-presets strong { font-size: 1.05rem; }
-.dashboard-tap-farming__rate-presets span { font-size: 0.52rem; }
 
 .dashboard-tap-farming__custom-rate {
   display: flex;
@@ -3626,7 +3588,7 @@ textarea:focus-visible {
   justify-content: space-between;
   gap: 0.65rem;
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: 0.78rem;
 }
 
 .dashboard-tap-farming__custom-rate input {
@@ -3656,8 +3618,8 @@ textarea:focus-visible {
 }
 
 .dashboard-tap-farming__equation svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.3rem;
+  height: 1.3rem;
   color: #73dec4;
 }
 
@@ -3715,14 +3677,14 @@ textarea:focus-visible {
 }
 
 .dashboard-tap-farming__boss-heading strong svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 1.15rem;
+  height: 1.15rem;
   color: #73dec4;
 }
 
 .dashboard-tap-farming__boss-heading small {
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: 0.78rem;
 }
 
 .dashboard-tap-farming__boss-heading > span {
@@ -3770,8 +3732,8 @@ textarea:focus-visible {
 }
 
 .dashboard-tap-farming__counter-grid svg {
-  width: 0.82rem;
-  height: 0.82rem;
+  width: 1.2rem;
+  height: 1.2rem;
   margin-bottom: 0.1rem;
   color: #73dec4;
 }
@@ -3779,7 +3741,7 @@ textarea:focus-visible {
 .dashboard-tap-farming__counter-grid span {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 0.54rem;
+  font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3795,9 +3757,20 @@ textarea:focus-visible {
   padding: 0.55rem 0.65rem;
   border-left: 0.18rem solid #73dec4;
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.4;
   background: rgb(116 222 196 / 4%);
+}
+
+.dashboard-tap-farming .dashboard-pesky-battle__state span,
+.dashboard-tap-farming .dashboard-live-event-conflict strong,
+.dashboard-tap-farming .dashboard-pesky-battle__footer p {
+  font-size: 0.88rem;
+}
+
+.dashboard-tap-farming .dashboard-eyebrow,
+.dashboard-tap-farming .dashboard-pesky-battle__footer small {
+  font-size: 0.78rem;
 }
 
 .live-overlay-preview {
@@ -3836,7 +3809,7 @@ textarea:focus-visible {
   max-width: 48rem;
   margin: 0.3rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   line-height: 1.4;
 }
 
@@ -4017,7 +3990,7 @@ textarea:focus-visible {
   padding: 0.32rem 0.52rem;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -4099,12 +4072,12 @@ textarea:focus-visible {
 
 .interaction-settings__toggle strong {
   color: var(--color-text-soft);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
 }
 
 .interaction-settings__toggle small {
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   line-height: 1.3;
 }
 
@@ -4206,7 +4179,7 @@ textarea:focus-visible {
   display: block;
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4222,7 +4195,7 @@ textarea:focus-visible {
 
 .dashboard-connection-card__footer strong {
   color: var(--color-text-soft);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
 }
 
 .dashboard-activity-grid {
@@ -4340,7 +4313,7 @@ textarea:focus-visible {
 }
 
 .dashboard-event-panel__confirmation strong {
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.35;
 }
 
@@ -4377,7 +4350,7 @@ textarea:focus-visible {
 
 .dashboard-events-empty span {
   max-width: 26rem;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.45;
 }
 
@@ -4813,10 +4786,6 @@ textarea:focus-visible {
   .dashboard-pesky-battle__actions,
   .dashboard-pesky-battle__actions button { width: 100%; }
   .dashboard-live-event-conflict { margin-inline: 1rem; }
-  .dashboard-tap-farming__rate-presets {
-    grid-template-columns: repeat(4, minmax(4.5rem, 1fr));
-    overflow-x: auto;
-  }
   .live-overlay-preview__heading { padding: 1rem; }
   .live-overlay-preview__reload { width: 100%; justify-content: center; }
   .live-overlay-preview__toolbar {

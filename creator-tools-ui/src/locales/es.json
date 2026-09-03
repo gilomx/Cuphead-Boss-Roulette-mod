@@ -160,7 +160,7 @@
     "tapFarming": {
       "eyebrow": "Juego del live",
       "title": "Farmeando taps",
-      "description": "Los taps de toda la comunidad se combinan y agregan una reserva de resistencia que el jugador debe consumir antes de seguir dañando al jefe.",
+      "description": "Los taps de toda la comunidad se combinan y aumentan la vida del jefe. Mientras más taps consigan, más tiempo durará la pelea.",
       "phase": {
         "off": "Desactivado",
         "collecting": "Acumulando vida",
@@ -179,10 +179,7 @@
         "stopping": "Terminando la ronda y liberando el espacio de Eventos Live."
       },
       "conversion": {
-        "title": "Conversión de taps",
-        "description": "Elige una equivalencia fácil de explicar a la audiencia.",
-        "preset": "taps → puntos de vida",
-        "presetSingular": "tap → punto de vida",
+        "description": "Define cuántos taps aumentan la vida del jefe. Usa una cantidad fácil de explicar a tu audiencia.",
         "custom": "Equivalencia personalizada de taps y vida",
         "equation": "Cada {taps} taps suma {health} puntos de vida",
         "every": "Cada",
@@ -206,9 +203,9 @@
       },
       "counters": {
         "totalTaps": "Taps totales",
-        "bankedTaps": "Taps guardados",
-        "reserve": "Reserva actual",
-        "absorbed": "Daño absorbido"
+        "bankedTaps": "Taps acumulados",
+        "reserve": "Vida extra actual",
+        "absorbed": "Vida extra quitada"
       },
       "actions": {
         "activate": "Activar Farmeando taps",

@@ -4,17 +4,11 @@ import {
   HeartPulse,
   Layers3,
   MousePointerClick,
+  Pointer,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
-
-const CONVERSION_PRESETS = [
-  { taps: 1, healthPoints: 1 },
-  { taps: 2, healthPoints: 1 },
-  { taps: 5, healthPoints: 1 },
-  { taps: 1, healthPoints: 2 },
-] as const;
 
 function normalizeConversionValue(value: number | undefined, fallback = 1) {
   const candidate = Number.isFinite(value) ? Math.floor(value ?? fallback) : fallback;
@@ -166,31 +160,7 @@ export function TapFarmingPanel() {
       <div className="dashboard-tap-farming__layout">
         <section className="dashboard-tap-farming__configuration">
           <div>
-            <strong>{t("dashboard.tapFarming.conversion.title")}</strong>
             <p>{t("dashboard.tapFarming.conversion.description")}</p>
-          </div>
-          <div className="dashboard-tap-farming__rate-presets">
-            {CONVERSION_PRESETS.map((preset) => {
-              const active = tapsDraft === preset.taps &&
-                healthPointsDraft === preset.healthPoints;
-              const label = t("dashboard.tapFarming.conversion.equation")
-                .replace("{taps}", String(preset.taps))
-                .replace("{health}", String(preset.healthPoints));
-              return (
-                <button
-                  type="button"
-                  data-active={active}
-                  aria-label={label}
-                  aria-pressed={active}
-                  disabled={locked || !tapFarming?.ready}
-                  key={`${preset.taps}-${preset.healthPoints}`}
-                  onClick={() => saveConversion(preset.taps, preset.healthPoints)}
-                >
-                  <strong>{preset.taps} → +{preset.healthPoints}</strong>
-                  <span>{t("dashboard.tapFarming.conversion.preset")}</span>
-                </button>
-              );
-            })}
           </div>
           <div
             className="dashboard-tap-farming__equation"
@@ -204,7 +174,7 @@ export function TapFarmingPanel() {
               saveConversion(tapsDraft, healthPointsDraft);
             }}
           >
-            <MousePointerClick aria-hidden="true" />
+            <Pointer aria-hidden="true" />
             <div className="dashboard-tap-farming__equation-fields">
               <span>{t("dashboard.tapFarming.conversion.every")}</span>
               <input
@@ -278,7 +248,7 @@ export function TapFarmingPanel() {
 
           <div className="dashboard-tap-farming__counter-grid">
             <article>
-              <MousePointerClick aria-hidden="true" />
+              <Pointer aria-hidden="true" />
               <span>{t("dashboard.tapFarming.counters.totalTaps")}</span>
               <strong>{totalTaps.toLocaleString(numberLocale)}</strong>
             </article>
