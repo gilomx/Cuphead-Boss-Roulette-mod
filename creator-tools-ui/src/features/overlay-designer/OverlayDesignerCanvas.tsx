@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent,
   type PointerEvent,
 } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
@@ -30,7 +29,6 @@ interface OverlayDesignerCanvasProps {
   tapState: TapFarmingPreviewSnapshot;
   battleState: PeskyBattlePreviewSnapshot;
   disabled?: boolean;
-  onSelect: (componentId: OverlayComponentId) => void;
   onChange: (
     componentId: OverlayComponentId,
     update: Partial<OverlayComposerComponent>,
@@ -97,7 +95,6 @@ export function OverlayDesignerCanvas({
   tapState,
   battleState,
   disabled = false,
-  onSelect,
   onChange,
 }: OverlayDesignerCanvasProps) {
   const { locale, t } = useLocalization();
@@ -148,11 +145,33 @@ export function OverlayDesignerCanvas({
     background,
   }), [background, battleState, locale, profile, selectedComponentId, tapState]);
 
-  const postDesign = useCallback(() => {
-    iframeRef.current?.contentWindow?.postMessage(message, window.location.origin);
-  }, [message]);
+  const latestMessageRef = useRef(message);
+  latestMessageRef.current = message;
 
-  useEffect(() => postDesign(), [postDesign]);
+  const postDesign = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      latestMessageRef.current,
+      window.location.origin,
+    );
+  }, []);
+
+  useEffect(() => {
+    const receiveReady = (event: MessageEvent<unknown>) => {
+      if (event.source !== iframeRef.current?.contentWindow ||
+          event.origin !== window.location.origin ||
+          !event.data || typeof event.data !== "object") return;
+      const ready = event.data as Record<string, unknown>;
+      if (ready.type !== "creator-tools-overlay-composer-ready" ||
+          Number(ready.version) !== 1 ||
+          ready.profileId !== latestMessageRef.current.profileId) return;
+      postDesign();
+    };
+
+    window.addEventListener("message", receiveReady);
+    return () => window.removeEventListener("message", receiveReady);
+  }, [postDesign]);
+
+  useEffect(() => postDesign(), [message, postDesign]);
 
   const source = useMemo(() => {
     const query = new URLSearchParams({ designer: "1", locale, background });
@@ -167,7 +186,7 @@ export function OverlayDesignerCanvas({
   ) => {
     event.preventDefault();
     event.stopPropagation();
-    onSelect(component.id);
+    if (component.id !== selectedComponentId) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     if (disabled || component.locked) return;
     dragRef.current = {
@@ -214,37 +233,6 @@ export function OverlayDesignerCanvas({
 
   const endInteraction = (event: PointerEvent<HTMLDivElement>) => {
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-  };
-
-  const nudge = (
-    event: KeyboardEvent<HTMLDivElement>,
-    component: OverlayComposerComponent,
-  ) => {
-    if (disabled || component.locked) return;
-    const distance = event.shiftKey ? 10 : 1;
-    const delta = event.key === "ArrowLeft"
-      ? { x: -distance, y: 0 }
-      : event.key === "ArrowRight"
-        ? { x: distance, y: 0 }
-        : event.key === "ArrowUp"
-          ? { x: 0, y: -distance }
-          : event.key === "ArrowDown"
-            ? { x: 0, y: distance }
-            : null;
-    if (!delta) return;
-    event.preventDefault();
-    onChange(component.id, {
-      x: Math.round(clamp(
-        component.x + delta.x,
-        0,
-        Math.max(0, profile.canvas.width - component.width),
-      )),
-      y: Math.round(clamp(
-        component.y + delta.y,
-        0,
-        Math.max(0, profile.canvas.height - component.height),
-      )),
-    });
   };
 
   const sortedComponents = [...profile.components].sort((left, right) =>
@@ -320,10 +308,8 @@ export function OverlayDesignerCanvas({
                     data-selected={selected}
                     data-enabled={component.enabled}
                     data-locked={component.locked}
-                    role="button"
-                    aria-pressed={selected}
+                    role="presentation"
                     aria-label={t(`overlayDesigner.components.${component.id}`)}
-                    tabIndex={0}
                     key={component.id}
                     style={{
                       left: component.x,
@@ -333,8 +319,6 @@ export function OverlayDesignerCanvas({
                       zIndex: component.layer + 1,
                     }}
                     onPointerDown={(event) => beginInteraction(event, component, "move")}
-                    onKeyDown={(event) => nudge(event, component)}
-                    onFocus={() => onSelect(component.id)}
                   >
                     <span className="overlay-designer-selection__label">
                       {t(`overlayDesigner.components.${component.id}`)}

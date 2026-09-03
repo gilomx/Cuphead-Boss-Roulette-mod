@@ -400,6 +400,19 @@ namespace Gilomx.CupheadBossRoulette
             bossPropertiesMainThread = null;
         }
 
+        internal void OnMapEntered()
+        {
+            lock (stateLock)
+            {
+                if (phase != "completed")
+                    return;
+                ResetSessionCountersLocked();
+                phase = "collecting";
+                SetFeedbackLocked(
+                    "tap_farming_waiting_for_boss", false);
+            }
+        }
+
         internal void OnPhaseTransition()
         {
             lock (stateLock)

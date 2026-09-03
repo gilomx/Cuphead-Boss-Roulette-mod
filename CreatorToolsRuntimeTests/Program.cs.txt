@@ -30,6 +30,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestBackgroundControlObservation);
             Run("Server Stop releases its listening port immediately",
                 TestServerStopReleasesPort);
+            Run("Creator Tools assets bypass the browser cache",
+                TestCreatorToolsAssetsBypassCache);
             Run("Server counts and prioritizes deferred manual tests",
                 TestDeferredManualTestCommands);
             Run("Control projections wait for their exact command sequence",
@@ -44,6 +46,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestDeferredTestMaterializationFailure);
             Run("Overlay composer persists clamped revisions atomically",
                 TestOverlayComposerPersistenceAndRevision);
+            Run("Overlay composer compacts legacy Tap Farming bounds",
+                TestOverlayComposerCompactsLegacyTapBounds);
             Run("Overlay composer serves POST config and preview routes",
                 TestOverlayComposerHttpRoutes);
             Run("Overlay preview expires and stops without gameplay state",
@@ -166,6 +170,25 @@ namespace Gilomx.CupheadBossRoulette
                         json.RootElement.GetProperty("backlogCount").GetInt64(),
                         "projected backlog count");
                 }
+            }
+        }
+
+        private static void TestCreatorToolsAssetsBypassCache()
+        {
+            using (var scope = new TestScope("creator-assets-cache"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            using (var response = client.GetAsync(
+                "http://127.0.0.1:" +
+                server.Port.ToString(CultureInfo.InvariantCulture) +
+                "/assets/creator-tools/gifts/catalog.json")
+                .GetAwaiter().GetResult())
+            {
+                Equal(HttpStatusCode.OK, response.StatusCode,
+                    "creator asset response");
+                True(response.Headers.CacheControl != null &&
+                    response.Headers.CacheControl.NoStore,
+                    "creator asset response was cacheable");
             }
         }
 
@@ -859,8 +882,9 @@ namespace Gilomx.CupheadBossRoulette
                     "\"x\":9999,\"width\":400," +
                     "\"opacity\":37," +
                     "\"variant\":\"compact\"," +
+                    "\"showTitle\":true," +
                     "\"showDetails\":true," +
-                    "\"liquidColor\":\"#12ABef\"," +
+                    "\"liquidColor\":\"#12ABef80\"," +
                     "\"collectingColor\":\"#FEDCBA\"," +
                     "\"textColor\":\"#112233\"," +
                     "\"outlineColor\":\"#ABCDEF\"}");
@@ -878,13 +902,15 @@ namespace Gilomx.CupheadBossRoulette
                     Equal("default",
                         component.GetProperty("variant").GetString(),
                         "legacy component variant is normalized");
-                    True(component.GetProperty("showDetails").GetBoolean(),
-                        "saved detail switch");
+                    False(component.GetProperty("showTitle").GetBoolean(),
+                        "tap farming title remains permanently hidden");
+                    False(component.GetProperty("showDetails").GetBoolean(),
+                        "tap farming details remain permanently hidden");
                     Equal(37, component.GetProperty("opacity").GetInt32(),
                         "saved overlay opacity");
-                    Equal("#12abef",
+                    Equal("#12abef80",
                         component.GetProperty("liquidColor").GetString(),
-                        "canonical liquid color");
+                        "canonical liquid color with alpha");
                     Equal("#fedcba",
                         component.GetProperty("collectingColor").GetString(),
                         "canonical collecting color");
@@ -928,9 +954,9 @@ namespace Gilomx.CupheadBossRoulette
                         json.RootElement, "vertical", "tap_farming");
                     Equal(680, component.GetProperty("x").GetInt32(),
                         "persisted component x");
-                    Equal("#12abef",
+                    Equal("#12abef80",
                         component.GetProperty("liquidColor").GetString(),
-                        "persisted liquid color");
+                        "persisted liquid color with alpha");
                     Equal(37, component.GetProperty("opacity").GetInt32(),
                         "persisted overlay opacity");
                 }
@@ -962,6 +988,39 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(1, json.RootElement
                         .GetProperty("revision").GetInt32(),
                         "restored primary revision");
+            }
+        }
+
+        private static void TestOverlayComposerCompactsLegacyTapBounds()
+        {
+            using (var scope = new TestScope("overlay-composer-compact-tap"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                var legacy = controller.ProcessConfigCommand(
+                    "{\"operation\":\"update\"," +
+                    "\"expectedRevision\":0," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"x\":220,\"y\":1010," +
+                    "\"width\":640,\"height\":720}");
+                Equal(200, legacy.StatusCode,
+                    "legacy Tap Farming bounds saved");
+
+                var migrated = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(
+                    migrated.GetConfigState()))
+                {
+                    var component = FindComposerComponent(
+                        json.RootElement, "vertical", "tap_farming");
+                    Equal(360, component.GetProperty("x").GetInt32(),
+                        "migrated Tap Farming x");
+                    Equal(1220, component.GetProperty("y").GetInt32(),
+                        "migrated Tap Farming y");
+                    Equal(360, component.GetProperty("width").GetInt32(),
+                        "migrated Tap Farming width");
+                    Equal(300, component.GetProperty("height").GetInt32(),
+                        "migrated Tap Farming height");
+                }
             }
         }
 
@@ -1022,6 +1081,8 @@ namespace Gilomx.CupheadBossRoulette
                     "\"sessionId\":\"http-preview\"," +
                     "\"componentId\":\"tap_farming\"," +
                     "\"scenario\":\"transition\"," +
+                    "\"bossName\":\"Rey Dado\"," +
+                    "\"levelId\":\"DicePalaceMain\"," +
                     "\"tapDelta\":500}", out status))
                 {
                     Equal(HttpStatusCode.OK, status,
@@ -1039,6 +1100,12 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(500L, preview.RootElement
                         .GetProperty("tapDelta").GetInt64(),
                         "preview tap delta through GET");
+                    Equal("Rey Dado", preview.RootElement
+                        .GetProperty("bossName").GetString(),
+                        "preview boss name through GET");
+                    Equal("DicePalaceMain", preview.RootElement
+                        .GetProperty("levelId").GetString(),
+                        "preview boss image key through GET");
                 }
             }
         }
@@ -1128,6 +1195,10 @@ namespace Gilomx.CupheadBossRoulette
                         json.RootElement.GetProperty("layout"),
                         "tap_farming").GetProperty("x").GetInt32(),
                         "live layout carries draft position");
+                    False(FindProfileComponent(
+                        json.RootElement.GetProperty("layout"),
+                        "tap_farming").GetProperty("showTitle").GetBoolean(),
+                        "live layout removes the tap farming title");
                     Equal("#336699", FindProfileComponent(
                         json.RootElement.GetProperty("layout"),
                         "tap_farming").GetProperty("liquidColor").GetString(),
@@ -1143,7 +1214,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 using (var json = JsonDocument.Parse(
                     controller.GetConfigState()))
-                    Equal(220, FindComposerComponent(
+                    Equal(360, FindComposerComponent(
                         json.RootElement, "vertical", "tap_farming")
                         .GetProperty("x").GetInt32(),
                         "live layout does not persist draft position");

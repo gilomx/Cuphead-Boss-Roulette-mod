@@ -1082,6 +1082,12 @@ namespace Gilomx.CupheadBossRoulette
                 });
             if (plugin.creatorToolsInteractions != null)
             {
+                // Cuphead's win path calls _OnLevelEnd before _OnPreWin.
+                // Project the win first so Tap Farming stops accepting taps
+                // at knockout and keeps its completed state for WinScreen.
+                if (Level.Won)
+                    plugin.creatorToolsInteractions.PeskyBattleLevelPreWin(
+                        __instance);
                 plugin.creatorToolsInteractions.PeskyBattleLevelEnded(
                     __instance);
                 plugin.creatorToolsInteractions.SuspendGameplayLevel();

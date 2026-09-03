@@ -386,7 +386,7 @@ namespace Gilomx.CupheadBossRoulette
         internal static string NormalizeColor(string value)
         {
             value = (value ?? string.Empty).Trim();
-            if (value.Length != 7 || value[0] != '#')
+            if ((value.Length != 7 && value.Length != 9) || value[0] != '#')
                 return string.Empty;
             for (var index = 1; index < value.Length; index++)
             {
@@ -420,6 +420,11 @@ namespace Gilomx.CupheadBossRoulette
             component.Opacity = Math.Max(0,
                 Math.Min(100, component.Opacity));
             component.Variant = "default";
+            if (component.Id == TapFarmingComponentId)
+            {
+                component.ShowTitle = false;
+                component.ShowDetails = false;
+            }
             var liquidColor = NormalizeColor(component.LiquidColor);
             component.LiquidColor = liquidColor.Length == 0
                 ? DefaultLiquidColor : liquidColor;
@@ -523,10 +528,10 @@ namespace Gilomx.CupheadBossRoulette
                 new CreatorToolsOverlayComposerComponent
                 {
                     Id = TapFarmingComponentId,
-                    X = vertical ? 220 : 1290,
-                    Y = vertical ? 1010 : 430,
-                    Width = vertical ? 640 : 570,
-                    Height = vertical ? 720 : 570,
+                    X = vertical ? 360 : 1395,
+                    Y = vertical ? 1220 : 565,
+                    Width = 360,
+                    Height = 300,
                     Enabled = true,
                     Locked = false,
                     Layer = 20,
@@ -618,6 +623,7 @@ namespace Gilomx.CupheadBossRoulette
                     : candidatePath;
                 var candidate = CreateDefaults(path, logWarning);
                 candidate.Revision = revision;
+                var migratedLegacyBounds = false;
                 var seenProfiles = new HashSet<string>(
                     StringComparer.OrdinalIgnoreCase);
                 for (var i = 0; i < profiles.ArrayValue.Count; i++)
@@ -647,6 +653,9 @@ namespace Gilomx.CupheadBossRoulette
                             !seenComponents.Add(componentId) ||
                             !TryLoadComponent(componentNode, component))
                             return false;
+                        migratedLegacyBounds =
+                            MigrateLegacyTapFarmingBounds(target, component) ||
+                            migratedLegacyBounds;
                         NormalizeComponent(target, component);
                     }
                     if (seenComponents.Count != target.Components.Count)
@@ -655,12 +664,36 @@ namespace Gilomx.CupheadBossRoulette
                 if (seenProfiles.Count != candidate.Profiles.Count)
                     return false;
                 loaded = candidate;
+                if (migratedLegacyBounds && !candidatePath.EndsWith(
+                        ".bak", StringComparison.OrdinalIgnoreCase))
+                    candidate.TrySave();
                 return true;
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static bool MigrateLegacyTapFarmingBounds(
+            CreatorToolsOverlayComposerProfile profile,
+            CreatorToolsOverlayComposerComponent component)
+        {
+            if (profile == null || component == null ||
+                component.Id != TapFarmingComponentId)
+                return false;
+            var vertical = profile.Id == VerticalProfileId;
+            var legacyWidth = vertical ? 640 : 570;
+            var legacyHeight = vertical ? 720 : 570;
+            if (component.Width != legacyWidth ||
+                component.Height != legacyHeight)
+                return false;
+
+            component.X += (legacyWidth - 360) / 2;
+            component.Y += (legacyHeight - 300) / 2;
+            component.Width = 360;
+            component.Height = 300;
+            return true;
         }
 
         private static bool TryLoadComponent(

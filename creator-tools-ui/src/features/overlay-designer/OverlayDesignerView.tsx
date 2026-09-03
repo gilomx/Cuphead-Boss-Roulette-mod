@@ -17,6 +17,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { OverlayDesignerCanvas } from "./OverlayDesignerCanvas";
 import { OverlayDesignerInspector } from "./OverlayDesignerInspector";
@@ -68,6 +69,7 @@ function createPreviewSessionId() {
 
 export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const { locale, t } = useLocalization();
+  const { tapFarming } = useConfig();
   const initialSelection = useMemo(querySelection, []);
   const [profileId, setProfileId] = useState<OverlayProfileId>(initialSelection.profileId);
   const [selectedComponentId, setSelectedComponentId] = useState<OverlayComponentId>(
@@ -101,6 +103,24 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const viewMountedRef = useRef(true);
   tapStateRef.current = tapState;
   battleStateRef.current = battleState;
+
+  const configuredTapsPerConversion = Math.max(1, Math.floor(
+    tapFarming?.conversion?.tapsPerConversion ??
+      tapFarming?.conversion?.tapsPerHealthPoint ??
+      1,
+  ));
+  const configuredHealthPointsPerConversion = Math.max(1, Math.floor(
+    tapFarming?.conversion?.healthPointsPerConversion ?? 1,
+  ));
+
+  useEffect(() => {
+    dispatchTap({
+      type: "conversion",
+      tapsPerConversion: configuredTapsPerConversion,
+      healthPointsPerConversion: configuredHealthPointsPerConversion,
+    });
+  }, [configuredHealthPointsPerConversion, configuredTapsPerConversion]);
+
   const {
     profiles,
     status,
@@ -357,6 +377,41 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     update: Partial<OverlayComposerComponent>,
   ) => updateComponent(profileId, componentId, update);
 
+  useEffect(() => {
+    const handleArrowNudge = (event: globalThis.KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || busy ||
+          !profile || !component || component.locked) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest(
+        "input, select, textarea, [contenteditable='true'], [role='tab']",
+      )) return;
+      const distance = event.shiftKey ? 10 : 1;
+      const delta = event.key === "ArrowLeft"
+        ? { x: -distance, y: 0 }
+        : event.key === "ArrowRight"
+          ? { x: distance, y: 0 }
+          : event.key === "ArrowUp"
+            ? { x: 0, y: -distance }
+            : event.key === "ArrowDown"
+              ? { x: 0, y: distance }
+              : null;
+      if (!delta) return;
+      event.preventDefault();
+      updateComponent(profileId, component.id, {
+        x: Math.min(
+          Math.max(0, profile.canvas.width - component.width),
+          Math.max(0, component.x + delta.x),
+        ),
+        y: Math.min(
+          Math.max(0, profile.canvas.height - component.height),
+          Math.max(0, component.y + delta.y),
+        ),
+      });
+    };
+    window.addEventListener("keydown", handleArrowNudge);
+    return () => window.removeEventListener("keydown", handleArrowNudge);
+  }, [busy, component, profile, profileId, updateComponent]);
+
   const moveLayer = (componentId: OverlayComponentId, direction: -1 | 1) => {
     if (!profile) return;
     const ordered = [...profile.components].sort((left, right) => left.layer - right.layer);
@@ -563,7 +618,6 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             tapState={tapState}
             battleState={battleState}
             disabled={busy}
-            onSelect={selectComponent}
             onChange={(componentId, update) => changeComponent(componentId, update)}
           />
           <OverlayDesignerInspector

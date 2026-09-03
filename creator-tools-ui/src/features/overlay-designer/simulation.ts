@@ -9,6 +9,11 @@ import type {
 
 export type TapSimulationAction =
   | { type: "scenario"; scenario: TapFarmingPreviewSnapshot["phase"] }
+  | {
+      type: "conversion";
+      tapsPerConversion: number;
+      healthPointsPerConversion: number;
+    }
   | { type: "add_taps"; amount: number }
   | { type: "damage"; amount: number }
   | { type: "next_phase" }
@@ -98,6 +103,10 @@ function withTapProgress(state: TapFarmingPreviewSnapshot) {
 
 export function createTapSimulation(
   scenario: TapFarmingPreviewSnapshot["phase"] = "active",
+  conversion: TapFarmingPreviewSnapshot["conversion"] = {
+    tapsPerConversion: 2,
+    healthPointsPerConversion: 1,
+  },
 ): TapFarmingPreviewSnapshot {
   const base: TapFarmingPreviewSnapshot = {
     revision: 1,
@@ -106,8 +115,11 @@ export function createTapSimulation(
     levelId: "DicePalaceMain",
     attempt: 2,
     conversion: {
-      tapsPerConversion: 2,
-      healthPointsPerConversion: 1,
+      tapsPerConversion: Math.max(1, Math.floor(conversion.tapsPerConversion)),
+      healthPointsPerConversion: Math.max(
+        1,
+        Math.floor(conversion.healthPointsPerConversion),
+      ),
     },
     counters: {
       totalTaps: 12486,
@@ -147,8 +159,23 @@ export function tapSimulationReducer(
   state: TapFarmingPreviewSnapshot,
   action: TapSimulationAction,
 ): TapFarmingPreviewSnapshot {
-  if (action.type === "reset") return createTapSimulation();
-  if (action.type === "scenario") return createTapSimulation(action.scenario);
+  if (action.type === "reset") return createTapSimulation("active", state.conversion);
+  if (action.type === "scenario") {
+    return createTapSimulation(action.scenario, state.conversion);
+  }
+  if (action.type === "conversion") {
+    return {
+      ...state,
+      revision: state.revision + 1,
+      conversion: {
+        tapsPerConversion: Math.max(1, Math.floor(action.tapsPerConversion)),
+        healthPointsPerConversion: Math.max(
+          1,
+          Math.floor(action.healthPointsPerConversion),
+        ),
+      },
+    };
+  }
   if (action.type === "add_taps") {
     const amount = Math.max(0, Math.floor(action.amount));
     const tapsPerConversion = Math.max(
@@ -308,6 +335,8 @@ export function previewCommand(
     simulationActive,
     layoutJson: JSON.stringify(profile),
     scenario: componentId === "tap_farming" ? tap.phase : battle.phase,
+    bossName: tap.bossName,
+    levelId: tap.levelId,
     totalTaps: tap.counters.totalTaps,
     tapDelta: tap.tapDelta,
     damageDelta: tap.damageDelta,

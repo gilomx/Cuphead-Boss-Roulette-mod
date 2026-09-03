@@ -1067,8 +1067,11 @@ namespace Gilomx.CupheadBossRoulette
         private static void ApplyRouletteReturnDestinationPrefix()
         {
             var plugin = activeInstance;
-            if (plugin != null)
-                plugin.ApplyRouletteReturnDestination();
+            if (plugin == null)
+                return;
+            plugin.ApplyRouletteReturnDestination();
+            if (plugin.creatorToolsInteractions != null)
+                plugin.creatorToolsInteractions.TapFarmingMapEntered();
         }
 
         private static void OverrideBlackAndWhiteFilterPostfix(

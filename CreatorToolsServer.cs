@@ -1909,7 +1909,10 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
-            ServeFile(stream, fullPath, MimeType(fullPath), true);
+            var cache = !decoded.StartsWith(
+                "creator-tools" + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase);
+            ServeFile(stream, fullPath, MimeType(fullPath), cache);
         }
 
         private static void ServeFile(

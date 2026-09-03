@@ -79,6 +79,8 @@ export interface OverlayPreviewCommand {
   simulationActive: boolean;
   layoutJson: string;
   scenario: string;
+  bossName: string;
+  levelId: string;
   totalTaps: number;
   tapDelta: number;
   damageDelta: number;

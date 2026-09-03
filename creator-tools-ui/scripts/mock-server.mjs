@@ -135,10 +135,10 @@ function defaultOverlayProfiles() {
       components: [
         {
           id: "tap_farming",
-          x: 220,
-          y: 1010,
-          width: 640,
-          height: 720,
+          x: 360,
+          y: 1220,
+          width: 360,
+          height: 300,
           enabled: true,
           locked: false,
           layer: 20,
@@ -179,10 +179,10 @@ function defaultOverlayProfiles() {
       components: [
         {
           id: "tap_farming",
-          x: 1290,
-          y: 430,
-          width: 570,
-          height: 570,
+          x: 1395,
+          y: 565,
+          width: 360,
+          height: 300,
           enabled: true,
           locked: false,
           layer: 20,
@@ -731,20 +731,22 @@ function normalizeOverlayComponent(component, canvas) {
     : 100;
   component.enabled = component.enabled !== false;
   component.locked = component.locked === true;
-  component.showTitle = component.showTitle !== false;
+  component.showTitle = component.id === "tap_farming"
+    ? false
+    : component.showTitle !== false;
   component.showDetails = component.showDetails !== false;
   component.motion = component.motion !== false;
   component.variant = "default";
-  component.liquidColor = /^#[0-9a-fA-F]{6}$/.test(String(component.liquidColor ?? ""))
+  component.liquidColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.liquidColor ?? ""))
     ? String(component.liquidColor).toLowerCase()
     : "#ff4f92";
-  component.collectingColor = /^#[0-9a-fA-F]{6}$/.test(String(component.collectingColor ?? ""))
+  component.collectingColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.collectingColor ?? ""))
     ? String(component.collectingColor).toLowerCase()
     : "#f4c95d";
-  component.textColor = /^#[0-9a-fA-F]{6}$/.test(String(component.textColor ?? ""))
+  component.textColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.textColor ?? ""))
     ? String(component.textColor).toLowerCase()
     : "#ffffff";
-  component.outlineColor = /^#[0-9a-fA-F]{6}$/.test(String(component.outlineColor ?? ""))
+  component.outlineColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.outlineColor ?? ""))
     ? String(component.outlineColor).toLowerCase()
     : "#f5f5f7";
 }
@@ -797,7 +799,7 @@ function applyOverlayComposerCommand(command, res) {
     }
     for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor"]) {
       if (Object.prototype.hasOwnProperty.call(command, key) &&
-          !/^#[0-9a-fA-F]{6}$/.test(String(command[key] ?? ""))) {
+          !/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(command[key] ?? ""))) {
         json(res, { ok: false, error: "invalid_color" }, 400);
         return;
       }
@@ -1007,6 +1009,8 @@ createServer((req, res) => {
       sessionId: preview.sessionId ?? "",
       componentId: preview.componentId,
       scenario: preview.scenario,
+      bossName: String(preview.bossName ?? ""),
+      levelId: String(preview.levelId ?? ""),
       expiresAtUtc: new Date(preview.expiresAt).toISOString(),
       totalTaps: Number(preview.totalTaps) || 0,
       tapDelta: Number(preview.tapDelta) || 0,

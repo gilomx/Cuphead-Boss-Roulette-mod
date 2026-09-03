@@ -393,6 +393,11 @@ namespace Gilomx.CupheadBossRoulette
             tapFarming.OnLevelEnded(level);
         }
 
+        internal void TapFarmingMapEntered()
+        {
+            tapFarming.OnMapEntered();
+        }
+
         internal bool PrepareTapFarmingBossDamage(
             object properties, ref float damage)
         {

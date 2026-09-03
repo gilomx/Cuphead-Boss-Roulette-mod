@@ -2,6 +2,76 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El KO de Farmeando taps se reconoce durante `_OnLevelEnd`, antes de la señal
+  tardía `_OnPreWin` de Cuphead: desde ese instante deja de aceptar taps y el
+  overlay conserva la escena de Victoria durante la pantalla de calificación.
+  Al crear nuevamente a los jugadores en el mapa, la sesión vuelve a
+  Acumulando vida con taps, PV, intentos y reserva reiniciados en cero.
+- Juntando taps tiene ahora una vista propia con contador y señal animada, sin
+  reutilizar el corazón. Su señal, título, contador y leyenda escalan con el
+  recuadro completo, sin tamaños máximos fijos. La escena pasa a llamarse
+  Acumulando vida y muestra, en vertical, los taps y los PV convertidos. El
+  círculo deriva del color configurado un fondo al 20 %, mientras la palabra
+  TAP y un segundo contorno simulan un doble tapeo rápido, descansan medio
+  segundo y repiten; ambos golpes tienen ahora una separación algo más marcada.
+  Los tres anillos conservan su expansión suave original;
+  sólo su nacimiento se sincroniza con esos mismos dos golpes. Las dos
+  cantidades usan una escala más discreta y forman un
+  bloque compacto junto al círculo. Se elimina el título interno Acumulando
+  vida y se recentran el círculo y sus métricas en el espacio disponible.
+  Al entrar, aparecen en secuencia el círculo TAP, los taps acumulados y los
+  PV convertidos, conservando después la animación continua de doble tapeo.
+  El encabezado muestra ahora la equivalencia configurada —por ejemplo,
+  `1 TAP = 1 PV`— y se actualiza con los dos valores reales de conversión.
+  La simulación del diseñador toma esa equivalencia de la configuración actual
+  en lugar de mantener el valor fijo que usaba anteriormente.
+  La equivalencia se alinea ahora con las cantidades en una sola columna
+  compacta; los números de taps y PV tienen una escala más discreta y reducen
+  también la distancia vertical entre ambas métricas. La entrada comienza por
+  el círculo TAP, continúa con la equivalencia y termina con ambas cantidades.
+  Las leyendas de ambas cantidades respetan directamente la opacidad del color
+  de texto, sin aplicarles una reducción adicional; las etiquetas de Victoria
+  hacen lo mismo, incluida la opacidad final de su animación de entrada.
+  Victoria muestra el GIF dorado junto a Taps de la
+  ronda, Intentos y Vida extra consumida, que acumula todos los intentos de la
+  ronda. Sus textos son más grandes y compactos, y cada elemento entra en una
+  secuencia diferenciada antes de que el bloque completo salga suavemente. El
+  GIF y toda la tipografía escalan ahora con el tamaño real del recuadro, sin
+  topes fijos que desperdicien el espacio al agrandarlo. Se
+  elimina el interruptor Mostrar detalles de Farmeando taps, y las ondas y
+  burbujas se mueven aproximadamente 30 % más rápido.
+- La capa de Farmeando taps usa ahora un marco compacto de 360 × 300, centrado
+  sobre la posición anterior, y un corazón aproximadamente 30 % más pequeño.
+  Los perfiles que aún conservaban el recuadro predeterminado grande se migran
+  automáticamente sin perder sus colores ni el resto de la configuración.
+- Al iniciar la escena del jefe ya no aparece el corazón vacío con `+X PV`.
+  Mientras llega la primera lectura real de vida se muestra directamente el
+  corazón lleno al 100 %, con la foto del jefe; los PV restantes aparecen en
+  cuanto el juego publica su valor, sin cambiar de composición.
+- El preview integrado del diseñador confirma ahora cuándo terminó de cargar y
+  recibe de nuevo el estado más reciente; así los cambios de posición, tamaño,
+  color y opacidad se reflejan sin depender del orden de carga de los iframes.
+  Los recursos visuales del diseñador ya no se guardan en caché, evitando que
+  una paleta antigua tape esos cambios. El corazón de Farmeando taps es además
+  más pequeño, ancho y redondeado.
+- Farmeando taps reduce el tamaño general del corazón y del porcentaje; ambos
+  textos internos comparten ahora 82 % de opacidad y los PV efectivos quedan
+  más cerca del porcentaje. Durante la etapa de recolección el corazón no se
+  muestra, dejando libre el espacio para una animación específica futura.
+- Los cuatro colores configurables del corazón aceptan opacidad. El líquido
+  conserva un único color base: sus ondas, luces y profundidades derivan de él
+  automáticamente y multiplican la nueva opacidad por sus proporciones
+  internas, sin obligar a configurar cada capa por separado.
+- El diseñador y la fuente de OBS muestran ahora la misma composición completa
+  y conservan el jefe simulado, incluida su imagen. Las capas se seleccionan
+  únicamente desde el panel lateral; las flechas mueven la capa elegida 1 px y
+  `Shift` + flecha la mueve 10 px. El espacio de trabajo deja crecer los paneles
+  y usa el scroll de la página para que ningún control quede recortado.
+- Farmeando taps elimina definitivamente el encabezado con el nombre del evento
+  y del jefe. El porcentaje dentro del corazón es más pequeño y muestra debajo
+  los puntos de vida efectivos restantes, sumando la vida nativa vigente y la
+  reserva agregada por taps. Cada aumento de taps produce además un latido
+  discreto cuando las animaciones están activas.
 - El retrato del jefe en Farmeo de taps queda más abajo dentro del corazón,
   con mayor separación de la hendidura superior. Al cerrar Cuphead, Creator
   Tools entra en un apagado definitivo e idempotente para impedir que vuelva

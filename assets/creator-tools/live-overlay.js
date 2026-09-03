@@ -83,7 +83,7 @@
 
   function normalizeHexColor(value, fallback) {
     const color = String(value || "").trim().toLowerCase();
-    return /^#[0-9a-f]{6}$/.test(color) ? color : fallback;
+    return /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(color) ? color : fallback;
   }
 
   function resolveProfileId() {
@@ -97,11 +97,11 @@
     const vertical = id === "vertical";
     const placements = vertical
       ? {
-          tap_farming: { x: 220, y: 1010, width: 640, height: 720, layer: 20 },
+          tap_farming: { x: 360, y: 1220, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 60, y: 1260, width: 960, height: 560, layer: 10 },
         }
       : {
-          tap_farming: { x: 1290, y: 430, width: 570, height: 570, layer: 20 },
+          tap_farming: { x: 1395, y: 565, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 80, y: 720, width: 1760, height: 300, layer: 10 },
         };
     return {
@@ -177,8 +177,12 @@
   function presentationFor(component) {
     return {
       variant: "default",
-      showTitle: component.showTitle !== false,
-      showDetails: component.showDetails !== false,
+      showTitle: component.id === "tap_farming"
+        ? false
+        : component.showTitle !== false,
+      showDetails: component.id === "tap_farming"
+        ? false
+        : component.showDetails !== false,
       motion: component.motion !== false,
       liquidColor: normalizeHexColor(component.liquidColor, "#ff4f92"),
       collectingColor: normalizeHexColor(component.collectingColor, "#f4c95d"),
@@ -219,13 +223,11 @@
     return `${definition.src}?${params}`;
   }
 
-  function applyProfile(profile, selectedId = "") {
+  function applyProfile(profile) {
     activeProfile = normalizedProfile(profile);
     root.dataset.profile = profileId;
     root.style.setProperty("--canvas-width", String(activeProfile.canvas.width));
     root.style.setProperty("--canvas-height", String(activeProfile.canvas.height));
-    const solo = normalizeComponentId(selectedId);
-
     for (const [id, entry] of components) {
       const config = componentConfig(id);
       const x = coordinatePercent(config.x, activeProfile.canvas.width, 0);
@@ -249,12 +251,11 @@
         String(clamp(finiteNumber(config.opacity, 100), 0, 100) / 100),
       );
       entry.host.style.zIndex = String(Math.round(finiteNumber(config.layer, 1)));
-      const forceDesignerVisible = Boolean(designer && solo && solo === id);
-      entry.host.dataset.enabled = String(forceDesignerVisible || config.enabled !== false);
+      entry.host.dataset.enabled = String(config.enabled !== false);
       entry.host.dataset.configEnabled = String(config.enabled !== false);
       entry.host.dataset.locked = String(config.locked === true);
       entry.host.dataset.variant = presentationFor(config).variant;
-      entry.host.dataset.soloHidden = String(Boolean(solo && solo !== id));
+      entry.host.dataset.soloHidden = "false";
     }
   }
 
@@ -500,13 +501,8 @@
     }, ownOrigin === "null" ? "*" : ownOrigin);
   }
 
-  function render(selectedId = "") {
-    const selected = normalizeComponentId(selectedId || (
-      previewState?.active && previewState.simulationActive === true
-        ? previewState.componentId
-        : ""
-    ));
-    applyProfile(activeProfile, selected);
+  function render() {
+    applyProfile(activeProfile);
     for (const id of components.keys()) postComponentState(id);
   }
 
@@ -620,7 +616,7 @@
         : previewPeskySnapshot({ scenario: "recruiting" }),
     };
     previewState = { active: false };
-    render(message.selectedComponentId);
+    render();
   }
 
   function announceReady() {

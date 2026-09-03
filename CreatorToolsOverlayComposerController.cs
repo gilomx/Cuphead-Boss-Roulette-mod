@@ -440,6 +440,8 @@ namespace Gilomx.CupheadBossRoulette
             if (componentId ==
                 CreatorToolsOverlayComposerSettings.TapFarmingComponentId)
             {
+                slot.BossName = "Rey Dado";
+                slot.LevelId = "DicePalaceMain";
                 slot.TotalTaps = 25680L;
                 slot.ReserveHealth = 3840d;
                 slot.SpentHealth = 9000d;
@@ -487,6 +489,11 @@ namespace Gilomx.CupheadBossRoulette
                 if (scenario.Length == 0) return false;
                 slot.Scenario = scenario;
             }
+            if (!ApplyOptionalText(values, "bossName",
+                    ref slot.BossName, 120) ||
+                !ApplyOptionalText(values, "levelId",
+                    ref slot.LevelId, 96))
+                return false;
             long integer64;
             double number;
             if (values.ContainsKey("totalTaps"))
@@ -553,6 +560,21 @@ namespace Gilomx.CupheadBossRoulette
             double value;
             if (!TryReadDouble(values, key, out value)) return false;
             target = Clamp(value, 0d, MaximumSyntheticValue);
+            return true;
+        }
+
+        private static bool ApplyOptionalText(
+            Dictionary<string, string> values,
+            string key,
+            ref string target,
+            int maximum)
+        {
+            if (!values.ContainsKey(key)) return true;
+            var value = (Value(values, key) ?? string.Empty).Trim();
+            if (value.Length > maximum) return false;
+            for (var index = 0; index < value.Length; index++)
+                if (char.IsControl(value[index])) return false;
+            target = value;
             return true;
         }
 
@@ -662,6 +684,10 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJson.AppendEscaped(builder, slot.ComponentId);
             builder.Append("\",\"scenario\":\"");
             CreatorToolsJson.AppendEscaped(builder, slot.Scenario);
+            builder.Append("\",\"bossName\":\"");
+            CreatorToolsJson.AppendEscaped(builder, slot.BossName);
+            builder.Append("\",\"levelId\":\"");
+            CreatorToolsJson.AppendEscaped(builder, slot.LevelId);
             builder.Append("\",\"expiresAtUtc\":");
             if (!slot.Active || slot.ExpiresAtUtc == DateTime.MinValue)
                 builder.Append("null");
@@ -795,6 +821,8 @@ namespace Gilomx.CupheadBossRoulette
             internal string SessionId = string.Empty;
             internal string ComponentId = string.Empty;
             internal string Scenario = string.Empty;
+            internal string BossName = string.Empty;
+            internal string LevelId = string.Empty;
             internal DateTime ExpiresAtUtc = DateTime.MinValue;
             internal long TotalTaps;
             internal long TapDelta;

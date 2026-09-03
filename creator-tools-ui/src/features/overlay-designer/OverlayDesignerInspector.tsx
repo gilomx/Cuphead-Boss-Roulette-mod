@@ -31,6 +31,27 @@ function numberValue(value: string, fallback: number) {
   return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
 }
 
+function colorBase(value: string) {
+  return /^#[0-9a-f]{6}/i.test(value) ? value.slice(0, 7) : "#ffffff";
+}
+
+function colorOpacity(value: string) {
+  if (!/^#[0-9a-f]{8}$/i.test(value)) return 100;
+  return Math.round(Number.parseInt(value.slice(7, 9), 16) / 255 * 100);
+}
+
+function colorWithOpacity(value: string, opacity: number) {
+  const alpha = Math.round(Math.min(100, Math.max(0, opacity)) * 255 / 100)
+    .toString(16)
+    .padStart(2, "0");
+  return `${colorBase(value)}${alpha}`.toLowerCase();
+}
+
+function colorWithBase(value: string, base: string) {
+  const alpha = /^#[0-9a-f]{8}$/i.test(value) ? value.slice(7, 9) : "ff";
+  return `${base}${alpha}`.toLowerCase();
+}
+
 export function OverlayDesignerInspector({
   profile,
   component,
@@ -65,6 +86,11 @@ export function OverlayDesignerInspector({
     ["width", component.width, minimumSize.width, maximumProportionalSize.width],
     ["height", component.height, minimumSize.height, maximumProportionalSize.height],
   ] as const;
+  const switchKeys: Array<
+    "enabled" | "locked" | "showTitle" | "showDetails" | "motion"
+  > = component.id === "tap_farming"
+    ? ["enabled", "locked", "motion"]
+    : ["enabled", "locked", "showTitle", "showDetails", "motion"];
 
   const updateGeometry = (
     key: typeof geometry[number][0],
@@ -176,14 +202,40 @@ export function OverlayDesignerInspector({
                 <span className="overlay-designer-properties__color-control">
                   <input
                     type="color"
-                    value={component[key]}
+                    value={colorBase(component[key])}
                     disabled={disabled}
                     aria-label={t(`overlayDesigner.inspector.colors.${key}`)}
                     onInput={(event) => onChange({
-                      [key]: (event.currentTarget as HTMLInputElement).value,
+                      [key]: colorWithBase(
+                        component[key],
+                        (event.currentTarget as HTMLInputElement).value,
+                      ),
                     })}
-                    onChange={(event) => onChange({ [key]: event.target.value })}
+                    onChange={(event) => onChange({
+                      [key]: colorWithBase(component[key], event.target.value),
+                    })}
                   />
+                  <span className="overlay-designer-properties__color-alpha">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={colorOpacity(component[key])}
+                      disabled={disabled}
+                      aria-label={`${t(`overlayDesigner.inspector.colors.${key}`)} · ${t("overlayDesigner.inspector.colors.alpha")}`}
+                      onInput={(event) => onChange({
+                        [key]: colorWithOpacity(
+                          component[key],
+                          Number((event.currentTarget as HTMLInputElement).value),
+                        ),
+                      })}
+                      onChange={(event) => onChange({
+                        [key]: colorWithOpacity(component[key], Number(event.target.value)),
+                      })}
+                    />
+                    <output>{colorOpacity(component[key])}%</output>
+                  </span>
                   <code>{component[key]}</code>
                 </span>
               </label>
@@ -192,7 +244,7 @@ export function OverlayDesignerInspector({
         )}
 
         <div className="overlay-designer-properties__switches">
-          {(["enabled", "locked", "showTitle", "showDetails", "motion"] as const).map((key) => (
+          {switchKeys.map((key) => (
             <button
               type="button"
               role="switch"

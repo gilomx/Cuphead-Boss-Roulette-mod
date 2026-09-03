@@ -163,7 +163,7 @@
       "description": "The entire community's taps combine into a resistance reserve that the player must drain before continuing to damage the boss.",
       "phase": {
         "off": "Disabled",
-        "collecting": "Collecting taps",
+        "collecting": "Accumulating health",
         "active": "Boss active",
         "transition": "Phase transition",
         "completed": "Finished",
@@ -457,7 +457,7 @@
       "unlock": "Unlock layer",
       "raise": "Raise layer",
       "lower": "Lower layer",
-      "hint": "Select a layer here or directly on the canvas. Use arrow keys to move it 1 px and Shift + arrow to move it 10 px."
+      "hint": "Select the layer only here. Use arrow keys to move it 1 px and Shift + arrow to move it 10 px."
     },
     "inspector": {
       "eyebrow": "Selection",
@@ -476,7 +476,8 @@
           "liquidColor": "Liquid",
           "collectingColor": "Collected health",
           "textColor": "Text",
-          "outlineColor": "Outline"
+          "outlineColor": "Outline",
+          "alpha": "Opacity"
         },
         "options": {
         "enabled": "Visible",
@@ -498,7 +499,7 @@
       "reset": "Reset simulation",
       "tap": {
         "phases": {
-          "collecting": "Collecting taps",
+          "collecting": "Accumulating health",
           "active": "Boss active",
           "transition": "Phase transition",
           "completed": "Victory"

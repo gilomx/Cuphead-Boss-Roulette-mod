@@ -163,7 +163,7 @@
       "description": "Los taps de toda la comunidad se combinan y agregan una reserva de resistencia que el jugador debe consumir antes de seguir dañando al jefe.",
       "phase": {
         "off": "Desactivado",
-        "collecting": "Juntando taps",
+        "collecting": "Acumulando vida",
         "active": "Jefe activo",
         "transition": "Cambio de fase",
         "completed": "Finalizado",
@@ -457,7 +457,7 @@
       "unlock": "Desbloquear capa",
       "raise": "Subir capa",
       "lower": "Bajar capa",
-      "hint": "Selecciona una capa aquí o directamente en el lienzo. Usa las flechas para moverla 1 px y Shift + flecha para moverla 10 px."
+      "hint": "Selecciona la capa únicamente aquí. Usa las flechas para moverla 1 px y Shift + flecha para moverla 10 px."
     },
     "inspector": {
       "eyebrow": "Selección",
@@ -476,7 +476,8 @@
           "liquidColor": "Líquido",
           "collectingColor": "Vida reunida",
           "textColor": "Texto",
-          "outlineColor": "Contorno"
+          "outlineColor": "Contorno",
+          "alpha": "Opacidad"
         },
         "options": {
         "enabled": "Visible",
@@ -498,7 +499,7 @@
       "reset": "Reiniciar simulación",
       "tap": {
         "phases": {
-          "collecting": "Juntando taps",
+          "collecting": "Acumulando vida",
           "active": "Jefe activo",
           "transition": "Cambio de fase",
           "completed": "Victoria"

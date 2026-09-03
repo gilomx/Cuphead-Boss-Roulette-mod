@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Farmeando taps</title>
-  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css?v=liquid-8">
+  <link rel="stylesheet" href="/assets/creator-tools/tap-farming-overlay.css?v=liquid-33">
 </head>
 <body>
   <main
@@ -14,16 +14,8 @@
     data-phase="off"
     data-value-mode="percent"
     data-variant="default"
-    data-show-title="false"
-    data-show-details="false"
     data-motion="true"
   >
-    <header class="tap-farming__title">
-      <span id="tap-eyebrow" class="tap-farming__eyebrow">FARMEANDO TAPS</span>
-      <strong id="tap-boss-name" class="tap-farming__boss">Esperando jefe</strong>
-      <span id="tap-preview-badge" class="tap-farming__preview" hidden>VISTA PREVIA</span>
-    </header>
-
     <section class="tap-heart-stage">
       <div class="tap-heart" role="img" aria-labelledby="tap-heart-label">
         <span id="tap-heart-label" class="sr-only">Porcentaje de vida restante</span>
@@ -32,7 +24,7 @@
           <defs>
             <path
               id="tap-heart-shape"
-              d="M160 274 C142 248 58 196 34 143 C11 91 38 45 84 39 C116 35 143 53 160 79 C177 53 204 35 236 39 C282 45 309 91 286 143 C262 196 178 248 160 274 Z">
+              d="M160 270 C137 250 48 200 28 139 C9 82 43 38 94 38 C125 38 149 56 160 77 C171 56 195 38 226 38 C277 38 311 82 292 139 C272 200 183 250 160 270 Z">
             </path>
 
             <clipPath id="tap-heart-clip">
@@ -122,36 +114,69 @@
             y="184"
             text-anchor="middle"
             dominant-baseline="middle">0%</text>
+          <text
+            id="tap-health-remaining"
+            class="tap-heart__remaining"
+            x="160"
+            y="206"
+            text-anchor="middle"
+            dominant-baseline="middle">0 PV</text>
         </svg>
 
         <span id="tap-delta" class="tap-heart__delta" aria-live="polite"></span>
       </div>
     </section>
 
-    <footer class="tap-farming__details">
-      <span class="tap-farming__state">
-        <b id="tap-status">Evento desactivado</b>
-      </span>
-      <span>
-        <b id="tap-total-label">TAPS</b>
-        <strong id="tap-total">0</strong>
-      </span>
-      <span>
-        <b id="tap-health-label">VIDA</b>
-        <strong id="tap-health">0 / 0</strong>
-      </span>
-      <span>
-        <b id="tap-reserve-label">RESERVA</b>
-        <strong id="tap-reserve">+0</strong>
-      </span>
-      <span>
-        <b id="tap-phase-label">Fase 1 de 1</b>
-        <strong id="tap-overall-progress">0%</strong>
-      </span>
-    </footer>
+    <section id="tap-collecting" class="tap-collecting" aria-live="polite">
+      <div class="tap-collecting__signal-entry" aria-hidden="true">
+        <div class="tap-collecting__signal">
+          <i></i><i></i><i></i><b>TAP</b>
+        </div>
+      </div>
+      <div class="tap-collecting__copy">
+        <span id="tap-collecting-conversion" class="tap-collecting__conversion">
+          1 TAP = 1 PV
+        </span>
+        <div class="tap-collecting__metrics">
+          <div class="tap-collecting__metric tap-collecting__metric--taps">
+            <strong id="tap-collecting-total">0</strong>
+            <small id="tap-collecting-caption">TAPS</small>
+          </div>
+          <div class="tap-collecting__metric tap-collecting__metric--health">
+            <strong id="tap-collecting-health">0</strong>
+            <small id="tap-collecting-health-caption">PV CONVERTIDOS</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tap-victory" aria-live="polite">
+      <img
+        class="tap-victory__image"
+        src="/assets/creator-tools/tap-farming-victory.gif?v=1"
+        alt=""
+        aria-hidden="true">
+      <div class="tap-victory__summary">
+        <span id="tap-victory-title" class="tap-victory__title">¡VICTORIA!</span>
+        <dl>
+          <div>
+            <dt id="tap-victory-taps-label">Taps de la ronda</dt>
+            <dd id="tap-victory-taps">0</dd>
+          </div>
+          <div>
+            <dt id="tap-victory-attempts-label">Intentos</dt>
+            <dd id="tap-victory-attempts">0</dd>
+          </div>
+          <div>
+            <dt id="tap-victory-absorbed-label">Vida extra consumida</dt>
+            <dd id="tap-victory-absorbed">0</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
   </main>
 
   <script src="/assets/creator-tools/live-event-overlay-runtime.js?v=composer-1"></script>
-  <script src="/assets/creator-tools/tap-farming-overlay.js?v=liquid-8"></script>
+  <script src="/assets/creator-tools/tap-farming-overlay.js?v=liquid-33"></script>
 </body>
 </html>
