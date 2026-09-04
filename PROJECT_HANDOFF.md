@@ -2,6 +2,46 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Catálogo: lanzamiento de cabeza de la Baronesa (2026-09-04)
+
+Se añadió `baroness_head_toss` como séptimo artículo. Conserva el `Animator`
+del castillo únicamente como soporte invisible de `Castle_Chase` y
+`Castle_Toss`, y deja visibles sólo `BaronessPhase2` y `BaronessPhase2Top`. La
+animación comienza con el cuerpo y la etiqueta completamente fuera del borde
+derecho. Entra durante los primeros 15/24 segundos del ciclo nativo de caminata,
+que termina en 21/24 antes de enlazar con el lanzamiento. Deja 24% de su ancho
+fuera del borde derecho y 70 píxeles bajo el borde inferior. Su altura es fija,
+no aleatoria. Dispara una sola vez en 40/24, usando el transform animado
+`BaronessTossPoint`; completa los 42 frames de `Castle_Toss` y sale caminando
+entre 63/24 y 78/24 antes de ocultar los renderers.
+
+La cabeza sigue siendo `BaronessLevelFollowingProjectile`: usa las propiedades
+de dificultad nativas, persigue y redirige igual que en la fase final, y
+conserva daño, collider y animación. El nombre y el regalo se transfieren desde
+la Baronesa a la cabeza. La jerarquía visual no tiene scripts, físicas ni
+colliders activos, por lo que nunca aparece ni ataca el castillo. Un padre
+`BaronessLevelCastle` inerte satisface la suscripción que exige el proyectil.
+
+Integrado en IDs, executor, precarga serializada, catálogo React, mock y
+traducciones ES/EN. El preview recorta el contenido visible de
+`baroness_head_toss_0009` en `atlas_baronesslevel`; su extractor reproducible es
+`tools/extract_native_baroness_head_toss_preview.py`. Ver
+`INTERACTION_CATALOG.md` para el contrato y la prueba manual pendiente.
+
+Validación: build .NET Release sin advertencias ni errores, build React y
+validación del catálogo con siete IDs correctos. La versión se instaló en la
+copia local del juego junto con `config.js`, `config.css` y el PNG; el endpoint
+`/api/config/interactions` publica `baroness_head_toss` como séptimo ID. DLL
+instalada: SHA-256
+`59F0528D4EC0B405F4E7BB85530B8EAAA49A4926DA7B27CA5BF3C2DE72B76427`.
+El respaldo anterior está en
+`installation-backups/baroness-head-toss-20260904-123900.zip`.
+
+Cuphead reinició y BepInEx cargó el mod sin errores de Harmony ni excepciones.
+La prueba del ataque dentro de una partida sigue pendiente porque el juego
+permanece en la pantalla inicial; no se activaron Interacciones ni se encoló
+ninguna prueba, así que se conservaron los ajustes del usuario.
+
 ## Catálogo: bomba teledirigida del Dr. Kahl (2026-09-04)
 
 Se añadió `robot_homing_bomb` como sexto artículo. Reutiliza el prefab

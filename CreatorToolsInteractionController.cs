@@ -119,6 +119,9 @@ namespace Gilomx.CupheadBossRoulette
             executors.Add(new RobotHomingBombInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
                 logInfo, logWarning));
+            executors.Add(new BaronessHeadTossInteractionExecutor(
+                coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
+                logInfo, logWarning));
             peskyBattle = new CreatorToolsPeskyBattleController(
                 pluginConfigPath, interactionQueue, liveEvents, resolveGift,
                 IsItemAvailable, DisableFreePeskyForBattle,

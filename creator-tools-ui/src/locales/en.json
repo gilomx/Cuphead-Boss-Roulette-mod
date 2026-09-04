@@ -707,6 +707,13 @@
         "imageAlt": "Original frame of Dr. Kahl's Robot homing bomb"
       }
     },
+    "baroness": {
+      "type": "Attack",
+      "headToss": {
+        "title": "Baroness head toss",
+        "imageAlt": "Original frame of Baroness Von Bon Bon throwing her head"
+      }
+    },
     "queue": {
       "title": "Redeems in progress",
       "description": "Active redeems and those waiting their turn appear here, respecting the configured simultaneous limit.",

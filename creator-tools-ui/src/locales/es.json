@@ -707,6 +707,13 @@
         "imageAlt": "Frame original de la bomba teledirigida del robot del Dr. Kahl"
       }
     },
+    "baroness": {
+      "type": "Ataque",
+      "headToss": {
+        "title": "Lanzamiento de cabeza de la Baronesa",
+        "imageAlt": "Frame original de la Baronesa Von Bon Bon lanzando su cabeza"
+      }
+    },
     "queue": {
       "title": "Interacciones en curso",
       "description": "Aquí aparecen las interacciones activas y las que esperan su turno, respetando el máximo simultáneo configurado.",

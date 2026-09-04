@@ -4,7 +4,8 @@ Esta guía define el contrato técnico que deben respetar todos los artículos
 nuevos del catálogo de Creator Tools. Las implementaciones de referencia son
 los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
 raíz, la semilla azul de Clavel de Cagney y la luciérnaga incendiada de Hosco
-y Tosco, además de la bomba teledirigida del Dr. Kahl.
+y Tosco, la bomba teledirigida del Dr. Kahl y el lanzamiento de cabeza de la
+Baronesa Von Bon Bon.
 
 ## Arquitectura obligatoria
 
@@ -291,8 +292,8 @@ cámara vive por ello en un wrapper y el actor conserva su escala local nativa;
 así no pierde la corrección de tamaño ni deforma sprite y `Collider2D` en jefes
 con zoom alejado.
 
-Las precargas de escenas de Hilda, La pandilla raíz, Cagney, Hosco y Tosco y
-Dr. Kahl se
+Las precargas de escenas de Hilda, La pandilla raíz, Cagney, Hosco y Tosco,
+Dr. Kahl y la Baronesa se
 serializan mediante `NativeInteractionPreloadCoordinator`. Todo cache nuevo que retenga una carga
 aditiva antes de activarla debe adquirir y liberar ese coordinador, incluso en
 fallo o `Dispose`, para no bloquear la cola asíncrona de escenas de Unity. Sus
@@ -338,6 +339,54 @@ Batalla Molestosa comparten el ID. El preview se extrae de
 `robot_ph1_bombot_0001` en `atlas_robotlevel_hq` mediante
 `tools/extract_native_robot_homing_bomb_preview.py`.
 
+## Lanzamiento de cabeza de la Baronesa
+
+`baroness_head_toss` reproduce una sola ejecución del ataque final de
+`scene_level_baroness`. La apariencia encadena los estados nativos
+`Castle_Chase` y `Castle_Toss`: el `Animator` y la jerarquía del castillo se
+conservan para que las dos capas
+`BaronessPhase2` y `BaronessPhase2Top` reciban sus sprites originales, mientras
+todos los renderers del castillo, brazos, dientes y fondo permanecen ocultos.
+Los scripts, colliders y rigidbodies de esa copia visual también quedan
+inertes; sólo la cabeza lanzada puede interactuar con el jugador.
+
+La Baronesa comienza completamente fuera del borde derecho, incluido el ancho
+de la etiqueta. Durante los primeros 15/24 segundos avanza hacia la esquina
+inferior derecha con el ciclo original `Castle_Chase`; el controlador espera a
+que ese ciclo complete sus 21/24 segundos antes de entrar en `Castle_Toss`.
+Así el tramo corto de caminata funciona como aviso del ataque. Su posición de
+ataque deja 24% del ancho visible del dibujo
+fuera del borde derecho y 70 píxeles bajo el borde inferior. La altura es fija;
+no participa en el sorteo vertical de los proyectiles. El evento nativo
+`FireHead` se reproduce manualmente una sola vez en el frame 19 del lanzamiento
+(40/24 segundos desde la aparición). El punto de salida se lee del transform
+animado `BaronessTossPoint` de la copia. `Castle_Toss` conserva sus 42 frames
+completos; luego el controlador regresa a `Castle_Chase` y la Baronesa camina
+fuera de cámara entre 63/24 y 78/24. Sus renderers sólo se ocultan cuando ha
+terminado ese recorrido.
+
+Los bounds usan `textureRectOffset`, `textureRect` y el pivote del sprite,
+porque los frames originales miden 1128 × 960 pero concentran el dibujo en una
+zona mucho menor. La entrada y la salida compensan también el desplazamiento
+de la cámara durante ese intervalo para permanecer pegadas al mismo borde.
+
+La cabeza es `BaronessLevelFollowingProjectile` y recibe directamente las
+propiedades `baronessVonBonbon` de la dificultad actual. Conserva el objetivo
+inicial, redirecciones, velocidad, animación, daño, collider y muerte del juego.
+El nombre y el icono de regalo nacen sobre la Baronesa y se transfieren a la
+cabeza al salir, sin crear una segunda etiqueta. El castillo invisible se
+mantiene como padre inerte para la suscripción nativa de muerte hasta que la
+cabeza abandona completamente la cámara o se destruye; existe un respaldo de
+24 segundos para liberar siempre el cupo activo.
+
+La precarga bloquea el lifecycle de los componentes `BaronessLevel*` de la
+escena temporal y también reconoce copias marcadas de la interacción. Esto
+evita que la jerarquía invisible inicie fases, daño o corrutinas del jefe. El
+proyectil no lleva esa marca, por lo que ejecuta normalmente su `Awake`,
+`Start`, movimiento y colisiones. El preview usa
+`baroness_head_toss_0009` de `atlas_baronesslevel` y se puede regenerar con
+`tools/extract_native_baroness_head_toss_preview.py`.
+
 ## Pasos para añadir un artículo
 
 1. Crear un ID estable en `CreatorToolsInteractionIds.All`, su tarjeta de
@@ -376,6 +425,10 @@ Batalla Molestosa comparten el ID. El preview se extrae de
   de su lanzamiento inicial a la persecución y conservar su explosión por daño,
   choque con jugador u otra bomba. Probar también su tiempo de vida original,
   precarga desde el mapa y captura dentro de la propia pelea del robot.
+- La Baronesa debe aparecer sola en la esquina inferior derecha, sin ningún
+  píxel visible del castillo, lanzar exactamente una cabeza y desaparecer. La
+  cabeza debe conservar sus redirecciones nativas, daño y colisiones; el nombre
+  debe transferirse del cuerpo al proyectil sin duplicarse.
 - Comparar al menos un jefe con cámara base y otro con zoom alejado, como Chef
   Saleroso; sprite, colisión, etiqueta y separación deben conservar el mismo
   tamaño aparente.

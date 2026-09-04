@@ -41,6 +41,13 @@ export const interactionItems = [
     typeKey: "interactions.robot.type",
     image: "/assets/creator-tools/interactions/robot-homing-bomb.png",
   },
+  {
+    id: "baroness_head_toss",
+    titleKey: "interactions.baroness.headToss.title",
+    imageAltKey: "interactions.baroness.headToss.imageAlt",
+    typeKey: "interactions.baroness.type",
+    image: "/assets/creator-tools/interactions/baroness-head-toss.png",
+  },
 ] as const;
 
 export function interactionItemFor(item: string) {

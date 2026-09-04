@@ -277,9 +277,10 @@ const interactionItems = [
   "hilda_purple_zeppelin",
   "rootpack_homing_carrot",
   "cagney_homing_plant",
-  "frogs_firefly",
-  "robot_homing_bomb",
-];
+    "frogs_firefly",
+    "robot_homing_bomb",
+    "baroness_head_toss",
+  ];
 
 function peskyBattleIsExclusive() {
   return ["recruiting", "ready", "waiting_level", "active"].includes(

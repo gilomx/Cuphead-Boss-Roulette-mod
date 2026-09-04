@@ -2,6 +2,16 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El catálogo incorpora el lanzamiento de cabeza de la Baronesa Von Bon Bon.
+  La animación comienza completamente fuera de cámara y usa un ciclo nativo de
+  `Castle_Chase` para caminar hasta la esquina inferior derecha antes de enlazar
+  con los 42 frames completos de `Castle_Toss`. Lanza una sola cabeza desde el
+  punto animado original y vuelve a salir caminando antes de ocultarse. La
+  cabeza conserva seguimiento, redirecciones, daño y colisiones originales. El
+  nombre del donador y el icono
+  de regalo pasan del cuerpo al proyectil. Está disponible en pruebas manuales,
+  reglas de stream, Modo Molestoso y Batalla Molestosa, con preview y textos
+  ES/EN.
 - El catálogo incluye la bomba teledirigida de la primera fase del Dr. Kahl.
   Entra desde la derecha a una altura aleatoria y conserva movimiento, vida y
   explosión nativos. Está disponible en pruebas manuales, reglas de stream,
