@@ -4,7 +4,7 @@ Esta guía define el contrato técnico que deben respetar todos los artículos
 nuevos del catálogo de Creator Tools. Las implementaciones de referencia son
 los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
 raíz, la semilla azul de Clavel de Cagney y la luciérnaga incendiada de Hosco
-y Tosco.
+y Tosco, además de la bomba teledirigida del Dr. Kahl.
 
 ## Arquitectura obligatoria
 
@@ -291,7 +291,8 @@ cámara vive por ello en un wrapper y el actor conserva su escala local nativa;
 así no pierde la corrección de tamaño ni deforma sprite y `Collider2D` en jefes
 con zoom alejado.
 
-Las precargas de escenas de Hilda, La pandilla raíz, Cagney y Hosco y Tosco se
+Las precargas de escenas de Hilda, La pandilla raíz, Cagney, Hosco y Tosco y
+Dr. Kahl se
 serializan mediante `NativeInteractionPreloadCoordinator`. Todo cache nuevo que retenga una carga
 aditiva antes de activarla debe adquirir y liberar ese coordinador, incluso en
 fallo o `Dispose`, para no bloquear la cola asíncrona de escenas de Unity. Sus
@@ -306,6 +307,36 @@ pendientes pueden continuar serialmente. Antes de iniciar una carga, cada cache
 comprueba si su escena fuente es la pelea actual: en ese caso debe capturar el
 prefab de los objetos ya cargados y jamás abrir una segunda copia aditiva del
 mismo jefe.
+
+## Bomba teledirigida del Dr. Kahl
+
+`robot_homing_bomb` reutiliza `RobotLevelHatchBombBot`, el prefab `secondary`
+de `RobotLevelRobotHatch` durante la primera fase de `scene_level_robot`.
+No conserva un robot auxiliar ni depende de que el jefe siga presente.
+
+La bomba entra completamente desde la derecha, a una Y aleatoria entre 15%
+y 80% del viewport. Hasta 24 candidatos ayudan a separar las entradas de otros
+actores y jugadores. El margen inicial incluye el nombre del donador. Usa el
+mismo lanzamiento hacia la izquierda, duración inicial aleatoria y transición
+de 4 segundos al homing que `RobotLevelRobotHatch.OnSecondaryAttack`.
+
+`HomingProjectile.Create` configura una copia inactiva; `InitBombBot` debe
+ejecutarse antes de activarla, porque `Start` necesita esas propiedades para
+configurar daño y movimiento. HP, velocidades, giro, colisiones, animación de
+explosión y tiempo de vida proceden de la dificultad nativa. No se añade TTL:
+se conservan tanto el límite nativo del homing como los respaldos originales
+de `AbstractProjectile`. El cupo se libera cuando se destruye el actor, después
+de la explosión cuando corresponde, no al primer evento `Die`.
+
+La escala de cámara vive en un wrapper que incluye sprite y colisiones durante
+vuelo y explosión. El nombre y el icono de regalo reutilizan la presentación
+compartida, con el hueco base de 14 px y el fade de 0.6 segundos al destruirse.
+Salir del nivel o reintentar elimina también el wrapper.
+
+La tarjeta, la fila de prueba manual, las reglas de stream, Modo Molestoso y
+Batalla Molestosa comparten el ID. El preview se extrae de
+`robot_ph1_bombot_0001` en `atlas_robotlevel_hq` mediante
+`tools/extract_native_robot_homing_bomb_preview.py`.
 
 ## Pasos para añadir un artículo
 
@@ -341,6 +372,10 @@ mismo jefe.
   de que la planta crezca y regrese persiguiendo al jugador. La luciérnaga debe
   entrar completamente desde la derecha, frenar dentro del encuadre y conservar
   sus pausas y avances sucesivos hacia el jugador.
+- La bomba del Dr. Kahl debe entrar desde la derecha a alturas variadas, pasar
+  de su lanzamiento inicial a la persecución y conservar su explosión por daño,
+  choque con jugador u otra bomba. Probar también su tiempo de vida original,
+  precarga desde el mapa y captura dentro de la propia pelea del robot.
 - Comparar al menos un jefe con cámara base y otro con zoom alejado, como Chef
   Saleroso; sprite, colisión, etiqueta y separación deben conservar el mismo
   tamaño aparente.

@@ -700,6 +700,13 @@
         "imageAlt": "Original frame of Ribby and Croaks' flaming firefly"
       }
     },
+    "robot": {
+      "type": "Enemy",
+      "homingBomb": {
+        "title": "Dr. Kahl's homing bomb",
+        "imageAlt": "Original frame of Dr. Kahl's Robot homing bomb"
+      }
+    },
     "queue": {
       "title": "Redeems in progress",
       "description": "Active redeems and those waiting their turn appear here, respecting the configured simultaneous limit.",

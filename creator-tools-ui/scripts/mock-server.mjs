@@ -278,6 +278,7 @@ const interactionItems = [
   "rootpack_homing_carrot",
   "cagney_homing_plant",
   "frogs_firefly",
+  "robot_homing_bomb",
 ];
 
 function peskyBattleIsExclusive() {

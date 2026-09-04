@@ -589,6 +589,9 @@ namespace Gilomx.CupheadBossRoulette
             NativeFrogsFireflyCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+            NativeRobotHomingBombCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
             InstallCreatorToolsGameplayLoadPatch();
             InstallCreatorToolsPhaseTransitionPatches();
 

@@ -700,6 +700,13 @@
         "imageAlt": "Frame original de la luciérnaga incendiada de Hosco y Tosco"
       }
     },
+    "robot": {
+      "type": "Enemigo",
+      "homingBomb": {
+        "title": "Bomba teledirigida del Dr. Kahl",
+        "imageAlt": "Frame original de la bomba teledirigida del robot del Dr. Kahl"
+      }
+    },
     "queue": {
       "title": "Interacciones en curso",
       "description": "Aquí aparecen las interacciones activas y las que esperan su turno, respetando el máximo simultáneo configurado.",

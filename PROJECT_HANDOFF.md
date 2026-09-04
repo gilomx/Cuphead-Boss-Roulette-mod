@@ -2,6 +2,38 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Catálogo: bomba teledirigida del Dr. Kahl (2026-09-04)
+
+Se añadió `robot_homing_bomb` como sexto artículo. Reutiliza el prefab
+`RobotLevelRobotHatch.secondary` (`RobotLevelHatchBombBot`) y el lanzamiento de
+la primera fase: entrada desde fuera del borde derecho, Y aleatoria entre 15%
+y 80% del viewport, propiedades de dificultad nativas y transición original al
+homing. Conserva explosión, colisiones y tiempo de vida del juego. Su cache
+participa en `NativeInteractionPreloadCoordinator` y aísla el lifecycle de la
+escena temporal del robot. Ver `INTERACTION_CATALOG.md` para el contrato.
+
+Integrado en IDs, executor, precarga, catálogo React, prueba manual, mock y
+traducciones ES/EN. Las listas compartidas lo incluyen también en reglas,
+Modo Molestoso y Batalla Molestosa. El preview nativo sale de
+`robot_ph1_bombot_0001` en `atlas_robotlevel_hq`; el extractor reproducible vive
+en `tools/extract_native_robot_homing_bomb_preview.py`.
+
+Validación: build .NET Release sin advertencias ni errores, build React y
+validación del catálogo con seis IDs correctos. La tarjeta y la fila de prueba
+se verificaron visualmente en el panel instalado; los endpoints de Interacciones
+y Modo Molestoso publican el nuevo ID. Se instalaron DLL, `config.js` y PNG, con
+respaldo en `installation-backups/robot-homing-bomb-20260904-115249.zip`.
+DLL instalada: SHA-256
+`5D2712C05F2C5BB5832FBC6CBB3EBB779A99A0E5AA19ECC0B2FFD2D307E35997`.
+
+Cuphead se cerró desde la pantalla de derrota y se abrió de nuevo mediante
+Steam. El log confirma el arranque del mod y la instalación de sus patches.
+La entrada real, persecución, explosión, etiqueta, pausa/retry y precarga quedan
+pendientes de la prueba en partida: el control automático no logró avanzar
+desde la pantalla de inicio y se pidió al usuario entrar a una partida.
+Se conservaron sus ajustes: Interacciones desactivadas, Modo Molestoso activo,
+lista de nombres vacía y máximo simultáneo 10. No se encolaron pruebas.
+
 The clean installer is `dist/La-Pichi-Ruleta-0.6.0.zip`: 457 files, 433 tracked
 mod assets, one plugin DLL and the 18-file BepInEx core. Its SHA-256 is
 `0086CBA10D97276AF793AC45AB93BD3A24FAFBFEB78D75C3F11D09B04E4FFB0B`.

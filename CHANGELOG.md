@@ -2,6 +2,10 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El catálogo incluye la bomba teledirigida de la primera fase del Dr. Kahl.
+  Entra desde la derecha a una altura aleatoria y conserva movimiento, vida y
+  explosión nativos. Está disponible en pruebas manuales, reglas de stream,
+  Modo Molestoso y Batalla Molestosa, con preview original y textos ES/EN.
 - El KO de Farmeando taps se reconoce durante `_OnLevelEnd`, antes de la señal
   tardía `_OnPreWin` de Cuphead: desde ese instante deja de aceptar taps y el
   overlay conserva la escena de Victoria durante la pantalla de calificación.

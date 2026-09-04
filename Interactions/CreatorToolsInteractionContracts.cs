@@ -10,6 +10,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string HomingCarrot = "rootpack_homing_carrot";
         internal const string CagneyHomingPlant = "cagney_homing_plant";
         internal const string FrogsFirefly = "frogs_firefly";
+        internal const string RobotHomingBomb = "robot_homing_bomb";
 
         internal static readonly string[] All =
         {
@@ -17,7 +18,8 @@ namespace Gilomx.CupheadBossRoulette
             PurpleZeppelin,
             HomingCarrot,
             CagneyHomingPlant,
-            FrogsFirefly
+            FrogsFirefly,
+            RobotHomingBomb
         };
     }
 

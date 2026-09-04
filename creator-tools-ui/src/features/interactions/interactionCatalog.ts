@@ -34,6 +34,13 @@ export const interactionItems = [
     typeKey: "interactions.frogs.type",
     image: "/assets/creator-tools/interactions/frogs-firefly.png",
   },
+  {
+    id: "robot_homing_bomb",
+    titleKey: "interactions.robot.homingBomb.title",
+    imageAltKey: "interactions.robot.homingBomb.imageAlt",
+    typeKey: "interactions.robot.type",
+    image: "/assets/creator-tools/interactions/robot-homing-bomb.png",
+  },
 ] as const;
 
 export function interactionItemFor(item: string) {
