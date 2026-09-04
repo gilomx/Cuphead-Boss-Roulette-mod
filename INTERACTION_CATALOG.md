@@ -4,8 +4,8 @@ Esta guía define el contrato técnico que deben respetar todos los artículos
 nuevos del catálogo de Creator Tools. Las implementaciones de referencia son
 los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
 raíz, la semilla azul de Clavel de Cagney y la luciérnaga incendiada de Hosco
-y Tosco, la bomba teledirigida del Dr. Kahl y el lanzamiento de cabeza de la
-Baronesa Von Bon Bon.
+y Tosco, la bomba teledirigida del Dr. Kahl, el lanzamiento de cabeza de la
+Baronesa Von Bon Bon y las bolas de fuego de Fósforo Sombrío.
 
 ## Arquitectura obligatoria
 
@@ -387,6 +387,33 @@ proyectil no lleva esa marca, por lo que ejecuta normalmente su `Awake`,
 `baroness_head_toss_0009` de `atlas_baronesslevel` y se puede regenerar con
 `tools/extract_native_baroness_head_toss_preview.py`.
 
+## Bolas de fuego de Fósforo Sombrío
+
+`dragon_fireballs` reutiliza el dragón de la primera fase y el ataque nativo de
+meteoros de `scene_level_dragon`. El cuerpo comienza completamente fuera del
+borde derecho, entra durante los primeros 12/24 segundos del ciclo `Idle` y
+queda centrado verticalmente con 24% de su ancho fuera de cámara. El trigger
+`OnMeteor` enlaza el ciclo de aviso con `MeteorStart`, un ciclo completo de
+`Meteor_Anticipation_Loop`, `Meteor_Anticipation_End`, `Meteor_Attack` y
+`Meteor_Attack_End`. El dragón vuelve a salir después del ataque y sus sprites
+sólo se ocultan al completar el recorrido exterior.
+
+El evento `FireMeteor` se reproduce una vez en su frame nativo, 7/24 segundos
+después de iniciar `Meteor_Attack`. Desde el transform animado `MouthRoot` se
+crean dos `DragonLevelMeteor`, uno con `State.Up` y otro con `State.Down`, usando
+`speedX` y `timeY` de la dificultad actual. Conservan animación, humo, sonido,
+trayectoria, daño, collider y destrucción originales. El nombre y el regalo se
+transfieren a la bola superior sin duplicarse sobre la segunda.
+
+La copia visual del dragón es decorativa: todos sus `MonoBehaviour`,
+`Collider2D` y `Rigidbody2D` están desactivados, por lo que el cuerpo no puede
+dañar, empujar ni recibir disparos. Sólo las dos bolas tienen hitbox. La precarga
+serializada aísla el lifecycle de los componentes `DragonLevel*` tanto en la
+escena temporal como en las copias marcadas de la interacción; los meteoros no
+llevan esa marca para que ejecuten normalmente su movimiento y colisiones. El
+preview usa `dragon_meteor_forward_0007` de `atlas_dragonlevel_nobg` y se
+regenera con `tools/extract_native_dragon_fireballs_preview.py`.
+
 ## Pasos para añadir un artículo
 
 1. Crear un ID estable en `CreatorToolsInteractionIds.All`, su tarjeta de
@@ -429,6 +456,10 @@ proyectil no lleva esa marca, por lo que ejecuta normalmente su `Awake`,
   píxel visible del castillo, lanzar exactamente una cabeza y desaparecer. La
   cabeza debe conservar sus redirecciones nativas, daño y colisiones; el nombre
   debe transferirse del cuerpo al proyectil sin duplicarse.
+- Fósforo debe entrar desde el borde derecho, completar la anticipación de
+  meteoros y escupir una pareja ascendente/descendente antes de volver a salir.
+  Confirmar que tocar o disparar al cuerpo no produce daño ni impacto y que sólo
+  las bolas conservan daño y colliders. El nombre debe pasar a una sola bola.
 - Comparar al menos un jefe con cámara base y otro con zoom alejado, como Chef
   Saleroso; sprite, colisión, etiqueta y separación deben conservar el mismo
   tamaño aparente.

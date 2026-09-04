@@ -714,6 +714,13 @@
         "imageAlt": "Original frame of Baroness Von Bon Bon throwing her head"
       }
     },
+    "dragon": {
+      "type": "Attack",
+      "fireballs": {
+        "title": "Grim Matchstick fireballs",
+        "imageAlt": "Original frame of Grim Matchstick spitting a fireball"
+      }
+    },
     "queue": {
       "title": "Redeems in progress",
       "description": "Active redeems and those waiting their turn appear here, respecting the configured simultaneous limit.",

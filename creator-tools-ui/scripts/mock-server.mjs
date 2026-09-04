@@ -280,6 +280,7 @@ const interactionItems = [
     "frogs_firefly",
     "robot_homing_bomb",
     "baroness_head_toss",
+    "dragon_fireballs",
   ];
 
 function peskyBattleIsExclusive() {

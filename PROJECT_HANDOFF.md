@@ -2,6 +2,42 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Catálogo: bolas de fuego de Fósforo Sombrío (2026-09-04)
+
+Se añadió `dragon_fireballs` como octavo artículo. Precarga
+`scene_level_dragon`, conserva el `Animator` de `DragonLevelDragon` y reproduce
+la cadena nativa `Idle` → `MeteorStart` → `Meteor_Anticipation_Loop` →
+`Meteor_Anticipation_End` → `Meteor_Attack` → `Meteor_Attack_End`. El cuerpo
+entra desde fuera del borde derecho durante 12/24 segundos, queda centrado con
+24% del ancho fuera de cámara y vuelve a salir tras completar el ataque.
+
+El evento de disparo se ejecuta en el frame 7 de `Meteor_Attack`. Crea dos
+`DragonLevelMeteor` desde el `MouthRoot` de la copia animada con estados `Up` y
+`Down`, y usa `speedX` y `timeY` de la dificultad actual. Ambos proyectiles
+conservan movimiento, humo, sonido, daño, collider y destrucción nativos. El
+nombre y el regalo se transfieren sólo al proyectil superior.
+
+El dragón visual tiene todos sus scripts, `Collider2D` y `Rigidbody2D`
+desactivados. No puede golpear al jugador ni recibir disparos; sólo las bolas de
+fuego tienen hitbox. `NativeDragonFireballsCache` serializa la precarga con el
+coordinador común y bloquea el lifecycle de `DragonLevel*` en la escena temporal
+y en las copias marcadas. Integrado en IDs, executor, parches, catálogo React,
+mock y traducciones ES/EN. El preview proviene de
+`dragon_meteor_forward_0007` en `atlas_dragonlevel_nobg`; el extractor es
+`tools/extract_native_dragon_fireballs_preview.py`.
+
+Validación: build .NET Release sin advertencias ni errores, build React y
+catálogo con ocho IDs correctos. El mock publicó `dragon_fireballs` como octavo
+ID; `config.js` y el preview respondieron correctamente. La versión se instaló
+en la copia local del juego junto con el catálogo y el PNG. DLL instalada:
+SHA-256
+`F59BA4CA1F2BB72ADBD143B2AB674963705B08DB5838E462D00117713B172424`.
+El respaldo anterior está en
+`installation-backups/dragon-fireballs-20260904-142300.zip`.
+
+Cuphead reinició y BepInEx cargó el mod sin excepciones ni errores nuevos de
+Harmony. Falta comprobar la secuencia del ataque dentro de una partida.
+
 ## Catálogo: lanzamiento de cabeza de la Baronesa (2026-09-04)
 
 Se añadió `baroness_head_toss` como séptimo artículo. Conserva el `Animator`

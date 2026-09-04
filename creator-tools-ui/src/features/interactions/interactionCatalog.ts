@@ -48,6 +48,13 @@ export const interactionItems = [
     typeKey: "interactions.baroness.type",
     image: "/assets/creator-tools/interactions/baroness-head-toss.png",
   },
+  {
+    id: "dragon_fireballs",
+    titleKey: "interactions.dragon.fireballs.title",
+    imageAltKey: "interactions.dragon.fireballs.imageAlt",
+    typeKey: "interactions.dragon.type",
+    image: "/assets/creator-tools/interactions/dragon-fireballs.png",
+  },
 ] as const;
 
 export function interactionItemFor(item: string) {

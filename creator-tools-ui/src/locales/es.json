@@ -714,6 +714,13 @@
         "imageAlt": "Frame original de la Baronesa Von Bon Bon lanzando su cabeza"
       }
     },
+    "dragon": {
+      "type": "Ataque",
+      "fireballs": {
+        "title": "Bolas de fuego de Fósforo Sombrío",
+        "imageAlt": "Frame original de Fósforo Sombrío escupiendo una bola de fuego"
+      }
+    },
     "queue": {
       "title": "Interacciones en curso",
       "description": "Aquí aparecen las interacciones activas y las que esperan su turno, respetando el máximo simultáneo configurado.",

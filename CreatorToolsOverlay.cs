@@ -595,6 +595,9 @@ namespace Gilomx.CupheadBossRoulette
             NativeBaronessHeadTossCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+            NativeDragonFireballsCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
             InstallCreatorToolsGameplayLoadPatch();
             InstallCreatorToolsPhaseTransitionPatches();
 

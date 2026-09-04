@@ -2,6 +2,13 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El catálogo incorpora las bolas de fuego de Fósforo Sombrío. El dragón entra
+  desde la derecha, reproduce la anticipación y el lanzamiento originales,
+  escupe una bola ascendente y otra descendente y sale completamente antes de
+  ocultarse. Su cuerpo es sólo visual y no tiene hitbox; las dos bolas conservan
+  trayectoria, humo, sonido, daño y colisiones nativos. Está disponible en
+  pruebas manuales, reglas de stream, Modo Molestoso y Batalla Molestosa, con
+  preview y textos ES/EN.
 - El catálogo incorpora el lanzamiento de cabeza de la Baronesa Von Bon Bon.
   La animación comienza completamente fuera de cámara y usa un ciclo nativo de
   `Castle_Chase` para caminar hasta la esquina inferior derecha antes de enlazar
