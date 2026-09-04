@@ -8,8 +8,9 @@ Se añadió `dragon_fireballs` como octavo artículo. Precarga
 `scene_level_dragon`, conserva el `Animator` de `DragonLevelDragon` y reproduce
 la cadena nativa `Idle` → `MeteorStart` → `Meteor_Anticipation_Loop` →
 `Meteor_Anticipation_End` → `Meteor_Attack` → `Meteor_Attack_End`. El cuerpo
-entra desde fuera del borde derecho durante 12/24 segundos, queda centrado con
-24% del ancho fuera de cámara y vuelve a salir tras completar el ataque.
+entra desde fuera del borde derecho durante 20/24 segundos, queda centrado con
+27% del ancho fuera de cámara y vuelve a salir durante 20/24 segundos tras
+completar el ataque.
 
 El evento de disparo se ejecuta en el frame 7 de `Meteor_Attack`. Crea dos
 `DragonLevelMeteor` desde el `MouthRoot` de la copia animada con estados `Up` y
@@ -31,9 +32,9 @@ catálogo con ocho IDs correctos. El mock publicó `dragon_fireballs` como octav
 ID; `config.js` y el preview respondieron correctamente. La versión se instaló
 en la copia local del juego junto con el catálogo y el PNG. DLL instalada:
 SHA-256
-`F59BA4CA1F2BB72ADBD143B2AB674963705B08DB5838E462D00117713B172424`.
+`8B9B35BBAEDE53D41F77B9D8386E6F5FE98D719E061085FC940EBC708B3E2953`.
 El respaldo anterior está en
-`installation-backups/dragon-fireballs-20260904-142300.zip`.
+`installation-backups/slower-boss-entry-exit-20260904-143200.zip`.
 
 Cuphead reinició y BepInEx cargó el mod sin excepciones ni errores nuevos de
 Harmony. Falta comprobar la secuencia del ataque dentro de una partida.
@@ -44,12 +45,12 @@ Se añadió `baroness_head_toss` como séptimo artículo. Conserva el `Animator`
 del castillo únicamente como soporte invisible de `Castle_Chase` y
 `Castle_Toss`, y deja visibles sólo `BaronessPhase2` y `BaronessPhase2Top`. La
 animación comienza con el cuerpo y la etiqueta completamente fuera del borde
-derecho. Entra durante los primeros 15/24 segundos del ciclo nativo de caminata,
+derecho. Entra durante los primeros 20/24 segundos del ciclo nativo de caminata,
 que termina en 21/24 antes de enlazar con el lanzamiento. Deja 24% de su ancho
 fuera del borde derecho y 70 píxeles bajo el borde inferior. Su altura es fija,
 no aleatoria. Dispara una sola vez en 40/24, usando el transform animado
 `BaronessTossPoint`; completa los 42 frames de `Castle_Toss` y sale caminando
-entre 63/24 y 78/24 antes de ocultar los renderers.
+entre 63/24 y 83/24 antes de ocultar los renderers.
 
 La cabeza sigue siendo `BaronessLevelFollowingProjectile`: usa las propiedades
 de dificultad nativas, persigue y redirige igual que en la fase final, y

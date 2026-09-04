@@ -10,9 +10,9 @@ namespace Gilomx.CupheadBossRoulette
             NativeChaseCycleSeconds + 19f / 24f;
         private const float NativeTossEndSeconds =
             NativeChaseCycleSeconds + 42f / 24f;
-        private const float EntranceDurationSeconds = 15f / 24f;
+        private const float EntranceDurationSeconds = 20f / 24f;
         private const float ExitStartSeconds = NativeTossEndSeconds;
-        private const float ExitDurationSeconds = 15f / 24f;
+        private const float ExitDurationSeconds = 20f / 24f;
         private const float MaximumLifetimeSeconds = 24f;
         private const float OffscreenCleanupMarginPixels = 220f;
         private const string TossParameterName = "Toss";

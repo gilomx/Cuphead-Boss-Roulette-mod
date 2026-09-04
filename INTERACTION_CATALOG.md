@@ -351,7 +351,7 @@ Los scripts, colliders y rigidbodies de esa copia visual también quedan
 inertes; sólo la cabeza lanzada puede interactuar con el jugador.
 
 La Baronesa comienza completamente fuera del borde derecho, incluido el ancho
-de la etiqueta. Durante los primeros 15/24 segundos avanza hacia la esquina
+de la etiqueta. Durante los primeros 20/24 segundos avanza hacia la esquina
 inferior derecha con el ciclo original `Castle_Chase`; el controlador espera a
 que ese ciclo complete sus 21/24 segundos antes de entrar en `Castle_Toss`.
 Así el tramo corto de caminata funciona como aviso del ataque. Su posición de
@@ -362,7 +362,7 @@ no participa en el sorteo vertical de los proyectiles. El evento nativo
 (40/24 segundos desde la aparición). El punto de salida se lee del transform
 animado `BaronessTossPoint` de la copia. `Castle_Toss` conserva sus 42 frames
 completos; luego el controlador regresa a `Castle_Chase` y la Baronesa camina
-fuera de cámara entre 63/24 y 78/24. Sus renderers sólo se ocultan cuando ha
+fuera de cámara entre 63/24 y 83/24. Sus renderers sólo se ocultan cuando ha
 terminado ese recorrido.
 
 Los bounds usan `textureRectOffset`, `textureRect` y el pivote del sprite,
@@ -391,12 +391,12 @@ proyectil no lleva esa marca, por lo que ejecuta normalmente su `Awake`,
 
 `dragon_fireballs` reutiliza el dragón de la primera fase y el ataque nativo de
 meteoros de `scene_level_dragon`. El cuerpo comienza completamente fuera del
-borde derecho, entra durante los primeros 12/24 segundos del ciclo `Idle` y
-queda centrado verticalmente con 24% de su ancho fuera de cámara. El trigger
+borde derecho, entra durante 20/24 segundos y queda centrado verticalmente con
+27% de su ancho fuera de cámara. El trigger
 `OnMeteor` enlaza el ciclo de aviso con `MeteorStart`, un ciclo completo de
 `Meteor_Anticipation_Loop`, `Meteor_Anticipation_End`, `Meteor_Attack` y
-`Meteor_Attack_End`. El dragón vuelve a salir después del ataque y sus sprites
-sólo se ocultan al completar el recorrido exterior.
+`Meteor_Attack_End`. El dragón vuelve a salir durante 20/24 segundos después del
+ataque y sus sprites sólo se ocultan al completar el recorrido exterior.
 
 El evento `FireMeteor` se reproduce una vez en su frame nativo, 7/24 segundos
 después de iniciar `Meteor_Attack`. Desde el transform animado `MouthRoot` se

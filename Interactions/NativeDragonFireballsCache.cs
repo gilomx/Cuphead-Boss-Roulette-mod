@@ -13,7 +13,7 @@ namespace Gilomx.CupheadBossRoulette
         private const string DragonSceneName = "scene_level_dragon";
         private const string IdleStateName = "Idle";
         private const string MeteorTriggerName = "OnMeteor";
-        private const float BodyFractionOutsideRightEdge = 0.24f;
+        private const float BodyFractionOutsideRightEdge = 0.27f;
         private const float BodyViewportCenterY = 0.5f;
         private const float OffscreenGapPixels = 190f;
 

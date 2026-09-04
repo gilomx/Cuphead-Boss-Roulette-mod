@@ -2,6 +2,10 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Las entradas y salidas de la Baronesa y Fósforo Sombrío avanzan ahora con más
+  calma: ambos usan 20 frames para cada recorrido. El dragón queda además 27%
+  fuera del borde derecho para mostrar menos cuerpo. Los instantes de
+  anticipación y lanzamiento permanecen sincronizados con sus animaciones.
 - El catálogo incorpora las bolas de fuego de Fósforo Sombrío. El dragón entra
   desde la derecha, reproduce la anticipación y el lanzamiento originales,
   escupe una bola ascendente y otra descendente y sale completamente antes de

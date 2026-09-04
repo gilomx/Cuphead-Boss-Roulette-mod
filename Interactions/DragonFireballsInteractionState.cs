@@ -21,8 +21,8 @@ namespace Gilomx.CupheadBossRoulette
             AttackStartSeconds + 7f / 24f;
         private const float ExitStartSeconds =
             AttackStartSeconds + NativeAttackSeconds + NativeAttackEndSeconds;
-        private const float EntranceDurationSeconds = 12f / 24f;
-        private const float ExitDurationSeconds = 15f / 24f;
+        private const float EntranceDurationSeconds = 20f / 24f;
+        private const float ExitDurationSeconds = 20f / 24f;
         private const float MaximumLifetimeSeconds = 24f;
         private const float OffscreenCleanupMarginPixels = 220f;
         private const string MeteorTriggerName = "OnMeteor";
