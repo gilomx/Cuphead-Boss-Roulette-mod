@@ -5,7 +5,8 @@ using UnityEngine;
 namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class DragonFireballsInteractionExecutor :
-        ICreatorToolsInteractionExecutor
+        ICreatorToolsInteractionExecutor,
+        ICreatorToolsExclusiveInteractionExecutor
     {
         private readonly NativeDragonFireballsCache nativeCache;
         private readonly Func<bool> canSpawn;
@@ -38,7 +39,13 @@ namespace Gilomx.CupheadBossRoulette
 
         public bool IsAvailable(string item)
         {
-            return Supports(item) && nativeCache.CanSpawn;
+            return Supports(item) && nativeCache.CanSpawn &&
+                !HasActiveDragon;
+        }
+
+        public bool BlocksConcurrentSpawn(string item)
+        {
+            return Supports(item) && HasActiveDragon;
         }
 
         public void Update()
@@ -77,6 +84,12 @@ namespace Gilomx.CupheadBossRoulette
                     : "native_assets_loading";
                 return false;
             }
+            RemoveFinishedStates();
+            if (HasActiveDragon)
+            {
+                feedbackCode = "interaction_type_active";
+                return false;
+            }
 
             DragonFireballsInteractionState state;
             if (!nativeCache.TrySpawn(
@@ -111,6 +124,18 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = activeStates.Count - 1; i >= 0; i--)
                 if (activeStates[i] == null)
                     activeStates.RemoveAt(i);
+        }
+
+        private bool HasActiveDragon
+        {
+            get
+            {
+                for (var i = 0; i < activeStates.Count; i++)
+                    if (activeStates[i] != null &&
+                        activeStates[i].BlocksConcurrentDragon)
+                        return true;
+                return false;
+            }
         }
 
         private static bool Evaluate(Func<bool> predicate)

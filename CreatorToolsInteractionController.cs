@@ -1122,7 +1122,8 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             if (feedbackCode == "native_assets_loading" ||
-                feedbackCode == "requires_gameplay_level")
+                feedbackCode == "requires_gameplay_level" ||
+                feedbackCode == "interaction_type_active")
                 return false;
 
             queue.Reject(entry);
@@ -1140,6 +1141,11 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsInteractionQueue.Entry entry, bool pesky)
         {
             if (entry == null)
+                return false;
+            var exclusiveExecutor = FindExecutor(entry.Item) as
+                ICreatorToolsExclusiveInteractionExecutor;
+            if (exclusiveExecutor != null &&
+                exclusiveExecutor.BlocksConcurrentSpawn(entry.Item))
                 return false;
             if (pesky)
                 return peskySettings.Enabled;

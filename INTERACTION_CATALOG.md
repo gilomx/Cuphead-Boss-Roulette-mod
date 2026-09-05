@@ -398,12 +398,25 @@ borde derecho, entra durante 20/24 segundos y queda centrado verticalmente con
 `Meteor_Attack_End`. El dragón vuelve a salir durante 20/24 segundos después del
 ataque y sus sprites sólo se ocultan al completar el recorrido exterior.
 
-El evento `FireMeteor` se reproduce una vez en su frame nativo, 7/24 segundos
-después de iniciar `Meteor_Attack`. Desde el transform animado `MouthRoot` se
-crean dos `DragonLevelMeteor`, uno con `State.Up` y otro con `State.Down`, usando
-`speedX` y `timeY` de la dificultad actual. Conservan animación, humo, sonido,
-trayectoria, daño, collider y destrucción originales. El nombre y el regalo se
-transfieren a la bola superior sin duplicarse sobre la segunda.
+Cada canje sortea un patrón de tres lanzamientos construido con los mismos
+estados del ataque original: `State.Up` crea una bola con recorrido ascendente,
+`State.Down` crea una con recorrido descendente y `State.Both` crea ambas a la
+vez. Los patrones alternan la dirección como los patrones nativos y algunos
+insertan el par simultáneo. El `Animator` conserva `Repeat` entre ataques, espera
+el `shotDelay` de la dificultad actual y reproduce `FireMeteor` en el frame 7 de
+cada `Meteor_Attack`; sólo después del tercero enlaza `Meteor_Attack_End` y la
+salida del dragón.
+
+Todas las bolas salen del transform animado `MouthRoot` y usan `speedX` y
+`timeY` de la dificultad actual. Conservan animación, humo, sonido, trayectoria,
+daño, collider y destrucción originales. El nombre y el regalo se transfieren a
+la primera bola sin duplicarse sobre los proyectiles siguientes.
+
+El ejecutor es exclusivo por tipo. Mientras un cuerpo de Fósforo no haya
+completado su salida, cualquier otro `dragon_fireballs` conserva su posición
+pendiente en la cola. El selector puede despachar otros artículos elegibles que
+estén detrás y vuelve a habilitar al dragón justo cuando el cuerpo anterior queda
+fuera de pantalla; las bolas que todavía viajen no prolongan esa espera.
 
 La copia visual del dragón es decorativa: todos sus `MonoBehaviour`,
 `Collider2D` y `Rigidbody2D` están desactivados, por lo que el cuerpo no puede

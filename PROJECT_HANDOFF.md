@@ -2,6 +2,30 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Catálogo: secuencia aleatoria de Fósforo Sombrío (2026-09-04)
+
+`dragon_fireballs` completa ahora tres ataques antes de abandonar la pantalla.
+El juego original selecciona cadenas de caracteres y traduce `U`, `D` y `B` a
+`State.Up`, `State.Down` y `State.Both`; la interacción sigue ese modelo con
+seis patrones de tres pasos que alternan arriba/abajo y pueden insertar el par
+simultáneo. Esto evita tres sorteos inconexos y conserva la cadencia visual del
+ataque nativo.
+
+Entre lanzamientos el `Animator` mantiene `Repeat`, reproduce anticipación,
+ataque y escupitajo, y espera el `shotDelay` de la dificultad actual. Antes del
+tercer ataque limpia `Repeat` para enlazar `Meteor_Attack_End`; sólo entonces
+comienza la salida. Todos los proyectiles se conservan en el handle hasta que
+mueren o salen de cámara. `MouthRoot`, `speedX`, `timeY`, escala, hitboxes y la
+presentación permanecen intactos.
+
+El ejecutor implementa `ICreatorToolsExclusiveInteractionExecutor`. Su bloqueo
+permanece activo mientras `DragonFireballsInteractionState` aún muestra el
+cuerpo y se libera en `HideDragon`, al completar la salida. `CanDispatchEntry`
+omite temporalmente un `dragon_fireballs` bloqueado, por lo que el canje queda
+pendiente sin impedir que otros artículos de la misma cola avancen. El guard de
+`TrySpawn` devuelve `interaction_type_active` como defensa ante carreras; el
+controlador trata ese código como espera temporal y no rechaza la entrada.
+
 ## Catálogo: bolas de fuego de Fósforo Sombrío (2026-09-04)
 
 Se añadió `dragon_fireballs` como octavo artículo. Precarga
@@ -12,11 +36,12 @@ entra desde fuera del borde derecho durante 20/24 segundos, queda centrado con
 27% del ancho fuera de cámara y vuelve a salir durante 20/24 segundos tras
 completar el ataque.
 
-El evento de disparo se ejecuta en el frame 7 de `Meteor_Attack`. Crea dos
-`DragonLevelMeteor` desde el `MouthRoot` de la copia animada con estados `Up` y
-`Down`, y usa `speedX` y `timeY` de la dificultad actual. Ambos proyectiles
-conservan movimiento, humo, sonido, daño, collider y destrucción nativos. El
-nombre y el regalo se transfieren sólo al proyectil superior.
+El evento de disparo se ejecuta en el frame 7 de cada `Meteor_Attack`. Cada uno
+de los tres pasos crea uno o dos `DragonLevelMeteor` desde el `MouthRoot` de la
+copia animada con estado `Up`, `Down` o `Both`, y usa `speedX` y `timeY` de la
+dificultad actual. Los proyectiles conservan movimiento, humo, sonido, daño,
+collider y destrucción nativos. El nombre y el regalo se transfieren sólo al
+primer proyectil.
 
 El dragón visual tiene todos sus scripts, `Collider2D` y `Rigidbody2D`
 desactivados. No puede golpear al jugador ni recibir disparos; sólo las bolas de

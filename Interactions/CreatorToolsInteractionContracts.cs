@@ -42,6 +42,11 @@ namespace Gilomx.CupheadBossRoulette
         void EndGameplayLevel();
     }
 
+    internal interface ICreatorToolsExclusiveInteractionExecutor
+    {
+        bool BlocksConcurrentSpawn(string item);
+    }
+
     internal interface ICreatorToolsInteractionHandle : IDisposable
     {
         bool IsComplete { get; }

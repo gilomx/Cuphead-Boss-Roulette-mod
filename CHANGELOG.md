@@ -8,11 +8,18 @@
   anticipación y lanzamiento permanecen sincronizados con sus animaciones.
 - El catálogo incorpora las bolas de fuego de Fósforo Sombrío. El dragón entra
   desde la derecha, reproduce la anticipación y el lanzamiento originales,
-  escupe una bola ascendente y otra descendente y sale completamente antes de
-  ocultarse. Su cuerpo es sólo visual y no tiene hitbox; las dos bolas conservan
-  trayectoria, humo, sonido, daño y colisiones nativos. Está disponible en
-  pruebas manuales, reglas de stream, Modo Molestoso y Batalla Molestosa, con
+  y completa tres lanzamientos antes de salir. Cada canje elige un patrón de
+  estados `Up`, `Down` y `Both` con la alternancia del ataque original; así cada
+  lanzamiento puede crear una bola ascendente, una descendente o ambas a la
+  vez. Entre lanzamientos mantiene el ciclo `Repeat` y la espera `shotDelay` de
+  la dificultad actual. Su cuerpo es sólo visual y no tiene hitbox; las bolas
+  conservan trayectoria, humo, sonido, daño y colisiones nativos. Está
+  disponible en pruebas manuales, reglas de stream, Modo Molestoso y Batalla
+  Molestosa, con
   preview y textos ES/EN.
+  Fósforo es además exclusivo por tipo: si otro canje del dragón llega mientras
+  su cuerpo sigue en pantalla, permanece pendiente hasta que el anterior termina
+  de salir. Esta espera no impide despachar otros artículos elegibles de la cola.
 - El catálogo incorpora el lanzamiento de cabeza de la Baronesa Von Bon Bon.
   La animación comienza completamente fuera de cámara y usa un ciclo nativo de
   `Castle_Chase` para caminar hasta la esquina inferior derecha antes de enlazar

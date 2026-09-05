@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
@@ -19,13 +20,22 @@ namespace Gilomx.CupheadBossRoulette
             StopAnticipationSeconds + NativeAnticipationEndSeconds;
         private const float FireballsReleaseSeconds =
             AttackStartSeconds + 7f / 24f;
-        private const float ExitStartSeconds =
-            AttackStartSeconds + NativeAttackSeconds + NativeAttackEndSeconds;
+        private const int AttackCount = 3;
         private const float EntranceDurationSeconds = 20f / 24f;
         private const float ExitDurationSeconds = 20f / 24f;
         private const float MaximumLifetimeSeconds = 24f;
         private const float OffscreenCleanupMarginPixels = 220f;
+        private static readonly string[] AttackPatternCodes =
+        {
+            "UDU",
+            "DUD",
+            "UBD",
+            "DBU",
+            "BDU",
+            "UDB"
+        };
         private const string MeteorTriggerName = "OnMeteor";
+        private const string MeteorRepeatName = "Repeat";
         private const string MeteorStartSound =
             "level_dragon_left_dragon_meteor_start";
         private const string MeteorAnticipationSound =
@@ -47,20 +57,32 @@ namespace Gilomx.CupheadBossRoulette
         private Vector3 attackPosition;
         private Vector3 initialCameraPosition;
         private CreatorToolsDonorLabel donorLabel;
-        private DragonLevelMeteor upperFireball;
-        private DragonLevelMeteor lowerFireball;
+        private readonly List<DragonLevelMeteor> fireballs =
+            new List<DragonLevelMeteor>();
+        private readonly List<float> fireballOffscreenElapsed =
+            new List<float>();
+        private DragonLevelMeteor.State[] attackPattern;
         private Action<string> logWarning;
         private string donor;
         private string giftImagePath = string.Empty;
         private float cameraScale = 1f;
         private float elapsed;
-        private float upperOffscreenElapsed;
-        private float lowerOffscreenElapsed;
+        private float repeatAnticipationStartSeconds = float.PositiveInfinity;
+        private float repeatTriggerSeconds = float.PositiveInfinity;
+        private float repeatAttackStartSeconds = float.PositiveInfinity;
+        private float repeatReleaseSeconds = float.PositiveInfinity;
+        private float exitStartSeconds = float.PositiveInfinity;
+        private int attacksReleased;
         private bool meteorStartSoundPlayed;
         private bool attackArmed;
         private bool anticipationStopped;
         private bool attackSoundPlayed;
         private bool fireballsReleased;
+        private bool repeatAnticipationStarted;
+        private bool repeatTriggered;
+        private bool repeatAttackSoundPlayed;
+        private bool attackSequenceComplete;
+        private bool presentationTransferred;
         private bool bodyHidden;
         private bool cleaningUp;
 
@@ -94,6 +116,9 @@ namespace Gilomx.CupheadBossRoulette
             this.donor = donor;
             this.giftImagePath = giftImagePath ?? string.Empty;
             this.logWarning = logWarning;
+            attackPattern = SelectAttackPattern();
+            if (animator != null)
+                animator.SetBool(MeteorRepeatName, AttackCount > 1);
             donorLabel = dragonRoot == null
                 ? null
                 : dragonRoot.GetComponent<CreatorToolsDonorLabel>();
@@ -108,16 +133,12 @@ namespace Gilomx.CupheadBossRoulette
 
         internal bool TryGetActorPosition(out Vector2 position)
         {
-            if (upperFireball != null)
-            {
-                position = upperFireball.transform.position;
-                return true;
-            }
-            if (lowerFireball != null)
-            {
-                position = lowerFireball.transform.position;
-                return true;
-            }
+            for (var i = 0; i < fireballs.Count; i++)
+                if (fireballs[i] != null)
+                {
+                    position = fireballs[i].transform.position;
+                    return true;
+                }
             if (dragonRoot != null)
             {
                 position = dragonRoot.transform.position;
@@ -125,6 +146,11 @@ namespace Gilomx.CupheadBossRoulette
             }
             position = Vector2.zero;
             return false;
+        }
+
+        internal bool BlocksConcurrentDragon
+        {
+            get { return !cleaningUp && !bodyHidden; }
         }
 
         private void Update()
@@ -165,21 +191,18 @@ namespace Gilomx.CupheadBossRoulette
                 PlaySound(MeteorAttackSound);
             }
             if (!fireballsReleased && elapsed >= FireballsReleaseSeconds)
-                ReleaseFireballs();
-            if (!bodyHidden && elapsed >=
-                    ExitStartSeconds + ExitDurationSeconds)
+            {
+                fireballsReleased = true;
+                ReleaseFireballs(AttackStartSeconds);
+            }
+            UpdateRepeatedAttacks();
+            if (!bodyHidden && attackSequenceComplete && elapsed >=
+                    exitStartSeconds + ExitDurationSeconds)
                 HideDragon();
 
-            if (bodyHidden)
-            {
-                CleanupIfOutside(ref upperFireball,
-                    ref upperOffscreenElapsed, delta);
-                CleanupIfOutside(ref lowerFireball,
-                    ref lowerOffscreenElapsed, delta);
-            }
+            CleanupFireballs(delta);
 
-            if (fireballsReleased && upperFireball == null &&
-                lowerFireball == null && bodyHidden)
+            if (attackSequenceComplete && fireballs.Count == 0 && bodyHidden)
             {
                 Destroy(gameObject);
                 return;
@@ -215,7 +238,7 @@ namespace Gilomx.CupheadBossRoulette
                     hidden, attack, progress);
                 return;
             }
-            if (elapsed <= ExitStartSeconds)
+            if (elapsed <= exitStartSeconds)
             {
                 dragonRoot.transform.position = attack;
                 return;
@@ -225,14 +248,13 @@ namespace Gilomx.CupheadBossRoulette
                 0f,
                 1f,
                 Mathf.Clamp01(
-                    (elapsed - ExitStartSeconds) / ExitDurationSeconds));
+                    (elapsed - exitStartSeconds) / ExitDurationSeconds));
             dragonRoot.transform.position = Vector3.Lerp(
                 attack, hidden, exitProgress);
         }
 
-        private void ReleaseFireballs()
+        private void ReleaseFireballs(float currentAttackStartSeconds)
         {
-            fireballsReleased = true;
             try
             {
                 if (dragonRoot == null || meteorTemplate == null ||
@@ -244,23 +266,135 @@ namespace Gilomx.CupheadBossRoulette
                     ? dragonRoot.transform.TransformPoint(
                         fallbackMouthLocalPosition)
                     : mouthRoot.position;
-                upperFireball = CreateFireball(
-                    mouthPosition, DragonLevelMeteor.State.Up,
-                    "CreatorTools_NativeDragonFireball_Up");
-                lowerFireball = CreateFireball(
-                    mouthPosition, DragonLevelMeteor.State.Down,
-                    "CreatorTools_NativeDragonFireball_Down");
+                var selectedState = attackPattern[attacksReleased];
+                if (selectedState == DragonLevelMeteor.State.Both)
+                {
+                    var upperFireball = CreateFireball(
+                        mouthPosition, DragonLevelMeteor.State.Up,
+                        "CreatorTools_NativeDragonFireball_Up");
+                    CreateFireball(
+                        mouthPosition, DragonLevelMeteor.State.Down,
+                        "CreatorTools_NativeDragonFireball_Down");
+                    TransferPresentationToFireball(upperFireball);
+                }
+                else
+                {
+                    var fireball = CreateFireball(
+                        mouthPosition,
+                        selectedState,
+                        selectedState == DragonLevelMeteor.State.Up
+                            ? "CreatorTools_NativeDragonFireball_Up"
+                            : "CreatorTools_NativeDragonFireball_Down");
+                    TransferPresentationToFireball(fireball);
+                }
                 PlaySound(MeteorSpitSound);
-                TransferPresentationToFireball();
+                attacksReleased++;
+                ScheduleNextAttack(currentAttackStartSeconds);
             }
             catch (Exception exception)
             {
                 Warn("Could not release the Dragon's native fireballs: ",
                     exception);
-                DestroyFireball(ref upperFireball);
-                DestroyFireball(ref lowerFireball);
+                DestroyFireballs();
                 Destroy(gameObject);
             }
+        }
+
+        private static DragonLevelMeteor.State[] SelectAttackPattern()
+        {
+            var code = AttackPatternCodes[
+                UnityEngine.Random.Range(0, AttackPatternCodes.Length)];
+            var pattern = new DragonLevelMeteor.State[AttackCount];
+            for (var i = 0; i < pattern.Length; i++)
+            {
+                switch (code[i])
+                {
+                    case 'U':
+                        pattern[i] = DragonLevelMeteor.State.Up;
+                        break;
+                    case 'D':
+                        pattern[i] = DragonLevelMeteor.State.Down;
+                        break;
+                    default:
+                        pattern[i] = DragonLevelMeteor.State.Both;
+                        break;
+                }
+            }
+            return pattern;
+        }
+
+        private void ScheduleNextAttack(float currentAttackStartSeconds)
+        {
+            if (attacksReleased >= attackPattern.Length)
+            {
+                attackSequenceComplete = true;
+                exitStartSeconds = currentAttackStartSeconds +
+                    NativeAttackSeconds + NativeAttackEndSeconds;
+                if (animator != null)
+                    animator.SetBool(MeteorRepeatName, false);
+                ClearRepeatSchedule();
+                return;
+            }
+
+            repeatAnticipationStartSeconds = currentAttackStartSeconds +
+                NativeAttackSeconds;
+            repeatTriggerSeconds = repeatAnticipationStartSeconds +
+                Mathf.Max(0f, meteorProperties.shotDelay);
+            repeatAttackStartSeconds = repeatTriggerSeconds +
+                NativeAnticipationEndSeconds;
+            repeatReleaseSeconds = repeatAttackStartSeconds + 7f / 24f;
+            repeatAnticipationStarted = false;
+            repeatTriggered = false;
+            repeatAttackSoundPlayed = false;
+        }
+
+        private void UpdateRepeatedAttacks()
+        {
+            if (!fireballsReleased || attackSequenceComplete)
+                return;
+
+            for (var i = 0; i < AttackCount; i++)
+            {
+                if (!repeatAnticipationStarted &&
+                    elapsed >= repeatAnticipationStartSeconds)
+                {
+                    repeatAnticipationStarted = true;
+                    if (animator != null)
+                        animator.SetBool(
+                            MeteorRepeatName,
+                            attacksReleased < attackPattern.Length - 1);
+                    PlaySound(MeteorAnticipationSound);
+                }
+                if (!repeatTriggered && elapsed >= repeatTriggerSeconds)
+                {
+                    repeatTriggered = true;
+                    if (animator != null)
+                        animator.SetTrigger(MeteorTriggerName);
+                    StopSound(MeteorAnticipationSound);
+                }
+                if (!repeatAttackSoundPlayed &&
+                    elapsed >= repeatAttackStartSeconds)
+                {
+                    repeatAttackSoundPlayed = true;
+                    PlaySound(MeteorAttackSound);
+                }
+                if (elapsed < repeatReleaseSeconds)
+                    return;
+
+                var attackStart = repeatAttackStartSeconds;
+                repeatReleaseSeconds = float.PositiveInfinity;
+                ReleaseFireballs(attackStart);
+                if (attackSequenceComplete)
+                    return;
+            }
+        }
+
+        private void ClearRepeatSchedule()
+        {
+            repeatAnticipationStartSeconds = float.PositiveInfinity;
+            repeatTriggerSeconds = float.PositiveInfinity;
+            repeatAttackStartSeconds = float.PositiveInfinity;
+            repeatReleaseSeconds = float.PositiveInfinity;
         }
 
         private DragonLevelMeteor CreateFireball(
@@ -284,50 +418,65 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsInteractionPresentation.BringActorToFront(
                 fireball.gameObject);
             fireball.gameObject.SetActive(true);
+            fireballs.Add(fireball);
+            fireballOffscreenElapsed.Add(0f);
             return fireball;
         }
 
-        private void TransferPresentationToFireball()
+        private void TransferPresentationToFireball(DragonLevelMeteor fireball)
         {
-            if (upperFireball == null)
+            if (presentationTransferred || fireball == null)
                 return;
-            var anchor = FindLabelAnchor(upperFireball.gameObject);
+            presentationTransferred = true;
+            var anchor = FindLabelAnchor(fireball.gameObject);
             if (donorLabel != null && donorLabel.RebindTo(
-                    upperFireball.gameObject, anchor, 0.2f))
+                    fireball.gameObject, anchor, 0.2f))
                 return;
 
             CreatorToolsInteractionPresentation.PrepareActor(
-                upperFireball.gameObject, anchor, donor, logWarning);
-            var label = upperFireball.gameObject.GetComponent<
+                fireball.gameObject, anchor, donor, logWarning);
+            var label = fireball.gameObject.GetComponent<
                 CreatorToolsDonorLabel>();
             if (label != null && !string.IsNullOrEmpty(giftImagePath))
                 label.SetGiftImage(giftImagePath);
         }
 
-        private void CleanupIfOutside(
-            ref DragonLevelMeteor fireball,
-            ref float offscreenElapsed,
-            float delta)
+        private void CleanupFireballs(float delta)
         {
-            if (fireball == null)
-                return;
-            if (IsFullyOutsideGameplayView(
-                    fireball.gameObject,
-                    OffscreenCleanupMarginPixels * cameraScale))
-                offscreenElapsed += delta;
-            else
-                offscreenElapsed = 0f;
-            if (offscreenElapsed < 0.6f)
-                return;
-            DestroyFireball(ref fireball);
-            offscreenElapsed = 0f;
+            for (var i = fireballs.Count - 1; i >= 0; i--)
+            {
+                var fireball = fireballs[i];
+                if (fireball == null)
+                {
+                    RemoveFireballAt(i);
+                    continue;
+                }
+                if (IsFullyOutsideGameplayView(
+                        fireball.gameObject,
+                        OffscreenCleanupMarginPixels * cameraScale))
+                    fireballOffscreenElapsed[i] += delta;
+                else
+                    fireballOffscreenElapsed[i] = 0f;
+                if (fireballOffscreenElapsed[i] < 0.6f)
+                    continue;
+                Destroy(fireball.gameObject);
+                RemoveFireballAt(i);
+            }
         }
 
-        private static void DestroyFireball(ref DragonLevelMeteor fireball)
+        private void RemoveFireballAt(int index)
         {
-            if (fireball != null)
-                Destroy(fireball.gameObject);
-            fireball = null;
+            fireballs.RemoveAt(index);
+            fireballOffscreenElapsed.RemoveAt(index);
+        }
+
+        private void DestroyFireballs()
+        {
+            for (var i = fireballs.Count - 1; i >= 0; i--)
+                if (fireballs[i] != null)
+                    Destroy(fireballs[i].gameObject);
+            fireballs.Clear();
+            fireballOffscreenElapsed.Clear();
         }
 
         private void HideDragon()
@@ -428,8 +577,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             cleaningUp = true;
             StopSound(MeteorAnticipationSound);
-            DestroyFireball(ref upperFireball);
-            DestroyFireball(ref lowerFireball);
+            DestroyFireballs();
             dragonRoot = null;
             animator = null;
             bodyRenderers = null;
@@ -437,6 +585,7 @@ namespace Gilomx.CupheadBossRoulette
             mouthRoot = null;
             meteorTemplate = null;
             meteorProperties = null;
+            attackPattern = null;
             donorLabel = null;
         }
     }
