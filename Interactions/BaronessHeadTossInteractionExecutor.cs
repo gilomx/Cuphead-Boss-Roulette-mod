@@ -36,6 +36,11 @@ namespace Gilomx.CupheadBossRoulette
                 StringComparison.Ordinal);
         }
 
+        internal NativeBaronessHeadTossCache NativeCache
+        {
+            get { return nativeCache; }
+        }
+
         public bool IsAvailable(string item)
         {
             return Supports(item) && nativeCache.CanSpawn;

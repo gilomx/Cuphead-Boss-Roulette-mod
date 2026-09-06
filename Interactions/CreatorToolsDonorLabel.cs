@@ -64,7 +64,7 @@ namespace Gilomx.CupheadBossRoulette
                 var labelTransform = labelText.rectTransform;
                 labelText.font = FindGameFont();
                 labelText.text = donor;
-                labelText.fontSize = 22f;
+                labelText.fontSize = 28f;
                 labelText.fontStyle = FontStyles.Bold;
                 labelText.alignment = TextAlignmentOptions.Center;
                 labelText.enableWordWrapping = false;
@@ -82,17 +82,11 @@ namespace Gilomx.CupheadBossRoulette
                     : anchorRenderer;
                 labelRenderer = labelText.GetComponent<Renderer>();
                 MatchActorSorting(labelRenderer);
-                labelTransform.localScale = AbsoluteScale(
-                    transform.lossyScale);
                 labelTransform.rotation = Quaternion.identity;
 
                 follower = labelObject.AddComponent<
                     CreatorToolsDonorLabelFollower>();
-                var cameraScale = GetComponent<
-                    CreatorToolsInteractionCameraScale>();
-                var scaleFactor = cameraScale == null
-                    ? 1f
-                    : Mathf.Max(0.01f, cameraScale.Factor);
+                var scaleFactor = GetLabelCameraScale();
                 follower.Initialize(
                     transform,
                     actorRenderer,
@@ -173,11 +167,7 @@ namespace Gilomx.CupheadBossRoulette
             if (actor == null || follower == null)
                 return false;
 
-            var cameraScale = actor.GetComponent<
-                CreatorToolsInteractionCameraScale>();
-            var scaleFactor = cameraScale == null
-                ? 1f
-                : Mathf.Max(0.01f, cameraScale.Factor);
+            var scaleFactor = GetLabelCameraScale();
             follower.Rebind(
                 actor.transform,
                 anchorRenderer,
@@ -194,6 +184,14 @@ namespace Gilomx.CupheadBossRoulette
                 follower.SetVerticalOffsetPixels(offsetPixels);
         }
 
+        internal void FollowAnimatedBody(
+            SpriteRenderer primary, SpriteRenderer secondary, bool includeSecondary,
+            Action prepareBody)
+        {
+            if (follower != null)
+                follower.FollowAnimatedBody(primary, secondary, includeSecondary, prepareBody);
+        }
+
         internal void Hide()
         {
             if (follower != null)
@@ -208,7 +206,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal bool CreateLevelEndSnapshot(Transform parent)
         {
-            if (parent == null || labelRenderer == null)
+            if (parent == null || labelRenderer == null ||
+                follower == null || !follower.HasVisibleActor)
                 return false;
             var source = labelRenderer.GetComponent<TextMeshPro>();
             if (source == null || !source.enabled ||
@@ -283,12 +282,13 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
-        private static Vector3 AbsoluteScale(Vector3 value)
+        internal static float GetLabelCameraScale()
         {
-            return new Vector3(
-                Mathf.Abs(value.x),
-                Mathf.Abs(value.y),
-                Mathf.Abs(value.z));
+            // Names and gifts have one readable screen size across the catalog.
+            // Actor scale may include a native prefab size or the aircraft
+            // reduction; neither should shrink the label, including on handoff.
+            var camera = CreatorToolsInteractionPresentation.FindGameplayCamera();
+            return camera == null ? 1f : Mathf.Max(0.01f, camera.orthographicSize / 360f);
         }
 
         private static Color ResolveTextColor()
@@ -365,16 +365,24 @@ namespace Gilomx.CupheadBossRoulette
 
     internal sealed class CreatorToolsDonorLabelFollower : MonoBehaviour
     {
-        private const float FadeDuration = 0.6f;
-
+        private readonly CreatorToolsDonorLabelLifetime lifetime =
+            new CreatorToolsDonorLabelLifetime();
         private Transform actorTransform;
         private SpriteRenderer actorRenderer;
+        private SpriteRenderer[] actorRenderers;
+        private SpriteRenderer secondaryBodyRenderer;
+        private readonly Dictionary<Sprite, Vector2[]> spriteVertices =
+            new Dictionary<Sprite, Vector2[]>();
+        private bool followAnimatedBody;
+        private bool includeSecondaryBody;
+        private Action prepareBodyForAnchor;
+        private float textBottomOffset;
+        private float presentationScale = 1f;
         private TextMeshPro text;
         private SpriteRenderer giftRenderer;
         private float fallbackVerticalOffset;
         private float visualGap;
         private float additionalVerticalOffset;
-        private float fadeElapsed;
         private Color originalColor;
         private Color originalGiftColor;
         private Color32 originalOutlineColor;
@@ -386,12 +394,15 @@ namespace Gilomx.CupheadBossRoulette
         private float currentOpacity = 1f;
         private float fadeInDuration;
         private float fadeInElapsed;
-        private float fadeOutStartOpacity = 1f;
         private bool waitingForActorVisibility;
         private bool fadingIn;
-        private bool fadeOutStarted;
         private bool giftImagePreferenceVisible = true;
         private bool giftImageLifecycleSuppressed;
+
+        internal bool HasVisibleActor
+        {
+            get { return lifetime.Opacity > 0.01f && ActorIsVisible(); }
+        }
 
         internal void Initialize(
             Transform actorTransform,
@@ -422,6 +433,12 @@ namespace Gilomx.CupheadBossRoulette
         {
             actorTransform = newActorTransform;
             actorRenderer = newActorRenderer;
+            actorRenderers = newActorTransform == null ? null :
+                newActorTransform.GetComponentsInChildren<SpriteRenderer>(true);
+            followAnimatedBody = false;
+            secondaryBodyRenderer = null;
+            prepareBodyForAnchor = null;
+            spriteVertices.Clear();
             fallbackVerticalOffset = newFallbackVerticalOffset;
             visualGap = newVisualGap;
             additionalVerticalOffset = 0f;
@@ -430,14 +447,29 @@ namespace Gilomx.CupheadBossRoulette
             rendererAnchorCaptured = false;
             dynamicAnchorRemaining = Mathf.Max(
                 0f, dynamicAnchorSeconds);
-            fadeOutStarted = false;
-            fadeElapsed = 0f;
-            if (text != null && actorTransform != null)
-                text.rectTransform.localScale = new Vector3(
-                    Mathf.Abs(actorTransform.lossyScale.x),
-                    Mathf.Abs(actorTransform.lossyScale.y),
-                    Mathf.Abs(actorTransform.lossyScale.z));
+            lifetime.Rebind();
+            presentationScale = CreatorToolsDonorLabel.GetLabelCameraScale();
+            ApplyPresentationScale();
             UpdatePosition();
+            UpdateLifetime(0f);
+        }
+
+        internal void FollowAnimatedBody(
+            SpriteRenderer primary, SpriteRenderer secondary, bool includeSecondary,
+            Action prepareBody)
+        {
+            actorRenderer = primary;
+            secondaryBodyRenderer = secondary;
+            includeSecondaryBody = includeSecondary;
+            prepareBodyForAnchor = prepareBody;
+            followAnimatedBody = true;
+            // Only the body can keep this name visible, never spawned bullets,
+            // dust or pieces thrown far away from a multipart miniboss.
+            actorRenderers = new[] { primary, secondary };
+            positioned = false;
+            MeasureTextBottomOffset();
+            UpdatePosition();
+            UpdateLifetime(0f);
         }
 
         internal void SetGiftRenderer(SpriteRenderer value)
@@ -449,7 +481,7 @@ namespace Gilomx.CupheadBossRoulette
             originalGiftColor = value == null
                 ? Color.clear
                 : value.color;
-            ApplyOpacity(currentOpacity);
+            ApplyOpacity(lifetime.Opacity);
             ApplyGiftRendererVisibility();
         }
 
@@ -467,14 +499,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void SetVerticalOffsetPixels(float offsetPixels)
         {
-            var cameraScale = actorTransform == null
-                ? null
-                : actorTransform.GetComponent<
-                    CreatorToolsInteractionCameraScale>();
-            var scaleFactor = cameraScale == null
-                ? 1f
-                : Mathf.Max(0.01f, cameraScale.Factor);
-            var scaledOffset = offsetPixels * scaleFactor;
+            UpdatePresentationScale();
+            var scaledOffset = offsetPixels * presentationScale;
             if (positioned)
                 actorOffset.y +=
                     scaledOffset - additionalVerticalOffset;
@@ -503,17 +529,27 @@ namespace Gilomx.CupheadBossRoulette
 
         private void LateUpdate()
         {
-            if (actorTransform != null)
+            if (text == null)
             {
-                UpdatePosition();
-                UpdateFadeIn();
+                Destroy(gameObject);
                 return;
             }
-            UpdateFade();
+            if (actorTransform != null)
+            {
+                UpdatePresentationScale();
+                UpdatePosition();
+                UpdateFadeIn();
+            }
+            UpdateLifetime(Time.unscaledDeltaTime);
         }
 
         private void UpdatePosition()
         {
+            if (followAnimatedBody)
+            {
+                UpdateAnimatedBodyPosition();
+                return;
+            }
             if ((!rendererAnchorCaptured ||
                  dynamicAnchorRemaining > 0f) &&
                 actorRenderer != null &&
@@ -554,32 +590,115 @@ namespace Gilomx.CupheadBossRoulette
                 rendererAnchorCaptured = true;
         }
 
-        private void UpdateFade()
+        private void UpdatePresentationScale()
         {
-            if (text == null)
-            {
-                Destroy(gameObject);
+            var scale = CreatorToolsDonorLabel.GetLabelCameraScale();
+            if (Mathf.Approximately(scale, presentationScale))
                 return;
-            }
+            var ratio = scale / presentationScale;
+            var previousGap = visualGap + additionalVerticalOffset;
+            visualGap *= ratio;
+            additionalVerticalOffset *= ratio;
+            if (positioned)
+                actorOffset.y += visualGap + additionalVerticalOffset - previousGap;
+            presentationScale = scale;
+            ApplyPresentationScale();
+        }
 
-            if (!fadeOutStarted)
+        private void ApplyPresentationScale()
+        {
+            if (text != null)
+                text.rectTransform.localScale = new Vector3(
+                    presentationScale, presentationScale, 1f);
+        }
+
+        private void UpdateAnimatedBodyPosition()
+        {
+            // Native turns can reset the body's scale in the same frame.
+            // Restore it before measuring, regardless of LateUpdate order.
+            if (prepareBodyForAnchor != null)
+                prepareBodyForAnchor();
+            Bounds bounds;
+            var hasBody = TryGetVisualBounds(actorRenderer, out bounds);
+            if (includeSecondaryBody || !hasBody)
             {
-                fadeOutStarted = true;
-                fadeElapsed = 0f;
-                fadeOutStartOpacity = currentOpacity;
-                waitingForActorVisibility = false;
-                fadingIn = false;
+                Bounds secondaryBounds;
+                if (TryGetVisualBounds(secondaryBodyRenderer, out secondaryBounds))
+                {
+                    if (hasBody)
+                        bounds.Encapsulate(secondaryBounds);
+                    else
+                        bounds = secondaryBounds;
+                    hasBody = true;
+                }
             }
-
-            var speed = Mathf.Max(0f, CupheadTime.GlobalSpeed);
-            if (speed <= 0f)
+            if (!hasBody)
                 return;
-            fadeElapsed += Time.unscaledDeltaTime * speed;
-            currentOpacity = fadeOutStartOpacity *
-                (1f - Mathf.Clamp01(fadeElapsed / FadeDuration));
-            ApplyOpacity(currentOpacity);
 
-            if (currentOpacity <= 0f)
+            // The TMP rect has a top pivot. Offset by the actual text bottom
+            // so the readable gap is above the drawing, not inside the rect.
+            var bottomOffset = textBottomOffset;
+            if (giftRenderer != null && giftRenderer.enabled && giftRenderer.sprite != null)
+                bottomOffset = Mathf.Max(bottomOffset,
+                    -giftRenderer.transform.localPosition.y - giftRenderer.sprite.bounds.min.y);
+            transform.position = new Vector3(bounds.center.x,
+                bounds.max.y + visualGap + additionalVerticalOffset +
+                    bottomOffset * presentationScale, bounds.center.z);
+            transform.rotation = Quaternion.identity;
+            positioned = true;
+        }
+
+        private void MeasureTextBottomOffset()
+        {
+            if (text == null || !followAnimatedBody)
+                return;
+            text.ForceMeshUpdate();
+            textBottomOffset = 0f;
+            // Include characters rendered by fallback font submeshes too.
+            var info = text.textInfo;
+            for (var i = 0; i < info.characterCount; i++)
+                if (info.characterInfo[i].isVisible)
+                    textBottomOffset = Mathf.Max(textBottomOffset,
+                        -info.characterInfo[i].vertex_BL.position.y);
+        }
+
+        private bool TryGetVisualBounds(SpriteRenderer renderer, out Bounds bounds)
+        {
+            bounds = new Bounds();
+            if (!RendererHasVisibleSprite(renderer))
+                return false;
+            var sprite = renderer.sprite;
+            Vector2[] vertices;
+            if (!spriteVertices.TryGetValue(sprite, out vertices))
+            {
+                // Cupcake frames have different pivots and a large transparent
+                // canvas. Cache each trimmed mesh once, not its moving bounds.
+                vertices = sprite.vertices;
+                spriteVertices.Add(sprite, vertices);
+            }
+            if (vertices.Length == 0)
+                return false;
+            var spriteTransform = renderer.transform;
+            var flipX = renderer.flipX ? -1f : 1f;
+            var flipY = renderer.flipY ? -1f : 1f;
+            for (var i = 0; i < vertices.Length; i++)
+            {
+                var point = spriteTransform.TransformPoint(new Vector3(
+                    vertices[i].x * flipX, vertices[i].y * flipY, 0f));
+                if (i == 0)
+                    bounds = new Bounds(point, Vector3.zero);
+                else
+                    bounds.Encapsulate(point);
+            }
+            return true;
+        }
+
+        private void UpdateLifetime(float unscaledDeltaTime)
+        {
+            lifetime.Advance(actorTransform != null, ActorIsVisible(),
+                currentOpacity, unscaledDeltaTime);
+            ApplyOpacity(lifetime.Opacity);
+            if (lifetime.Finished)
                 Destroy(gameObject);
         }
 
@@ -601,33 +720,65 @@ namespace Gilomx.CupheadBossRoulette
             fadeInElapsed += Time.unscaledDeltaTime * speed;
             currentOpacity = Mathf.Clamp01(
                 fadeInElapsed / fadeInDuration);
-            ApplyOpacity(currentOpacity);
             if (currentOpacity >= 1f)
                 fadingIn = false;
         }
 
         private bool ActorIsVisible()
         {
-            if (actorTransform == null)
+            if (actorTransform == null ||
+                !actorTransform.gameObject.activeInHierarchy)
                 return false;
-            var camera = Camera.main;
-            if (camera == null || !camera.enabled)
+            var camera = CreatorToolsInteractionPresentation.FindGameplayCamera();
+            if (camera == null)
                 return false;
-            if (actorRenderer == null || actorRenderer.sprite == null ||
-                !actorRenderer.enabled ||
-                !actorRenderer.gameObject.activeInHierarchy)
+            // Multi-part native actors can have an empty/disabled root sprite.
+            // Test their actual visuals, never their still-existing root point.
+            for (var i = 0; actorRenderers != null && i < actorRenderers.Length; i++)
             {
-                var point = camera.WorldToViewportPoint(
-                    actorTransform.position);
-                return point.z >= 0f && point.x >= 0f && point.x <= 1f &&
-                    point.y >= 0f && point.y <= 1f;
+                var renderer = actorRenderers[i];
+                if (followAnimatedBody)
+                {
+                    Bounds bounds;
+                    if (TryGetVisualBounds(renderer, out bounds) &&
+                        (camera.cullingMask & (1 << renderer.gameObject.layer)) != 0 &&
+                        BoundsAreVisible(bounds, camera))
+                        return true;
+                }
+                else if (RendererIsVisible(renderer, camera))
+                    return true;
             }
+            return false;
+        }
 
-            var bounds = actorRenderer.bounds;
+        private static bool RendererIsVisible(SpriteRenderer renderer, Camera camera)
+        {
+            if (!RendererHasVisibleSprite(renderer) ||
+                (camera.cullingMask & (1 << renderer.gameObject.layer)) == 0)
+                return false;
+            return BoundsAreVisible(renderer.bounds, camera);
+        }
+
+        private static bool BoundsAreVisible(Bounds bounds, Camera camera)
+        {
             var minimum = camera.WorldToViewportPoint(bounds.min);
             var maximum = camera.WorldToViewportPoint(bounds.max);
             return maximum.z >= 0f && maximum.x >= 0f &&
                 minimum.x <= 1f && maximum.y >= 0f && minimum.y <= 1f;
+        }
+
+        private static bool RendererHasVisibleSprite(SpriteRenderer renderer)
+        {
+            if (renderer == null || renderer.sprite == null || !renderer.enabled ||
+                !renderer.gameObject.activeInHierarchy || renderer.color.a <= 0.01f)
+                return false;
+            // Native death fades can change the material alpha instead of the
+            // SpriteRenderer tint. Read the current material without instancing it.
+            var material = renderer.sharedMaterial;
+            if (material != null && material.HasProperty("_Color") &&
+                material.color.a <= 0.01f)
+                return false;
+            return true;
         }
 
         private void ApplyOpacity(float opacity)
@@ -663,6 +814,7 @@ namespace Gilomx.CupheadBossRoulette
                 text.margin = visible
                     ? giftVisibleTextMargin
                     : Vector4.zero;
+            MeasureTextBottomOffset();
         }
     }
 }

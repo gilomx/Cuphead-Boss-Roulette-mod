@@ -2,6 +2,294 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Mini jefes: demás niveles de avión (2026-09-05)
+
+El usuario pidió activar los mini jefes en otras peleas aéreas y revisar qué
+faltaba. Se habilitaron los cinco donde existe `PlanePlayerController`:
+Hilda, Djimmi, Titi Trinos, Robot, Esther, Phear Lap y Mr. Chimes. Cala María
+mantiene el agua real y la retirada/bloqueo al entrar en Head o perderla.
+
+`usesAircraftArena` separa escala 0.8, colliders de Corn/mini corns y piso de
+avión de `usesWaterFloor`, que sólo describe Cala. Los otros aviones usan
+`aircraftFloorY = cameraY - orthographicSize + 100 * cameraScale`, fijado al
+aparecer. No se añade un collider ni se modifica el suelo global. El margen
+interior permite las partes que bajan del suelo nominal (Waffle ~82 unidades
+base). El piso estable mantiene coherentes las posiciones que Init/corutinas
+guardan en Gumball, CandyCorn y Waffle, y el aterrizaje/splash de Cupcake.
+
+Revisión nativa: las tres lecturas de Ground de Cupcake ya están adaptadas;
+los otros cuatro usan altura inicial/pivote o persecución 2D. Escenas/IL
+confirman cámara Y relativa en Hilda (-14..35) y Robot (-10..24), X relativa
+en Mr. Chimes (±35) y cámara fija en los restantes; sin rotación/zoom nativo
+durante estas peleas. El movimiento de cámara no cambia sólo una parte del
+patrón. Se conserva el límite global de un mini jefe y los ajustes de nombres.
+
+Textos ES/EN y docs del panel actualizados; build UI correcto (13 artículos,
+43 regalos, TypeScript/Vite). Build Release limpio, 36 grupos de runtime y
+contrato nativo de mini jefes pasan. Instalados 9 archivos verificados con
+respaldo `installation-backups/baroness-mini-bosses-20260905-175758/`.
+DLL SHA-256: `A6811F584A577822855C99D9DBDCFC57F11D4514C8120C950BF577FA9BF06C77`.
+Reinicio correcto: sin nuevos errores del mod/Harmony, API lista con 13
+artículos, máximo de uno y texto actualizado servido desde el bundle instalado.
+Pendiente prueba visual de cada recorrido/combate en estas arenas: puede haber
+recortes breves en los extremos del patrón con cámara relativa; no se promete
+que todo sprite y nombre permanezca siempre dentro de la pantalla.
+
+## Etiquetas: lectura en tierra y seguimiento de mini jefes (2026-09-05)
+
+El usuario precisó que los comportamientos extraños eran de los nombres:
+Caramelo gigante demasiado alto y Cupcake suspendido durante la bajada. Se
+revisaron los cinco prefabs y sus animaciones nativas. Jawbreaker tiene el
+renderer raíz vacío y el dibujo en el hijo `sprite`; Cupcake cambia pivote
+y borde superior del mesh entre frames (más de 400 unidades de diferencia).
+El offset fijo respecto al root no sirve para estas animaciones.
+
+La fuente común sube de 22 a 28 para mejorar lectura en tierra y avión. La
+escala del nombre/regalo sigue dependiendo sólo de la cámara y ahora se
+actualiza cada LateUpdate. Los cinco mini jefes optan por `FollowAnimatedBody`
+en el follower compartido: mesh real por frame, incluyendo transformaciones
+y flips; vértices cacheados por sprite. Cupcake y CandyCorn usan su cuerpo;
+Jawbreaker el hijo visible; Waffle usa cuerpo y, al separarse, la boca central
+(excluye piezas); Gumball combina cuerpo y tapa. La visibilidad usa sólo esas
+partes y sus meshes, sin mantener nombres por proyectiles/efectos sueltos.
+Se conserva el pivote TMP aprobado y el gap de 14 se mide desde el borde
+inferior real del texto/regalo hasta el dibujo. Se incluyen los caracteres
+de fuentes alternativas y se vuelve a medir al cambiar el layout del regalo.
+`RestoreActorSize` se ejecuta también antes de medir el ancla, evitando un
+salto por el orden de LateUpdate cuando los giros nativos reinician la escala.
+
+Los ataques estándar conservan sus anclas fijas y los handoffs existentes;
+el fade por destrucción y los snapshots siguen compartidos. No se cambiaron
+HP, patrones, colisiones, límite de un mini jefe ni reducción aérea del cuerpo.
+
+Build Release sin advertencias ni errores; 36 grupos del harness y contrato
+nativo de los cinco mini jefes pasan. Revisión independiente de geometría,
+partes, TMP instalado y giros. Instalados 9 archivos con hashes verificados;
+respaldo `installation-backups/baroness-mini-bosses-20260905-173556/`.
+DLL SHA-256: `E156B0FD3AE14BB43C2F84FF0CC01CE3F572B69B05843E1A5924C81267D623FC`.
+Cuphead reiniciado; arranque sin nuevos errores del mod/Harmony y API lista
+con 13 artículos y `maxMiniBosses = 1`.
+La comprobación visual del recorrido completo en combate sigue pendiente;
+las pruebas del harness no simulan la geometría ni el render de Unity.
+
+## Etiquetas: tamaño común para todos los actores (2026-09-05)
+
+El usuario pidió restaurar la legibilidad de los nombres de mini jefes y de
+la cabeza de la Baronesa al tamaño de zepelines y zanahoria. La etiqueta ya no
+copia `actor.lossyScale`: `GetLabelCameraScale` calcula sólo el factor de la
+cámara (`orthographicSize / 360`). La fuente 22 y la escala uniforme se aplican
+tanto en creación como en Rebind, por lo que el lanzamiento de la cabeza
+conserva el tamaño del mismo nombre/regalo. Los márgenes explícitos usan esa
+misma referencia. El cuerpo de los mini jefes conserva su reducción aérea 0.8.
+Los snapshots siguen copiando la escala final de la etiqueta; la limpieza,
+ocultación reversible y vida independiente no cambian.
+
+Build Release sin errores ni advertencias; revisión de handoff/snapshot y
+`diff --check` sin hallazgos. Instalados los 9 archivos con hashes verificados
+y respaldo en `installation-backups/baroness-mini-bosses-20260905-171706/`.
+DLL instalada SHA-256:
+`74604160ED164572058D7AF8081A3BA7A85E6207781A15B45BBB13F53D792A1A`.
+Arranque sin nuevos errores de Harmony/mod; API lista con 13 artículos y
+máximo de uno. Pendiente comprobar visualmente los nombres en combate.
+
+## Mini jefes: proporción del tamaño en avión (2026-09-05)
+
+Por solicitud del usuario, los mini jefes de avión y sus secundarios usan
+`AircraftSizeMultiplier = 0.8f`: 20 % menos tamaño lineal sobre la compensación
+de cámara. Sólo aplica a la arena aérea compatible (Cala María); en tierra
+permanece 1. No fluctúa al activar el mini avión del jugador. Se eligió como
+punto inicial entre las proporciones locales equivalentes por área de sprites
+del personaje/avión (0.76) y de sus hitboxes (0.845), no como balance definitivo.
+
+`ApplyActorSize` escala cada root completo y registra el factor compuesto para
+la presentación; sprites y colliders conservan su alineación. Los secundarios
+se ajustan una vez al registrarlos. Las piezas hijas de Waffle heredan escala
+sin reducir de nuevo su `explodeDistance`. `RestoreActorSize` se ejecuta tras
+Init, antes de crear la etiqueta, y en LateUpdate para conservar el tamaño tras
+los giros nativos de Cupcake, Gumball y Waffle. Las etiquetas y regalos mantienen
+su proporción con el actor y la corrección previa de visibilidad.
+
+El tamaño corporal se separa de `cameraScale`: Gumball182, CandyCorn122,
+Cupcake120/entrada82 y sus salpicaduras ajustan los márgenes del cuerpo respecto
+al agua. Los demás límites, velocidades y tiempos conservan su escala anterior.
+En particular, `jawbreakerMiniSpace` también afecta cadencia/seguimiento y se
+conserva; `Gumball.offsetX` es un extremo del recorrido, no la boquilla.
+HP independiente, límite fijo de uno y triggers acuáticos de los maíces siguen.
+
+Build .NET Release sin errores/advertencias y contrato IL nativo pasan.
+Instalado con los 9 archivos verificados y respaldo en
+`installation-backups/baroness-mini-bosses-20260905-170648/`.
+DLL instalada SHA-256:
+`FE175BC29FC245A9862E4A628C9FAC6FAA3194062008893CD3DE619466B3B4A3`.
+Arranque real sin nuevos errores de Harmony/mod; API lista con 13 artículos
+y máximo de un mini jefe. Falta evaluar visualmente el ajuste en combate.
+
+## Corrección: nombres residuales y maíz dulce en Cala María (2026-09-05)
+
+El usuario reportó nombres visibles después de desaparecer ataques/minijefes
+y ausencia de impactos en CandyCorn y mini corns en Cala María. Se identificaron
+dos causas independientes mediante código, IL y prefabs del juego instalado.
+
+`CreatorToolsDonorLabelFollower` antes sólo comprobaba si existía el Transform.
+Ahora comprueba todos los sprites hijos, actividad, alfa del renderer/material,
+capas y encuadre. Oculta nombre/regalo si desaparece el visual y los restaura
+si vuelve; mantiene los handoffs semilla/planta y cuerpo/proyectil. La nueva
+política `CreatorToolsDonorLabelLifetime` termina el fade de un objetivo
+destruido con tiempo real, incluso si `CupheadTime.GlobalSpeed` es cero.
+El snapshot de fin de nivel sólo captura nombres con actor visible y se toma
+antes de deshabilitar los sprites originales. Cagney oculta su renderer antes
+de destruir el objeto; Gumball alterna sprites temporalmente, por lo que la
+invisibilidad no destruye por sí sola el follower.
+
+Los dos prefabs de maíz usan BoxCollider2D sólido y Rigidbody2D cinemático con
+contactos completos desactivados. Las balas/bombas básicas de avión usan
+colliders sólidos sin Rigidbody2D: esa combinación no produce contactos.
+Las copias acuáticas de CandyCorn y CandyCornMini cambian a triggers antes de
+la física; los seis callbacks nativos de trigger/colisión llegan al mismo
+`checkCollision`. Se conservan HP, DamageReceiver, impactos y muerte originales.
+La implementación está en `PrepareAircraftDamageColliders`, sólo para copias
+en agua; no modifica prefabs ni actores terrestres. El límite fijo de uno sigue.
+
+Validación: 36 grupos del harness pasan (6 nuevos de etiquetas), build Release
+sin errores ni advertencias, contrato IL ampliado pasa. El nuevo verificador
+`tools/verify_native_aircraft_collision_contract.py` confirma los siete prefabs
+que explican la diferencia entre balas terrestres y aéreas. Requiere UnityPy;
+no carga el juego ni sustituye una prueba de combate. Se instalaron los 9
+archivos verificados con respaldo en
+`installation-backups/baroness-mini-bosses-20260905-165155/`.
+DLL instalada SHA-256:
+`0726D0BF04A11EA38454F6ECC30FE06D67737AE626B436E3E556A976A4E8D490`.
+Arranque real verificado sin nuevos errores de Harmony/mod; API lista con
+13 artículos y `maxMiniBosses: 1`, hash instalado idéntico. El log registra
+entrada en FlyingMermaid. Falta confirmar impactos, muerte y limpieza visual
+en combate; las pruebas automáticas no afirmaron ese resultado.
+
+## Mini jefes: exclusión fija de todos los tipos (2026-09-05)
+
+El usuario precisó que sólo puede salir **un mini jefe a la vez**, sin
+coincidir con el mismo ni con otro tipo. Esta regla sustituye la opción de
+1 o 2 de la actualización anterior. `CreatorToolsMiniBossSpawnPolicy` rechaza
+cualquier aparición mientras la captura compartida contenga un actor activo.
+Se espera hasta que su cuerpo desaparezca, incluida la animación de muerte;
+las solicitudes bloqueadas siguen pendientes.
+
+El panel deja de ofrecer un límite editable. La clave BepInEx
+`MiniJefesMaximosEnPantalla` y el campo API `maxMiniBosses` permanecen por
+compatibilidad, normalizados siempre a 1, incluso si una configuración o
+cliente anterior envía 2. La compatibilidad de Cala María se conserva.
+
+Validación: build .NET Release sin errores ni advertencias, build del panel y
+30 grupos del harness pasan. Las 25 parejas posibles de mini jefes quedan
+bloqueadas aunque se solicite un límite anterior de 2 o superior. La prueba
+HTTP del mock confirma que otro ataque puede avanzar detrás de los mini jefes
+pendientes. Instalados los 9 archivos con respaldo en
+`installation-backups/baroness-mini-bosses-20260905-163103/` y hashes verificados.
+DLL instalada SHA-256:
+`DA75D8BB97FF119BEC587F9B873030B29E3DB03E3FB7E65A1C15539C5C5B7432`.
+Cuphead cerró normalmente y volvió a iniciar sin nuevos errores de Harmony/mod.
+El panel servido incluye «Un solo mini jefe». Una petición real a
+`/api/config/interactions/set?maxMiniBosses=2` fue procesada y el estado
+confirmó `maxMiniBosses: 1`, conservando máximo general 10 y regalo visible.
+No se realizó una prueba de combate en esta corrección.
+
+## Mini jefes: primera versión del límite y agua de Cala María (2026-09-05)
+
+Actualización instalada después de la primera implementación descrita abajo.
+`MiniJefesMaximosEnPantalla` / `maxMiniBosses` permite 1 o 2 y empieza en 1.
+El ajuste **Mini jefes simultáneos** aparece en el panel con textos ES/EN.
+El límite se comparte entre todas las colas y nunca admite el mismo tipo dos
+veces. Los cuerpos cuentan hasta desaparecer, incluida su animación de muerte;
+los canjeos bloqueados esperan sin impedir que otros artículos avancen.
+Reducir de 2 a 1 deja terminar a los actores existentes.
+
+El ejecutor reconoce también actores originales. Durante la ronda nativa de
+la Baronesa espera hasta `BaronessLevelCastle.State.Chase`, usando el campo
+`castle` del nivel real, para evitar duplicados en convocatorias posteriores.
+No usa una búsqueda global de castillos porque la interacción de cabeza
+también conserva una copia visual inerte.
+
+La compatibilidad aérea inicial abarca sólo Cala María, antes de `States.Head`
+y con agua visible. Usa el borde superior del collider nativo de
+`FlyingMermaidLevelSplashManager`, comprueba `wave1`/`wave2` y el encuadre,
+y conserva HP y persecución nativos. Cupcake adapta sus tres lecturas de
+`Level.Ground` en caída y salpicaduras; los cinco aparecen respecto al agua.
+Entrar en fase cabeza o perder la superficie retira actores y secundarios.
+El estado de fase se comprueba explícitamente: las olas pueden seguir activas
+con otras capas de renderizado durante la transición. `EndGameplayLevel`
+libera también las referencias estáticas de la arena mediante `ResetArenaCache`.
+Los demás niveles de avión mantienen sus solicitudes pendientes.
+
+Validación: 30 grupos del harness pasan, contrato IL ampliado para suelo,
+persecución aérea y fase de Cala María pasa; build .NET Release sin errores
+ni advertencias. Build del panel y pruebas HTTP del mock pasan para límite,
+duplicados, conservación de ajustes y reducción sin retirar actores.
+Se instalaron y verificaron los 9 archivos con respaldo en
+`installation-backups/baroness-mini-bosses-20260905-155530/`.
+DLL instalada SHA-256:
+`77103BC6DE69A693FB85642E5AFC45C1477C7C43DA682E09B12EC1720627B8FB`.
+Cuphead reinició sin nuevos errores de Harmony/mod; API lista con 13 artículos,
+`maxMiniBosses: 1` y máximo general conservado en 10. El bundle servido contiene
+el nuevo ajuste y la compatibilidad de Cala María. Falta verificar combate,
+altura visual y balance en partida; no se ha afirmado validación jugable.
+
+## Catálogo: mini jefes de la Baronesa (2026-09-05)
+
+Primera implementación en código de `baroness_cupcake`, `baroness_gumball`,
+`baroness_waffle`, `baroness_candy_corn` y `baroness_jawbreaker`. El catálogo
+tiene 13 IDs y el panel incorpora el tipo `mini_boss` y el filtro Mini jefes,
+con previews nativos, traducciones ES/EN y selección en las reglas compartidas.
+
+Los actores usan sus cinco controladores y HP nativos por dificultad. El
+bridge `BaronessLevelMiniBossBase.OnDamageTaken` se omite exclusivamente para
+copias marcadas del catálogo; no se registran en el castillo ni en la timeline
+de la arena. La vida de cada aparición es independiente y su muerte conserva
+la secuencia original. `NativeBaronessMiniBossCache` obtiene los prefabs del
+castillo inerte que ya conserva `NativeBaronessHeadTossCache`; no inicia una
+segunda carga de la misma escena.
+
+La adaptación de coordenadas se limita a los actores marcados. Cada aparición
+crea propiedades espaciales propias y conserva tiempos, HP y dificultad; no
+modifica límites globales ni propiedades del nivel activo. La primera versión
+requiere una arena terrestre con suelo visible. La interfaz
+`ICreatorToolsLevelRestrictedInteractionExecutor` conserva canjeos pendientes
+incompatibles y permite que avance el resto de la cola. La consulta de
+disponibilidad no rota el objetivo de jugador en cooperativo.
+
+El estado agrupa al mini jefe, su pivote y secundarios para limpieza en
+cancelación/reintento. Los hooks de corrutinas identifican pequeños caramelos,
+fantasma y salpicaduras; el disparo de Gumball identifica sólo sus proyectiles
+mediante un contexto restaurado en el finalizer. Un fallo al instalar los
+parches deshabilita estos artículos y devuelve `native_assets_unavailable`.
+
+Validación del panel: build con 13 interacciones y 43 regalos, TypeScript/Vite,
+filtros 5 mini jefes / 8 ataques, preservación de campos al filtrar y regla/lote
+manual confirmados contra el mock. Los 23 casos del harness de streaming pasan.
+Build .NET Release final: cero advertencias/errores. La comprobación
+`tools/verify_native_baroness_miniboss_contract.ps1` pasó contra el juego
+instalado (HP, prefabs, daño, coordenadas y propiedad de secundarios). DLL
+compilada SHA-256:
+`3DDF61C12A5A9D227C5D7981C8CCE7596CAD32357F19F07C7EBAA58DCFE24076`.
+
+Instalada por solicitud del usuario el 2026-09-05: DLL, los tres archivos del
+panel y cinco PNG, todos con hashes verificados. Respaldo de la instalación
+anterior en `installation-backups/baroness-mini-bosses-20260905-153347/`, con
+manifest que registra también cuáles archivos todavía no existían.
+
+El primer arranque real detectó que `AccessTools.Method(type, "Create")`
+seleccionaba `AbstractProjectile.Create()` heredado en lugar de la fábrica de
+Gumball. Se corrigió usando la firma explícita `(Vector2, Vector2, float)` y
+el contrato IL ahora comprueba ese overload. La búsqueda de corrutinas filtra
+`IEnumerator` antes de consultar campos, evitando advertencias sobre enums y
+registros serializados. Tras recompilar, reinstalar y reiniciar, el log confirma
+el arranque sin nuevos errores de Harmony/mod. `/api/config/interactions`
+publica 13 artículos, incluidos los cinco mini jefes. La configuración del
+usuario se conservó. Sigue pendiente probar daño, movimiento, pausa, muerte y
+limpieza en combate; ver `INTERACTION_CATALOG.md`.
+
+La propuesta inicial para avión está en `FUTURE_IDEAS.md`. La actualización
+posterior descrita arriba implementa el agua de Cala María; el resto sigue
+como propuesta.
+
 ## Catálogo: secuencia aleatoria de Fósforo Sombrío (2026-09-04)
 
 `dragon_fireballs` completa ahora tres ataques antes de abandonar la pantalla.

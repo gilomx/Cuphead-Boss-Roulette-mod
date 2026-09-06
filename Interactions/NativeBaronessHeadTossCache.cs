@@ -75,6 +75,17 @@ namespace Gilomx.CupheadBossRoulette
             get { return preloadFailed; }
         }
 
+        // The retained castle also owns the native mini-boss prefab references.
+        // Sharing this source avoids loading the same scene a second time.
+        internal BaronessLevelCastle CachedCastle
+        {
+            get
+            {
+                return baronessTemplate == null ? null :
+                    baronessTemplate.GetComponent<BaronessLevelCastle>();
+            }
+        }
+
         internal bool CanSpawn
         {
             get { return Ready && Evaluate(canSpawn); }
@@ -328,6 +339,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool AllowBaronessLifecycle(object __instance)
         {
+            if (NativeBaronessMiniBossCache.ShouldSuppressLifecycle(__instance))
+                return false;
             if (suppressTemplateLifecycle)
                 return false;
             if (BelongsToInteraction(__instance))

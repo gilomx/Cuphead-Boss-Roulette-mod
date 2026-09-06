@@ -42,6 +42,20 @@ regenera con `tools/extract_native_frogs_firefly_preview.py`. Todos parten de
 frames nativos.
 El build ejecuta `scripts/validate-interaction-catalog.mjs` y falla si la lista
 central del runtime, `interactionItems` y el servidor simulado dejan de coincidir.
+También comprueba categorías, traducciones ES/EN y previews PNG locales. Los
+cinco mini jefes de la Baronesa aparecen bajo `Mini jefes`; comparten entradas
+con las pruebas, reglas, Modo Molestoso y Batalla Molestosa. El filtro de tipo
+conserva los datos de prueba al cambiar de categoría. El panel explica que su
+vida es independiente del jefe y que están disponibles en arenas terrestres con
+suelo visible y en niveles de avión. Cala María conserva la condición de agua
+visible: al desaparecer, sus mini jefes se retiran y las nuevas solicitudes
+esperan en la cola. En los demás niveles de avión usan un suelo virtual en la
+franja inferior, fijado al aparecer; el panel no añade controles para ajustarlo.
+Solo puede haber un mini jefe en pantalla entre Interacciones, Modo
+Molestoso y Batalla Molestosa, respetando también el máximo general. Los siguientes
+esperan a que desaparezca el actual, aunque sean distintos. Este límite es fijo.
+El mock verifica los ajustes y el despacho de la cola del
+panel; no simula el daño ni la duración de los actores de Unity.
 
 El mismo servidor de desarrollo expone `GET /api/dashboard` y
 `GET /api/dashboard/simulate`. Permite generar regalos, monedas, likes,

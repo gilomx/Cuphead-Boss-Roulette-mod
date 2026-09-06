@@ -19,6 +19,8 @@ namespace Gilomx.CupheadBossRoulette
             new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
         private readonly Action<int> setMaximumActive;
+        private readonly Func<int> getMaximumMiniBosses;
+        private readonly Action<int> setMaximumMiniBosses;
         private readonly Func<bool> getShowGiftImage;
         private readonly Action<bool> setShowGiftImage;
         private readonly Func<bool> getInteractionsEnabled;
@@ -72,6 +74,8 @@ namespace Gilomx.CupheadBossRoulette
             Func<bool> canSpawnInteraction,
             Func<int> getMaximumActive,
             Action<int> setMaximumActive,
+            Func<int> getMaximumMiniBosses,
+            Action<int> setMaximumMiniBosses,
             Func<bool> getShowGiftImage,
             Action<bool> setShowGiftImage,
             Func<bool> getInteractionsEnabled,
@@ -89,6 +93,8 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
             this.setMaximumActive = setMaximumActive;
+            this.getMaximumMiniBosses = getMaximumMiniBosses;
+            this.setMaximumMiniBosses = setMaximumMiniBosses;
             this.getShowGiftImage = getShowGiftImage;
             this.setShowGiftImage = setShowGiftImage;
             this.getInteractionsEnabled = getInteractionsEnabled;
@@ -119,8 +125,13 @@ namespace Gilomx.CupheadBossRoulette
             executors.Add(new RobotHomingBombInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
                 logInfo, logWarning));
-            executors.Add(new BaronessHeadTossInteractionExecutor(
+            var baronessHead = new BaronessHeadTossInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
+                logInfo, logWarning);
+            executors.Add(baronessHead);
+            executors.Add(new BaronessMiniBossInteractionExecutor(
+                baronessHead.NativeCache, canSpawnInteraction,
+                delegate { return MaximumMiniBosses; },
                 logInfo, logWarning));
             executors.Add(new DragonFireballsInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
@@ -571,6 +582,7 @@ namespace Gilomx.CupheadBossRoulette
                 return 0;
             }
             if (values.ContainsKey("maxActive") ||
+                values.ContainsKey("maxMiniBosses") ||
                 values.ContainsKey("showGiftImage"))
             {
                 SetInteractionSettings(values);
@@ -930,6 +942,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             string value;
             var maximumActive = MaximumActive;
+            var maximumMiniBosses = MaximumMiniBosses;
             var showGiftImage = ShowGiftImage;
             if (values.TryGetValue("maxActive", out value))
             {
@@ -949,8 +962,21 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
 
+            if (values.TryGetValue("maxMiniBosses", out value))
+            {
+                int requested;
+                if (!int.TryParse(value, out requested))
+                {
+                    SetInteractionFeedback("invalid_setting", true);
+                    return;
+                }
+                maximumMiniBosses = CreatorToolsMiniBossSpawnPolicy.ClampMaximum(requested);
+            }
+
             if (setMaximumActive != null)
                 setMaximumActive(maximumActive);
+            if (setMaximumMiniBosses != null)
+                setMaximumMiniBosses(maximumMiniBosses);
             if (setShowGiftImage != null)
                 setShowGiftImage(showGiftImage);
             CreatorToolsDonorLabel.SetGiftImagesVisible(showGiftImage);
@@ -1123,6 +1149,7 @@ namespace Gilomx.CupheadBossRoulette
 
             if (feedbackCode == "native_assets_loading" ||
                 feedbackCode == "requires_gameplay_level" ||
+                feedbackCode == "requires_ground_level" ||
                 feedbackCode == "interaction_type_active")
                 return false;
 
@@ -1142,7 +1169,15 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (entry == null)
                 return false;
-            var exclusiveExecutor = FindExecutor(entry.Item) as
+            var executor = FindExecutor(entry.Item);
+            // Retain earned interactions until a compatible arena is active,
+            // allowing the other entries in the same queue to advance.
+            var restrictedExecutor = executor as
+                ICreatorToolsLevelRestrictedInteractionExecutor;
+            if (restrictedExecutor != null &&
+                !restrictedExecutor.SupportsCurrentLevel(entry.Item))
+                return false;
+            var exclusiveExecutor = executor as
                 ICreatorToolsExclusiveInteractionExecutor;
             if (exclusiveExecutor != null &&
                 exclusiveExecutor.BlocksConcurrentSpawn(entry.Item))
@@ -1189,6 +1224,15 @@ namespace Gilomx.CupheadBossRoulette
             get
             {
                 return getShowGiftImage == null || getShowGiftImage();
+            }
+        }
+
+        private int MaximumMiniBosses
+        {
+            get
+            {
+                return CreatorToolsMiniBossSpawnPolicy.ClampMaximum(
+                    getMaximumMiniBosses == null ? 1 : getMaximumMiniBosses());
             }
         }
 
@@ -1254,6 +1298,7 @@ namespace Gilomx.CupheadBossRoulette
                     : Math.Max(0L, getStreamBacklogCount()))
                 .Append(",\"deferredTestCount\":0")
                 .Append(",\"maxActive\":").Append(MaximumActive)
+                .Append(",\"maxMiniBosses\":").Append(MaximumMiniBosses)
                 .Append(",\"maxActiveLimit\":").Append(MaximumActiveLimit)
                 .Append(",\"maxBatch\":")
                 .Append(CreatorToolsInteractionQueue.MaximumBatchSize)

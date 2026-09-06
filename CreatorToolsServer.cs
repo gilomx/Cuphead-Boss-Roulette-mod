@@ -90,7 +90,7 @@ namespace Gilomx.CupheadBossRoulette
             "\"pendingClearProjected\":false," +
             "\"pendingCount\":0,\"backlogCount\":0," +
             "\"deferredTestCount\":0," +
-            "\"showGiftImage\":true,\"settingsRevision\":0}";
+            "\"showGiftImage\":true,\"maxMiniBosses\":1,\"settingsRevision\":0}";
         private long latestInteractionBacklogCount;
         private long pendingInteractionTestCount;
         private int inFlightInteractionTestCommands;

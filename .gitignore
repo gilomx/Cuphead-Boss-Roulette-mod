@@ -14,6 +14,9 @@ packages/
 node_modules/
 *.tsbuildinfo
 
+# Local backups of installed plugin versions
+installation-backups/
+
 # OS metadata
 .DS_Store
 Thumbs.db

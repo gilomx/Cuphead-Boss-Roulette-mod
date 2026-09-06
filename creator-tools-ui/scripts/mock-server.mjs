@@ -21,6 +21,7 @@ let interactionLastItem = "";
 let interactionNextId = 1;
 let interactionQueue = [];
 let interactionMaxActive = 1;
+const interactionMaxMiniBosses = 1;
 let interactionShowGiftImage = true;
 let interactionSettingsRevision = 0;
 let interactionsEnabled = false;
@@ -277,11 +278,23 @@ const interactionItems = [
   "hilda_purple_zeppelin",
   "rootpack_homing_carrot",
   "cagney_homing_plant",
-    "frogs_firefly",
-    "robot_homing_bomb",
-    "baroness_head_toss",
-    "dragon_fireballs",
-  ];
+  "frogs_firefly",
+  "robot_homing_bomb",
+  "baroness_head_toss",
+  "dragon_fireballs",
+  "baroness_cupcake",
+  "baroness_gumball",
+  "baroness_waffle",
+  "baroness_candy_corn",
+  "baroness_jawbreaker",
+];
+const miniBossItems = new Set([
+  "baroness_cupcake",
+  "baroness_gumball",
+  "baroness_waffle",
+  "baroness_candy_corn",
+  "baroness_jawbreaker",
+]);
 
 function peskyBattleIsExclusive() {
   return ["recruiting", "ready", "waiting_level", "active"].includes(
@@ -435,9 +448,16 @@ function refreshInteractionQueue() {
   }
   if (!interactionsEnabled || interactionQueuePaused) return;
   let active = interactionQueue.filter((entry) => entry.status === "active").length;
+  const activeMiniBosses = new Set(interactionQueue
+    .filter((entry) => entry.status === "active" && miniBossItems.has(entry.item))
+    .map((entry) => entry.item));
   for (const entry of interactionQueue) {
     if (active >= interactionMaxActive) break;
     if (entry.status === "queued") {
+      if (miniBossItems.has(entry.item)) {
+        if (activeMiniBosses.has(entry.item) || activeMiniBosses.size >= interactionMaxMiniBosses) continue;
+        activeMiniBosses.add(entry.item);
+      }
       entry.status = "active";
       active += 1;
     }
@@ -1269,6 +1289,7 @@ createServer((req, res) => {
       pendingCount: interactionQueue.filter((entry) => entry.status !== "active").length,
       backlogCount: 0,
       maxActive: interactionMaxActive,
+      maxMiniBosses: interactionMaxMiniBosses,
       maxActiveLimit: 20,
       maxBatch: 50,
       maxDelay: 3600,
@@ -1349,6 +1370,7 @@ createServer((req, res) => {
     const queuePausedValue = url.searchParams.get("queuePaused");
     const clearPendingValue = url.searchParams.get("clearPending");
     const maxActiveValue = url.searchParams.get("maxActive");
+    const maxMiniBossesValue = url.searchParams.get("maxMiniBosses");
     const showGiftImageValue = url.searchParams.get("showGiftImage");
     let nextFeedback = "settings_saved";
     if (interactionsEnabledValue !== null) {
@@ -1385,7 +1407,7 @@ createServer((req, res) => {
     if (showGiftImageValue !== null) {
       interactionShowGiftImage = showGiftImageValue === "1";
     }
-    if (maxActiveValue !== null || showGiftImageValue !== null) {
+    if (maxActiveValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null) {
       interactionSettingsRevision += 1;
     }
     const phaseTransitionProtectionValue = url.searchParams.get(

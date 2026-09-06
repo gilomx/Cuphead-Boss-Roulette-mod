@@ -12,12 +12,14 @@ using System.Threading;
 
 namespace Gilomx.CupheadBossRoulette
 {
-    internal static class Program
+    internal static partial class Program
     {
         private static readonly List<string> failures = new List<string>();
 
         private static int Main()
         {
+            RunMiniBossSpawnPolicyTests();
+            RunDonorLabelLifetimeTests();
             Run("Evaluate creates backlog without Enqueue",
                 TestEvaluateOnlyCreatesBacklog);
             Run("Explicit drain moves the exact quantity",

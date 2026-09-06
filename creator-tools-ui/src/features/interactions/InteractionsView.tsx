@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import { interactionItems } from "./interactionCatalog";
+import { interactionItems, type InteractionCategoryFilter } from "./interactionCatalog";
+import { InteractionCategorySelect } from "./InteractionCategorySelect";
 import { InteractionSettingsPanel } from "./InteractionSettingsPanel";
 import { StreamRulesView } from "./StreamRulesView";
 
@@ -17,6 +18,9 @@ export function InteractionsView() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [delays, setDelays] = useState<Record<string, number>>({});
   const [testingItem, setTestingItem] = useState<string | null>(null);
+  const [category, setCategory] = useState<InteractionCategoryFilter>("all");
+  const visibleItems = interactionItems.filter((item) =>
+    category === "all" || item.category === category);
   const maxBatch = interaction?.maxBatch ?? 50;
   const maxDelay = interaction?.maxDelay ?? 3600;
   const testFeedback = optimisticInteractionQueue.length > 0
@@ -41,10 +45,18 @@ export function InteractionsView() {
       <section className="section interaction-catalog-section" aria-labelledby="interaction-catalog-title">
         <div className="section__heading interaction-section-heading">
           <h2 id="interaction-catalog-title">{t("interactions.catalog.title")}</h2>
+          <InteractionCategorySelect value={category} onChange={setCategory} />
         </div>
 
+        {category !== "attack" ? (
+          <p className="interaction-catalog-note">
+            {t("interactions.miniBoss.description")}{" "}
+            {t("interactions.miniBoss.compatibility")}
+          </p>
+        ) : null}
+
         <div className="interaction-catalog">
-          {interactionItems.map((item) => (
+          {visibleItems.map((item) => (
             <article className="interaction-card" key={item.id}>
               <div className="interaction-card__visual">
                 <img
@@ -73,6 +85,7 @@ export function InteractionsView() {
               <h2 id="interaction-tests-title">{t("interactions.test.title")}</h2>
               <p>{t("interactions.test.description")}</p>
             </div>
+            <InteractionCategorySelect value={category} onChange={setCategory} />
           </div>
 
           <div className="interaction-table-wrap">
@@ -84,7 +97,7 @@ export function InteractionsView() {
                 </tr>
               </thead>
               <tbody>
-                {interactionItems.map((item) => {
+                {visibleItems.map((item) => {
                   const donor = donors[item.id] ?? "";
                   const quantity = quantities[item.id] ?? 1;
                   const delay = delays[item.id] ?? 0;

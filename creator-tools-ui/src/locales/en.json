@@ -647,13 +647,26 @@
     },
 
     "catalog": {
-      "title": "Redeem catalog"
+      "title": "Redeem catalog",
+      "filterLabel": "Type"
+    },
+    "categories": {
+      "all": "All",
+      "attack": "Attacks",
+      "mini_boss": "Mini-bosses"
+    },
+    "miniBoss": {
+      "type": "Mini-boss",
+      "description": "The Baroness's mini-bosses have their own health, separate from the level boss. Their endurance is similar to the original fight; duration depends on difficulty and the damage they take.",
+      "compatibility": "Available in ground arenas with visible ground and in airplane levels. In Cala Maria, they require visible water. Incompatible requests wait in the queue."
     },
     "settings": {
       "title": "Settings",
       "description": "Adjust active redeems and how the donor appears in the game.",
       "maxActiveLabel": "Simultaneous items",
       "maxActiveHint": "Number of items that can be active at the same time.",
+      "maxMiniBossesLabel": "One mini boss at a time",
+      "maxMiniBossesHint": "Only one mini boss can be on screen across Interactions, Pesky Mode and Pesky Battle. The next ones wait until the current one disappears, even if they are different. The general item limit also applies.",
       "showGiftImage": "Show gift image",
       "showGiftImageHint": "It will appear next to the donor name.",
       "save": "Save",
@@ -712,6 +725,26 @@
       "headToss": {
         "title": "Baroness head toss",
         "imageAlt": "Original frame of Baroness Von Bon Bon throwing her head"
+      },
+      "cupcake": {
+        "title": "Baroness cupcake",
+        "imageAlt": "Original sprite of Baroness Von Bon Bon's cupcake mini-boss"
+      },
+      "gumball": {
+        "title": "Baroness gumball machine",
+        "imageAlt": "Original sprite of Baroness Von Bon Bon's gumball machine mini-boss"
+      },
+      "waffle": {
+        "title": "Baroness waffle",
+        "imageAlt": "Original sprite of Baroness Von Bon Bon's waffle mini-boss"
+      },
+      "candyCorn": {
+        "title": "Baroness candy corn",
+        "imageAlt": "Original sprite of Baroness Von Bon Bon's candy corn mini-boss"
+      },
+      "jawbreaker": {
+        "title": "Baroness jawbreaker",
+        "imageAlt": "Original sprite of Baroness Von Bon Bon's jawbreaker mini-boss"
       }
     },
     "dragon": {
@@ -768,6 +801,7 @@
       "native_assets_loading": "The item's native assets are still being prepared.",
       "native_assets_unavailable": "The item's native assets could not be prepared.",
       "requires_gameplay_level": "Start any gameplay level to send the redeem.",
+      "requires_ground_level": "This mini boss needs visible ground or an airplane level. In Cala Maria, it requires visible water. It will wait in the queue until a compatible arena is available.",
       "waiting_game": "The request is already visible and is waiting for the game to confirm it.",
       "queued": "The redeems were added to the queue.",
       "queued_paused": "The interactions were saved in the queue and will wait until playback is available again.",

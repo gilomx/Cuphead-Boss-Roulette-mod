@@ -65,6 +65,12 @@ export function InteractionSettingsPanel() {
             ))}
           />
         </label>
+        <div className="interaction-settings__number">
+          <span>
+            <strong>{t("interactions.settings.maxMiniBossesLabel")}</strong>
+            <small>{t("interactions.settings.maxMiniBossesHint")}</small>
+          </span>
+        </div>
         <label className="interaction-settings__toggle">
           <span>
             <strong>{t("interactions.settings.showGiftImage")}</strong>

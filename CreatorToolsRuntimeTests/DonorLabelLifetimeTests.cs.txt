@@ -1,0 +1,105 @@
+using System;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunDonorLabelLifetimeTests()
+        {
+            Run("A visible donor label survives a paused actor",
+                TestDonorLabelVisiblePause);
+            Run("Invisible actors hide labels without ending their lifetime",
+                TestDonorLabelInvisibleRecovery);
+            Run("Destroyed actors release labels using real elapsed time",
+                TestDonorLabelDestroyedFade);
+            Run("Destroying an invisible actor cannot revive its label",
+                TestDonorLabelInvisibleDestruction);
+            Run("Actor handoffs recover labels and reset the missing timer",
+                TestDonorLabelRebind);
+            Run("Visibility recovery preserves requested hide and fade opacity",
+                TestDonorLabelRequestedOpacity);
+        }
+
+        private static void TestDonorLabelVisiblePause()
+        {
+            var label = new CreatorToolsDonorLabelLifetime();
+            label.Advance(true, true, 1f, 0f);
+            label.Advance(true, true, 1f, 120f);
+            Equal(1f, label.Opacity, "visible label opacity after a long pause");
+            False(label.Finished, "a paused actor must retain its label");
+        }
+
+        private static void TestDonorLabelInvisibleRecovery()
+        {
+            var label = new CreatorToolsDonorLabelLifetime();
+            label.Advance(true, true, 1f, 0f);
+            // The Unity boundary treats disabled sprites, inactive actors,
+            // transparent materials and offscreen bounds as not visible.
+            foreach (var hiddenSeconds in new[] { 0f, 0.02f, 2f, 120f })
+            {
+                label.Advance(true, false, 1f, hiddenSeconds);
+                Equal(0f, label.Opacity, "hidden actors cannot leave a visible name");
+                False(label.Finished, "temporary invisibility is reversible");
+                label.Advance(true, true, 1f, 0f);
+                Equal(1f, label.Opacity, "the returning actor restores its name");
+                False(label.Finished, "the returning label remains alive");
+            }
+        }
+
+        private static void TestDonorLabelDestroyedFade()
+        {
+            var label = new CreatorToolsDonorLabelLifetime();
+            label.Advance(true, true, 1f, 0f);
+            // Delta is unscaled wall time, so this still completes when the
+            // combat clock is zero during pause or after the level ends.
+            label.Advance(false, false, 1f, 0.3f);
+            True(Math.Abs(label.Opacity - 0.5f) < 0.001f,
+                "destroyed label fades from its displayed opacity");
+            False(label.Finished, "fade retains the label until it completes");
+            label.Advance(false, false, 1f, 0.31f);
+            Equal(0f, label.Opacity, "destroyed label fully disappears");
+            True(label.Finished, "destroyed label releases its detached object");
+        }
+
+        private static void TestDonorLabelInvisibleDestruction()
+        {
+            var label = new CreatorToolsDonorLabelLifetime();
+            label.Advance(true, true, 1f, 0f);
+            label.Advance(true, false, 1f, 0f);
+            label.Advance(false, false, 1f, 0f);
+            Equal(0f, label.Opacity, "destruction never flashes a hidden name");
+            True(label.Finished, "an already hidden orphan can be removed immediately");
+        }
+
+        private static void TestDonorLabelRebind()
+        {
+            var label = new CreatorToolsDonorLabelLifetime();
+            label.Advance(true, true, 1f, 0f);
+            label.Advance(false, false, 1f, 0.4f);
+            label.Rebind();
+            label.Advance(true, true, 1f, 0f);
+            Equal(1f, label.Opacity, "seed-to-plant and body-to-projectile handoffs recover");
+            False(label.Finished, "new target keeps the detached follower alive");
+            label.Advance(false, false, 1f, 0.3f);
+            True(Math.Abs(label.Opacity - 0.5f) < 0.001f,
+                "the old actor's missing timer does not shorten the new fade");
+            False(label.Finished, "the new target receives a complete fade");
+        }
+
+        private static void TestDonorLabelRequestedOpacity()
+        {
+            var label = new CreatorToolsDonorLabelLifetime();
+            label.Advance(true, false, 0f, 1f);
+            label.Advance(true, true, 0f, 1f);
+            Equal(0f, label.Opacity, "an explicit hide remains hidden after visibility returns");
+            label.Advance(true, true, 0.4f, 1f);
+            Equal(0.4f, label.Opacity, "fade-in opacity remains authoritative");
+            label.Advance(true, false, 0.4f, 1f);
+            label.Advance(true, true, 0.4f, 1f);
+            Equal(0.4f, label.Opacity, "temporary invisibility does not force full opacity");
+            label.Advance(false, false, 0f, 0f);
+            Equal(0f, label.Opacity, "an explicit hide cancels an orphan's residual fade");
+            True(label.Finished, "the hidden orphan is released");
+        }
+    }
+}

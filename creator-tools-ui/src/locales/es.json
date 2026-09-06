@@ -647,13 +647,26 @@
     },
 
     "catalog": {
-      "title": "Catálogo de interacciones"
+      "title": "Catálogo de interacciones",
+      "filterLabel": "Tipo"
+    },
+    "categories": {
+      "all": "Todos",
+      "attack": "Ataques",
+      "mini_boss": "Mini jefes"
+    },
+    "miniBoss": {
+      "type": "Mini jefe",
+      "description": "Los mini jefes de la Baronesa tienen vida propia, separada del jefe del nivel. Su resistencia es similar a la de su combate original; la duración depende de la dificultad y del daño que reciban.",
+      "compatibility": "Disponibles en arenas terrestres con suelo visible y en niveles de avión. En Cala María requieren agua visible. Las solicitudes incompatibles esperan en la cola."
     },
     "settings": {
       "title": "Configuración",
       "description": "Ajusta cómo se comportan las interacciones y cómo aparece el donador dentro del juego.",
       "maxActiveLabel": "Elementos simultáneos",
       "maxActiveHint": "Cantidad de elementos que pueden estar activos al mismo tiempo.",
+      "maxMiniBossesLabel": "Un solo mini jefe",
+      "maxMiniBossesHint": "Solo puede haber un mini jefe en pantalla entre Interacciones, Modo Molestoso y Batalla Molestosa. Los siguientes esperan a que desaparezca el actual, aunque sean distintos. También se respeta el máximo general de elementos.",
       "showGiftImage": "Mostrar imagen del regalo",
       "showGiftImageHint": "Aparecerá junto al nombre del donador.",
       "save": "Guardar",
@@ -712,6 +725,26 @@
       "headToss": {
         "title": "Lanzamiento de cabeza de la Baronesa",
         "imageAlt": "Frame original de la Baronesa Von Bon Bon lanzando su cabeza"
+      },
+      "cupcake": {
+        "title": "Cupcake de la Baronesa",
+        "imageAlt": "Sprite original del mini jefe cupcake de la Baronesa Von Bon Bon"
+      },
+      "gumball": {
+        "title": "Máquina de chicles de la Baronesa",
+        "imageAlt": "Sprite original del mini jefe máquina de chicles de la Baronesa Von Bon Bon"
+      },
+      "waffle": {
+        "title": "Waffle de la Baronesa",
+        "imageAlt": "Sprite original del mini jefe waffle de la Baronesa Von Bon Bon"
+      },
+      "candyCorn": {
+        "title": "Maíz dulce de la Baronesa",
+        "imageAlt": "Sprite original del mini jefe maíz dulce de la Baronesa Von Bon Bon"
+      },
+      "jawbreaker": {
+        "title": "Rompemandíbulas de la Baronesa",
+        "imageAlt": "Sprite original del mini jefe rompemandíbulas de la Baronesa Von Bon Bon"
       }
     },
     "dragon": {
@@ -768,6 +801,7 @@
       "native_assets_loading": "Los recursos nativos del artículo todavía se están preparando.",
       "native_assets_unavailable": "No se pudieron preparar los recursos nativos del artículo.",
       "requires_gameplay_level": "Inicia cualquier nivel jugable para enviar la interacción.",
+      "requires_ground_level": "Este mini jefe necesita suelo visible o un nivel de avión. En Cala María requiere agua visible. Esperará en la cola hasta una arena compatible.",
       "waiting_game": "La solicitud ya está visible y espera a que el juego la confirme.",
       "queued": "Las interacciones fueron agregadas a la cola.",
       "queued_paused": "Las interacciones fueron guardadas en la cola y esperarán hasta que la reproducción vuelva a estar disponible.",

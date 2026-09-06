@@ -199,6 +199,16 @@ namespace Gilomx.CupheadBossRoulette
                         snapshotRoot, gameplayScene);
 
                 var capturedCount = 0;
+                // Capture label visibility before cloning disables the source
+                // sprites. Hidden or detached labels must not become snapshots.
+                var labels = UnityEngine.Object.FindObjectsOfType<
+                    CreatorToolsDonorLabel>();
+                for (var i = 0; i < labels.Length; i++)
+                    if (labels[i] != null &&
+                        labels[i].CreateLevelEndSnapshot(
+                            snapshotRoot.transform))
+                        capturedCount++;
+
                 var priorities = UnityEngine.Object.FindObjectsOfType<
                     CreatorToolsInteractionRenderPriority>();
                 for (var i = 0; i < priorities.Length; i++)
@@ -212,14 +222,6 @@ namespace Gilomx.CupheadBossRoulette
                         priority.gameObject,
                         snapshotRoot.transform);
                 }
-
-                var labels = UnityEngine.Object.FindObjectsOfType<
-                    CreatorToolsDonorLabel>();
-                for (var i = 0; i < labels.Length; i++)
-                    if (labels[i] != null &&
-                        labels[i].CreateLevelEndSnapshot(
-                            snapshotRoot.transform))
-                        capturedCount++;
 
                 if (capturedCount == 0)
                     UnityEngine.Object.Destroy(snapshotRoot);
@@ -508,7 +510,7 @@ namespace Gilomx.CupheadBossRoulette
                 logWarning(prefix + exception);
         }
 
-        private static Camera FindGameplayCamera()
+        internal static Camera FindGameplayCamera()
         {
             var main = Camera.main;
             if (main != null && main.enabled && main.orthographic)

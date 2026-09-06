@@ -5,6 +5,13 @@ dashboard, rules, backlog, event models and local server directly into its test
 assembly. Only Unity's interaction controller/queue and the stream source are
 replaced by narrow recording fakes.
 
+The harness also links the production mini-boss admission policy directly.
+Its shared limit is fixed at one mini-boss total: every second actor waits,
+whether its type matches or differs. Tests cover all 25 type pairs, legacy
+settings above one, slot release and preservation of the active snapshot.
+Unity scene discovery and the water-floor integration still require in-game
+verification.
+
 Run it from the repository root:
 
 ```powershell

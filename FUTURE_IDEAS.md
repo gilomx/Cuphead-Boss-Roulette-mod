@@ -4,6 +4,44 @@ Este documento guarda propuestas que todavía no forman parte del mod. No deben
 tratarse como funciones terminadas ni activarse en una versión pública sin sus
 pruebas correspondientes.
 
+## Mini jefes de la Baronesa en niveles de avión
+
+Propuesta del 2026-09-05, ya implementada en su versión inicial. Cala María
+usa su agua visible como suelo propio; los demás niveles de avión usan un
+suelo virtual fijo en la franja inferior. Jawbreaker conserva la persecución
+nativa del avión. El contrato vigente está en `INTERACTION_CATALOG.md` y
+todavía requiere validación de combate en cada arena. Las ideas de la tabla
+son variantes futuras de los patrones, no requisitos pendientes de habilitación.
+
+| Mini jefe | Comportamiento propuesto en avión |
+| --- | --- |
+| Caramelo gigante (Jawbreaker) | Persecución 2D del avión; conservar sus acompañantes y limitar cuánto tiempo permanece detrás del jugador. |
+| Waffle | Órbita en centro-derecha y separación en piezas, con espacio para esquivar por arriba o abajo. |
+| Maíz dulce | Recorrido de ida y vuelta por dos alturas de la pantalla y acompañantes nativos. |
+| Máquina de chicles | Flotar en una franja alta, moverse horizontalmente y dejar caer chicles con su gravedad nativa. |
+| Cupcake | Rebotes sobre una base o nube cerca del borde inferior, usando un suelo virtual exclusivo de la interacción. |
+
+Orden recomendado para probar las variantes: caramelo gigante, waffle y maíz dulce primero; después
+máquina de chicles y finalmente cupcake. Los tres primeros ya tienen patrones
+aptos para espacio aéreo. Gumball tampoco requiere una colisión física contra
+suelo, aunque sus puntos de entrada actuales dependen de `Level.Ground`.
+
+Quitar únicamente el bloqueo de avión no es suficiente: hay que elegir
+posiciones y límites respecto a la cámara, mantener sincronizados el pivote
+de Waffle y los extremos almacenados de los recorridos si la cámara se mueve,
+y adaptar `GoingDown` y `splash_cr` de Cupcake al mismo suelo virtual.
+`CagneyHomingPlantInteractionState` contiene un precedente de suelo virtual
+propio; nunca debe modificarse el `Ground` global del nivel.
+
+Conservar vida independiente y HP nativo como base de pruebas. El tiempo de
+derrota puede cambiar con balas, bombas y supers de avión, de modo que un
+factor específico de HP sólo debe elegirse después de medir esa duración.
+Comprobar impactos en receptores raíz y secundarios, cooperativo, ataques
+desde detrás, cámara desplazada, pausa, muerte y limpieza por cambio de fase.
+El código de daño conserva `AbstractPlayerController`/`DamageReceiver`; las
+copias aéreas de Corn y sus secundarios usan triggers para recibir las balas
+del avión. Falta completar la validación en partida de todas las arenas.
+
 ## Dos Ms. Chalice en cooperativo y variante morada
 
 ### Comportamiento observado

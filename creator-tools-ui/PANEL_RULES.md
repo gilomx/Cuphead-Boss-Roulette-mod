@@ -52,6 +52,19 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   pequeño con el primer frame nativo arriba y la información debajo; no
   contienen descripciones, controles de prueba ni un estado operativo
   duplicado.
+- El catálogo compartido clasifica los artículos anteriores como `attack` y
+  los cinco mini jefes de la Baronesa como `mini_boss`. El selector de tipo
+  filtra tanto tarjetas como pruebas sin perder los datos escritos por ID.
+  Reglas de stream, Modo Molestoso y Batalla Molestosa reutilizan esa lista.
+  La explicación de vida independiente aparece fuera de las tarjetas y, al
+  elegir un mini jefe, en el formulario de reglas. No promete segundos fijos:
+  la resistencia procede de la dificultad nativa y la duración depende del
+  daño recibido. Están disponibles en arenas terrestres con suelo visible y en
+  niveles de avión. Cala María requiere agua visible; al desaparecer, se retiran
+  los mini jefes presentes y las solicitudes esperan una fase o arena compatible.
+  Los demás niveles de avión usan un suelo virtual fijo al aparecer, en la
+  franja inferior de la pantalla. La UI sólo explica esta compatibilidad;
+  el suelo y la disponibilidad los decide C#, sin controles nuevos en el panel.
 - La zona operativa coloca la cola en el panel principal y, a su derecha, la
   configuración sobre la tabla de pruebas. Cada fila de prueba acepta donador,
   cantidad y espera en segundos. Un lote o varios tipos se agregan al final sin
@@ -61,6 +74,11 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   activos y pendientes. El canjeo activo permanece visible hasta que su actor
   termina o muere; entonces libera su cupo. Estos límites y el despacho
   pertenecen a C#, no a la vista.
+- Los mini jefes tienen además un máximo fijo de uno en pantalla, compartido
+  entre Interacciones, Modo Molestoso y Batalla Molestosa. Los siguientes esperan
+  a que desaparezca el actual, aunque sean distintos. La UI muestra esta regla
+  sin un control para editarla. También respetan el máximo general de elementos;
+  C# vuelve a comprobar ambos límites al despachar.
 - Todo artículo nuevo del catálogo se incorpora tanto a la tabla de prueba
   manual como al catálogo configurable de Modo Molestoso. La sección de
   Interacciones no contiene un generador aleatorio automático: ese uso pertenece
@@ -123,8 +141,12 @@ feedback, revisiones, límites y la cola autoritativa con estados `scheduled`,
 `queued` y `active`. `GET /api/config/interactions/test` recibe `item`, `donor`,
 `quantity` y `delay`; sólo encola la prueba. Unity la ejecuta después en su hilo
 principal y confirma el resultado incrementando la revisión. El endpoint
-`GET /api/config/interactions/set` cambia el máximo simultáneo y la prueba
-aleatoria. Los códigos de feedback se traducen en React y nunca se usan como
+`GET /api/config/interactions/set` cambia el máximo simultáneo (`maxActive`)
+y la imagen del regalo (`showGiftImage`). Cada parámetro es opcional y conserva
+los ajustes omitidos. El parámetro heredado `maxMiniBosses` se acepta por
+compatibilidad, pero siempre se normaliza a 1.
+`GET /api/config/interactions` incluye `maxMiniBosses: 1` y la revisión de ajustes
+para confirmar el guardado. Los códigos de feedback se traducen en React y nunca se usan como
 reglas de negocio.
 
 Los zepelines nunca se recrean con sprites, proyectiles o movimiento

@@ -155,7 +155,11 @@ export function StreamRuleForm({
               getLabel={(item) => t(item.titleKey)}
               getImage={(item) => item.image}
               getMeta={(item) => t(item.typeKey)}
-              getSearchTerms={(item) => [item.id, t(item.typeKey)]}
+              getSearchTerms={(item) => [
+                item.id,
+                t(item.typeKey),
+                t(`interactions.categories.${item.category}`),
+              ]}
               onSelect={(item) => onChange({
                 ...draft,
                 interaction: item.id,
@@ -182,6 +186,12 @@ export function StreamRuleForm({
         {draft.eventType === "follow" ? (
           <p className="stream-rule-execution__notice">
             {t("interactions.rules.editor.followOnceHint")}
+          </p>
+        ) : null}
+        {selectedInteraction?.category === "mini_boss" ? (
+          <p className="stream-rule-execution__notice">
+            {t("interactions.miniBoss.description")}{" "}
+            {t("interactions.miniBoss.compatibility")}
           </p>
         ) : null}
       </fieldset>

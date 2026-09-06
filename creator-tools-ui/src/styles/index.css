@@ -1414,7 +1414,8 @@ textarea:focus-visible {
 
 .stream-rule-form input,
 .stream-rule-form select,
-.stream-gift-picker > input {
+.stream-gift-picker > input,
+.interaction-category-filter select {
   min-width: 0;
   min-height: 2.55rem;
   padding: 0.55rem 0.68rem;
@@ -1427,11 +1428,13 @@ textarea:focus-visible {
 
 .stream-rule-form input:focus,
 .stream-rule-form select:focus,
-.stream-gift-picker > input:focus {
+.stream-gift-picker > input:focus,
+.interaction-category-filter select:focus {
   border-color: var(--color-focus);
 }
 
-.stream-rule-form select {
+.stream-rule-form select,
+.interaction-category-filter select {
   color-scheme: dark;
 }
 
@@ -1744,7 +1747,38 @@ textarea:focus-visible {
   }
 }
 .interaction-catalog-section .interaction-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-bottom: var(--space-3);
+}
+
+.interaction-category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.interaction-category-filter select {
+  width: auto;
+  min-width: 8rem;
+}
+
+.interaction-tests .interaction-panel__heading {
+  flex-wrap: wrap;
+}
+
+.interaction-catalog-note {
+  max-width: 60rem;
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .interaction-catalog {

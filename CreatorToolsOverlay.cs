@@ -47,6 +47,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsRetryBehaviorSetting;
         private ConfigEntry<int>
             creatorToolsInteractionMaximumActiveSetting;
+        private ConfigEntry<int> creatorToolsMiniBossMaximumActiveSetting;
         private ConfigEntry<bool>
             creatorToolsInteractionShowGiftImageSetting;
         private ConfigEntry<bool>
@@ -132,6 +133,9 @@ namespace Gilomx.CupheadBossRoulette
                 "MostrarImagenDelRegalo",
                 true,
                 "Muestra el regalo junto al nombre del donador en el juego.");
+            creatorToolsMiniBossMaximumActiveSetting = Config.Bind(
+                "Creator Tools", "MiniJefesMaximosEnPantalla", 1,
+                "Limite fijo compartido: solo un mini jefe en pantalla. Cualquier otro espera. Los valores anteriores se normalizan a 1.");
             creatorToolsInteractionsEnabledSetting = Config.Bind(
                 "Creator Tools",
                 "InteraccionesActivadas",
@@ -168,6 +172,8 @@ namespace Gilomx.CupheadBossRoulette
                 CanSpawnCreatorToolsInteraction,
                 GetCreatorToolsInteractionMaximumActive,
                 SetCreatorToolsInteractionMaximumActive,
+                GetCreatorToolsMiniBossMaximumActive,
+                SetCreatorToolsMiniBossMaximumActive,
                 GetCreatorToolsInteractionShowGiftImage,
                 SetCreatorToolsInteractionShowGiftImage,
                 GetCreatorToolsInteractionsEnabled,
@@ -593,6 +599,9 @@ namespace Gilomx.CupheadBossRoulette
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
             NativeBaronessHeadTossCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
+            BaronessMiniBossInteractionPatches.InstallPatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
             NativeDragonFireballsCache.InstallLifecyclePatches(
@@ -1149,6 +1158,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsOpacitySetting.Value = opacity;
             SetCreatorToolsInteractionMaximumActive(
                 GetCreatorToolsInteractionMaximumActive());
+            SetCreatorToolsMiniBossMaximumActive(GetCreatorToolsMiniBossMaximumActive());
         }
 
         private int GetCreatorToolsInteractionMaximumActive()
@@ -1179,6 +1189,21 @@ namespace Gilomx.CupheadBossRoulette
         {
             return creatorToolsInteractionShowGiftImageSetting == null ||
                 creatorToolsInteractionShowGiftImageSetting.Value;
+        }
+
+        private int GetCreatorToolsMiniBossMaximumActive()
+        {
+            return CreatorToolsMiniBossSpawnPolicy.ClampMaximum(
+                creatorToolsMiniBossMaximumActiveSetting == null ? 1 :
+                creatorToolsMiniBossMaximumActiveSetting.Value);
+        }
+
+        private void SetCreatorToolsMiniBossMaximumActive(int value)
+        {
+            var normalized = CreatorToolsMiniBossSpawnPolicy.ClampMaximum(value);
+            if (creatorToolsMiniBossMaximumActiveSetting != null &&
+                creatorToolsMiniBossMaximumActiveSetting.Value != normalized)
+                creatorToolsMiniBossMaximumActiveSetting.Value = normalized;
         }
 
         private void SetCreatorToolsInteractionShowGiftImage(bool value)

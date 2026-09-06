@@ -298,6 +298,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         backlogCount: nextInteraction.backlogCount ?? 0,
         deferredTestCount: nextInteraction.deferredTestCount ?? 0,
         showGiftImage: nextInteraction.showGiftImage !== false,
+        maxMiniBosses: 1,
         settingsRevision: nextInteraction.settingsRevision ?? 0,
       };
       if (visibleInteraction.pendingClearProjected) {
@@ -633,6 +634,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         ? {
             ...current,
             maxActive: normalized,
+            maxMiniBosses: 1,
             showGiftImage,
             feedback: "settings_saved",
             error: false,
@@ -643,6 +645,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
       const query = new URLSearchParams({
         maxActive: String(normalized),
+        maxMiniBosses: "1",
         showGiftImage: showGiftImage ? "1" : "0",
       });
       const send = () => fetch(

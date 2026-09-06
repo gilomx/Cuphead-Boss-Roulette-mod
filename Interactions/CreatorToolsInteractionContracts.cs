@@ -13,6 +13,11 @@ namespace Gilomx.CupheadBossRoulette
         internal const string RobotHomingBomb = "robot_homing_bomb";
         internal const string BaronessHeadToss = "baroness_head_toss";
         internal const string DragonFireballs = "dragon_fireballs";
+        internal const string BaronessCupcake = "baroness_cupcake";
+        internal const string BaronessGumball = "baroness_gumball";
+        internal const string BaronessWaffle = "baroness_waffle";
+        internal const string BaronessCandyCorn = "baroness_candy_corn";
+        internal const string BaronessJawbreaker = "baroness_jawbreaker";
 
         internal static readonly string[] All =
         {
@@ -23,7 +28,12 @@ namespace Gilomx.CupheadBossRoulette
             FrogsFirefly,
             RobotHomingBomb,
             BaronessHeadToss,
-            DragonFireballs
+            DragonFireballs,
+            BaronessCupcake,
+            BaronessGumball,
+            BaronessWaffle,
+            BaronessCandyCorn,
+            BaronessJawbreaker
         };
     }
 
@@ -45,6 +55,11 @@ namespace Gilomx.CupheadBossRoulette
     internal interface ICreatorToolsExclusiveInteractionExecutor
     {
         bool BlocksConcurrentSpawn(string item);
+    }
+
+    internal interface ICreatorToolsLevelRestrictedInteractionExecutor
+    {
+        bool SupportsCurrentLevel(string item);
     }
 
     internal interface ICreatorToolsInteractionHandle : IDisposable

@@ -1,0 +1,144 @@
+using System;
+using System.Collections.Generic;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static readonly string[] MiniBossItems =
+        {
+            "baroness_cupcake", "baroness_gumball", "baroness_waffle",
+            "baroness_candy_corn", "baroness_jawbreaker"
+        };
+
+        private static void RunMiniBossSpawnPolicyTests()
+        {
+            Run("Mini-boss capacity is fixed at one for every legacy setting",
+                TestMiniBossCapacityLimits);
+            Run("Mini-boss admission blocks all second actors regardless of type",
+                TestMiniBossSecondAdmission);
+            Run("Existing multiple mini-bosses block all new admissions",
+                TestMiniBossThirdAdmission);
+            Run("Mini-boss default capacity admits only one actor",
+                TestMiniBossDefaultCapacity);
+            Run("Mini-boss admission preserves the complete active snapshot",
+                TestMiniBossSnapshotPreserved);
+            Run("A defeated mini-boss frees the single slot for any type",
+                TestMiniBossSlotRelease);
+            Run("Mini-boss admission ignores empty entries and counts every live type",
+                TestMiniBossEmptyEntries);
+        }
+
+        private static void TestMiniBossCapacityLimits()
+        {
+            Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(int.MinValue),
+                "negative capacity");
+            Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(0),
+                "unset capacity");
+            Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(1),
+                "one capacity");
+            Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(2),
+                "legacy capacity two must normalize to one");
+            Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(int.MaxValue),
+                "oversized legacy capacity must normalize to one");
+        }
+
+        private static void TestMiniBossSecondAdmission()
+        {
+            foreach (var first in MiniBossItems)
+                foreach (var candidate in MiniBossItems)
+                    foreach (var legacyMaximum in new[] { 2, int.MaxValue })
+                        False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                                candidate, new[] { first }, legacyMaximum),
+                            "second actor after " + first + ": " + candidate +
+                            " with legacy maximum " + legacyMaximum);
+        }
+
+        private static void TestMiniBossThirdAdmission()
+        {
+            foreach (var first in MiniBossItems)
+                foreach (var second in MiniBossItems)
+                    foreach (var candidate in MiniBossItems)
+                        False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                                candidate, new[] { first, second }, 2),
+                            "third actor admitted after " + first + " and " + second);
+        }
+
+        private static void TestMiniBossDefaultCapacity()
+        {
+            foreach (var candidate in MiniBossItems)
+            {
+                True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                        candidate, new string[0], 1),
+                    "default capacity must admit the first actor");
+                foreach (var activeItem in MiniBossItems)
+                    False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                            candidate, new[] { activeItem }, 1),
+                        "default capacity must block a second actor");
+                False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                        candidate, new[] { MiniBossItems[0] }, 0),
+                    "an unset capacity must also fall back to one");
+            }
+        }
+
+        private static void TestMiniBossSnapshotPreserved()
+        {
+            var active = new List<string>
+            {
+                null, MiniBossItems[0], string.Empty, MiniBossItems[1]
+            };
+            foreach (var legacyMaximum in new[] { 1, 2, int.MaxValue })
+            {
+                False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                        MiniBossItems[2], active, legacyMaximum),
+                    "existing actors must block new admissions");
+                Equal(4, active.Count, "admission does not remove snapshot entries");
+                Equal(null, active[0], "null snapshot entry is preserved");
+                Equal(MiniBossItems[0], active[1], "first active actor is preserved");
+                Equal(string.Empty, active[2], "empty snapshot entry is preserved");
+                Equal(MiniBossItems[1], active[3], "second active actor is preserved");
+            }
+        }
+
+        private static void TestMiniBossSlotRelease()
+        {
+            foreach (var defeated in MiniBossItems)
+                foreach (var candidate in MiniBossItems)
+                {
+                    var active = new List<string> { defeated };
+                    False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(candidate, active, 2),
+                        "the single slot begins occupied");
+                    active.Clear();
+                    True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(candidate, active, 1),
+                        "the released slot must admit " + candidate + " after " + defeated);
+                    Equal(0, active.Count, "successful admission does not mutate the snapshot");
+                    active.Add(candidate);
+                    foreach (var next in MiniBossItems)
+                        False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(next, active, int.MaxValue),
+                            "refilling the slot blocks every following type");
+                }
+        }
+
+        private static void TestMiniBossEmptyEntries()
+        {
+            False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(null, null, 2),
+                "null candidate is rejected");
+            False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(string.Empty, null, 2),
+                "empty candidate is rejected");
+            True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0], null, 1),
+                "a null snapshot represents no active actors");
+            True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0],
+                    new[] { null, string.Empty }, 1),
+                "null and empty entries do not occupy slots");
+            False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0],
+                    new[] { null, MiniBossItems[1], string.Empty }, 2),
+                "a different live type occupies the single slot");
+            False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0],
+                    new[] { null, MiniBossItems[0], string.Empty }, 2),
+                "empty entries do not bypass duplicate rejection");
+            False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0],
+                    new[] { MiniBossItems[0].ToUpperInvariant() }, 2),
+                "every live type occupies the slot regardless of ID casing");
+        }
+    }
+}

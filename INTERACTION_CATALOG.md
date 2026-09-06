@@ -5,7 +5,151 @@ nuevos del catálogo de Creator Tools. Las implementaciones de referencia son
 los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
 raíz, la semilla azul de Clavel de Cagney y la luciérnaga incendiada de Hosco
 y Tosco, la bomba teledirigida del Dr. Kahl, el lanzamiento de cabeza de la
-Baronesa Von Bon Bon y las bolas de fuego de Fósforo Sombrío.
+Baronesa Von Bon Bon, las bolas de fuego de Fósforo Sombrío y los cinco
+mini jefes de la Baronesa.
+
+## Tipo Mini jefes: Baronesa
+
+El catálogo contiene 13 artículos. El panel distingue `attack` y `mini_boss`
+y ofrece el filtro Todos / Ataques / Mini jefes, compartido con las pruebas
+manuales. Las reglas, Modo Molestoso y Batalla Molestosa consumen los mismos
+IDs del catálogo.
+
+| ID | Mini jefe | HP Fácil / Normal | HP Experto |
+| --- | --- | ---: | ---: |
+| `baroness_cupcake` | Cupcake | 185 | 235 |
+| `baroness_gumball` | Máquina de chicles | 270 | 320 |
+| `baroness_waffle` | Waffle | 250 | 305 |
+| `baroness_candy_corn` | Maíz dulce | 225 | 250 |
+| `baroness_jawbreaker` | Caramelo gigante | 180 | 220 |
+
+La resistencia procede de las propiedades nativas de la dificultad actual.
+No existe un temporizador de desaparición: la duración depende del daño del
+jugador, igual que en el combate original. Cada aparición inicializa su propio
+campo `health` y conserva los receptores de daño, ataques, animación de muerte
+y pausas nativos. No se conecta `OnDamageTakenEvent` al castillo ni a las
+propiedades del jefe de la arena; vencer una copia no adelanta sus fases ni
+provoca un knockout del nivel.
+
+### Concurrencia de mini jefes
+
+Sólo puede haber **un mini jefe en pantalla**, sea del mismo tipo o de otro.
+Es un límite fijo compartido entre donaciones/pruebas, Modo Molestoso y
+Batalla Molestosa; también se respeta el máximo general de cada cola.
+Todas las nuevas entradas de mini jefes esperan mientras exista uno activo.
+El panel muestra esta regla sin ofrecer un límite editable.
+`MiniJefesMaximosEnPantalla` y `maxMiniBosses` se conservan por compatibilidad
+con configuraciones y clientes anteriores, pero siempre se normalizan a 1;
+ni enviar 2 por API ni editar la configuración permite otro mini jefe.
+
+El ejecutor implementa `ICreatorToolsExclusiveInteractionExecutor` y devuelve
+`interaction_type_active` como espera temporal si alguien intenta saltarse
+la validación de cola. Se cuentan los cuerpos activos hasta su destrucción,
+incluida la animación de muerte; el fade de etiqueta y los efectos restantes
+no reservan otro cupo. La captura de actores se reutiliza durante el mismo
+frame y se invalida inmediatamente después de cada aparición.
+
+También se reconocen los mini jefes nativos presentes. Durante la ronda de
+mini jefes de la pelea original de la Baronesa, los del catálogo esperan hasta
+`BaronessLevelCastle.State.Chase`, incluyendo las pausas entre convocatorias.
+Así una convocatoria posterior del castillo no crea un duplicado inesperado.
+El mod no bloquea ni altera el avance de esa pelea original.
+
+`CreatorToolsMiniBossSpawnPolicy` y el harness prueban que las 25 parejas entre
+los cinco IDs quedan bloqueadas, incluso con valores antiguos mayores que 1,
+así como la liberación del único cupo y las entradas vacías.
+
+Se despachan en arenas terrestres con suelo visible y en niveles de avión.
+La detección usa el jugador `PlanePlayerController`, incluyendo Hilda,
+Djimmi, Titi Trinos, Robot, Esther y las dos peleas aéreas del casino. Cala
+María conserva la condición de agua visible. En una arena terrestre cuyo
+suelo lógico queda fuera de cámara o en la cueva de Cala, el canje permanece
+pendiente para la siguiente arena compatible. El despachador omite esa
+entrada temporalmente y permite avanzar a las demás. Modo Molestoso usa la
+misma disponibilidad.
+
+En los aviones distintos de Cala, los cinco usan un suelo virtual de la
+interacción: `cameraY - orthographicSize + 100 * cameraScale`. El margen
+interior permite los pies y el recorrido inferior de Waffle, que baja unas
+82 unidades base por debajo de su suelo nominal. No se añade un collider ni
+se modifica `Level.Ground` o el área de movimiento del jugador. Esta altura
+mundial se fija al aparecer: Gumball conserva la Y inicial, CandyCorn almacena
+`bottomPoint` y Waffle guarda referencias del pivote; hacer que sólo Cupcake
+siguiera una cámara móvil daría alturas incoherentes. Hilda y Robot desplazan
+la cámara ligeramente con el jugador, y Mr. Chimes la desplaza en X; se
+conservan sus ajustes nativos. Las salidas temporales del patrón y el recorte
+de extremos aún requieren revisión visual en combate.
+
+En Cala María, `FlyingMermaidLevelSplashManager` aporta el collider físico de
+entrada al agua. Su borde superior es el suelo exclusivo de la interacción;
+también se comprueban los renderers nativos `wave1`/`wave2` y el encuadre. No
+se crea un manager artificial ni se sustituye el agua por el piso virtual de
+otros aviones cuando ésta desaparece. Todos
+los puntos iniciales usan esa altura. Cupcake adapta tanto el aterrizaje como
+las salpicaduras a ese suelo, y Jawbreaker persigue al avión mediante su
+`AbstractPlayerController` nativo. La vida conserva los mismos HP.
+
+En avión, el cuerpo de cada mini jefe y sus secundarios usan el **80 % del
+tamaño anterior** sobre la compensación de cámara. La reducción se aplica al
+root completo para alinear sprites y colliders, y se mantiene tras los giros
+nativos que restablecen la escala. Los actores terrestres conservan su tamaño.
+Es una proporción estable respecto al avión normal, sin cambiar al activar el
+mini avión del jugador. Como referencia local, la relación lineal entre áreas
+visibles de Cuphead y su avión es aproximadamente 0.76; entre sus hitboxes es
+0.845. El factor 0.8 es un punto inicial de ajuste visual.
+
+Los márgenes corporales de avión (Gumball 182, CandyCorn 122 y aterrizaje de
+Cupcake 120 unidades base) usan esa misma reducción. Los demás límites de
+recorrido, velocidades, HP y tiempos conservan su ajuste de cámara;
+`cameraScale` y el factor corporal están separados.
+Las piezas hijas de Waffle heredan el tamaño sin volver a reducir su separación
+local; sus secundarios independientes se ajustan una sola vez al registrarlos.
+
+Las copias aéreas de CandyCorn y sus mini corns convierten sus colliders a
+triggers antes del primer paso de física. Los prefabs originales usan cuerpos
+cinemáticos sólidos, mientras las balas y bombas básicas de avión tienen
+colliders sólidos sin Rigidbody2D; esa combinación no genera contactos con
+`useFullKinematicContacts` desactivado. Los callbacks de trigger y colisión de
+Cuphead llegan al mismo `checkCollision`, por lo que se conservan receptores,
+HP, impactos y muerte nativos. El cambio sólo afecta copias del catálogo en avión.
+`tools/verify_native_aircraft_collision_contract.py` verifica los siete prefabs
+relevantes del juego instalado; el contrato IL comprueba callbacks y daño de
+mini corns. Regla física documentada en
+[Unity 2017.4](https://docs.unity3d.com/2017.4/Documentation/ScriptReference/Rigidbody2D-useFullKinematicContacts.html).
+
+Al entrar en `States.Head` o perder el agua visible, los actores que la usaban
+se retiran junto con sus secundarios; las nuevas solicitudes esperan. La fase
+se comprueba explícitamente porque las olas pueden seguir activas con otras
+capas de renderizado durante la transición a la cueva.
+Los límites globales del nivel y los actores originales permanecen intactos.
+`usesAircraftArena` gobierna tamaño, colisiones y altura aérea;
+`usesWaterFloor` gobierna exclusivamente el agua y la retirada en Cala.
+No se debe usar la presencia de agua para decidir daño o tamaño de otros aviones.
+Esta compatibilidad inicial todavía requiere la prueba de combate para
+ajustar altura visual y duración frente a balas, bombas y supers de avión.
+
+`NativeBaronessMiniBossCache` conserva copias inactivas de los cinco prefabs
+serializados en el castillo ya retenido por `NativeBaronessHeadTossCache`.
+Comparte esa precarga y no carga otra vez la escena. El guard de lifecycle
+suprime las plantillas, pero cada copia jugable ejecuta su propio `Awake`
+antes de `Init`. No se clonan actores de un combate que ya haya comenzado.
+
+Los cinco previews PNG locales se regeneran mediante
+`tools/extract_native_baroness_mini_boss_previews.py`. Gumball combina cuerpo,
+tapa y piernas respetando los anclajes de los sprites originales.
+
+`tools/verify_native_baroness_miniboss_contract.ps1` valida contra el DLL del
+juego los HP de las tres dificultades, prefabs, firmas `Init`, vida propia,
+coordenadas usadas por los adaptadores y campos de propiedad de secundarios.
+Acepta `-CupheadDir` y `-CecilPath`; inspecciona IL sin arrancar Unity.
+
+Prueba en partida requerida antes de distribuir: ejecutar cada mini jefe con
+el jefe de la arena fuera de la línea de disparo, comprobar que sólo baja la
+vida del mini jefe y que al morir se libera el cupo. Repetir con dos tipos
+distintos y una solicitud duplicada que deba quedar pendiente, además de
+pausa, derrota, reintento y vaciado de cola; verificar también sus proyectiles
+secundarios y el nombre/regalo del donador. Los builds y el harness de streaming
+no sustituyen esta comprobación dentro de Unity.
 
 ## Arquitectura obligatoria
 
@@ -48,7 +192,7 @@ no tienen regalo conservan únicamente el nombre.
    React; por eso atraviesa la cámara de gameplay y conserva los filtros
    visuales de Cuphead.
 2. El texto usa `TextMeshPro`, la fuente Memphis del juego, mayúsculas, tamaño
-   22, color crema y contorno oscuro. Si Memphis no se puede resolver, se busca
+   28, color crema y contorno oscuro. Si Memphis no se puede resolver, se busca
    otro asset Memphis cargado y finalmente se usa la fuente predeterminada.
    La paleta compartida también define un texto alternativo casi negro
    (`#181411`). `AlternateTextColorLevels` es la única tabla que debe decidir
@@ -83,9 +227,11 @@ no tienen regalo conservan únicamente el nombre.
    `(camera.orthographicSize * 2) / 720`. Cuphead usa un encuadre base de 720
    unidades, pero algunos jefes alejan la cámara; sin esta corrección el mismo
    actor se ve mucho más pequeño. Se escala el root completo para conservar la
-   alineación entre sprite y `Collider2D`, no sólo el renderer. La separación
-   de bounds de la etiqueta reutiliza el mismo factor; el fallback local ya lo
-   recibe mediante `TransformPoint` y no debe multiplicarlo una segunda vez.
+   alineación entre sprite y `Collider2D`, no sólo el renderer. La etiqueta
+   calcula su escala sólo desde la cámara actual, sin heredar la escala nativa
+   ni la reducción corporal del actor. El fallback local de los ataques
+   estándar ya recibe la escala del actor mediante `TransformPoint` y no debe
+   multiplicarse una segunda vez.
 
 Esta normalización no se hereda automáticamente por objetos que el actor crea
 después como roots independientes. Es una limitación conocida de los mini
@@ -98,40 +244,75 @@ no modificar velocidad, daño ni los prefabs nativos compartidos.
 
 ### Posición y seguimiento
 
-- Cuando el `SpriteRenderer` elegido ya tiene un sprite activo, el follower
+- Para los ataques estándar, cuando el `SpriteRenderer` elegido ya tiene un
+  sprite activo, el follower
   captura una sola ancla en `bounds.center.x`, `bounds.max.y + 14` y
   `bounds.center.z`. Por defecto se usa el renderer raíz; los actores cuyo dibujo
   vive en un hijo deben pasarlo explícitamente a `PrepareActor`.
 - Esa ancla se convierte inmediatamente en un desplazamiento respecto al
   `Transform` del actor. A partir de ese momento sólo se sigue
   `actorTransform.position + actorOffset`, con rotación mundial neutra.
-- Los bounds no se recalculan en cada frame. Una animación puede cambiar mucho
-  el tamaño del sprite y recalcular el borde haría brincar el nombre, sobre todo
-  durante la animación de muerte.
-- La única excepción actual es una transición explícita entre dos actores. La
-  semilla azul crea la etiqueta oculta, la transfiere a la planta y sigue sus
+- En este seguimiento estándar los bounds no se recalculan en cada frame.
+  Mantener el offset evita que los cambios de forma de sus animaciones,
+  incluida la muerte, hagan brincar el nombre.
+- Las transferencias explícitas entre actores pueden abrir una ventana breve
+  de seguimiento dinámico. Por ejemplo, la semilla azul crea la etiqueta
+  oculta, la transfiere a la planta y sigue sus
   bounds sólo durante 0.55 segundos de crecimiento; después vuelve a fijar un
   único offset. Cuando el sprite de la planta entra al viewport, la etiqueta
   aparece con un fade de 0.45 segundos. No se crea una segunda etiqueta y la
-  muerte nunca activa seguimiento dinámico.
-- Si el renderer todavía no está listo se usa temporalmente un desplazamiento
+  muerte de la planta no activa otra ventana de seguimiento dinámico.
+- En los ataques estándar, si el renderer todavía no está listo se usa temporalmente un desplazamiento
   vertical de 350 unidades. Cuando aparece un sprite válido se captura el ancla
   definitiva una sola vez.
 - Estas magnitudes usan el espacio mundial de referencia de Cuphead. Con la
   cámara base de 720 unidades de alto, una unidad corresponde aproximadamente
-  a un píxel del encuadre de referencia: el hueco de 14 se percibe como unos 14
-  píxeles. El factor de cámara escala ese hueco para conservar su tamaño visual
+  a un píxel del encuadre de referencia. El factor de cámara escala la
+  separación del ancla para conservar su tamaño visual
   cuando un jefe acerca o aleja el encuadre.
 - `SetVerticalOffsetPixels` permite un ajuste vertical por artículo después del
   ancla compartida y aplica el mismo factor de cámara. La planta de Cagney usa
-  `+10`, por lo que su separación vertical final es 24 px; la luciérnaga usa
-  `-70`, con una separación final de -56 px. Los dos zepelines y la zanahoria
-  conservan el hueco base de 14 px.
+  `+10`, por lo que el desplazamiento vertical del ancla es 24 px; la luciérnaga
+  usa `-70`, con un desplazamiento de -56 px. Los dos zepelines y la zanahoria
+  conservan el desplazamiento base de 14 px. Estas cifras del seguimiento
+  estándar sitúan el pivote del rectángulo, no el borde inferior de las letras.
 - Nunca se debe crear un seguidor paralelo ni calcular una posición de pantalla
   para resolver una geometría distinta.
-- La escala mundial copiada a la etiqueta siempre usa valores absolutos. Un
-  actor puede conservar `lossyScale.x` negativo para mirar al otro lado, pero
-  el texto del donador nunca debe heredarlo ni aparecer espejeado.
+- Los nombres usan siempre fuente 28 y una escala mundial uniforme calculada
+  sólo con `camera.orthographicSize / 360`, como referencia común del catálogo.
+  No heredan `actor.lossyScale` ni el factor compuesto del cuerpo: reducir un
+  mini jefe a 0.8 o pasar el nombre a la cabeza de la Baronesa no reduce la letra.
+  El regalo comparte esa escala. Cada `LateUpdate` actualiza el factor desde la
+  cámara y reajusta la separación y los offsets explícitos, incluso si el zoom
+  cambia después de crear la etiqueta. La escala del texto es positiva en ambos
+  ejes y nunca se espejea al girar.
+
+Los cinco mini jefes activan explícitamente `FollowAnimatedBody` en el mismo
+follower compartido. Para ellos se recalcula el ancla en cada `LateUpdate` a
+partir de los vértices reales de `Sprite.vertices`, transformados al mundo con
+la escala, rotación y `flipX`/`flipY` actuales. Se cachean los vértices de cada
+sprite, no sus bounds mundiales. Así el canvas transparente y los cambios de
+pivote de Cupcake no fijan el nombre en una posición ajena al dibujo.
+
+| Mini jefe | Ancla visual dinámica |
+| --- | --- |
+| Cupcake | Renderer raíz; sigue el dibujo de cada frame del salto y el golpe. |
+| Maíz dulce | Renderer raíz. |
+| Caramelo gigante | Renderer del hijo `Sprite`; el renderer raíz está vacío. |
+| Waffle | Cuerpo raíz mientras esté visible; boca central como alternativa. Las ocho piezas expulsadas y sus efectos no forman el ancla. |
+| Máquina de chicles | Unión del cuerpo raíz y la tapa visible; excluye polvo, chispas y explosiones. |
+
+Antes de medir estas anclas, el follower invoca `RestoreActorSize`. El callback
+restaura la escala corporal tras los giros nativos y evita depender del orden
+entre los `LateUpdate` del estado y la etiqueta.
+
+En este modo, los 14 píxeles base separan el borde superior del dibujo del
+borde inferior real del texto o del regalo visible, el que quede más abajo.
+Se conserva el pivote `(0.5, 1)`: tras `ForceMeshUpdate()` se mide el borde de
+los caracteres visibles, incluidos los que usan submallas de fuentes
+alternativas, y se compensa su desplazamiento local. La medición se renueva al
+cambiar la presentación del regalo. Texto, icono y separación usan el factor
+de cámara común, sin alterar la geometría de los actores.
 
 ### Muerte, fade y destrucción
 
@@ -140,15 +321,20 @@ desaparezca de golpe:
 
 1. El follower vive en el objeto independiente de la etiqueta y conserva la
    referencia al `Transform` del actor.
-2. Mientras el actor existe, `LateUpdate` actualiza únicamente su seguimiento.
+2. Mientras el actor existe, `LateUpdate` mantiene su seguimiento y comprueba
+   que al menos un sprite del actor esté activo, con alfa visible, dentro del
+   encuadre y de las capas dibujadas por la cámara. Si se oculta o sale de
+   cámara, el nombre y regalo también se ocultan. La etiqueta puede reaparecer
+   si vuelve el actor, incluyendo cuerpos con varias piezas y cambios de actor.
+   Los mini jefes comprueban los meshes de sus anclas corporales configuradas;
+   una pieza expulsada o un efecto aislado no conserva el nombre en pantalla.
 3. Cuando Unity considera destruido al actor, la etiqueta deja de moverse y
-   conserva su última posición. Esto evita el salto vertical visto cuando la
-   muerte cambiaba los bounds del sprite.
+   conserva su última posición, sin volver a consultar la geometría destruida.
 4. Comienza un fade de 0.6 segundos. La misma opacidad se aplica al color del
-   texto y al alfa del contorno.
-5. El tiempo avanza con `Time.unscaledDeltaTime * CupheadTime.GlobalSpeed`.
-   Con el juego pausado o en la pantalla de derrota, `GlobalSpeed` es cero: la
-   etiqueta y su fade quedan congelados exactamente como el resto del juego.
+   texto, al alfa del contorno y al regalo.
+5. El fade de destrucción usa `Time.unscaledDeltaTime` y termina aunque el
+   juego esté pausado o en derrota. Sólo termina etiquetas cuyo objetivo ya
+   se destruyó; pausar por sí solo no elimina el nombre de un actor visible.
 6. Al llegar a opacidad cero se destruye el `GameObject` de la etiqueta. Si el
    componente de texto ya no existe, el follower destruye inmediatamente su
    propio objeto para no dejar residuos.
@@ -159,10 +345,16 @@ fade saliente puede convivir brevemente con el siguiente artículo. Es
 intencional y no cuenta como otro elemento activo.
 
 No se debe destruir la etiqueta desde `OnDestroy` del actor ni hacerla hija del
-actor: cualquiera de esas dos opciones elimina el fade. Tampoco se debe seguir
-consultando los bounds después de iniciar la muerte. Desactivar el actor no
+actor: cualquiera de esas dos opciones elimina el fade y puede romper una
+transferencia a otro objetivo. Los ataques estándar conservan su ancla fija
+durante la animación de muerte; los mini jefes continúan siguiendo su cuerpo
+visible hasta que se destruye el objetivo. Desactivar el actor no
 equivale a destruirlo: todo ejecutor debe destruir finalmente su `GameObject` o
 ampliar el contrato compartido con una señal explícita de finalización.
+La política `CreatorToolsDonorLabelLifetime` tiene pruebas de pérdida de
+objetivo, ocultación reversible y transferencia entre actores. Los snapshots
+de fin de nivel comprueban que el actor sea visible y capturan las etiquetas
+antes de apagar los sprites originales; no congelan nombres huérfanos.
 
 ## Ciclo de partida, pausas y cola
 
@@ -442,8 +634,9 @@ regenera con `tools/extract_native_dragon_fireballs_preview.py`.
    si se elige muerte natural, documentar que conservará el cupo hasta morir y
    garantizar siempre limpieza en `EndGameplayLevel` y `Dispose`.
 5. Si necesita otra geometría, extender la presentación compartida con un
-   renderer o ancla configurable; mantener sin cambios el seguimiento único,
-   la pausa y el fade de destrucción.
+   renderer o ancla configurable. El seguimiento dinámico requiere una opción
+   explícita como `FollowAnimatedBody`; conservar un solo follower, la pausa
+   del actor y el fade de destrucción compartido.
 6. Verificar que una excepción al crear la etiqueta deje vivo al actor y genere
    un diagnóstico completo en el log.
 7. Confirmar obligatoriamente las dos rutas de prueba: fila manual con donador,
@@ -478,14 +671,23 @@ regenera con `tools/extract_native_dragon_fireballs_preview.py`.
   tamaño aparente.
 - Confirmar que nombre y actor están delante del jefe y bajo los filtros del
   juego.
-- Verificar que el nombre sigue al actor sin cambiar de distancia durante sus
-  animaciones. Para la semilla azul debe permanecer invisible durante la caída,
+- Verificar que los ataques estándar conservan su desplazamiento de ancla
+  durante sus animaciones. Para la semilla azul debe permanecer invisible durante la caída,
   aparecer con fade cuando la planta entre a pantalla, acompañar el crecimiento
   y quedar fijada sobre la planta sin parpadeo ni texto espejeado en ninguna
   dirección.
-- Matar al actor y comprobar que el nombre no salta, queda en su última posición
-  y desvanece texto y contorno en aproximadamente 0.6 segundos.
-- Pausar con un actor vivo y durante el fade: nada debe moverse ni desaparecer.
+- En los cinco mini jefes, comprobar que las letras y el regalo siguen el
+  dibujo con su separación de 14 px: Cupcake durante todo el salto y descenso,
+  ambos caramelos al girar, Waffle al separarse y reunirse, y Gumball al abrir
+  la tapa. Las piezas y efectos independientes no deben arrastrar el nombre.
+- Comparar el tamaño común 28 en tierra y avión, durante cambios de zoom y al
+  transferir el nombre de la Baronesa a su cabeza. La reducción corporal de
+  los mini jefes no debe reducir texto ni regalo.
+- Destruir al actor y comprobar que el nombre queda en su última posición y
+  desvanece texto, contorno y regalo en aproximadamente 0.6 segundos.
+- Pausar con un actor vivo: debe conservar su nombre mientras siga visible.
+  Si el actor ya fue destruido, el fade de la etiqueta debe terminar incluso
+  durante la pausa.
 - Perder la partida: los actores presentes deben quedarse congelados y no deben
   llegar otros. Al abandonar o reiniciar la escena no deben quedar residuos.
 - Activar Modo Molestoso desde el panel mientras el juego está pausado,
