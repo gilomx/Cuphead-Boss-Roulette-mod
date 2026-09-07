@@ -62,8 +62,9 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   daño recibido. Están disponibles en arenas terrestres con suelo visible y en
   niveles de avión. Cala María requiere agua visible; al desaparecer, se retiran
   los mini jefes presentes y las solicitudes esperan una fase o arena compatible.
-  Los demás niveles de avión usan un suelo virtual fijo al aparecer, en la
-  franja inferior de la pantalla. La UI sólo explica esta compatibilidad;
+  Los demás niveles de avión usan un suelo virtual fijo al aparecer,
+  exactamente en el borde inferior visible y sin margen interior.
+  La UI sólo explica esta compatibilidad;
   el suelo y la disponibilidad los decide C#, sin controles nuevos en el panel.
 - La zona operativa coloca la cola en el panel principal y, a su derecha, la
   configuración sobre la tabla de pruebas. Cada fila de prueba acepta donador,

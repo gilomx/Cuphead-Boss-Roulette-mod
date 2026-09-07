@@ -69,11 +69,13 @@ entrada temporalmente y permite avanzar a las demás. Modo Molestoso usa la
 misma disponibilidad.
 
 En los aviones distintos de Cala, los cinco usan un suelo virtual de la
-interacción: `cameraY - orthographicSize + 100 * cameraScale`. El margen
-interior permite los pies y el recorrido inferior de Waffle, que baja unas
-82 unidades base por debajo de su suelo nominal. No se añade un collider ni
-se modifica `Level.Ground` o el área de movimiento del jugador. Esta altura
-mundial se fija al aparecer: Gumball conserva la Y inicial, CandyCorn almacena
+interacción: `cameraY - orthographicSize`, exactamente en el borde inferior
+visible al aparecer y sin margen interior. Los patrones nativos conservan su
+recorrido: algunos frames pueden cruzar ese borde, incluido Waffle, que baja
+unas 82 unidades base por debajo de su suelo nominal. No se añaden
+compensaciones ni colliders; se conservan `Level.Ground` y el área de movimiento
+del jugador. Esta altura mundial se fija al aparecer: Gumball conserva la Y
+inicial, CandyCorn almacena
 `bottomPoint` y Waffle guarda referencias del pivote; hacer que sólo Cupcake
 siguiera una cámara móvil daría alturas incoherentes. Hilda y Robot desplazan
 la cámara ligeramente con el jugador, y Mr. Chimes la desplaza en X; se

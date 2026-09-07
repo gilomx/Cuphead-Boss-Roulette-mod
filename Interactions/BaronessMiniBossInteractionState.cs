@@ -18,10 +18,6 @@ namespace Gilomx.CupheadBossRoulette
         // stable size reduction; shrinking the player temporarily must not
         // resize enemies in the middle of an attack.
         private const float AircraftSizeMultiplier = 0.8f;
-        // Leave room for Waffle's loop below its nominal floor and for the
-        // native feet/squash sprites. This is an actor-only reference height,
-        // not a collider or a change to the aircraft's movement boundaries.
-        private const float AircraftFloorInset = 100f;
         private static readonly FieldInfo JawbreakerSprite =
             AccessTools.Field(typeof(BaronessLevelJawbreaker), "sprite");
         private static readonly FieldInfo WaffleMouth =
@@ -202,8 +198,8 @@ namespace Gilomx.CupheadBossRoulette
             // Freeze this plane arena's reference at spawn: Gumball, Corn and
             // Waffle store world positions in their native routines. Following
             // camera shake/player tracking only for Cupcake would split floors.
-            aircraftFloorY = initialCameraPosition.y - gameplayCamera.orthographicSize +
-                AircraftFloorInset * cameraScale;
+            // Use the visible bottom edge without an inward margin.
+            aircraftFloorY = initialCameraPosition.y - gameplayCamera.orthographicSize;
             actor.gameObject.AddComponent<CreatorToolsBaronessMiniBossMarker>().Owner = this;
             actor.gameObject.name = "CreatorTools_NativeBaronessMiniBoss_" + item;
 

@@ -49,8 +49,9 @@ conserva los datos de prueba al cambiar de categoría. El panel explica que su
 vida es independiente del jefe y que están disponibles en arenas terrestres con
 suelo visible y en niveles de avión. Cala María conserva la condición de agua
 visible: al desaparecer, sus mini jefes se retiran y las nuevas solicitudes
-esperan en la cola. En los demás niveles de avión usan un suelo virtual en la
-franja inferior, fijado al aparecer; el panel no añade controles para ajustarlo.
+esperan en la cola. En los demás niveles de avión usan un suelo virtual
+exactamente en el borde inferior visible, sin margen interior y fijado al
+aparecer; el panel no añade controles para ajustarlo.
 Solo puede haber un mini jefe en pantalla entre Interacciones, Modo
 Molestoso y Batalla Molestosa, respetando también el máximo general. Los siguientes
 esperan a que desaparezca el actual, aunque sean distintos. Este límite es fijo.

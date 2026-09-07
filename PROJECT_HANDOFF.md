@@ -2,6 +2,24 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Mini jefes: piso virtual en el borde inferior (2026-09-07)
+
+El usuario pidió que el piso virtual de los demás jefes aéreos coincida con
+la última parte visible de la pantalla. Se quitó `AircraftFloorInset = 100`:
+ahora `aircraftFloorY = initialCameraPosition.y - orthographicSize`, sin
+margen interior. Se conserva la referencia mundial fijada al aparecer para
+mantener coherentes las posiciones nativas almacenadas de los cinco actores.
+Cala continúa usando su agua; terreno, tamaño, vida, nombres y patrones no
+cambian. No se añade otra compensación por sprite: las partes de animaciones
+que crucen el piso nominal pueden quedar bajo el borde visible.
+
+Build Release sin advertencias ni errores y diff revisado. Instalados los 9
+archivos con hashes verificados; respaldo
+`installation-backups/baroness-mini-bosses-20260907-104222/`.
+DLL SHA-256: `A494CA01AC047F67D2C30FE4D9A024864369560B2079F6D8EFEF37E571DCFFDB`.
+Cuphead estaba cerrado y se dejó cerrado. La altura y los recortes durante
+las animaciones quedan pendientes de comprobación visual en combate.
+
 ## Mini jefes: demás niveles de avión (2026-09-05)
 
 El usuario pidió activar los mini jefes en otras peleas aéreas y revisar qué
