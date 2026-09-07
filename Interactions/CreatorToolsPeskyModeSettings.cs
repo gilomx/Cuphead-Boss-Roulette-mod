@@ -10,7 +10,11 @@ namespace Gilomx.CupheadBossRoulette
     {
         internal const int MaximumNameLength = 32;
         internal const int MaximumNames = 200;
-        private const int CurrentVersion = 1;
+        internal const float IntervalLowerLimit = 0.35f;
+        internal const float IntervalUpperLimit = 300f;
+        internal const float DefaultMinimumInterval = 1.25f;
+        internal const float DefaultMaximumInterval = 3.25f;
+        private const int CurrentVersion = 2;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -25,6 +29,8 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logWarning;
 
         internal bool Enabled;
+        internal float MinimumInterval { get; private set; }
+        internal float MaximumInterval { get; private set; }
         internal readonly List<string> Names = new List<string>();
         internal readonly HashSet<string> DisabledItems =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -94,6 +100,28 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal bool TrySetIntervals(string minimum, string maximum)
+        {
+            float minimumInterval;
+            float maximumInterval;
+            if (!float.TryParse(minimum, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out minimumInterval) ||
+                !float.TryParse(maximum, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out maximumInterval) ||
+                float.IsNaN(minimumInterval) ||
+                float.IsInfinity(minimumInterval) ||
+                float.IsNaN(maximumInterval) ||
+                float.IsInfinity(maximumInterval) ||
+                minimumInterval < IntervalLowerLimit ||
+                maximumInterval > IntervalUpperLimit ||
+                minimumInterval > maximumInterval)
+                return false;
+
+            MinimumInterval = minimumInterval;
+            MaximumInterval = maximumInterval;
+            return true;
+        }
+
         internal void Save()
         {
             try
@@ -129,8 +157,15 @@ namespace Gilomx.CupheadBossRoulette
         private void ResetToDefaults()
         {
             Enabled = false;
+            ResetIntervalsToDefaults();
             DisabledItems.Clear();
             SetNames(DefaultNames);
+        }
+
+        private void ResetIntervalsToDefaults()
+        {
+            MinimumInterval = DefaultMinimumInterval;
+            MaximumInterval = DefaultMaximumInterval;
         }
 
         private bool TryLoadFile(string candidatePath)
@@ -157,6 +192,19 @@ namespace Gilomx.CupheadBossRoulette
                         DisabledItems.Add(disabledItems[i]);
                 if (EnabledItemCount == 0)
                     Enabled = false;
+
+                // Older files have no interval fields. Recover only this pair
+                // if a later file has invalid values, retaining names/items.
+                ResetIntervalsToDefaults();
+                var minimumPosition = FindPropertyValue(
+                    json, "minimumInterval");
+                var maximumPosition = FindPropertyValue(
+                    json, "maximumInterval");
+                if ((minimumPosition >= 0 || maximumPosition >= 0) &&
+                    !TrySetIntervals(ReadNumberToken(json, minimumPosition),
+                        ReadNumberToken(json, maximumPosition)))
+                    Warn("Los intervalos de Modo Molestoso no eran validos; " +
+                        "se usaran los intervalos predeterminados.");
                 return true;
             }
             catch
@@ -172,6 +220,12 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(CurrentVersion.ToString(CultureInfo.InvariantCulture))
                 .Append(",\n  \"enabled\": ")
                 .Append(Enabled ? "true" : "false")
+                .Append(",\n  \"minimumInterval\": ")
+                .Append(MinimumInterval.ToString(
+                    "R", CultureInfo.InvariantCulture))
+                .Append(",\n  \"maximumInterval\": ")
+                .Append(MaximumInterval.ToString(
+                    "R", CultureInfo.InvariantCulture))
                 .Append(",\n  \"names\": [");
             for (var i = 0; i < Names.Count; i++)
             {
@@ -237,6 +291,17 @@ namespace Gilomx.CupheadBossRoulette
             if (StartsWith(json, position, "false"))
                 return true;
             return false;
+        }
+
+        private static string ReadNumberToken(string json, int position)
+        {
+            if (position < 0 || position >= json.Length)
+                return null;
+            var end = position;
+            while (end < json.Length && json[end] != ',' &&
+                json[end] != '}' && !char.IsWhiteSpace(json[end]))
+                end++;
+            return json.Substring(position, end - position);
         }
 
         private static bool TryReadStringArray(

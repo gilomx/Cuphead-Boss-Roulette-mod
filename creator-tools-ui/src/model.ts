@@ -95,6 +95,10 @@ export interface PeskyModeConfigState {
   error: boolean;
   minimumInterval: number;
   maximumInterval: number;
+  intervalLowerLimit: number;
+  intervalUpperLimit: number;
+  defaultMinimumInterval: number;
+  defaultMaximumInterval: number;
   names: string[];
   items: string[];
   disabledItems: string[];

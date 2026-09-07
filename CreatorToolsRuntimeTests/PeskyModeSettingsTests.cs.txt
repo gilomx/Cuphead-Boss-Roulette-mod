@@ -1,0 +1,207 @@
+using System;
+using System.Globalization;
+using System.IO;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private const string PeskySettingsFileName =
+            "mx.gilomx.cuphead.bossroulette.pesky-mode.json";
+
+        private static void RunPeskyModeSettingsTests()
+        {
+            Run("Pesky interval defaults preserve the existing cadence",
+                TestPeskyIntervalDefaults);
+            Run("Pesky interval validation is atomic, finite and culture independent",
+                TestPeskyIntervalValidation);
+            Run("Pesky intervals persist without changing names and item choices",
+                TestPeskyIntervalPersistence);
+            Run("Legacy Pesky settings acquire defaults without losing selections",
+                TestPeskyIntervalLegacyMigration);
+            Run("Invalid stored Pesky interval pairs recover only their defaults",
+                TestPeskyIntervalInvalidStoredValues);
+        }
+
+        private static void TestPeskyIntervalDefaults()
+        {
+            using (var scope = new TestScope("pesky-interval-defaults"))
+            {
+                var settings = LoadPeskySettings(scope);
+                Equal(1.25f, settings.MinimumInterval, "default minimum seconds");
+                Equal(3.25f, settings.MaximumInterval, "default maximum seconds");
+                Equal(0.35f, CreatorToolsPeskyModeSettings.IntervalLowerLimit,
+                    "minimum supported seconds");
+                Equal(300f, CreatorToolsPeskyModeSettings.IntervalUpperLimit,
+                    "maximum supported seconds");
+                False(settings.Enabled, "new settings remain disabled");
+                Equal(6, settings.Names.Count, "existing default names");
+                Equal(0, settings.DisabledItems.Count, "new items remain enabled");
+            }
+        }
+
+        private static void TestPeskyIntervalValidation()
+        {
+            using (var scope = new TestScope("pesky-interval-validation"))
+            {
+                var settings = LoadPeskySettings(scope);
+                True(settings.TrySetIntervals("0.35", "300"),
+                    "both inclusive range boundaries are accepted");
+                Equal(0.35f, settings.MinimumInterval, "lower boundary");
+                Equal(300f, settings.MaximumInterval, "upper boundary");
+                True(settings.TrySetIntervals("2.5", "2.5"),
+                    "equal values select a fixed interval");
+
+                var invalidPairs = new[]
+                {
+                    new[] { "0.349", "2" },
+                    new[] { "2", "300.001" },
+                    new[] { "301", "302" },
+                    new[] { "-1", "-0.5" },
+                    new[] { "4", "3" },
+                    new[] { "NaN", "3" },
+                    new[] { "2", "NaN" },
+                    new[] { "Infinity", "300" },
+                    new[] { "2", "Infinity" },
+                    new[] { "-Infinity", "3" },
+                    new[] { "1e100", "3" },
+                    new[] { "2", "1e100" },
+                    new[] { null, "3" },
+                    new[] { "2", null },
+                    new[] { "", "3" },
+                    new[] { "2", "" },
+                    new[] { "2,5", "3" },
+                    new[] { "one", "3" }
+                };
+                foreach (var pair in invalidPairs)
+                {
+                    False(settings.TrySetIntervals(pair[0], pair[1]),
+                        "invalid pair rejected: " + pair[0] + "/" + pair[1]);
+                    Equal(2.5f, settings.MinimumInterval,
+                        "invalid pair preserves the complete previous minimum");
+                    Equal(2.5f, settings.MaximumInterval,
+                        "invalid pair preserves the complete previous maximum");
+                }
+
+                var previousCulture = CultureInfo.CurrentCulture;
+                try
+                {
+                    CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+                    True(settings.TrySetIntervals("0.625", "4.125"),
+                        "API numbers use invariant decimal points");
+                    Equal(0.625f, settings.MinimumInterval,
+                        "non-integer precision is preserved");
+                    Equal(4.125f, settings.MaximumInterval,
+                        "maximum precision is preserved");
+                }
+                finally
+                {
+                    CultureInfo.CurrentCulture = previousCulture;
+                }
+            }
+        }
+
+        private static void TestPeskyIntervalPersistence()
+        {
+            using (var scope = new TestScope("pesky-interval-persistence"))
+            {
+                var settings = LoadPeskySettings(scope);
+                settings.Enabled = true;
+                settings.SetNames(new[] { "Invitado", "Nombre con \"comillas\"" });
+                True(settings.TrySetIntervals("0.625", "12.125"), "custom pair");
+                settings.Save();
+
+                var reloaded = LoadPeskySettings(scope);
+                Equal(0.625f, reloaded.MinimumInterval, "saved minimum");
+                Equal(12.125f, reloaded.MaximumInterval, "saved maximum");
+                True(reloaded.Enabled, "enabled setting survives interval save");
+                Equal(2, reloaded.Names.Count, "all custom names persist");
+                Equal("Nombre con \"comillas\"", reloaded.Names[1],
+                    "escaped custom name persists");
+
+                reloaded.Enabled = false;
+                reloaded.DisabledItems.Add(CreatorToolsInteractionIds.All[0]);
+                True(reloaded.TrySetIntervals("7", "7"), "fixed interval");
+                reloaded.Save();
+                var finalSettings = LoadPeskySettings(scope);
+                Equal(7f, finalSettings.MinimumInterval, "updated minimum");
+                Equal(7f, finalSettings.MaximumInterval, "updated maximum");
+                False(finalSettings.Enabled, "disabled setting persists");
+                True(finalSettings.DisabledItems.Contains(
+                        CreatorToolsInteractionIds.All[0]),
+                    "item toggles survive interval save");
+                Equal("Invitado", finalSettings.Names[0], "names remain unchanged");
+                True(File.Exists(Path.Combine(scope.ConfigDirectory,
+                        PeskySettingsFileName + ".bak")),
+                    "existing atomic backup behavior is retained");
+            }
+        }
+
+        private static void TestPeskyIntervalLegacyMigration()
+        {
+            using (var scope = new TestScope("pesky-interval-legacy"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                File.WriteAllText(path,
+                    "{\"version\":1,\"enabled\":true," +
+                    "\"names\":[\"Nombre anterior\"],\"disabledItems\":[]}");
+                var settings = LoadPeskySettings(scope);
+                True(settings.Enabled, "legacy enabled mode remains enabled");
+                Equal("Nombre anterior", settings.Names[0], "legacy name retained");
+                Equal(1.25f, settings.MinimumInterval, "legacy minimum default");
+                Equal(3.25f, settings.MaximumInterval, "legacy maximum default");
+                settings.Save();
+                using (var json = JsonDocument.Parse(File.ReadAllText(path)))
+                {
+                    Equal(2, json.RootElement.GetProperty("version").GetInt32(),
+                        "saved file uses the interval schema");
+                    Equal(1.25f, json.RootElement.GetProperty("minimumInterval")
+                        .GetSingle(), "new minimum is serialized");
+                    Equal(3.25f, json.RootElement.GetProperty("maximumInterval")
+                        .GetSingle(), "new maximum is serialized");
+                }
+            }
+        }
+
+        private static void TestPeskyIntervalInvalidStoredValues()
+        {
+            using (var scope = new TestScope("pesky-interval-invalid-file"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                foreach (var fields in new[]
+                {
+                    "\"minimumInterval\":2",
+                    "\"maximumInterval\":4",
+                    "\"minimumInterval\":10,\"maximumInterval\":3",
+                    "\"minimumInterval\":0.2,\"maximumInterval\":3",
+                    "\"minimumInterval\":2,\"maximumInterval\":301",
+                    "\"minimumInterval\":null,\"maximumInterval\":3",
+                    "\"minimumInterval\":2,\"maximumInterval\":\"NaN\""
+                })
+                {
+                    File.WriteAllText(path,
+                        "{\"version\":2,\"enabled\":false," + fields +
+                        ",\"names\":[\"Nombre protegido\"],\"disabledItems\":[\"" +
+                        CreatorToolsInteractionIds.All[0] + "\"]}");
+                    var settings = LoadPeskySettings(scope);
+                    Equal(1.25f, settings.MinimumInterval,
+                        "bad stored pair recovers the entire default minimum");
+                    Equal(3.25f, settings.MaximumInterval,
+                        "bad stored pair recovers the entire default maximum");
+                    Equal("Nombre protegido", settings.Names[0],
+                        "bad intervals do not erase names");
+                    True(settings.DisabledItems.Contains(
+                            CreatorToolsInteractionIds.All[0]),
+                        "bad intervals do not erase item selections");
+                }
+            }
+        }
+
+        private static CreatorToolsPeskyModeSettings LoadPeskySettings(TestScope scope)
+        {
+            return CreatorToolsPeskyModeSettings.Load(
+                Path.Combine(scope.ConfigDirectory, "plugin.cfg"), null);
+        }
+    }
+}

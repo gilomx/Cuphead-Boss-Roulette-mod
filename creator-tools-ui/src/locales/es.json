@@ -823,6 +823,18 @@
     "description": "Mete ataques aleatorios del catálogo de interacciones durante cualquier pelea, ya sea normal o por ruleta. También puedes configurar nombres para que aparezcan aleatoriamente con los ataques.",
     "interactionsNotice": "Las interacciones están activadas, por lo que seguirás recibiendo ataques de donaciones además de los ataques de este modo.",
     "battleBlocked": "Batalla Molestosa tiene el control exclusivo. Termina o cancela esa batalla para volver a activar el modo libre.",
+    "intervals": {
+      "title": "Intervalo de aparición",
+      "description": "Panel secreto de Modo Molestoso. Configura la espera entre actores en segundos.",
+      "minimum": "Mínimo (segundos)",
+      "maximum": "Máximo (segundos)",
+      "hint": "La espera se elige al azar entre ambos valores. Usa el mismo valor para una espera fija. Al guardar comienza una nueva espera; se siguen respetando los cupos y la disponibilidad de actores.",
+      "invalid": "Introduce valores entre {minimum} y {maximum} segundos. El mínimo no puede superar al máximo.",
+      "restore": "Restablecer valores",
+      "save": "Guardar intervalo",
+      "unsaved": "Cambios sin guardar",
+      "close": "Cerrar panel de intervalo"
+    },
     "control": {
       "title": "Control del modo",
       "enable": "Activar modo",
@@ -875,6 +887,8 @@
       "enabled": "Modo Molestoso está activado.",
       "disabled": "Modo Molestoso está desactivado.",
       "names_saved": "Los nombres fueron guardados.",
+      "intervals_saved": "El intervalo de aparición fue guardado.",
+      "invalid_interval": "El intervalo enviado no es válido. Revisa el mínimo y el máximo.",
       "items_saved": "La selección de ataques fue guardada.",
       "blocked_by_pesky_battle": "Modo Molestoso libre no puede activarse durante Batalla Molestosa.",
       "disabled_by_pesky_battle": "Modo Molestoso libre se desactivó porque Batalla Molestosa fue armada.",

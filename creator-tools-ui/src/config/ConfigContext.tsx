@@ -46,6 +46,7 @@ interface ConfigValue {
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
+  applyPeskyIntervals: (minimum: number, maximum: number) => void;
   applyPeskyBattleGift: (giftId: string) => void;
   applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
   applyPeskyBattleItem: (item: string, enabled: boolean) => void;
@@ -965,6 +966,27 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [pesky, sendPeskyUpdate],
   );
 
+  const applyPeskyIntervals = useCallback(
+    (minimum: number, maximum: number) => {
+      if (!pesky?.ready || !Number.isFinite(minimum) ||
+          !Number.isFinite(maximum) || minimum < pesky.intervalLowerLimit ||
+          maximum > pesky.intervalUpperLimit || minimum > maximum) return;
+      sendPeskyUpdate(
+        new URLSearchParams({
+          minimumInterval: String(minimum),
+          maximumInterval: String(maximum),
+        }),
+        (state) => ({
+          ...state,
+          minimumInterval: minimum,
+          maximumInterval: maximum,
+          error: false,
+        }),
+      );
+    },
+    [pesky, sendPeskyUpdate],
+  );
+
   const applyPeskyNames = useCallback(
     (names: string) => {
       const nextNames = names.split(/\r?\n|\r/).filter(Boolean);
@@ -1434,6 +1456,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      applyPeskyIntervals,
       applyPeskyBattleGift,
       applyPeskyBattleStreamAttacks,
       applyPeskyBattleItem,
@@ -1475,6 +1498,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      applyPeskyIntervals,
       applyPeskyBattleGift,
       applyPeskyBattleStreamAttacks,
       applyPeskyBattleItem,

@@ -75,6 +75,15 @@ function resetStreamRuleAccumulators(ruleId) {
 let peskyEnabled = false;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
+let peskyError = false;
+const peskyIntervalLowerLimit = 0.35;
+const peskyIntervalUpperLimit = 300;
+const peskyDefaultMinimumInterval = 1.25;
+const peskyDefaultMaximumInterval = 3.25;
+let peskyIntervals = {
+  minimumInterval: peskyDefaultMinimumInterval,
+  maximumInterval: peskyDefaultMaximumInterval,
+};
 let peskyNames = [];
 let peskyDisabledItems = [];
 let peskyBattleRevision = 0;
@@ -1640,9 +1649,12 @@ createServer((req, res) => {
       startingBattle: false,
       revision: peskyRevision,
       feedback: peskyFeedback,
-      error: false,
-      minimumInterval: 1.25,
-      maximumInterval: 3.25,
+      error: peskyError,
+      ...peskyIntervals,
+      intervalLowerLimit: peskyIntervalLowerLimit,
+      intervalUpperLimit: peskyIntervalUpperLimit,
+      defaultMinimumInterval: peskyDefaultMinimumInterval,
+      defaultMaximumInterval: peskyDefaultMaximumInterval,
       names: peskyNames,
       items: interactionItems,
       disabledItems: peskyDisabledItems,
@@ -1658,7 +1670,23 @@ createServer((req, res) => {
     const enabledValue = url.searchParams.get("enabled");
     const namesValue = url.searchParams.get("names");
     const itemValue = url.searchParams.get("item");
-    if (enabledValue !== null) {
+    const minimumIntervalValue = url.searchParams.get("minimumInterval");
+    const maximumIntervalValue = url.searchParams.get("maximumInterval");
+    peskyError = false;
+    if (minimumIntervalValue !== null || maximumIntervalValue !== null) {
+      const minimumInterval = Number(minimumIntervalValue);
+      const maximumInterval = Number(maximumIntervalValue);
+      if (minimumIntervalValue === null || maximumIntervalValue === null ||
+          !Number.isFinite(minimumInterval) || !Number.isFinite(maximumInterval) ||
+          minimumInterval < peskyIntervalLowerLimit || maximumInterval > peskyIntervalUpperLimit ||
+          minimumInterval > maximumInterval) {
+        peskyFeedback = "invalid_interval";
+        peskyError = true;
+      } else {
+        peskyIntervals = { minimumInterval, maximumInterval };
+        peskyFeedback = "intervals_saved";
+      }
+    } else if (enabledValue !== null) {
       if (enabledValue === "1" && peskyBattleIsExclusive()) {
         peskyEnabled = false;
         peskyFeedback = "blocked_by_pesky_battle";
@@ -1678,7 +1706,7 @@ createServer((req, res) => {
       peskyFeedback = "items_saved";
     }
     peskyRevision += 1;
-    json(res, { ok: true }, 202);
+    json(res, { ok: !peskyError, feedback: peskyFeedback, error: peskyError }, 202);
     return;
   }
   if (url.pathname === "/api/config/interactions/test") {

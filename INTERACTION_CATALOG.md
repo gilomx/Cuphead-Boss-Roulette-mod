@@ -59,16 +59,18 @@ El mod no bloquea ni altera el avance de esa pelea original.
 los cinco IDs quedan bloqueadas, incluso con valores antiguos mayores que 1,
 así como la liberación del único cupo y las entradas vacías.
 
-Se despachan en arenas terrestres con suelo visible y en niveles de avión.
+Se despachan en arenas terrestres con suelo visible, en niveles de avión y
+en Los Perritos Pilotos (`Levels.Airplane`).
 La detección usa el jugador `PlanePlayerController`, incluyendo Hilda,
 Djimmi, Titi Trinos, Robot, Esther y las dos peleas aéreas del casino. Cala
-María conserva la condición de agua visible. En una arena terrestre cuyo
+María conserva la condición de agua visible. Perritos Pilotos usa el piso
+virtual aunque conserva controles terrestres. En otra arena terrestre cuyo
 suelo lógico queda fuera de cámara o en la cueva de Cala, el canje permanece
 pendiente para la siguiente arena compatible. El despachador omite esa
 entrada temporalmente y permite avanzar a las demás. Modo Molestoso usa la
 misma disponibilidad.
 
-En los aviones distintos de Cala, los cinco usan un suelo virtual de la
+En los aviones distintos de Cala y en Perritos Pilotos, los cinco usan un suelo virtual de la
 interacción: `cameraY - orthographicSize`, exactamente en el borde inferior
 visible al aparecer y sin margen interior. Los patrones nativos conservan su
 recorrido: algunos frames pueden cruzar ese borde, incluido Waffle, que baja
@@ -79,7 +81,11 @@ inicial, CandyCorn almacena
 `bottomPoint` y Waffle guarda referencias del pivote; hacer que sólo Cupcake
 siguiera una cámara móvil daría alturas incoherentes. Hilda y Robot desplazan
 la cámara ligeramente con el jugador, y Mr. Chimes la desplaza en X; se
-conservan sus ajustes nativos. Las salidas temporales del patrón y el recorte
+conservan sus ajustes nativos. En Perritos Pilotos se usa el borde inferior
+del encuadre vertical original, incluso si el mini jefe aparece durante un
+giro: la gravedad nativa sigue apuntando hacia abajo en coordenadas mundiales.
+Tomar la extensión vertical de la vista lateral dejaría el piso por debajo
+de la pantalla al volver a enderezarse. Las salidas temporales del patrón y el recorte
 de extremos aún requieren revisión visual en combate.
 
 En Cala María, `FlyingMermaidLevelSplashManager` aporta el collider físico de
@@ -101,7 +107,8 @@ mini avión del jugador. Como referencia local, la relación lineal entre áreas
 visibles de Cuphead y su avión es aproximadamente 0.76; entre sus hitboxes es
 0.845. El factor 0.8 es un punto inicial de ajuste visual. En Perritos Pilotos
 se aplica esa misma proporción por solicitud del usuario: la pelea conserva
-su clasificación terrestre, suelo y colisiones. Los nombres y regalos siguen
+sus controles y colisiones terrestres, con el suelo virtual de la interacción.
+Los nombres y regalos siguen
 usando fuente 28 y escala de cámara independiente, sin la reducción corporal.
 
 Los márgenes corporales de avión y Perritos Pilotos (Gumball 182, CandyCorn 122 y aterrizaje de
@@ -128,7 +135,9 @@ se retiran junto con sus secundarios; las nuevas solicitudes esperan. La fase
 se comprueba explícitamente porque las olas pueden seguir activas con otras
 capas de renderizado durante la transición a la cueva.
 Los límites globales del nivel y los actores originales permanecen intactos.
-`usesAircraftArena` gobierna tamaño, colisiones y altura aérea;
+`usesAircraftArena` identifica al jugador de avión para adaptar colisiones;
+el tamaño corporal también incluye Perritos Pilotos. `usesViewportFloor`
+selecciona el piso virtual de los aviones sin agua y de Perritos Pilotos;
 `usesWaterFloor` gobierna exclusivamente el agua y la retirada en Cala.
 No se debe usar la presencia de agua para decidir daño o tamaño de otros aviones.
 Esta compatibilidad inicial todavía requiere la prueba de combate para
@@ -606,8 +615,20 @@ cada `Meteor_Attack`; sólo después del tercero enlaza `Meteor_Attack_End` y la
 salida del dragón.
 
 Todas las bolas salen del transform animado `MouthRoot` y usan `speedX` y
-`timeY` de la dificultad actual. Conservan animación, humo, sonido, trayectoria,
-daño, collider y destrucción originales. El nombre y el regalo se transfieren a
+`timeY` de la dificultad actual. La velocidad horizontal y la amplitud vertical
+se ajustan a la misma escala de cámara que el cuerpo; los extremos verticales
+se centran en la cámara. Conservan las corutinas, tiempos, animación, humo,
+sonido, daño y collider nativos. En las copias de la interacción se desactiva
+la muerte nativa en X = -840: esa muerte detiene el movimiento sin destruir
+el objeto y deja la animación en pantalla con el zoom de Perritos Pilotos.
+El ejecutor destruye las bolas cuando sus límites visibles llevan 0.6 segundos
+fuera del encuadre más un margen de 220 unidades base. Proyecta las cuatro
+esquinas de esos límites para admitir giros de cámara. También retira cualquier
+bola que haya quedado en estado `dead`. El ángulo combina el desplazamiento Y
+nativo con la velocidad X calculada para el mismo intervalo de frame: X avanza
+en pasos de física y el tween Y en cada frame. Esto evita los saltos a 90 grados
+entre pasos de física; la pausa conserva el ángulo anterior.
+El nombre y el regalo se transfieren a
 la primera bola sin duplicarse sobre los proyectiles siguientes.
 
 El ejecutor es exclusivo por tipo. Mientras un cuerpo de Fósforo no haya
@@ -621,7 +642,13 @@ La copia visual del dragón es decorativa: todos sus `MonoBehaviour`,
 dañar, empujar ni recibir disparos. Sólo las dos bolas tienen hitbox. La precarga
 serializada aísla el lifecycle de los componentes `DragonLevel*` tanto en la
 escena temporal como en las copias marcadas de la interacción; los meteoros no
-llevan esa marca para que ejecuten normalmente su movimiento y colisiones. El
+llevan esa marca para que ejecuten normalmente su movimiento y colisiones.
+Una marca distinta, `CreatorToolsDragonFireballMarker`, limita los ajustes de
+trayectoria y giro a los meteoros de la interacción. El ataque original del
+dragón conserva su comportamiento. Si no se puede adaptar el IL esperado,
+el artículo queda pendiente y se registra el error.
+`tools/verify_native_dragon_fireballs_contract.ps1` comprueba ese contrato IL y
+el giro de la DLL compilada con distintas tasas de frames y escalas de cámara. El
 preview usa `dragon_meteor_forward_0007` de `atlas_dragonlevel_nobg` y se
 regenera con `tools/extract_native_dragon_fireballs_preview.py`.
 

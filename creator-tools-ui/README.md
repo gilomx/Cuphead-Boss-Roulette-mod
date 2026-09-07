@@ -8,6 +8,12 @@ Las rutas `/config`, `/config/roulette`, `/config/interactions`,
 shell y cambia únicamente la vista central; `/config` abre Ruleta como sección
 inicial y `/dashboard` abre el monitor operativo de eventos multistream.
 
+En Modo Molestoso, `Ctrl+I` abre el panel secreto de intervalo de aparición;
+el mismo atajo, `Escape` o la X lo cierran. Permite guardar mínimo y máximo
+entre 0.35 y 300 segundos, o un intervalo fijo con ambos valores iguales.
+Los valores originales son 1.25–3.25 segundos. El mod los persiste y vuelve
+a programar la siguiente espera, conservando cupos y disponibilidad.
+
 ## Desarrollo
 
 ```powershell

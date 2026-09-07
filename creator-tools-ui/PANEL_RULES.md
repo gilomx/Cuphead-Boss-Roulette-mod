@@ -89,6 +89,16 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   porque al desactivarlo puede borrar pendientes y actores activos sin perder
   donaciones. Si ambos modos están activos, la vista informa que los ataques de
   donaciones continuarán junto con los del modo.
+- Sólo en Modo Molestoso, `Ctrl+I` abre o cierra un panel secreto para configurar
+  el intervalo de aparición. No tiene botón ni entrada visible de navegación;
+  `Escape` y la X también lo cierran. El diálogo contiene el foco y lo restaura
+  al cerrar; el listener se retira al abandonar la sección.
+  Mínimo y máximo se guardan juntos, en segundos, entre 0.35 y 300, con mínimo
+  menor o igual al máximo. Valores iguales dan una espera fija; los valores
+  originales son 1.25 y 3.25. Restablecer modifica el formulario y requiere
+  Guardar. El juego persiste los valores, reinicia la siguiente espera y conserva
+  las colas, los cupos y la disponibilidad de actores. Batalla Molestosa conserva
+  sus propios tiempos. El indicador de guardado espera la confirmación del mod.
 - `Nombres aleatorios` es una configuración opcional. Cero nombres no es un
   error ni bloquea el interruptor: el panel debe explicar que los ataques se
   mostrarán sin nombre y permitir guardar la lista vacía.
@@ -98,6 +108,16 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   UI nunca ejecuta el efecto ni lo confirma por sí misma.
 
 ## Contrato con el mod
+
+`GET /api/config/pesky` expone los intervalos actuales `minimumInterval` y
+`maximumInterval`, sus límites `intervalLowerLimit`/`intervalUpperLimit` y sus
+valores originales `defaultMinimumInterval`/`defaultMaximumInterval`.
+`GET /api/config/pesky/set` recibe ambos intervalos juntos. Unity valida que
+sean finitos, estén en rango y ordenados antes de cambiar o persistir el par;
+informa `intervals_saved` o `invalid_interval` por el snapshot y su revisión.
+El JSON v2 de Modo Molestoso conserva nombres y selecciones; los archivos
+anteriores adquieren los intervalos originales. Un par corrupto recupera sólo
+los intervalos, sin borrar el resto de la configuración.
 
 `GET /api/dashboard` entrega un snapshot con `schemaVersion`, `revision`,
 estado del motor, conexiones, contadores y eventos ordenados del más reciente al

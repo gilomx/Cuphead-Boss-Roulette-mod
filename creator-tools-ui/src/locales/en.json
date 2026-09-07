@@ -823,6 +823,18 @@
     "description": "Adds random attacks from the interaction catalog during any fight, whether entered normally or through the roulette. You can also configure names to appear randomly with the attacks.",
     "interactionsNotice": "Interactions are enabled, so donation attacks will continue arriving in addition to this mode's attacks.",
     "battleBlocked": "Pesky Battle has exclusive control. Finish or cancel that battle before enabling the free mode again.",
+    "intervals": {
+      "title": "Spawn interval",
+      "description": "Pesky Mode's secret panel. Set the delay between actors in seconds.",
+      "minimum": "Minimum (seconds)",
+      "maximum": "Maximum (seconds)",
+      "hint": "The delay is picked randomly between these values. Use the same value for a fixed delay. Saving starts a new wait; actor capacity and availability still apply.",
+      "invalid": "Enter values between {minimum} and {maximum} seconds. The minimum cannot exceed the maximum.",
+      "restore": "Restore defaults",
+      "save": "Save interval",
+      "unsaved": "Unsaved changes",
+      "close": "Close interval panel"
+    },
     "control": {
       "title": "Mode control",
       "enable": "Enable mode",
@@ -875,6 +887,8 @@
       "enabled": "Pesky Mode is enabled.",
       "disabled": "Pesky Mode is disabled.",
       "names_saved": "The names were saved.",
+      "intervals_saved": "The spawn interval was saved.",
+      "invalid_interval": "The submitted interval is invalid. Check the minimum and maximum.",
       "items_saved": "The attack selection was saved.",
       "blocked_by_pesky_battle": "Free Pesky Mode cannot be enabled during a Pesky Battle.",
       "disabled_by_pesky_battle": "Free Pesky Mode was disabled because a Pesky Battle was armed.",

@@ -67,7 +67,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal bool CanSpawn
         {
-            get { return Ready && Evaluate(canSpawn); }
+            get { return Ready && DragonFireballsInteractionPatches.InstalledSuccessfully && Evaluate(canSpawn); }
         }
 
         internal void Update()
@@ -120,6 +120,9 @@ namespace Gilomx.CupheadBossRoulette
                 if (!Evaluate(canSpawn))
                     throw new InvalidOperationException(
                         "No active gameplay level can receive the interaction.");
+                if (!DragonFireballsInteractionPatches.InstalledSuccessfully)
+                    throw new InvalidOperationException(
+                        "The native Dragon fireball path could not be adapted.");
 
                 var meteorProperties = ResolveMeteorProperties();
                 stateRoot = new GameObject(
@@ -227,6 +230,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (harmony == null)
                 return;
+
+            DragonFireballsInteractionPatches.Install(harmony, logWarning);
 
             var prefix = AccessTools.Method(
                 typeof(NativeDragonFireballsCache),
@@ -626,10 +631,13 @@ namespace Gilomx.CupheadBossRoulette
                 camera.transform.position.z - bodyRoot.transform.position.z);
             var center = camera.ViewportToWorldPoint(new Vector3(
                 0.5f, BodyViewportCenterY, distance));
-            var topRight = camera.ViewportToWorldPoint(
-                new Vector3(1f, 1f, distance));
+            var rightmost = float.NegativeInfinity;
+            for (var x = 0; x < 2; x++)
+                for (var y = 0; y < 2; y++)
+                    rightmost = Mathf.Max(rightmost,
+                        camera.ViewportToWorldPoint(new Vector3(x, y, distance)).x);
             var bounds = visible.Value;
-            var targetRight = topRight.x +
+            var targetRight = rightmost +
                 bounds.size.x * BodyFractionOutsideRightEdge;
             attackPosition = bodyRoot.transform.position + new Vector3(
                 targetRight - bounds.max.x,

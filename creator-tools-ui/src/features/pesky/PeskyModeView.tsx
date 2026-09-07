@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { interactionItemFor, interactionItems } from "../interactions/interactionCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { PeskyIntervalPanel } from "./PeskyIntervalPanel";
 
 function validNames(value: string) {
   const seen = new Set<string>();
@@ -29,6 +30,7 @@ export function PeskyModeView() {
   const { t } = useLocalization();
   const [namesDraft, setNamesDraft] = useState("");
   const [namesDirty, setNamesDirty] = useState(false);
+  const [intervalPanelOpen, setIntervalPanelOpen] = useState(false);
   // Preserved for a future diagnostics build. Transition protection remains
   // enabled by default, but its public panel control is intentionally hidden.
   // const phaseTransitionProtectionEnabled =
@@ -39,6 +41,18 @@ export function PeskyModeView() {
       setNamesDraft(pesky.names.join("\n"));
     }
   }, [namesDirty, pesky?.names]);
+
+  useEffect(() => {
+    const toggleIntervals = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || event.altKey || event.shiftKey || event.metaKey ||
+          event.isComposing || event.key.toLowerCase() !== "i") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) setIntervalPanelOpen((open) => !open);
+    };
+    window.addEventListener("keydown", toggleIntervals, true);
+    return () => window.removeEventListener("keydown", toggleIntervals, true);
+  }, []);
 
   const normalizedNames = useMemo(() => validNames(namesDraft), [namesDraft]);
   const disabledItems = new Set(pesky?.disabledItems ?? []);
@@ -61,6 +75,9 @@ export function PeskyModeView() {
 
   return (
     <div className="page page--pesky">
+      {intervalPanelOpen ? (
+        <PeskyIntervalPanel onClose={() => setIntervalPanelOpen(false)} />
+      ) : null}
       <header className="page-header pesky-page-header">
         <div>
           <h1>{t("pesky.title")}</h1>

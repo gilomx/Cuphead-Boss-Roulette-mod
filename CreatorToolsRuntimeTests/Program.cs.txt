@@ -20,6 +20,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             RunMiniBossSpawnPolicyTests();
             RunDonorLabelLifetimeTests();
+            RunPeskyModeSettingsTests();
             Run("Evaluate creates backlog without Enqueue",
                 TestEvaluateOnlyCreatesBacklog);
             Run("Explicit drain moves the exact quantity",

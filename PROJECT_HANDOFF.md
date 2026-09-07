@@ -2,6 +2,106 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Modo Molestoso: intervalo configurable con Ctrl+I (2026-09-07)
+
+El usuario pidió un panel secreto para configurar el intervalo de aparición
+de actores. Dentro de Modo Molestoso, `Ctrl+I` abre/cierra un diálogo oculto
+por defecto, sin botón público; `Escape` y la X también lo cierran. El foco
+queda dentro del diálogo y vuelve al elemento anterior al cerrarlo. El atajo
+se desmonta al salir de la sección y no captura Ctrl+Shift+I.
+
+Mínimo y máximo en segundos se guardan como un par entre 0.35 y 300, con
+mínimo <= máximo; valores iguales seleccionan una espera fija. Los defaults
+siguen siendo 1.25/3.25. Restaurar carga esos valores en el formulario y requiere
+guardar. Validaciones y estado de conexión/guardado están traducidos ES/EN.
+Los valores se confirman mediante las revisiones del snapshot de C#.
+
+`CreatorToolsPeskyModeSettings` persiste el par en su JSON v2 conservando
+nombres, enabled y selección de artículos. Configuraciones anteriores toman
+los defaults; un par corrupto recupera sólo los intervalos. El comando
+`/api/config/pesky/set` requiere ambas claves, rechaza no finitos/rangos
+inválidos atómicamente e informa `intervals_saved` o `invalid_interval`.
+El snapshot entrega valores, límites y defaults. Guardar reinicia solamente
+`nextPeskyAt`; no cambia actores, colas, cupos ni separación de despachos.
+El scheduler sigue respetando disponibilidad, pausa y el único mini jefe.
+Los tiempos de Batalla Molestosa y donaciones no cambian.
+
+Build Release limpio; 41 grupos del harness pasan, incluidos cinco de
+validación, persistencia y migración de intervalos. Build UI correcto (13
+artículos, 43 regalos, TypeScript/Vite). Mock verificado por HTTP con cuatro
+pares válidos y 15 inválidos. En navegador se verificaron Ctrl+I, Escape,
+alcance por sección, reapertura, guardado fijo/decimal, validación, restaurar
+y traducciones ES/EN; presentación visual revisada. El mock conserva su
+alcance anterior, sin simular combate ni scheduler de Modo Molestoso.
+
+Instalados DLL y bundle junto con los archivos del manifiesto habitual (9),
+hashes verificados y respaldo en
+`installation-backups/baroness-mini-bosses-20260907-131830/`.
+DLL SHA-256: `8267EF2AC65A8D9FB4B0C337675A155B8E828377454ECCF319E352FE239B1ACD`.
+Cuphead se cerró normalmente y se volvió a abrir. Arranque sin nuevos errores;
+API real lista con defaults/límites esperados y Ctrl+I comprobado en el panel
+instalado. No se cambiaron valores reales del usuario para las pruebas.
+
+## Perritos Pilotos: piso visible y bolas del dragón (2026-09-07)
+
+Después del commit `297eea0`, el usuario encontró el piso de mini jefes por
+debajo del encuadre y las bolas del dragón girando raro y detenidas, todavía
+visibles, en el borde izquierdo. Confirmó que ocurre desde la primera fase.
+
+Piso: Howling Aces usa `Level.Ground = -502`, pero su zoom 0.811 sitúa el borde
+visible inicial en aproximadamente -443.896. `usesViewportFloor` incluye ahora
+`Levels.Airplane` además de los aviones sin agua y fija el piso local en
+`cameraY - orthographicSize`. No cambia el suelo global ni los controles y
+colliders terrestres de Howling. El tamaño corporal sigue en 0.8 y los nombres
+y regalos conservan fuente 28 y su escala de cámara independiente.
+
+La gravedad de Howling sigue orientada hacia abajo en coordenadas mundiales
+durante los giros 0/270/180/90/0. Se mantiene el piso del encuadre vertical
+original al crear un mini jefe durante una vista lateral: usar el mínimo Y
+de las cuatro esquinas daría aproximadamente -789 y volvería a ocultar el piso
+al enderezarse la cámara. Gumball, Corn y Waffle guardan referencias mundiales,
+por lo que el piso se fija al aparecer, igual que en los demás aviones.
+
+Dragón: `DragonLevelMeteor.moveX_cr` termina en X = -840; `Die` detiene todas
+las corutinas y desactiva el collider, pero no destruye el objeto. Su animator
+sólo tiene un loop, sin transición de muerte, y con este zoom sigue visible.
+`CreatorToolsDragonFireballMarker` limita los nuevos transpilers a las copias
+de la interacción: elimina ese límite fijo, adapta la amplitud vertical al
+centro/escala de cámara y adapta el ángulo al intervalo local de cada frame.
+La posición X nativa avanza con FixedUpdate, pero `TweenPositionY` avanza con
+`LocalDeltaTime` y `yield null`. El giro usa la velocidad X durante ese mismo
+intervalo y el desplazamiento Y real, evitando saltos a 90 grados cuando no
+hubo paso de física. La pausa conserva el ángulo anterior.
+La velocidad X y el límite de distancia de `AbstractProjectile` se escalan
+con el cuerpo. La marca se configura antes de activar el clon inactivo y
+antes de `Start`; los actores originales no cambian.
+
+El ejecutor retira proyectiles `dead` y destruye los que llevan 0.6 segundos
+completamente fuera del viewport más un margen de 220 unidades base. La
+comprobación proyecta las cuatro esquinas de sus bounds, válida con cámara
+girada. La colocación inicial del cuerpo usa el extremo derecho de las cuatro
+esquinas del viewport. Se conservan los tres lanzamientos, cadencia, humo,
+sonido, daño y traspaso único del nombre/regalo a la primera bola. Si los
+transpilers no encuentran el IL esperado, el canje queda pendiente con aviso.
+
+Build Release sin advertencias ni errores; pasan los 36 grupos del harness,
+el contrato nativo de mini jefes y `verify_native_dragon_fireballs_contract.ps1`.
+Este último comprueba el IL esperado y ejecuta 36 casos del cálculo de giro
+de la DLL real, variando FPS, escala de cámara y dirección vertical. Una revisión
+independiente confirmó la separación entre piso, controles y colisiones.
+
+Instalados 9 archivos con hashes verificados; respaldo
+`installation-backups/baroness-mini-bosses-20260907-124943/`.
+DLL SHA-256: `EC30A57349D8CE6F9AC4AEFEB1A118714224ABB9FBA06260C104F36C6098DD4A`.
+Arranque real de Cuphead correcto, sin nuevos errores de mod/Harmony; API lista,
+13 artículos y máximo de un mini jefe. Se abrió sólo para esa comprobación y
+se cerró normalmente, restaurando el estado inicial. El aviso preexistente de
+HarmonyX sobre `Application.isBatchMode` permanece sin cambios.
+
+La prueba visual en combate debe comprobar el aterrizaje/splash de Cupcake y la salida completa
+de las bolas en fase 1; también crear un mini jefe durante un giro de 90 grados
+y comprobarlo al volver a 0. No se ha automatizado esa prueba visual.
+
 ## Mini jefes: proporción en Perritos Pilotos (2026-09-07)
 
 El ajuste anterior del piso al borde inferior quedó en el commit `41ce04d`.

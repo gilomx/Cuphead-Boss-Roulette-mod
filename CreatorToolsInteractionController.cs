@@ -8,8 +8,6 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsInteractionController : IDisposable
     {
-        private const float PeskyMinimumIntervalSeconds = 1.25f;
-        private const float PeskyMaximumIntervalSeconds = 3.25f;
         private const float MinimumDispatchSeparationSeconds = 0.35f;
         private const int MaximumCommandsPerUpdate = 64;
 
@@ -707,7 +705,10 @@ namespace Gilomx.CupheadBossRoulette
         private void ProcessPeskyCommand(
             Dictionary<string, string> values)
         {
-            if (values.ContainsKey("names"))
+            if (values.ContainsKey("minimumInterval") ||
+                values.ContainsKey("maximumInterval"))
+                SetPeskyIntervals(values);
+            else if (values.ContainsKey("names"))
                 SetPeskyNames(values);
             else if (values.ContainsKey("item"))
                 SetPeskyItem(values);
@@ -715,6 +716,25 @@ namespace Gilomx.CupheadBossRoulette
                 SetPeskyEnabled(values);
             else
                 SetPeskyFeedback("invalid_setting", true);
+        }
+
+        private void SetPeskyIntervals(Dictionary<string, string> values)
+        {
+            string minimum;
+            string maximum;
+            if (!values.TryGetValue("minimumInterval", out minimum) ||
+                !values.TryGetValue("maximumInterval", out maximum) ||
+                !peskySettings.TrySetIntervals(minimum, maximum))
+            {
+                SetPeskyFeedback("invalid_interval", true);
+                return;
+            }
+
+            // Restart the generation timer without changing queued actors,
+            // active limits, or the independent dispatch separation.
+            nextPeskyAt = -1f;
+            peskySettings.Save();
+            SetPeskyFeedback("intervals_saved", false);
         }
 
         private void SetPeskyEnabled(Dictionary<string, string> values)
@@ -862,7 +882,7 @@ namespace Gilomx.CupheadBossRoulette
         private void ScheduleNextPesky(float now)
         {
             nextPeskyAt = now + UnityEngine.Random.Range(
-                PeskyMinimumIntervalSeconds, PeskyMaximumIntervalSeconds);
+                peskySettings.MinimumInterval, peskySettings.MaximumInterval);
         }
 
         private void ResetPeskySchedule()
@@ -1334,11 +1354,23 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append("\",\"error\":")
                 .Append(peskyFeedbackError ? "true" : "false")
                 .Append(",\"minimumInterval\":")
-                .Append(PeskyMinimumIntervalSeconds.ToString(
-                    "0.##", CultureInfo.InvariantCulture))
+                .Append(peskySettings.MinimumInterval.ToString(
+                    "R", CultureInfo.InvariantCulture))
                 .Append(",\"maximumInterval\":")
-                .Append(PeskyMaximumIntervalSeconds.ToString(
-                    "0.##", CultureInfo.InvariantCulture))
+                .Append(peskySettings.MaximumInterval.ToString(
+                    "R", CultureInfo.InvariantCulture))
+                .Append(",\"intervalLowerLimit\":")
+                .Append(CreatorToolsPeskyModeSettings.IntervalLowerLimit
+                    .ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\"intervalUpperLimit\":")
+                .Append(CreatorToolsPeskyModeSettings.IntervalUpperLimit
+                    .ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\"defaultMinimumInterval\":")
+                .Append(CreatorToolsPeskyModeSettings.DefaultMinimumInterval
+                    .ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\"defaultMaximumInterval\":")
+                .Append(CreatorToolsPeskyModeSettings.DefaultMaximumInterval
+                    .ToString("R", CultureInfo.InvariantCulture))
                 .Append(",\"names\":[");
             for (var i = 0; i < peskySettings.Names.Count; i++)
             {

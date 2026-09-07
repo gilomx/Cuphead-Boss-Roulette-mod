@@ -406,13 +406,26 @@ namespace Gilomx.CupheadBossRoulette
                 position,
                 new DragonLevelMeteor.Properties(
                     meteorProperties.timeY,
-                    meteorProperties.speedX,
+                    meteorProperties.speedX * cameraScale,
                     state));
             if (fireball == null)
                 throw new InvalidOperationException(
                     "Cuphead did not create a native Dragon fireball.");
 
             fireball.gameObject.name = actorName;
+            var marker = fireball.gameObject.AddComponent<
+                CreatorToolsDragonFireballMarker>();
+            marker.CameraScale = cameraScale;
+            marker.HorizontalSpeed = meteorProperties.speedX * cameraScale;
+            marker.Meteor = fireball;
+            var camera = FindGameplayCamera();
+            marker.CenterY = camera == null
+                ? initialCameraPosition.y
+                : camera.transform.position.y;
+            // AbstractProjectile also has a world-distance death guard. Keep
+            // its native screen distance when the arena uses a wider zoom.
+            if (fireball.DestroyDistance > 0f)
+                fireball.DestroyDistance *= cameraScale;
             CreatorToolsInteractionPresentation.MatchGameplayCameraScale(
                 fireball.gameObject, logWarning);
             CreatorToolsInteractionPresentation.BringActorToFront(
@@ -448,6 +461,14 @@ namespace Gilomx.CupheadBossRoulette
                 var fireball = fireballs[i];
                 if (fireball == null)
                 {
+                    RemoveFireballAt(i);
+                    continue;
+                }
+                // Native Die stops all meteor coroutines but does not destroy
+                // its object. Never retain a stopped projectile in the view.
+                if (fireball.dead)
+                {
+                    Destroy(fireball.gameObject);
                     RemoveFireballAt(i);
                     continue;
                 }
@@ -532,20 +553,37 @@ namespace Gilomx.CupheadBossRoulette
             var camera = FindGameplayCamera();
             if (actor == null || camera == null)
                 return false;
-            var distance = Mathf.Abs(
-                camera.transform.position.z - actor.transform.position.z);
-            var bottomLeft = camera.ViewportToWorldPoint(
-                new Vector3(0f, 0f, distance));
-            var topRight = camera.ViewportToWorldPoint(
-                new Vector3(1f, 1f, distance));
             var bounds = BaronessHeadTossInteractionState.VisibleBounds(actor);
             if (!bounds.HasValue)
-                return false;
-            var value = bounds.Value;
-            return value.max.x < bottomLeft.x - margin ||
-                value.min.x > topRight.x + margin ||
-                value.max.y < bottomLeft.y - margin ||
-                value.min.y > topRight.y + margin;
+                return IsOutsideViewport(camera,
+                    new Bounds(actor.transform.position, Vector3.zero), margin);
+            return IsOutsideViewport(camera, bounds.Value, margin);
+        }
+
+        private static bool IsOutsideViewport(Camera camera, Bounds value,
+            float margin)
+        {
+            // A rotated camera's bottom-left is not necessarily the smallest
+            // world X/Y. Project every bounds corner into the actual view.
+            var min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            for (var x = 0; x < 2; x++)
+                for (var y = 0; y < 2; y++)
+                {
+                    var point = camera.WorldToViewportPoint(new Vector3(
+                        x == 0 ? value.min.x : value.max.x,
+                        y == 0 ? value.min.y : value.max.y,
+                        value.center.z));
+                    min.x = Mathf.Min(min.x, point.x);
+                    min.y = Mathf.Min(min.y, point.y);
+                    max.x = Mathf.Max(max.x, point.x);
+                    max.y = Mathf.Max(max.y, point.y);
+                }
+            var height = Mathf.Max(0.01f, camera.orthographicSize * 2f);
+            var marginY = margin / height;
+            var marginX = marginY / Mathf.Max(0.01f, camera.aspect);
+            return max.x < -marginX || min.x > 1f + marginX ||
+                max.y < -marginY || min.y > 1f + marginY;
         }
 
         internal static Camera FindGameplayCamera()

@@ -52,7 +52,8 @@ namespace Gilomx.CupheadBossRoulette
         private bool cleaningUp;
         private bool usesAircraftArena;
         private bool usesWaterFloor;
-        private float aircraftFloorY;
+        private bool usesViewportFloor;
+        private float viewportFloorY;
         private float waterFloorY;
 
         internal static bool CanSpawnInCurrentLevel(string item)
@@ -62,10 +63,12 @@ namespace Gilomx.CupheadBossRoulette
             var camera = BaronessHeadTossInteractionState.FindGameplayCamera();
             if (camera == null)
                 return false;
-            if (UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null)
+            if (UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null ||
+                Level.Current.CurrentLevel == Levels.Airplane)
             {
                 // Cala keeps its visible water contract, including the cave
-                // transition. Other aircraft arenas use a virtual floor.
+                // transition. Aircraft and The Howling Aces use a viewport
+                // floor even when the native logical floor is out of view.
                 if (Level.Current.CurrentLevel != Levels.FlyingMermaid)
                     return true;
                 float groundOnWater;
@@ -194,16 +197,20 @@ namespace Gilomx.CupheadBossRoulette
             cameraScale = Mathf.Max(0.01f, gameplayCamera.orthographicSize / 360f);
             usesAircraftArena = UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null;
             usesWaterFloor = usesAircraftArena && Level.Current.CurrentLevel == Levels.FlyingMermaid;
-            // The Howling Aces has ground controls despite its airborne arena.
-            // Share only the body reduction, not aircraft floors or contacts.
+            // The Howling Aces retains ground controls and contacts, while
+            // sharing the smaller bodies and visible floor of aircraft arenas.
             bodySizeMultiplier = usesAircraftArena ||
                 Level.Current.CurrentLevel == Levels.Airplane
                     ? AircraftSizeMultiplier : 1f;
+            usesViewportFloor = !usesWaterFloor && (usesAircraftArena ||
+                Level.Current.CurrentLevel == Levels.Airplane);
             // Freeze this plane arena's reference at spawn: Gumball, Corn and
             // Waffle store world positions in their native routines. Following
             // camera shake/player tracking only for Cupcake would split floors.
-            // Use the visible bottom edge without an inward margin.
-            aircraftFloorY = initialCameraPosition.y - gameplayCamera.orthographicSize;
+            // Howling Aces keeps world-down gravity when its camera rotates.
+            // Use the upright viewport's bottom: a floor captured from a side
+            // view's wider world-Y span would vanish when the camera turns back.
+            viewportFloorY = initialCameraPosition.y - gameplayCamera.orthographicSize;
             actor.gameObject.AddComponent<CreatorToolsBaronessMiniBossMarker>().Owner = this;
             actor.gameObject.name = "CreatorTools_NativeBaronessMiniBoss_" + item;
 
@@ -398,10 +405,10 @@ namespace Gilomx.CupheadBossRoulette
 
         internal float ArenaGround(float native)
         {
-            if (!usesAircraftArena)
-                return native;
+            if (usesViewportFloor)
+                return viewportFloorY;
             if (!usesWaterFloor)
-                return aircraftFloorY;
+                return native;
             float ground;
             if (TryGetWaterGround(gameplayCamera, out ground))
                 waterFloorY = ground;
@@ -450,7 +457,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!initialized || cleaningUp)
                 return;
             float currentWaterGround;
-            if (Level.Current == null || (usesAircraftArena && gameplayCamera == null) ||
+            if (Level.Current == null || ((usesViewportFloor || usesWaterFloor) && gameplayCamera == null) ||
                 (usesWaterFloor &&
                 !TryGetWaterGround(gameplayCamera, out currentWaterGround)))
             {

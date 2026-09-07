@@ -308,6 +308,63 @@ textarea:focus-visible {
   margin-top: var(--space-5);
 }
 
+.pesky-interval-panel {
+  width: min(32rem, calc(100% - 2 * var(--space-3)));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  color: var(--color-text);
+  background: var(--color-background-raised);
+}
+
+.pesky-interval-panel::backdrop {
+  background: color-mix(in srgb, var(--color-background) 78%, transparent);
+}
+
+.pesky-interval-panel__close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text-soft);
+  background: var(--color-control);
+  cursor: pointer;
+}
+
+.pesky-interval-panel__close:hover {
+  background: var(--color-control-hover);
+}
+
+.pesky-interval-panel__hint {
+  margin: var(--space-1) 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.pesky-interval-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.pesky-interval-panel__actions button[type="button"] {
+  border-color: var(--color-border);
+  background: var(--color-control);
+}
+
+.pesky-interval-panel input[type="number"] {
+  flex-shrink: 0;
+  width: 6rem;
+}
+
 .pesky-names__body {
   display: grid;
   gap: var(--space-2);
