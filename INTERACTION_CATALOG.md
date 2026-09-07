@@ -91,16 +91,20 @@ los puntos iniciales usan esa altura. Cupcake adapta tanto el aterrizaje como
 las salpicaduras a ese suelo, y Jawbreaker persigue al avión mediante su
 `AbstractPlayerController` nativo. La vida conserva los mismos HP.
 
-En avión, el cuerpo de cada mini jefe y sus secundarios usan el **80 % del
+En avión y en Los Perritos Pilotos (`Levels.Airplane`), el cuerpo de cada mini
+jefe y sus secundarios usan el **80 % del
 tamaño anterior** sobre la compensación de cámara. La reducción se aplica al
 root completo para alinear sprites y colliders, y se mantiene tras los giros
-nativos que restablecen la escala. Los actores terrestres conservan su tamaño.
+nativos que restablecen la escala. Los demás niveles terrestres conservan su tamaño.
 Es una proporción estable respecto al avión normal, sin cambiar al activar el
 mini avión del jugador. Como referencia local, la relación lineal entre áreas
 visibles de Cuphead y su avión es aproximadamente 0.76; entre sus hitboxes es
-0.845. El factor 0.8 es un punto inicial de ajuste visual.
+0.845. El factor 0.8 es un punto inicial de ajuste visual. En Perritos Pilotos
+se aplica esa misma proporción por solicitud del usuario: la pelea conserva
+su clasificación terrestre, suelo y colisiones. Los nombres y regalos siguen
+usando fuente 28 y escala de cámara independiente, sin la reducción corporal.
 
-Los márgenes corporales de avión (Gumball 182, CandyCorn 122 y aterrizaje de
+Los márgenes corporales de avión y Perritos Pilotos (Gumball 182, CandyCorn 122 y aterrizaje de
 Cupcake 120 unidades base) usan esa misma reducción. Los demás límites de
 recorrido, velocidades, HP y tiempos conservan su ajuste de cámara;
 `cameraScale` y el factor corporal están separados.

@@ -2,6 +2,31 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Mini jefes: proporción en Perritos Pilotos (2026-09-07)
+
+El ajuste anterior del piso al borde inferior quedó en el commit `41ce04d`.
+El usuario pidió además reducir los mini jefes en Los Perritos Pilotos,
+conservando el tamaño de los nombres. La escena nativa `level58` usa
+`camera.zoom = 0.811` frente a 1 en la Baronesa; el IL de `set_zoom` calcula
+`orthographicSize = OrthographicSize / zoom`. Mugman utiliza el mismo recurso
+de jugador terrestre y se ve más pequeño por el encuadre (aprox. 81.1 %).
+
+`Levels.Airplane` ahora comparte `bodySizeMultiplier = 0.8` con los niveles
+de avión, sobre la compensación de cámara que ya aplica el mod. Afecta sólo
+cuerpos, colliders y secundarios de mini jefes, con los mismos márgenes
+corporales y restauración tras giros. `usesAircraftArena` sigue dependiendo
+del controlador de avión: Perritos Pilotos conserva el suelo y las colisiones
+terrestres. No se cambió la disponibilidad ni las rotaciones/patrones del nivel.
+Los nombres y regalos conservan fuente 28 y su escala independiente de cámara;
+no se modificó `CreatorToolsDonorLabel`.
+
+Build Release sin advertencias ni errores, revisión del alcance y diff limpio.
+Instalados 9 archivos con hashes verificados; respaldo
+`installation-backups/baroness-mini-bosses-20260907-122113/`.
+DLL SHA-256: `BB1398FEB72F2A5C3F2E8874C1625D4918B09C1680F2FFB9B50D3CEE19AE6657`.
+Cuphead estaba cerrado y se dejó cerrado. Pendiente comprobación visual del
+tamaño en combate y durante las rotaciones; no se automatizó esa prueba.
+
 ## Mini jefes: piso virtual en el borde inferior (2026-09-07)
 
 El usuario pidió que el piso virtual de los demás jefes aéreos coincida con

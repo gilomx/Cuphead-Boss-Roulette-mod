@@ -14,9 +14,9 @@ namespace Gilomx.CupheadBossRoulette
     // timeline; interaction actors deliberately never enter that registry.
     internal sealed class BaronessMiniBossInteractionState : MonoBehaviour
     {
-        // Aircraft are smaller than the walking character. Keep a modest,
-        // stable size reduction; shrinking the player temporarily must not
-        // resize enemies in the middle of an attack.
+        // Aircraft and The Howling Aces use the same smaller miniboss bodies.
+        // Keep this reduction stable; temporary player transformations must
+        // not resize enemies in the middle of an attack.
         private const float AircraftSizeMultiplier = 0.8f;
         private static readonly FieldInfo JawbreakerSprite =
             AccessTools.Field(typeof(BaronessLevelJawbreaker), "sprite");
@@ -194,7 +194,11 @@ namespace Gilomx.CupheadBossRoulette
             cameraScale = Mathf.Max(0.01f, gameplayCamera.orthographicSize / 360f);
             usesAircraftArena = UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null;
             usesWaterFloor = usesAircraftArena && Level.Current.CurrentLevel == Levels.FlyingMermaid;
-            bodySizeMultiplier = usesAircraftArena ? AircraftSizeMultiplier : 1f;
+            // The Howling Aces has ground controls despite its airborne arena.
+            // Share only the body reduction, not aircraft floors or contacts.
+            bodySizeMultiplier = usesAircraftArena ||
+                Level.Current.CurrentLevel == Levels.Airplane
+                    ? AircraftSizeMultiplier : 1f;
             // Freeze this plane arena's reference at spawn: Gumball, Corn and
             // Waffle store world positions in their native routines. Following
             // camera shake/player tracking only for Cupcake would split floors.
