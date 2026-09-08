@@ -2,6 +2,32 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Granitoviejo: proporción de los mini jefes (2026-09-08)
+
+Después de guardar el ajuste de Chef Saleroso en el commit `2a7fcc5`, el
+usuario pidió revisar el mismo efecto en Granitoviejo (`Levels.OldMan`).
+Confirmado en la escena nativa `level60`: cámara 1120 con tamaño ortográfico
+443.8963928; Level 1848 con zoom 0.8109999895, jugador Ground, recursos
+compartidos `sharedassets9.assets/4287` y raíces de nivel/cámara a escala 1.
+El IL de OldMan mantiene el zoom durante las tres fases; cambia posición y
+límites de cámara, sin reducir físicamente al jugador.
+
+Se incluyó `Levels.OldMan` en `usesNativeBodyScale`, conservando el tamaño
+mundial nativo de los mini jefes y sus secundarios (aproximadamente 19 %
+menos de tamaño visible que antes). Nombres y regalos mantienen su escala
+independiente. Suelo, disponibilidad, HP y transiciones siguen sus reglas
+existentes; el piso móvil del Diablo continúa limitado a su arena inferior.
+
+Build Release sin advertencias ni errores y contrato nativo de mini jefes
+correcto. Instalado a petición del usuario con respaldo en
+`installation-backups/baroness-mini-bosses-20260908-175315/`; los 9 archivos
+del manifiesto habitual quedaron verificados por hash.
+DLL SHA-256: `66C20854BF096C4F853F05894566F55E7243B4637149A40D8A79A492BF8D8C0A`.
+Cuphead ya estaba cerrado al instalar; se abrió después y quedó listo para
+probar. Arranque sin nuevos errores del mod/Harmony, API lista con 13
+artículos, sin error y máximo de un mini jefe. No se modificaron ajustes
+del usuario. La comprobación visual del tamaño en combate sigue pendiente.
+
 ## Chef Saleroso: proporción de los mini jefes (2026-09-08)
 
 El usuario detectó que el personaje también se ve reducido en Chef Saleroso.

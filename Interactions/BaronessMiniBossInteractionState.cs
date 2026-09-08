@@ -242,11 +242,14 @@ namespace Gilomx.CupheadBossRoulette
             usesAircraftArena = UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null;
             usesWaterFloor = usesAircraftArena && Level.Current.CurrentLevel == Levels.FlyingMermaid;
             usesDevilLowerArena = IsDevilLowerArena();
-            usesNativeBodyScale = usesDevilLowerArena || Level.Current.CurrentLevel == Levels.Saltbaker;
+            usesNativeBodyScale = usesDevilLowerArena ||
+                Level.Current.CurrentLevel == Levels.Saltbaker ||
+                Level.Current.CurrentLevel == Levels.OldMan;
             // The Howling Aces retains ground controls and contacts, while
             // sharing the smaller bodies and visible floor of aircraft arenas.
-            // Devil's lower arena and Saltbaker keep the player's native world
-            // size under a wider camera. Cancel body zoom compensation there.
+            // Devil's lower arena, Saltbaker and Glumstone keep the player's
+            // native world size under a wider camera. Cancel body zoom
+            // compensation there.
             // Labels continue to use their independent live camera scale.
             bodySizeMultiplier = usesNativeBodyScale ? 1f / cameraScale :
                 (usesAircraftArena || Level.Current.CurrentLevel == Levels.Airplane

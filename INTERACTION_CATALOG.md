@@ -119,7 +119,7 @@ jefe y sus secundarios usan el **80 % del
 tamaño anterior** sobre la compensación de cámara. La reducción se aplica al
 root completo para alinear sprites y colliders, y se mantiene tras los giros
 nativos que restablecen la escala. La primera fase del Diablo y los demás
-niveles terrestres, excepto Chef Saleroso, conservan su tamaño anterior.
+niveles terrestres, excepto Chef Saleroso y Granitoviejo, conservan su tamaño anterior.
 Es una proporción estable respecto al avión normal, sin cambiar al activar el
 mini avión del jugador. Como referencia local, la relación lineal entre áreas
 visibles de Cuphead y su avión es aproximadamente 0.76; entre sus hitboxes es
@@ -129,15 +129,16 @@ sus controles y colisiones terrestres, con el suelo virtual de la interacción.
 Los nombres y regalos siguen
 usando fuente 28 y escala de cámara independiente, sin la reducción corporal.
 
-En la arena inferior del Diablo y desde el inicio de Chef Saleroso se elimina
-la compensación del zoom del cuerpo y sus secundarios: conservan su escala nativa en el mundo, igual
+En la arena inferior del Diablo y desde el inicio de Chef Saleroso y
+Granitoviejo se elimina la compensación del zoom del cuerpo y sus secundarios:
+conservan su escala nativa en el mundo, igual
 que el jugador terrestre. Con el zoom final 0.811 se ven aproximadamente
 un 19 % más pequeños que antes del ajuste. El factor corporal es
 `1 / cameraScale`; los nombres y regalos mantienen su escala de cámara
 independiente. Los secundarios creados mientras termina el zoom también
 conservan su escala nativa, sin heredar un factor de cámara antiguo.
-Chef Saleroso mantiene su zoom 0.811 durante todas las fases; este ajuste
-corporal se conserva durante la pelea. Su disponibilidad, suelo y protección
+Chef Saleroso y Granitoviejo mantienen su zoom 0.811 durante todas las fases;
+este ajuste corporal se conserva durante ambas peleas. Su disponibilidad, suelo y protección
 de transiciones mantienen sus reglas anteriores: la excepción de piso móvil
 del Diablo se controla por separado de `usesNativeBodyScale`.
 
@@ -167,7 +168,7 @@ capas de renderizado durante la transición a la cueva.
 Los límites globales del nivel y los actores originales permanecen intactos.
 `usesAircraftArena` identifica al jugador de avión para adaptar colisiones;
 el tamaño corporal también incluye Perritos Pilotos y la arena inferior
-del Diablo y Chef Saleroso. `usesViewportFloor` selecciona el piso virtual
+del Diablo, Chef Saleroso y Granitoviejo. `usesViewportFloor` selecciona el piso virtual
 de los aviones sin agua, Perritos Pilotos y la arena inferior del Diablo;
 `usesWaterFloor` gobierna exclusivamente el agua y la retirada en Cala.
 No se debe usar la presencia de agua para decidir daño o tamaño de otros aviones.
