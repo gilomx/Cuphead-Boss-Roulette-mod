@@ -2,6 +2,39 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Chef Saleroso: proporción de los mini jefes (2026-09-08)
+
+El usuario detectó que el personaje también se ve reducido en Chef Saleroso.
+La cámara usa zoom 0.811 desde el inicio, sin cambios de zoom en las fases
+posteriores. El jugador conserva su escala mundial. Los mini jefes y sus
+secundarios ahora usan esa misma proporción nativa durante toda la pelea:
+aproximadamente 19 % menos de tamaño visible que antes, conservando fuente
+28 y escala de cámara independiente para nombres y regalos.
+
+`usesNativeBodyScale` reúne Chef Saleroso y la arena inferior del Diablo para
+seleccionar `bodySizeMultiplier = 1 / cameraScale` y marcar los cuerpos con
+factor 1 antes de preparar la presentación. `usesDevilLowerArena` conserva
+por separado el seguimiento de piso y su limpieza al cambiar de arena.
+Chef Saleroso mantiene la disponibilidad, suelo y transiciones existentes;
+el ajuste de tamaño no agrega una excepción de piso ni activa nuevos canjes.
+
+Comprobado en los assets locales de `level66`: cámara con tamaño ortográfico
+443.8963928, zoom 0.8109999895, jugador Ground y LevelResources compartido
+4287. El IL de las clases Saltbaker no cambia el zoom durante la pelea; las
+transiciones reubican al jugador y cambian límites, sin reducir su escala.
+Build Release y contrato nativo de mini jefes correctos, sin advertencias ni
+errores. La revisión independiente confirmó escala de cuerpos/secundarios,
+nombres y separación del piso especial del Diablo.
+
+Instalado a petición del usuario con respaldo en
+`installation-backups/baroness-mini-bosses-20260908-173411/`; los 9 archivos
+del manifiesto habitual quedaron verificados por hash.
+DLL SHA-256: `C187C632362559A457F29958291C792E87C6420AB20B3B0303D7D9206A34D22C`.
+Cuphead ya estaba cerrado al instalar; se abrió después y quedó listo para
+probar. Arranque sin nuevos errores del mod/Harmony y API lista con 13
+artículos, sin error y máximo de un mini jefe. No se modificaron ajustes
+del usuario. La comprobación visual del tamaño en combate sigue pendiente.
+
 ## Diablo: proporción y piso desde la segunda fase (2026-09-08)
 
 El usuario encontró los mini jefes desproporcionados desde la segunda fase

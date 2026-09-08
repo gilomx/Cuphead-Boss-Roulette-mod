@@ -62,6 +62,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool usesWaterFloor;
         private bool usesViewportFloor;
         private bool usesDevilLowerArena;
+        private bool usesNativeBodyScale;
         private float viewportFloorY;
         private float waterFloorY;
 
@@ -241,12 +242,13 @@ namespace Gilomx.CupheadBossRoulette
             usesAircraftArena = UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null;
             usesWaterFloor = usesAircraftArena && Level.Current.CurrentLevel == Levels.FlyingMermaid;
             usesDevilLowerArena = IsDevilLowerArena();
+            usesNativeBodyScale = usesDevilLowerArena || Level.Current.CurrentLevel == Levels.Saltbaker;
             // The Howling Aces retains ground controls and contacts, while
             // sharing the smaller bodies and visible floor of aircraft arenas.
-            // Devil's player keeps its native world size as the camera zooms
-            // out. Cancel body zoom compensation to retain that proportion.
+            // Devil's lower arena and Saltbaker keep the player's native world
+            // size under a wider camera. Cancel body zoom compensation there.
             // Labels continue to use their independent live camera scale.
-            bodySizeMultiplier = usesDevilLowerArena ? 1f / cameraScale :
+            bodySizeMultiplier = usesNativeBodyScale ? 1f / cameraScale :
                 (usesAircraftArena || Level.Current.CurrentLevel == Levels.Airplane
                     ? AircraftSizeMultiplier : 1f);
             usesViewportFloor = !usesWaterFloor && (usesAircraftArena ||
@@ -395,7 +397,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ApplyActorSize(GameObject root)
         {
-            if (usesDevilLowerArena)
+            if (usesNativeBodyScale)
             {
                 // Preserve prefab scale, including secondary objects spawned
                 // while the native zoom is still settling. Mark it so later
