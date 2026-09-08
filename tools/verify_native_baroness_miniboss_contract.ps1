@@ -23,6 +23,24 @@ function NativeMethod($type, [string]$name) {
     Require ($null -ne $method) "Missing native method: $($type.Name).$name"
     return $method
 }
+function NativeMethodsDeep($type) {
+    foreach ($method in $type.Methods) {
+        if ($method.HasBody) { $method }
+    }
+    foreach ($nested in $type.NestedTypes) { NativeMethodsDeep $nested }
+}
+function NativeCalls($method, [string]$typeName, [string]$methodName) {
+    $method.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.DeclaringType.FullName -eq $typeName -and
+        $_.Operand.Name -eq $methodName
+    }
+}
+function RequireNativeField($type, [string]$name, [string]$fieldType) {
+    Require (@($type.Fields | Where-Object {
+        $_.Name -eq $name -and $_.FieldType.FullName -eq $fieldType
+    }).Count -eq 1) "Native field changed: $($type.FullName).$name ($fieldType)"
+}
 function IntegerConstant($instruction) {
     $code = $instruction.OpCode.Code.ToString()
     if ($code -eq 'Ldc_I4' -or $code -eq 'Ldc_I4_S') { return [int]$instruction.Operand }
@@ -206,5 +224,135 @@ Require (@((NativeMethod $mermaidLevel 'OnStateChanged').Body.Instructions | Whe
 $splashManager = NativeType 'FlyingMermaidLevelSplashManager'
 Require ((NativeMethod $splashManager 'OnTriggerEnter2D').Parameters[0].ParameterType.FullName -eq 'UnityEngine.Collider2D') 'Cala native water detection is no longer a 2D trigger'
 
-Write-Output 'Native Baroness miniboss HP, prefab, damage, coordinates, water-floor, aircraft contacts/targeting and secondary-ownership contracts passed.'
+# Devil's lower arena uses ground controls but a wider camera. Its platform
+# activation and the player's input state are readiness signals; the phase
+# property alone changes before the descent/zoom has finished.
+$devil = NativeType 'DevilLevel'
+$devilMethods = @(NativeMethodsDeep $devil)
+$devilZoom = NativeMethod $devil 'ZoomOut'
+$devilZoomInstructions = $devilZoom.Body.Instructions
+Require ($devil.BaseType.FullName -eq 'Level') 'Devil no longer uses the shared ground level'
+Require (@((NativeType 'Levels').Fields | Where-Object {
+    $_.Name -eq 'Devil' -and $_.Constant -eq 1466688317
+}).Count -eq 1) 'Devil level identifier changed'
+RequireNativeField $devil 'phase3Platforms' 'UnityEngine.GameObject'
+$platformReads = @($devilMethods | ForEach-Object {
+    $method = $_
+    foreach ($instruction in $method.Body.Instructions) {
+        if ($instruction.Operand -is [Mono.Cecil.FieldReference] -and
+            $instruction.Operand.DeclaringType.FullName -eq 'DevilLevel' -and
+            $instruction.Operand.Name -eq 'phase3Platforms') {
+            [pscustomobject]@{ Method = $method; Instruction = $instruction }
+        }
+    }
+})
+Require ($platformReads.Count -eq 1 -and $platformReads[0].Method -eq $devilZoom) 'Devil lower-arena platform signal is now reused outside ZoomOut'
+$platformRead = $platformReads[0].Instruction
+Require ((IntegerConstant $platformRead.Next) -eq 1 -and
+    $platformRead.Next.Next.Operand -is [Mono.Cecil.MethodReference] -and
+    $platformRead.Next.Next.Operand.FullName -eq 'System.Void UnityEngine.GameObject::SetActive(System.Boolean)') 'Devil ZoomOut no longer activates the lower-arena platform root'
+
+$zoomCalls = @(NativeCalls $devilZoom 'CupheadLevelCamera' 'change_zoom_cr')
+Require ($zoomCalls.Count -eq 1) 'Devil lower-arena zoom call changed'
+Require ($zoomCalls[0].Previous.Previous.OpCode.Code -eq 'Ldc_R4' -and
+    [float]$zoomCalls[0].Previous.Previous.Operand -eq [float]0.811 -and
+    $zoomCalls[0].Previous.OpCode.Code -eq 'Ldc_R4' -and
+    [float]$zoomCalls[0].Previous.Operand -eq [float]10) 'Devil lower-arena zoom target/duration changed'
+foreach ($method in $devilMethods) {
+    if ($method -eq $devilZoom) { continue }
+    Require (@(NativeCalls $method 'CupheadLevelCamera' 'change_zoom_cr').Count -eq 0 -and
+        @(NativeCalls $method 'Level' 'SetBounds').Count -eq 0) 'A later Devil phase now changes zoom or arena bounds'
+}
+$devilProperties = (NativeType 'LevelProperties').NestedTypes | Where-Object Name -eq 'Devil'
+$devilStates = $devilProperties.NestedTypes | Where-Object Name -eq 'States'
+foreach ($phase in @(@('GiantHead', 3), @('Hands', 4), @('Tears', 5))) {
+    Require (@($devilStates.Fields | Where-Object {
+        $_.Name -eq $phase[0] -and $_.Constant -eq $phase[1]
+    }).Count -eq 1) "Devil lower-arena phase changed: $($phase[0])"
+}
+$devilStateChange = NativeMethod $devil 'OnStateChanged'
+Require (@(NativeCalls $devilStateChange 'DevilLevel' 'phase_1_end_trans').Count -eq 1 -and
+    @(NativeCalls $devilStateChange 'DevilLevelGiantHead' 'StartHands').Count -eq 1 -and
+    @(NativeCalls $devilStateChange 'DevilLevelGiantHead' 'StartTears').Count -eq 1) 'Devil lower-arena phase workflow changed'
+
+# ZoomOut normalizes each player's facing with SetScale(1, null, null).
+# There is no native Y resize to combine with the camera compensation.
+$playerScaleCalls = @(NativeCalls $devilZoom 'TransformExtensions' 'SetScale')
+Require ($playerScaleCalls.Count -eq 2 -and
+    @(NativeCalls $devilZoom 'UnityEngine.Transform' 'set_localScale').Count -eq 0) 'Devil player scale reset changed'
+foreach ($scaleCall in $playerScaleCalls) {
+    $index = $devilZoomInstructions.IndexOf($scaleCall)
+    Require ($index -ge 8) 'Devil player scale arguments are missing'
+    $arguments = @($devilZoomInstructions[($index - 8)..($index - 1)])
+    Require ($arguments[0].OpCode.Code -eq 'Ldc_R4' -and
+        [float]$arguments[0].Operand -eq [float]1 -and
+        $arguments[1].OpCode.Code -eq 'Newobj' -and
+        @($arguments | Where-Object {
+            $_.OpCode.Code -eq 'Initobj' -and
+            $_.Operand.FullName -eq 'System.Nullable`1<System.Single>'
+        }).Count -eq 2) 'Devil now resizes the player instead of resetting X facing only'
+}
+$groundPlayer = NativeType 'LevelPlayerController'
+Require ($groundPlayer.BaseType.FullName -eq 'AbstractPlayerController' -and
+    (NativeMethod $groundPlayer 'get_weaponManager').ReturnType.FullName -eq 'LevelPlayerWeaponManager') 'Devil ground-player input access changed'
+$weaponManager = NativeType 'LevelPlayerWeaponManager'
+RequireNativeField $weaponManager 'allowInput' 'System.Boolean'
+foreach ($inputContract in @(@('EnableInput', 1), @('DisableInput', 0))) {
+    $inputWrites = @((NativeMethod $weaponManager $inputContract[0]).Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'allowInput'
+    })
+    Require ($inputWrites.Count -eq 1 -and
+        (IntegerConstant $inputWrites[0].Previous) -eq $inputContract[1]) 'Weapon-manager readiness flag changed'
+}
+$devilInputIterator = $devil.NestedTypes | Where-Object { $_.Name.StartsWith('<disable_input_cr>') }
+$devilInput = NativeMethod $devilInputIterator 'MoveNext'
+Require (@(NativeCalls $devilInput 'LevelPlayerWeaponManager' 'DisableInput').Count -gt 0 -and
+    @(NativeCalls $devilInput 'LevelPlayerWeaponManager' 'EnableInput').Count -gt 0) 'Devil intro no longer restores native weapon input readiness'
+Write-Output 'Devil: lower-arena activation, shared phases/zoom and ground-player input/scale contracts passed.'
+
+# Moving the floor must rebase every persistent world-Y anchor, while retaining
+# each actor's native state, health, timers and local piece animation.
+RequireNativeField (NativeType 'BaronessLevelCandyCorn') 'bottomPoint' 'System.Single'
+$waffle = NativeType 'BaronessLevelWaffle'
+RequireNativeField $waffle 'startPos' 'UnityEngine.Vector3'
+RequireNativeField $waffle 'originalPivotPos' 'UnityEngine.Vector3'
+RequireNativeField $waffle 'pivotPoint' 'UnityEngine.Transform'
+$waffleEnterIterator = $waffle.NestedTypes | Where-Object { $_.Name.StartsWith('<enter_cr>') }
+foreach ($anchor in @('startPos', 'originalPivotPos', 'pivotPoint')) {
+    $anchorWriter = if ($anchor -eq 'pivotPoint') {
+        NativeMethod $waffle 'Init'
+    } else {
+        NativeMethod $waffleEnterIterator 'MoveNext'
+    }
+    Require (@($anchorWriter.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq $anchor
+    }).Count -gt 0) "Waffle's persistent world anchor changed: $anchor"
+}
+foreach ($actorType in @($cupcake, (NativeType 'BaronessLevelGumball'), $waffle)) {
+    $actorMethods = @(NativeMethodsDeep $actorType)
+    Require (@($actorMethods | ForEach-Object { $_.Body.Instructions } | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.DeclaringType.FullName -eq 'AbstractMonoBehaviour' -and
+        $_.Operand.Name -match '^(TweenPosition|TweenPositionY|tweenPosition_cr|tweenPositionY_cr)$'
+    }).Count -eq 0) "$($actorType.Name) now has an external tween that caches world Y"
+    foreach ($iterator in @($actorType.NestedTypes | Where-Object { $_.Name.StartsWith('<') })) {
+        Require (@($iterator.Fields | Where-Object {
+            $_.FieldType.FullName -in @('UnityEngine.Vector2', 'UnityEngine.Vector3')
+        }).Count -eq 0) "$($iterator.FullName) now caches a world position across frames"
+    }
+}
+$gumballMoveIterator = (NativeType 'BaronessLevelGumball').NestedTypes | Where-Object { $_.Name.StartsWith('<move_cr>') }
+$gumballMove = NativeMethod $gumballMoveIterator 'MoveNext'
+Require (@($gumballMove.Body.Instructions | Where-Object {
+    $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'y' -and
+    $_.Operand.DeclaringType.FullName -in @('UnityEngine.Vector2', 'UnityEngine.Vector3')
+}).Count -eq 0) 'Gumball movement now reads/caches a vertical path endpoint'
+$piecesIterator = $waffle.NestedTypes | Where-Object { $_.Name.StartsWith('<waffle_pieces>') }
+$piecesMove = NativeMethod $piecesIterator 'MoveNext'
+Require (@(NativeCalls $piecesMove 'UnityEngine.Transform' 'set_localPosition').Count -gt 0 -and
+    @(NativeCalls $piecesMove 'UnityEngine.Transform' 'set_position').Count -eq 0 -and
+    @(NativeCalls $piecesMove 'UnityEngine.Transform' 'set_parent').Count -eq 0) 'Waffle attack pieces no longer animate in the moving root local space'
+Write-Output 'Devil floor following: Corn/Waffle anchors, live Cupcake ground reads, uncached Gumball Y and local Waffle pieces passed.'
+
+Write-Output 'Native Baroness miniboss HP, prefab, damage, coordinates, water/Devil floors, aircraft contacts/targeting and secondary-ownership contracts passed.'
 $module.Dispose()

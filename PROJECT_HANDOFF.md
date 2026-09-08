@@ -2,6 +2,49 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Diablo: proporción y piso desde la segunda fase (2026-09-08)
+
+El usuario encontró los mini jefes desproporcionados desde la segunda fase
+y pidió usar el límite inferior de pantalla como piso para poder esquivarlos.
+El jugador conserva su escala mundial; `ZoomOut` aleja la cámara a 0.811,
+mientras el mod compensaba ese zoom agrandando el cuerpo de los mini jefes.
+Ahora sus cuerpos y secundarios conservan la escala mundial nativa desde
+GiantHead hasta Hands y Tears (aproximadamente 19 % menos de tamaño visible
+que antes). Los nombres y regalos mantienen fuente 28 y escala de cámara
+independiente. La primera fase conserva su comportamiento anterior.
+
+Se identifica la arena inferior por `DevilLevel.phase3Platforms.activeSelf`:
+la raíz se activa en `ZoomOut` y sigue activa al quitar plataformas en fases
+posteriores. El enum ya avanzó durante la primera arena y no se usa como
+señal anticipada. Las apariciones esperan al control de armas de un jugador
+terrestre vivo. Al cambiar de arena se retiran los mini jefes anteriores y
+sus secundarios aun si se desactivó la protección global de transiciones.
+
+El piso local sigue `cameraY - orthographicSize`. El seguimiento del jugador
+mueve verticalmente la cámara hasta unas 136 unidades, por lo que se rebasa
+el cuerpo junto con `CandyCorn.bottomPoint` y las referencias de Waffle
+(`startPos`, `originalPivotPos`, pivote). Gumball no guarda referencias Y;
+Cupcake consulta el piso y sus salpicaduras se trasladan juntas. Jawbreaker
+sigue al jugador sin trasladarse con el piso; los proyectiles independientes
+conservan sus trayectorias. La sincronización es idempotente en LateUpdate
+y en el callback anterior a medir la etiqueta. No cambia HP, tiempos,
+corutinas, colliders ni el suelo/plataformas del jugador.
+
+Build Release sin advertencias ni errores; pasan los 41 grupos del harness.
+El contrato IL ampliado verifica activación/fases/zoom, escala e input del
+jugador y referencias mundiales de los mini jefes. Pasó contra el juego
+instalado; la revisión independiente no encontró errores de escala,
+etiquetas, transiciones o propiedad de los secundarios.
+
+Instalados los 9 archivos del manifiesto habitual con hashes verificados y
+respaldo en `installation-backups/baroness-mini-bosses-20260908-144620/`.
+DLL SHA-256: `7A1E7A034CD8B7B4D29601362C94687EEEA7A64A8F9AFAAA2F41EEAEFE70DEFB`.
+Cuphead arrancó sin nuevos errores del mod/Harmony; API lista con 13 artículos
+y máximo de un mini jefe. Se cerró normalmente tras la comprobación,
+restaurando el estado inicial y sin cambiar la configuración del usuario.
+La proporción y el recorrido visual de los cinco mini jefes en las fases
+2/3/4 requieren comprobación manual en combate.
+
 ## Modo Molestoso: intervalo configurable con Ctrl+I (2026-09-07)
 
 El usuario pidió un panel secreto para configurar el intervalo de aparición

@@ -30,6 +30,14 @@ namespace Gilomx.CupheadBossRoulette
             AccessTools.Field(typeof(FlyingMermaidLevelMerdusaHead), "wave2");
         private static readonly FieldInfo MermaidProperties =
             AccessTools.Field(typeof(FlyingMermaidLevel), "properties");
+        private static readonly FieldInfo DevilLowerPlatforms =
+            AccessTools.Field(typeof(DevilLevel), "phase3Platforms");
+        private static readonly FieldInfo CornBottomPoint =
+            AccessTools.Field(typeof(BaronessLevelCandyCorn), "bottomPoint");
+        private static readonly FieldInfo WaffleStartPosition =
+            AccessTools.Field(typeof(BaronessLevelWaffle), "startPos");
+        private static readonly FieldInfo WaffleOriginalPivotPosition =
+            AccessTools.Field(typeof(BaronessLevelWaffle), "originalPivotPos");
         private static Level waterLevel;
         private static LevelProperties.FlyingMermaid waterProperties;
         private static Collider2D waterCollider;
@@ -53,6 +61,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool usesAircraftArena;
         private bool usesWaterFloor;
         private bool usesViewportFloor;
+        private bool usesDevilLowerArena;
         private float viewportFloorY;
         private float waterFloorY;
 
@@ -63,6 +72,19 @@ namespace Gilomx.CupheadBossRoulette
             var camera = BaronessHeadTossInteractionState.FindGameplayCamera();
             if (camera == null)
                 return false;
+            if (IsDevilLowerArena())
+            {
+                // ZoomOut activates the lower arena before the descent ends.
+                // Wait for native controls even if transition protection is off.
+                foreach (var player in PlayerManager.GetAllPlayers())
+                {
+                    var groundPlayer = player as LevelPlayerController;
+                    if (groundPlayer != null && !groundPlayer.IsDead &&
+                        groundPlayer.weaponManager != null && groundPlayer.weaponManager.allowInput)
+                        return true;
+                }
+                return false;
+            }
             if (UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null ||
                 Level.Current.CurrentLevel == Levels.Airplane)
             {
@@ -81,6 +103,27 @@ namespace Gilomx.CupheadBossRoulette
             // outside the screen, which would strand a cupcake permanently.
             return ground >= camera.transform.position.y - halfHeight * 1.15f &&
                 ground < camera.transform.position.y + halfHeight * 0.25f;
+        }
+
+        private static bool IsDevilLowerArena()
+        {
+            var level = Level.Current as DevilLevel;
+            if (level == null || DevilLowerPlatforms == null)
+                return false;
+            // The enum advances while phase one's arena is still visible.
+            // This root activates at ZoomOut and stays active through Hands
+            // and Tears, even as its individual platforms disappear.
+            var platforms = DevilLowerPlatforms.GetValue(level) as GameObject;
+            return platforms != null && platforms.activeSelf;
+        }
+
+        internal static bool HasNativeArenaFields
+        {
+            get
+            {
+                return DevilLowerPlatforms != null && CornBottomPoint != null &&
+                    WaffleStartPosition != null && WaffleOriginalPivotPosition != null;
+            }
         }
 
         private static bool TryGetWaterGround(Camera camera, out float ground)
@@ -197,19 +240,25 @@ namespace Gilomx.CupheadBossRoulette
             cameraScale = Mathf.Max(0.01f, gameplayCamera.orthographicSize / 360f);
             usesAircraftArena = UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null;
             usesWaterFloor = usesAircraftArena && Level.Current.CurrentLevel == Levels.FlyingMermaid;
+            usesDevilLowerArena = IsDevilLowerArena();
             // The Howling Aces retains ground controls and contacts, while
             // sharing the smaller bodies and visible floor of aircraft arenas.
-            bodySizeMultiplier = usesAircraftArena ||
-                Level.Current.CurrentLevel == Levels.Airplane
-                    ? AircraftSizeMultiplier : 1f;
+            // Devil's player keeps its native world size as the camera zooms
+            // out. Cancel body zoom compensation to retain that proportion.
+            // Labels continue to use their independent live camera scale.
+            bodySizeMultiplier = usesDevilLowerArena ? 1f / cameraScale :
+                (usesAircraftArena || Level.Current.CurrentLevel == Levels.Airplane
+                    ? AircraftSizeMultiplier : 1f);
             usesViewportFloor = !usesWaterFloor && (usesAircraftArena ||
-                Level.Current.CurrentLevel == Levels.Airplane);
+                Level.Current.CurrentLevel == Levels.Airplane || usesDevilLowerArena);
             // Freeze this plane arena's reference at spawn: Gumball, Corn and
             // Waffle store world positions in their native routines. Following
             // camera shake/player tracking only for Cupcake would split floors.
             // Howling Aces keeps world-down gravity when its camera rotates.
             // Use the upright viewport's bottom: a floor captured from a side
             // view's wider world-Y span would vanish when the camera turns back.
+            // Devil alone follows its moving lower viewport; SyncDevilFloor
+            // rebases the native cached points together with every floor actor.
             viewportFloorY = initialCameraPosition.y - gameplayCamera.orthographicSize;
             actor.gameObject.AddComponent<CreatorToolsBaronessMiniBossMarker>().Owner = this;
             actor.gameObject.name = "CreatorTools_NativeBaronessMiniBoss_" + item;
@@ -346,6 +395,14 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ApplyActorSize(GameObject root)
         {
+            if (usesDevilLowerArena)
+            {
+                // Preserve prefab scale, including secondary objects spawned
+                // while the native zoom is still settling. Mark it so later
+                // presentation setup does not apply camera compensation again.
+                CreatorToolsInteractionPresentation.MarkInheritedGameplayCameraScale(root, 1f);
+                return;
+            }
             CreatorToolsInteractionPresentation.MatchGameplayCameraScale(root, warning);
             if (bodySizeMultiplier == 1f)
                 return;
@@ -458,11 +515,12 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             float currentWaterGround;
             if (Level.Current == null || ((usesViewportFloor || usesWaterFloor) && gameplayCamera == null) ||
+                usesDevilLowerArena != IsDevilLowerArena() ||
                 (usesWaterFloor &&
                 !TryGetWaterGround(gameplayCamera, out currentWaterGround)))
             {
-                // Stop native coroutines/collisions immediately when Cala's
-                // water disappears. Destroy also clears owned projectiles.
+                // Clear the old arena's actors even if global transition
+                // protection is disabled. Destroy clears owned projectiles.
                 gameObject.SetActive(false);
                 Destroy(gameObject);
                 return;
@@ -484,6 +542,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void RestoreActorSize()
         {
+            // Also called before the label measures its anchor, making floor
+            // following independent of the two components' LateUpdate order.
+            SyncDevilFloor();
             if (actor == null || cleaningUp)
                 return;
             // Native turn animation events reset root scale to +/-1.
@@ -492,6 +553,53 @@ namespace Gilomx.CupheadBossRoulette
             var bodyScale = cameraScale * bodySizeMultiplier;
             actor.transform.localScale = new Vector3(
                 Mathf.Sign(scale.x) * bodyScale, bodyScale, scale.z);
+        }
+
+        private void SyncDevilFloor()
+        {
+            if (!initialized || cleaningUp || !usesDevilLowerArena || gameplayCamera == null)
+                return;
+            var floor = gameplayCamera.transform.position.y - gameplayCamera.orthographicSize;
+            var deltaY = floor - viewportFloorY;
+            if (deltaY == 0f)
+                return;
+            viewportFloorY = floor;
+            if (actor != null && !(actor is BaronessLevelJawbreaker))
+            {
+                // Shift the body, not the ownership root: already launched
+                // projectiles keep their independent world trajectories.
+                ShiftTransformY(actor.transform, deltaY);
+                if (actor is BaronessLevelCandyCorn)
+                    CornBottomPoint.SetValue(actor, (float)CornBottomPoint.GetValue(actor) + deltaY);
+                else if (actor is BaronessLevelWaffle)
+                {
+                    ShiftTransformY(pivot, deltaY);
+                    ShiftWafflePointY(WaffleStartPosition, deltaY);
+                    ShiftWafflePointY(WaffleOriginalPivotPosition, deltaY);
+                }
+            }
+            // Cupcake's floor splashes are independently owned effects. They
+            // must stay on the same floor after landing, including after death.
+            if (actor is BaronessLevelCupcake)
+                for (var i = 0; i < secondaryObjects.Count; i++)
+                    if (secondaryObjects[i] != null && secondaryObjects[i].GetComponent<Effect>() != null)
+                        ShiftTransformY(secondaryObjects[i].transform, deltaY);
+        }
+
+        private static void ShiftTransformY(Transform target, float deltaY)
+        {
+            if (target == null)
+                return;
+            var position = target.position;
+            position.y += deltaY;
+            target.position = position;
+        }
+
+        private void ShiftWafflePointY(FieldInfo field, float deltaY)
+        {
+            var position = (Vector3)field.GetValue(actor);
+            position.y += deltaY;
+            field.SetValue(actor, position);
         }
 
         private void OnDestroy()
@@ -531,7 +639,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (harmony == null)
                 return;
-            InstalledSuccessfully = true;
+            InstalledSuccessfully = BaronessMiniBossInteractionState.HasNativeArenaFields;
+            if (!InstalledSuccessfully && warning != null)
+                warning("Could not prepare Baroness miniboss arena fields for Devil's lower arena.");
             for (var i = 0; i < ActorTypes.Length; i++)
             {
                 var methods = ActorTypes[i].GetMethods(BindingFlags.Instance | BindingFlags.Public |

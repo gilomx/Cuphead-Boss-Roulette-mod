@@ -59,8 +59,8 @@ El mod no bloquea ni altera el avance de esa pelea original.
 los cinco IDs quedan bloqueadas, incluso con valores antiguos mayores que 1,
 así como la liberación del único cupo y las entradas vacías.
 
-Se despachan en arenas terrestres con suelo visible, en niveles de avión y
-en Los Perritos Pilotos (`Levels.Airplane`).
+Se despachan en arenas terrestres con suelo visible, en niveles de avión,
+en Los Perritos Pilotos (`Levels.Airplane`) y en la arena inferior del Diablo.
 La detección usa el jugador `PlanePlayerController`, incluyendo Hilda,
 Djimmi, Titi Trinos, Robot, Esther y las dos peleas aéreas del casino. Cala
 María conserva la condición de agua visible. Perritos Pilotos usa el piso
@@ -88,6 +88,23 @@ Tomar la extensión vertical de la vista lateral dejaría el piso por debajo
 de la pantalla al volver a enderezarse. Las salidas temporales del patrón y el recorte
 de extremos aún requieren revisión visual en combate.
 
+Desde la segunda fase del Diablo (GiantHead, Hands y Tears), el piso es
+también el borde inferior visible, pero sigue la cámara en `LateUpdate`.
+El seguimiento vertical del jugador puede desplazar ese borde unas 136
+unidades mundiales, por lo que fijarlo al aparecer dejaría de coincidir con
+la pantalla. Se trasladan juntos el cuerpo y sus referencias: `bottomPoint`
+de CandyCorn; pivote, `startPos` y `originalPivotPos` de Waffle; cuerpo de
+Gumball y Cupcake, incluidas las salpicaduras de suelo de este último.
+Jawbreaker conserva su persecución del jugador y los proyectiles ya lanzados
+mantienen sus trayectorias. No se reinician corutinas, ataques ni vida.
+
+La arena inferior se detecta con `DevilLevel.phase3Platforms.activeSelf`,
+activado por `ZoomOut` y conservado hasta Tears. El enum cambia antes de
+abandonar la primera arena y no sirve por sí solo como señal. Se espera a
+que el control de armas de un jugador terrestre vivo esté habilitado para
+crear nuevas copias. Al cambiar entre ambas arenas se retiran las copias
+anteriores y sus secundarios, incluso con protección de transición apagada.
+
 En Cala María, `FlyingMermaidLevelSplashManager` aporta el collider físico de
 entrada al agua. Su borde superior es el suelo exclusivo de la interacción;
 también se comprueban los renderers nativos `wave1`/`wave2` y el encuadre. No
@@ -101,7 +118,8 @@ En avión y en Los Perritos Pilotos (`Levels.Airplane`), el cuerpo de cada mini
 jefe y sus secundarios usan el **80 % del
 tamaño anterior** sobre la compensación de cámara. La reducción se aplica al
 root completo para alinear sprites y colliders, y se mantiene tras los giros
-nativos que restablecen la escala. Los demás niveles terrestres conservan su tamaño.
+nativos que restablecen la escala. La primera fase del Diablo y los demás
+niveles terrestres conservan su tamaño anterior.
 Es una proporción estable respecto al avión normal, sin cambiar al activar el
 mini avión del jugador. Como referencia local, la relación lineal entre áreas
 visibles de Cuphead y su avión es aproximadamente 0.76; entre sus hitboxes es
@@ -110,6 +128,14 @@ se aplica esa misma proporción por solicitud del usuario: la pelea conserva
 sus controles y colisiones terrestres, con el suelo virtual de la interacción.
 Los nombres y regalos siguen
 usando fuente 28 y escala de cámara independiente, sin la reducción corporal.
+
+En la arena inferior del Diablo se elimina la compensación del zoom del
+cuerpo y sus secundarios: conservan su escala nativa en el mundo, igual
+que el jugador terrestre. Con el zoom final 0.811 se ven aproximadamente
+un 19 % más pequeños que antes del ajuste. El factor corporal es
+`1 / cameraScale`; los nombres y regalos mantienen su escala de cámara
+independiente. Los secundarios creados mientras termina el zoom también
+conservan su escala nativa, sin heredar un factor de cámara antiguo.
 
 Los márgenes corporales de avión y Perritos Pilotos (Gumball 182, CandyCorn 122 y aterrizaje de
 Cupcake 120 unidades base) usan esa misma reducción. Los demás límites de
@@ -136,8 +162,9 @@ se comprueba explícitamente porque las olas pueden seguir activas con otras
 capas de renderizado durante la transición a la cueva.
 Los límites globales del nivel y los actores originales permanecen intactos.
 `usesAircraftArena` identifica al jugador de avión para adaptar colisiones;
-el tamaño corporal también incluye Perritos Pilotos. `usesViewportFloor`
-selecciona el piso virtual de los aviones sin agua y de Perritos Pilotos;
+el tamaño corporal también incluye Perritos Pilotos y la arena inferior
+del Diablo. `usesViewportFloor` selecciona el piso virtual de los aviones
+sin agua, Perritos Pilotos y la arena inferior del Diablo;
 `usesWaterFloor` gobierna exclusivamente el agua y la retirada en Cala.
 No se debe usar la presencia de agua para decidir daño o tamaño de otros aviones.
 Esta compatibilidad inicial todavía requiere la prueba de combate para
