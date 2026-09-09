@@ -1,0 +1,118 @@
+using System;
+using System.Collections;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private sealed class LoadingProbe
+        {
+            internal bool Settled;
+            internal bool Busy;
+            internal bool Window;
+            internal float Now;
+            internal int Timeouts;
+            internal int NativeStarts;
+            internal int NativeDisposals;
+            internal readonly object NativeYield = new object();
+
+            internal IEnumerator Wrap(bool prepare = true)
+            {
+                return NativeInteractionLoadingBarrier.BeforeSceneLoad(
+                    NativeLoad(), prepare, () => Settled, () => Busy,
+                    allowed => Window = allowed, () => Now, () => Timeouts++);
+            }
+
+            private IEnumerator NativeLoad()
+            {
+                True(!Busy && !Window, "native load starts after capture and unload");
+                NativeStarts++;
+                try { yield return NativeYield; }
+                finally { NativeDisposals++; }
+            }
+        }
+
+        private static void RunNativeLoadingBarrierTests()
+        {
+            Run("Catalog completes and unloads before the native scene is queued", () =>
+            {
+                var p = new LoadingProbe();
+                var load = p.Wrap();
+                True(load.MoveNext(), "pending preparation yields a frame");
+                True(p.Window, "preload window opens behind fade");
+                Equal(0, p.NativeStarts, "native async queue remains untouched");
+                p.Settled = true;
+                p.Busy = true;
+                True(load.MoveNext(), "ready templates still wait for source unload");
+                False(p.Window, "no new preloads during drain");
+                Equal(0, p.NativeStarts, "target cannot race source unload");
+                p.Busy = false;
+                True(load.MoveNext(), "original loader resumes");
+                True(ReferenceEquals(p.NativeYield, load.Current), "original yield object preserved");
+                False(load.MoveNext(), "original completion preserved");
+                Equal(1, p.NativeDisposals, "native iterator disposed once");
+            });
+            Run("Ready or failed catalog adds no frame delay on retry", () =>
+            {
+                var p = new LoadingProbe { Settled = true };
+                var load = p.Wrap();
+                True(load.MoveNext(), "native first yield occurs immediately");
+                True(ReferenceEquals(p.NativeYield, load.Current), "no extra preparation frame");
+                Equal(1, p.NativeStarts, "retry starts immediately");
+                ((IDisposable)load).Dispose();
+                Equal(1, p.NativeDisposals, "cancellation reaches native iterator");
+            });
+            Run("Menu transitions drain a map preload without starting a catalog", () =>
+            {
+                var p = new LoadingProbe { Busy = true };
+                var load = p.Wrap(false);
+                True(load.MoveNext(), "in-flight preload is awaited");
+                False(p.Window, "menu transition never admits preparation");
+                p.Busy = false;
+                True(load.MoveNext(), "menu continues despite incomplete catalog");
+                Equal(1, p.NativeStarts, "menu is not held for unstarted assets");
+                ((IDisposable)load).Dispose();
+            });
+            Run("Preparation timeout stops new work and drains only the current operation", () =>
+            {
+                var p = new LoadingProbe { Busy = true };
+                var load = p.Wrap();
+                True(load.MoveNext(), "preparing");
+                p.Now = NativeInteractionLoadingBarrier.PreparationBudgetSeconds;
+                True(load.MoveNext(), "draining after timeout");
+                False(p.Window, "timeout closes admission");
+                Equal(1, p.Timeouts, "timeout reported once");
+                Equal(0, p.NativeStarts, "no race with uncancellable operation");
+                p.Busy = false;
+                True(load.MoveNext(), "incomplete catalog does not block forever");
+                Equal(1, p.NativeStarts, "native level now starts");
+                ((IDisposable)load).Dispose();
+            });
+            Run("Aborted preparation closes its preload window", () =>
+            {
+                var p = new LoadingProbe();
+                var load = p.Wrap();
+                True(load.MoveNext(), "preparing");
+                ((IDisposable)load).Dispose();
+                False(p.Window, "aborted loading cannot enable gameplay preloads");
+                Equal(0, p.NativeStarts, "aborted transition did not enqueue a target");
+            });
+            Run("Later loading screens can finish assets left by a timeout", () =>
+            {
+                var p = new LoadingProbe();
+                var first = p.Wrap();
+                first.MoveNext();
+                p.Now = 31;
+                first.MoveNext();
+                ((IDisposable)first).Dispose();
+                var next = p.Wrap();
+                True(next.MoveNext(), "new transition gets a fresh preparation budget");
+                True(p.Window, "unfinished assets can resume outside gameplay");
+                p.Settled = true;
+                True(next.MoveNext(), "prepared transition continues");
+                False(p.Window, "admission closes before native load");
+                ((IDisposable)next).Dispose();
+            });
+        }
+    }
+}

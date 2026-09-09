@@ -20,7 +20,7 @@ export function InteractionsView() {
   const [testingItem, setTestingItem] = useState<string | null>(null);
   const [category, setCategory] = useState<InteractionCategoryFilter>("all");
   const visibleItems = interactionItems.filter((item) =>
-    category === "all" || item.category === category);
+    category === "all" || item.group === category);
   const maxBatch = interaction?.maxBatch ?? 50;
   const maxDelay = interaction?.maxDelay ?? 3600;
   const testFeedback = optimisticInteractionQueue.length > 0
@@ -48,7 +48,8 @@ export function InteractionsView() {
           <InteractionCategorySelect value={category} onChange={setCategory} />
         </div>
 
-        {category !== "attack" ? (
+        <p className="interaction-catalog-note">{t("interactions.groups.description")}</p>
+        {category === "all" || category === "mini_boss" ? (
           <p className="interaction-catalog-note">
             {t("interactions.miniBoss.description")}{" "}
             {t("interactions.miniBoss.compatibility")}
@@ -65,7 +66,7 @@ export function InteractionsView() {
                 />
               </div>
               <div className="interaction-card__content">
-                <p className="interaction-card__eyebrow">{t(item.typeKey)}</p>
+                <p className="interaction-card__eyebrow">{t(`interactions.groups.${item.group}`)}</p>
                 <h3>{t(item.titleKey)}</h3>
               </div>
             </article>

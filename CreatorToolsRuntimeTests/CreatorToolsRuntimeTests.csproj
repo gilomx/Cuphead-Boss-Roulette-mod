@@ -20,6 +20,24 @@
     <Compile Include="PeskyModeSettingsTests.cs.txt" Link="PeskyModeSettingsTests.cs" />
     <Compile Include="PeskyPacingTests.cs.txt" Link="PeskyPacingTests.cs" />
     <Compile Include="IndependentPacingTests.cs.txt" Link="IndependentPacingTests.cs" />
+    <Compile Include="SpawnGroupSettingsTests.cs.txt" Link="SpawnGroupSettingsTests.cs" />
+    <Compile Include="SpawnSchedulingTests.cs.txt" Link="SpawnSchedulingTests.cs" />
+    <Compile Include="InteractionBodyScaleTests.cs.txt" Link="InteractionBodyScaleTests.cs" />
+    <Compile Include="MiniBossBalanceTests.cs.txt" Link="MiniBossBalanceTests.cs" />
+    <Compile Include="VisualSnapshotHierarchyTests.cs.txt" Link="VisualSnapshotHierarchyTests.cs" />
+    <Compile Include="NativeLoadingBarrierTests.cs.txt" Link="NativeLoadingBarrierTests.cs" />
+    <Compile Include="..\Interactions\NativeInteractionLoadingBarrier.cs"
+             Link="Product\Interactions\NativeInteractionLoadingBarrier.cs" />
+    <Compile Include="..\Interactions\CreatorToolsVisualSnapshotHierarchy.cs"
+             Link="Product\Interactions\CreatorToolsVisualSnapshotHierarchy.cs" />
+    <Compile Include="..\Interactions\CreatorToolsMiniBossHealth.cs"
+             Link="Product\Interactions\CreatorToolsMiniBossHealth.cs" />
+    <Compile Include="..\Interactions\CreatorToolsInteractionBodyScalePolicy.cs"
+             Link="Product\Interactions\CreatorToolsInteractionBodyScalePolicy.cs" />
+    <Compile Include="..\Interactions\CreatorToolsSpawnGroupSettings.cs"
+             Link="Product\Interactions\CreatorToolsSpawnGroupSettings.cs" />
+    <Compile Include="..\Interactions\CreatorToolsInteractionGroups.cs"
+             Link="Product\Interactions\CreatorToolsInteractionGroups.cs" />
     <Compile Include="..\Interactions\CreatorToolsInteractionPacingSettings.cs"
              Link="Product\Interactions\CreatorToolsInteractionPacingSettings.cs" />
     <Compile Include="RuntimeStubs.cs.txt" Link="RuntimeStubs.cs" />

@@ -15,15 +15,15 @@ namespace Gilomx.CupheadBossRoulette
         private TrainLevelEngineBossDropperProjectile actor;
         private SpriteRenderer sprite;
         private BoxCollider2D horizontalCollider;
-        private float cameraScale;
+        private float bodyScale;
         private Action<string> logWarning;
         private bool seenInCamera;
 
-        internal void Initialize(TrainLevelEngineBossDropperProjectile actor, float cameraScale,
+        internal void Initialize(TrainLevelEngineBossDropperProjectile actor, float bodyScale,
             Action<string> logWarning)
         {
             this.actor = actor;
-            this.cameraScale = cameraScale;
+            this.bodyScale = bodyScale;
             this.logWarning = logWarning;
             sprite = actor.GetComponent<SpriteRenderer>();
             horizontalCollider = actor.GetComponent<BoxCollider2D>();
@@ -105,10 +105,10 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var scale = effect.transform.localScale;
                 effect.transform.localScale = new Vector3(
-                    scale.x * state.cameraScale, scale.y * state.cameraScale, scale.z);
+                    scale.x * state.bodyScale, scale.y * state.bodyScale, scale.z);
                 effect.transform.SetParent(state.transform, true);
                 CreatorToolsInteractionPresentation.MarkInheritedGameplayCameraScale(
-                    effect.gameObject, state.cameraScale);
+                    effect.gameObject, state.bodyScale);
                 CreatorToolsInteractionPresentation.BringActorToFront(effect.gameObject);
             }
             catch (Exception exception)

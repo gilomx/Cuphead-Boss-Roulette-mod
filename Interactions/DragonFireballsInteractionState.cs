@@ -426,7 +426,7 @@ namespace Gilomx.CupheadBossRoulette
             // its native screen distance when the arena uses a wider zoom.
             if (fireball.DestroyDistance > 0f)
                 fireball.DestroyDistance *= cameraScale;
-            CreatorToolsInteractionPresentation.MatchGameplayCameraScale(
+            CreatorToolsInteractionPresentation.MatchGameplayBodyScale(
                 fireball.gameObject, logWarning);
             CreatorToolsInteractionPresentation.BringActorToFront(
                 fireball.gameObject);

@@ -77,6 +77,10 @@ namespace Gilomx.CupheadBossRoulette
                     __state.Contains(projectile.GetInstanceID()) ||
                     !projectile.gameObject.activeInHierarchy)
                     continue;
+                // Native bullets are independent prefab clones; the zeppelin's
+                // body scale does not reach their sprites or colliders.
+                CreatorToolsInteractionPresentation.MatchGameplayBodyScale(
+                    projectile.gameObject, null);
                 CreatorToolsInteractionPresentation.BringActorToFront(
                     projectile.gameObject);
             }

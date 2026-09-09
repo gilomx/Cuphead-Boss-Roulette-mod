@@ -76,20 +76,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedStates();
-            if (!Ready)
-                CaptureFromLoadedDragon();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(DragonSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedDragon();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(DragonSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -168,7 +173,9 @@ namespace Gilomx.CupheadBossRoulette
                 var bodyRendererVisibility = SnapshotRendererVisibility(
                     bodyRenderers);
                 var cameraScale = CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(bodyRoot, logWarning);
+                    GetGameplayCameraScale();
+                CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(bodyRoot, logWarning);
                 Vector3 offscreenPosition;
                 Vector3 attackPosition;
                 CalculateBodyPositions(
@@ -250,6 +257,11 @@ namespace Gilomx.CupheadBossRoulette
                 "Grim Matchstick");
 
             var patched = new HashSet<MethodBase>();
+            // Only the marked decorative body skips damage-flash setup.
+            // Its copied renderer references can point into an unloaded scene.
+            PatchLifecycleMethod(harmony,
+                AccessTools.Method(typeof(NativeDragonFireballsCache), "AllowDecorativeHitFlashAwake"),
+                AccessTools.Method(typeof(HitFlash), "Awake"), patched, logWarning);
             PatchLifecycleMethod(
                 harmony, prefix,
                 AccessTools.Method(typeof(Level), "Awake"),
@@ -327,6 +339,11 @@ namespace Gilomx.CupheadBossRoulette
                 return false;
             return !suppressPreloadLifecycle ||
                 !BelongsToScene(__instance, DragonSceneName);
+        }
+
+        private static bool AllowDecorativeHitFlashAwake(object __instance)
+        {
+            return !BelongsToInteraction(__instance);
         }
 
         private IEnumerator PreloadNativeAssets()

@@ -1,0 +1,47 @@
+using System.Collections.Generic;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private sealed class VisualNode
+        {
+            internal VisualNode Parent;
+        }
+
+        private static void RunVisualSnapshotHierarchyTests()
+        {
+            Run("Level-end snapshots retain animated sprite paths and skip nonvisual branches",
+                TestVisualSnapshotHierarchy);
+        }
+
+        private static void TestVisualSnapshotHierarchy()
+        {
+            var scene = new VisualNode();
+            var rootAnimator = new VisualNode { Parent = scene };
+            var turningPivot = new VisualNode { Parent = rootAnimator };
+            var bodySprite = new VisualNode { Parent = turningPivot };
+            var hiddenMouth = new VisualNode { Parent = turningPivot };
+            var pieceAnimator = new VisualNode { Parent = rootAnimator };
+            var hiddenPieceSprite = new VisualNode { Parent = pieceAnimator };
+            var projectileSpawnPoint = new VisualNode { Parent = rootAnimator };
+            var colliderOnly = new VisualNode { Parent = turningPivot };
+            var kept = new HashSet<VisualNode>();
+            foreach (var sprite in new[] { bodySprite, hiddenMouth, hiddenPieceSprite })
+                CreatorToolsVisualSnapshotHierarchy.RetainBranch(kept, sprite, rootAnimator,
+                    delegate(VisualNode node) { return node.Parent; });
+
+            Equal(6, kept.Count, "all three sprites and their animation/transform ancestors");
+            True(kept.Contains(hiddenMouth), "currently hidden mouth remains animatable");
+            True(kept.Contains(hiddenPieceSprite), "inactive piece remains animatable");
+            True(kept.Contains(pieceAnimator), "nested animator path survives");
+            True(kept.Contains(turningPivot), "shared local transform path survives");
+            False(kept.Contains(scene), "snapshot stops at the actor root");
+            False(kept.Contains(projectileSpawnPoint), "spawn metadata does not create visual objects");
+            False(kept.Contains(colliderOnly), "collider-only branch is not copied");
+            CreatorToolsVisualSnapshotHierarchy.RetainBranch(kept, bodySprite, rootAnimator,
+                delegate { throw new System.Exception("Retained paths must not be traversed again."); });
+            Equal(6, kept.Count, "overlapping paths are only retained once");
+        }
+    }
+}

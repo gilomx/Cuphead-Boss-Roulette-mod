@@ -26,6 +26,7 @@ namespace Gilomx.CupheadBossRoulette
         private string donor;
         private string giftImagePath = string.Empty;
         private float cameraScale = 1f;
+        private float bodyScale = 1f;
         private bool virtualLandingTriggered;
         private bool plantWasAttached;
         private bool followLandingSurface;
@@ -63,6 +64,7 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsDonorLabel seedLabel,
             string donor,
             float cameraScale,
+            float bodyScale,
             bool useVirtualGroundOnly,
             Action<string> logWarning)
         {
@@ -70,6 +72,7 @@ namespace Gilomx.CupheadBossRoulette
             this.seedLabel = seedLabel;
             this.donor = donor;
             this.cameraScale = Mathf.Max(0.01f, cameraScale);
+            this.bodyScale = Mathf.Max(0.01f, bodyScale);
             UseVirtualGroundOnly = useVirtualGroundOnly;
             this.logWarning = logWarning;
         }
@@ -175,7 +178,7 @@ namespace Gilomx.CupheadBossRoulette
                 CreatorToolsInteractionPresentation.
                     MarkInheritedGameplayCameraScale(
                         plant.gameObject,
-                        cameraScale);
+                        bodyScale);
                 CreatorToolsInteractionPresentation.BringActorToFront(
                     plant.gameObject);
 
@@ -242,9 +245,11 @@ namespace Gilomx.CupheadBossRoulette
             var worldPosition = plantTransform.position;
             var worldRotation = plantTransform.rotation;
             var scaledNative = plantTransform.localScale;
+            // OnSpawnPlant copies the seed's local scale. Move that inherited
+            // body factor to the wrapper: native movement reads localScale.x.
             var nativeScale = new Vector3(
-                scaledNative.x / cameraScale,
-                scaledNative.y / cameraScale,
+                scaledNative.x / bodyScale,
+                scaledNative.y / bodyScale,
                 scaledNative.z);
 
             plantScaleRoot = new GameObject(
@@ -252,8 +257,8 @@ namespace Gilomx.CupheadBossRoulette
             plantScaleRoot.transform.position = worldPosition;
             plantScaleRoot.transform.rotation = Quaternion.identity;
             plantScaleRoot.transform.localScale = new Vector3(
-                cameraScale,
-                cameraScale,
+                bodyScale,
+                bodyScale,
                 1f);
             plantTransform.SetParent(plantScaleRoot.transform, false);
             plantTransform.localPosition = Vector3.zero;

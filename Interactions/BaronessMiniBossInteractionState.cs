@@ -49,6 +49,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly List<GameObject> secondaryObjects = new List<GameObject>();
         private BaronessLevelMiniBossBase actor;
+        private string item;
         private Action<string> warning;
         private Camera gameplayCamera;
         private Transform pivot;
@@ -65,6 +66,11 @@ namespace Gilomx.CupheadBossRoulette
         private bool usesNativeBodyScale;
         private float viewportFloorY;
         private float waterFloorY;
+
+        internal string PresentItem
+        {
+            get { return actor != null && actor.gameObject.activeInHierarchy ? item : null; }
+        }
 
         internal static bool CanSpawnInCurrentLevel(string item)
         {
@@ -86,7 +92,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 return false;
             }
-            if (UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null ||
+            if (CreatorToolsInteractionPresentation.HasAircraftPlayer() ||
                 Level.Current.CurrentLevel == Levels.Airplane)
             {
                 // Cala keeps its visible water contract, including the cave
@@ -106,7 +112,7 @@ namespace Gilomx.CupheadBossRoulette
                 ground < camera.transform.position.y + halfHeight * 0.25f;
         }
 
-        private static bool IsDevilLowerArena()
+        internal static bool IsDevilLowerArena()
         {
             var level = Level.Current as DevilLevel;
             if (level == null || DevilLowerPlatforms == null)
@@ -235,11 +241,12 @@ namespace Gilomx.CupheadBossRoulette
             if (actor == null || !CanSpawnInCurrentLevel(item))
                 throw new InvalidOperationException("The native Baroness miniboss requires visible ground, an aircraft arena or Cala Maria's visible water.");
             this.actor = actor;
+            this.item = item;
             this.warning = warning;
             gameplayCamera = BaronessHeadTossInteractionState.FindGameplayCamera();
             initialCameraPosition = gameplayCamera.transform.position;
             cameraScale = Mathf.Max(0.01f, gameplayCamera.orthographicSize / 360f);
-            usesAircraftArena = UnityEngine.Object.FindObjectOfType<PlanePlayerController>() != null;
+            usesAircraftArena = CreatorToolsInteractionPresentation.HasAircraftPlayer();
             usesWaterFloor = usesAircraftArena && Level.Current.CurrentLevel == Levels.FlyingMermaid;
             usesDevilLowerArena = IsDevilLowerArena();
             usesNativeBodyScale = usesDevilLowerArena ||
@@ -285,18 +292,22 @@ namespace Gilomx.CupheadBossRoulette
             if (actor is BaronessLevelGumball)
             {
                 var p = properties.gumball;
-                var scaled = new LevelProperties.Baroness.Gumball(p.HP,
+                var health = CreatorToolsMiniBossHealth.ForCatalog(p.HP);
+                // Native rateOfFire is the delay between single projectiles.
+                // Double it for roughly half as many gumballs per attack burst.
+                var scaled = new LevelProperties.Baroness.Gumball(health,
                     p.gumballMovementSpeed, p.gumballDeathSpeed * cameraScale,
                     p.gumballAttackDurationOffRange, p.gumballAttackDurationOnRange,
-                    p.gravity * cameraScale, Scale(p.velocityX), p.rateOfFire,
+                    p.gravity * cameraScale, Scale(p.velocityX), p.rateOfFire * 2f,
                     Scale(p.velocityY), Scale(p.offsetX));
                 ((BaronessLevelGumball)actor).Init(scaled,
-                    new Vector2(right, ground + ScaleBodyDistance(182f)), p.HP);
+                    new Vector2(right, ground + ScaleBodyDistance(182f)), health);
             }
             else if (actor is BaronessLevelWaffle)
             {
                 var p = properties.waffle;
-                var scaled = new LevelProperties.Baroness.Waffle(p.HP,
+                var health = CreatorToolsMiniBossHealth.ForCatalog(p.HP);
+                var scaled = new LevelProperties.Baroness.Waffle(health,
                     p.movementSpeed, p.anticipation, p.attackDelayRange,
                     p.explodeSpeed, p.explodeTwoDuration, p.explodeDistance,
                     p.explodeReturnSpeed, p.XAxisSpeed * cameraScale,
@@ -306,23 +317,28 @@ namespace Gilomx.CupheadBossRoulette
                 pivot.position = new Vector3(WorldX(-74f), ground + 226f * cameraScale, 0f);
                 ScaleActorField("loopSize");
                 ((BaronessLevelWaffle)actor).Init(scaled,
-                    new Vector2(right, ground + 82f * cameraScale), pivot, p.movementSpeed, p.HP);
+                    new Vector2(right, ground + 82f * cameraScale), pivot, p.movementSpeed, health);
             }
             else if (actor is BaronessLevelCandyCorn)
             {
                 var p = properties.candyCorn;
-                var scaled = new LevelProperties.Baroness.CandyCorn(p.HP,
+                var health = CreatorToolsMiniBossHealth.ForCatalog(p.HP);
+                var miniSpawnDelay = mode == Level.Mode.Normal || mode == Level.Mode.Hard
+                    ? new MinMax(p.miniCornSpawnDelay.min + 0.6f, p.miniCornSpawnDelay.max + 0.6f)
+                    : p.miniCornSpawnDelay;
+                var scaled = new LevelProperties.Baroness.CandyCorn(health,
                     p.movementSpeed * cameraScale, p.changeLevelString,
                     WorldX(p.centerPosition), p.deathMoveSpeed * cameraScale,
-                    p.deathAcceleration, p.miniCornSpawnDelay, p.miniCornHP,
+                    p.deathAcceleration, miniSpawnDelay, p.miniCornHP,
                     p.miniCornMovementSpeed * cameraScale, p.spawnMinis);
                 ((BaronessLevelCandyCorn)actor).Init(scaled,
-                    new Vector2(right, ground + ScaleBodyDistance(122f)), scaled.movementSpeed, p.HP);
+                    new Vector2(right, ground + ScaleBodyDistance(122f)), scaled.movementSpeed, health);
             }
             else if (actor is BaronessLevelCupcake)
             {
                 var p = properties.cupcake;
-                var scaled = new LevelProperties.Baroness.Cupcake(p.HP,
+                var health = CreatorToolsMiniBossHealth.ForCatalog(p.HP);
+                var scaled = new LevelProperties.Baroness.Cupcake(health,
                     ScalePatterns(p.XSpeedString), p.hold,
                     ScaleBodyDistance(p.splashOriginalOffset), ScaleBodyDistance(p.splashOffset),
                     p.projectileOn);
@@ -330,18 +346,19 @@ namespace Gilomx.CupheadBossRoulette
                 ScaleActorField("ySpeedDown");
                 ScaleActorField("offset");
                 ((BaronessLevelCupcake)actor).Init(scaled,
-                    new Vector2(right + 100f * cameraScale, ground + ScaleBodyDistance(82f)), p.HP);
+                    new Vector2(right + 100f * cameraScale, ground + ScaleBodyDistance(82f)), health);
             }
             else if (actor is BaronessLevelJawbreaker)
             {
                 var p = properties.jawbreaker;
+                var health = CreatorToolsMiniBossHealth.ForCatalog(p.jawbreakerHomingHP);
                 var scaled = new LevelProperties.Baroness.Jawbreaker(p.jawbreakerMinis,
                     p.jawbreakerMiniSpace * cameraScale, p.jawbreakerHomeDuration,
-                    p.jawbreakerHomingHP, p.jawbreakerHomingSpeed * cameraScale,
+                    health, p.jawbreakerHomingSpeed * cameraScale,
                     p.jawbreakerHomingRotation);
                 ((BaronessLevelJawbreaker)actor).Init(scaled, PlayerManager.GetNext(),
                     new Vector2(right, ground + 92f * cameraScale),
-                    p.jawbreakerHomingRotation, p.jawbreakerHomingHP);
+                    p.jawbreakerHomingRotation, health);
             }
             else
                 throw new InvalidOperationException("Unknown native Baroness miniboss controller.");

@@ -1,5 +1,5 @@
 import { useLocalization } from "../../i18n/LocalizationContext";
-import { interactionCategories, type InteractionCategoryFilter } from "./interactionCatalog";
+import { interactionGroups, type InteractionCategoryFilter } from "./interactionCatalog";
 
 interface InteractionCategorySelectProps {
   value: InteractionCategoryFilter;
@@ -10,15 +10,15 @@ export function InteractionCategorySelect({ value, onChange }: InteractionCatego
   const { t } = useLocalization();
   return (
     <label className="interaction-category-filter">
-      <span>{t("interactions.catalog.filterLabel")}</span>
+      <span>{t("interactions.groups.filter")}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as InteractionCategoryFilter)}
       >
-        <option value="all">{t("interactions.categories.all")}</option>
-        {interactionCategories.map((category) => (
+        <option value="all">{t("interactions.groups.all")}</option>
+        {interactionGroups.map((category) => (
           <option value={category} key={category}>
-            {t(`interactions.categories.${category}`)}
+            {t(`interactions.groups.${category}`)}
           </option>
         ))}
       </select>

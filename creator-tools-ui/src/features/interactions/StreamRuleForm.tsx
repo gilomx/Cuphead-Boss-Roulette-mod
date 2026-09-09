@@ -154,7 +154,7 @@ export function StreamRuleForm({
               getKey={(item) => item.id}
               getLabel={(item) => t(item.titleKey)}
               getImage={(item) => item.image}
-              getMeta={(item) => t(item.typeKey)}
+              getMeta={(item) => t(`interactions.groups.${item.group}`)}
               getSearchTerms={(item) => [
                 item.id,
                 t(item.typeKey),

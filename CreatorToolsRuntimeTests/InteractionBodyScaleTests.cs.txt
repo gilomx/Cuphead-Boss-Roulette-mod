@@ -1,0 +1,66 @@
+using System;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunInteractionBodyScaleTests()
+        {
+            Run("Common bodies retain their screen size in ordinary arenas",
+                TestOrdinaryInteractionBodySize);
+            Run("Wide ground arenas retain native bodies while the zoom settles",
+                TestNativeInteractionBodySize);
+            Run("Aircraft and Howling bodies appear twenty percent smaller",
+                TestAircraftInteractionBodySize);
+            Run("Native ground body size takes precedence over aircraft detection",
+                TestNativeBodySizePrecedence);
+        }
+
+        private static void TestOrdinaryInteractionBodySize()
+        {
+            foreach (var camera in new[] { 1f, 443.8963928f / 360f, 2f })
+            {
+                var body = CreatorToolsInteractionBodyScalePolicy.Calculate(
+                    camera, false, false);
+                // Project a 128-unit native body into the 720px reference view.
+                True(Math.Abs(128f * body / camera - 128f) < 0.001f,
+                    "ordinary sprite and root collider keep their screen size");
+            }
+        }
+
+        private static void TestNativeInteractionBodySize()
+        {
+            foreach (var camera in new[] { 1f, 1.1f, 443.8963928f / 360f })
+            {
+                var body = CreatorToolsInteractionBodyScalePolicy.Calculate(
+                    camera, true, false);
+                Equal(128f, 128f * body,
+                    "native world body must not grow during a ground zoom");
+            }
+            var finalCamera = 443.8963928f / 360f;
+            var finalBody = CreatorToolsInteractionBodyScalePolicy.Calculate(
+                finalCamera, true, false);
+            True(Math.Abs(128f * finalBody / finalCamera - 103.808f) < 0.001f,
+                "0.811 zoom shrinks bodies like the native ground player");
+        }
+
+        private static void TestAircraftInteractionBodySize()
+        {
+            foreach (var camera in new[] { 1f, 443.8963928f / 360f, 2f })
+            {
+                var body = CreatorToolsInteractionBodyScalePolicy.Calculate(
+                    camera, false, true);
+                True(Math.Abs(128f * body / camera - 102.4f) < 0.001f,
+                    "aircraft body keeps the mini-boss screen proportion");
+            }
+        }
+
+        private static void TestNativeBodySizePrecedence()
+        {
+            foreach (var camera in new[] { 1f, 1.25f, 2f })
+                Equal(1f, CreatorToolsInteractionBodyScalePolicy.Calculate(
+                    camera, true, true),
+                    "wide ground arena must preserve native world size");
+        }
+    }
+}

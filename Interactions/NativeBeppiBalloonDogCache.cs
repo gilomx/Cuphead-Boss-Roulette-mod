@@ -74,20 +74,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!Ready)
-                CaptureFromLoadedClown();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(ClownSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedClown();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(ClownSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -125,13 +130,15 @@ namespace Gilomx.CupheadBossRoulette
                 actor = UnityEngine.Object.Instantiate(pink ? pinkTemplate : template);
                 actor.gameObject.name = "CreatorTools_NativeBeppiBalloonDog";
                 actor.transform.position = parameters.Position;
+                var bodyScale = CreatorToolsInteractionPresentation.
+                    GetGameplayBodyScale(parameters.CameraScale);
                 scaleRoot = new GameObject("CreatorTools_BeppiBalloonDog_ScaleRoot");
-                scaleRoot.transform.localScale = new Vector3(parameters.CameraScale, parameters.CameraScale, 1f);
+                scaleRoot.transform.localScale = new Vector3(bodyScale, bodyScale, 1f);
                 actor.transform.SetParent(scaleRoot.transform, false);
                 actor.transform.position = parameters.Position;
                 var state = scaleRoot.AddComponent<BeppiBalloonDogInteractionState>();
                 state.Initialize(actor);
-                CreatorToolsInteractionPresentation.MarkInheritedGameplayCameraScale(actor.gameObject, parameters.CameraScale);
+                CreatorToolsInteractionPresentation.MarkInheritedGameplayCameraScale(actor.gameObject, bodyScale);
                 actor.gameObject.SetActive(true);
                 actor.Init(parameters.Properties.dogHP, parameters.Position,
                     parameters.Properties.dogSpeed * parameters.CameraScale,

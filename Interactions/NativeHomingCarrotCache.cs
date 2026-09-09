@@ -70,20 +70,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!Ready)
-                CaptureFromLoadedVeggies();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(VeggiesSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedVeggies();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(VeggiesSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -143,7 +148,9 @@ namespace Gilomx.CupheadBossRoulette
                 spawned.gameObject.SetActive(true);
 
                 var cameraScale = CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(
+                    GetGameplayCameraScale();
+                CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(
                         spawned.gameObject,
                         logWarning);
                 MoveFullyAboveUpperEdge(

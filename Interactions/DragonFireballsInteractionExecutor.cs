@@ -29,6 +29,11 @@ namespace Gilomx.CupheadBossRoulette
                 logWarning);
         }
 
+        public bool NativeAssetsSettled
+        {
+            get { return nativeCache.Ready || nativeCache.Failed; }
+        }
+
         public bool Supports(string item)
         {
             return string.Equals(

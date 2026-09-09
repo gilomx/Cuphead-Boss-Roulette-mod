@@ -77,20 +77,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!Ready)
-                CaptureFromLoadedDevil();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(DevilSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedDevil();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(DevilSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -162,7 +167,8 @@ namespace Gilomx.CupheadBossRoulette
                 actor.gameObject.name = "CreatorTools_NativeDevilFireCircle";
                 actor.transform.SetParent(scaleRoot.transform, true);
                 state.Initialize(actor, pitchfork.dormantDuration + spinner.attackDuration);
-                CreatorToolsInteractionPresentation.MatchGameplayCameraScale(actor.gameObject, logWarning);
+                var bodyScale = CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(actor.gameObject, logWarning);
 
                 var rotation = Rand.PosOrNeg() * spinner.rotationSpeed;
                 var angles = new DevilLevelPitchforkProjectileSpawner(4, spinner.angleOffset).getSpawnAngles();
@@ -179,7 +185,7 @@ namespace Gilomx.CupheadBossRoulette
                         pitchfork.spawnRadius * cameraScale;
                     orbit.gameObject.name = "CreatorTools_DevilFireCircle_Orbit";
                     CreatorToolsInteractionPresentation.MarkInheritedGameplayCameraScale(
-                        orbit.gameObject, cameraScale);
+                        orbit.gameObject, bodyScale);
                     orbit.gameObject.SetActive(true);
                 }
                 foreach (var animator in actor.GetComponentsInChildren<Animator>())

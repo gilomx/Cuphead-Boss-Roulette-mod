@@ -88,7 +88,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(1, settings.MaximumCompanionsDuringMiniBoss, "default companion cap");
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(5, json.RootElement.GetProperty("version").GetInt32(), "automatic migration");
+                    Equal(8, json.RootElement.GetProperty("version").GetInt32(), "automatic migration");
                     Equal(30f, json.RootElement.GetProperty("miniBossCooldownSeconds").GetSingle(),
                         "new tuning visible in file without a panel save");
                 }

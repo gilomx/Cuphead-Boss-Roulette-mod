@@ -97,20 +97,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedStates();
-            if (!Ready)
-                CaptureFromLoadedBaroness();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(BaronessSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedBaroness();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(BaronessSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -186,7 +191,9 @@ namespace Gilomx.CupheadBossRoulette
                 ApplyBaronessRendererMask(bodyRoot, false);
 
                 var cameraScale = CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(bodyRoot, logWarning);
+                    GetGameplayCameraScale();
+                CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(bodyRoot, logWarning);
                 Vector3 offscreenPosition;
                 Vector3 attackPosition;
                 CalculateBodyPositions(
@@ -268,6 +275,12 @@ namespace Gilomx.CupheadBossRoulette
                 "Baroness Von Bon Bon");
 
             var patched = new HashSet<MethodBase>();
+            // Disabling a MonoBehaviour does not stop Awake when its root is
+            // activated. The decorative castle retains stale flash renderer
+            // references from the source scene and never receives damage.
+            PatchLifecycleMethod(harmony,
+                AccessTools.Method(typeof(NativeBaronessHeadTossCache), "AllowDecorativeHitFlashAwake"),
+                AccessTools.Method(typeof(HitFlash), "Awake"), patched, logWarning);
             PatchLifecycleMethod(
                 harmony, prefix,
                 AccessTools.Method(typeof(Level), "Awake"),
@@ -347,6 +360,11 @@ namespace Gilomx.CupheadBossRoulette
                 return false;
             return !suppressPreloadLifecycle ||
                 !BelongsToScene(__instance, BaronessSceneName);
+        }
+
+        private static bool AllowDecorativeHitFlashAwake(object __instance)
+        {
+            return !BelongsToInteraction(__instance);
         }
 
         private IEnumerator PreloadNativeAssets()

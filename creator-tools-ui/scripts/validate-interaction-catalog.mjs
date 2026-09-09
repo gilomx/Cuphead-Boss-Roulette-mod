@@ -14,6 +14,12 @@ const view = readFileSync(
   "utf8",
 );
 const mockServer = readFileSync(resolve(uiRoot, "scripts", "mock-server.mjs"), "utf8");
+const groupsSource = readFileSync(resolve(repositoryRoot, "Interactions", "CreatorToolsInteractionGroups.cs"), "utf8");
+const runtimeGroups = new Map();
+for (const match of groupsSource.matchAll(/((?:\s*case "[^"]+":)+)\s*return (Light|Strong|MiniBoss);/g)) {
+  const group = { Light: "light", Strong: "strong", MiniBoss: "mini_boss" }[match[2]];
+  for (const item of match[1].matchAll(/case "([^"]+)":/g)) runtimeGroups.set(item[1], group);
+}
 const locales = ["es", "en"].map((locale) => ({
   locale,
   messages: JSON.parse(readFileSync(resolve(uiRoot, "src", "locales", `${locale}.json`), "utf8")),
@@ -70,6 +76,11 @@ for (const match of view.matchAll(/\{\s*id:\s*"([^"]+)"([\s\S]*?)\}/g)) {
     throw new Error(`Unknown or missing category for ${id}: ${category}.`);
   }
   validateTranslation(`interactions.categories.${category}`);
+  const group = fields.match(/\bgroup:\s*"([^"]+)"/)?.[1];
+  if (!group || runtimeGroups.get(id) !== group) {
+    throw new Error(`Spawn group differs between runtime and panel for ${id}: ${runtimeGroups.get(id)} / ${group}.`);
+  }
+  validateTranslation(`interactions.groups.${group}`);
   for (const field of ["titleKey", "imageAltKey", "typeKey"]) {
     const key = fields.match(new RegExp(`\\b${field}:\\s*"([^"]+)"`))?.[1];
     if (!key) throw new Error(`Missing ${field} for ${id}.`);

@@ -9,6 +9,32 @@ Baronesa Von Bon Bon, las bolas de fuego de Fósforo Sombrío y los cinco
 mini jefes de la Baronesa, el aro de huesos del Expreso Fantasma y el círculo
 de fuego del Diablo y los perritos globo de Beppi.
 
+## Grupos de molestias y apariciones conjuntas
+
+El grupo `light` / `strong` / `mini_boss` es independiente de la categoría
+`attack` / `mini_boss` y de la dificultad nativa. `CreatorToolsInteractionGroups`
+es la clasificación que usa C#; `interactionItems.group` la refleja en el panel.
+El validador del catálogo exige una asignación explícita coincidente para cada
+ID. Las tarjetas, pruebas y selección de reglas muestran el grupo.
+
+Leves: zepelín morado, zanahoria, semilla de Cagney, luciérnaga y perrito rosa.
+Intensas: zepelín verde, bomba del robot, cabeza de Baronesa, bolas del dragón,
+aro del tren, círculo del Diablo y perrito aleatorio. Los cinco mini jefes
+conservan su grupo exclusivo. Una incorporación debe asignar su grupo tanto en
+runtime como en UI; no se infiere por daño ni por la dificultad del juego.
+
+Cada modo tiene un intervalo común y otro rango de descanso para minijefes,
+y rangos separados de cantidad por aparición leve/intensa. Una aparición
+conjunta conserva las fábricas y handles individuales; se revalida capacidad y
+exclusividad tras cada alta. No convierte un regalo en más ataques: agrupa sólo
+entradas pendientes elegibles, conservando identidad, atribución y retraso. El
+modo automático descarta sobrantes de una oportunidad sin crear backlog.
+
+El primer minijefe compatible está listo tras el margen seguro del nivel; la
+espera propia sólo empieza al desaparecer uno. Los ataques normales no consumen
+ni reinician ese reloj. Pausa congela los dos relojes y reintento los restablece.
+El límite físico de un minijefe y las reglas nativas de compatibilidad se mantienen.
+
 ## Perritos globo de Beppi
 
 Dos artículos comparten `BeppiBalloonDogInteractionExecutor`:
@@ -149,15 +175,34 @@ y ofrece el filtro Todos / Ataques / Mini jefes, compartido con las pruebas
 manuales. Las reglas, Modo Molestoso y Batalla Molestosa consumen los mismos
 IDs del catálogo.
 
-| ID | Mini jefe | HP Fácil / Normal | HP Experto |
-| --- | --- | ---: | ---: |
-| `baroness_cupcake` | Cupcake | 185 | 235 |
-| `baroness_gumball` | Máquina de chicles | 270 | 320 |
-| `baroness_waffle` | Waffle | 250 | 305 |
-| `baroness_candy_corn` | Maíz dulce | 225 | 250 |
-| `baroness_jawbreaker` | Caramelo gigante | 180 | 220 |
+Los valores del catálogo conservan el 65% de la vida nativa:
 
-La resistencia procede de las propiedades nativas de la dificultad actual.
+| ID | Mini jefe | Fácil / Normal: original → mod | Experto: original → mod |
+| --- | --- | ---: | ---: |
+| `baroness_cupcake` | Cupcake | 185 → 121 | 235 → 153 |
+| `baroness_gumball` | Máquina de chicles | 270 → 176 | 320 → 208 |
+| `baroness_waffle` | Waffle | 250 → 163 | 305 → 199 |
+| `baroness_candy_corn` | Maíz dulce | 225 → 147 | 250 → 163 |
+| `baroness_jawbreaker` | Rompemandíbulas | 180 → 117 | 220 → 143 |
+
+`CreatorToolsMiniBossHealth.ForCatalog` toma los HP de la dificultad actual y
+conserva el 65%, redondeado hacia arriba con mínimo 1. Sólo lo llama el estado
+de las copias del catálogo al inicializar propiedades y vida. No muta las
+propiedades compartidas ni cambia la pelea original de la Baronesa.
+
+La copia de Maíz dulce suma 0.6 s a ambos extremos de `miniCornSpawnDelay`
+en Normal (1.5–2.3 → 2.1–2.9 s) y Experto (1.3–2 → 1.9–2.6 s). La rutina
+nativa crea un pequeño durante un giro y espera ese intervalo antes de volver
+a buscar otro giro. Fácil sigue sin generar pequeños. Sus hijos conservan
+10 HP; la reducción de vida corresponde a los cinco minijefes del catálogo.
+
+La copia de la máquina de chicles duplica `rateOfFire`, que en la rutina nativa
+es la espera entre proyectiles individuales: Normal pasa de 0.23 a 0.46 s y
+Experto de 0.16 a 0.32 s (Fácil: 0.5 a 1 s). Conserva la duración de cada
+ráfaga, los descansos y las trayectorias. Por ello dispara aproximadamente la
+mitad de chicles por ráfaga; el número exacto depende de la duración sorteada
+y de los frames. En Fácil se conserva el patrón nativo sin ráfagas activas.
+
 No existe un temporizador de desaparición: la duración depende del daño del
 jugador, igual que en el combate original. Cada aparición inicializa su propio
 campo `health` y conserva los receptores de daño, ataques, animación de muerte
@@ -404,24 +449,32 @@ no tienen regalo conservan únicamente el nombre.
    proyectil nuevo: se comparan los `FlyingBlimpLevelEnemyProjectile` antes y
    después del disparo y sólo las balas nacidas de un zepelín marcado como
    interacción reciben `CreatorToolsInteractionRenderPriority`.
-7. `MatchGameplayCameraScale` multiplica la escala nativa del root por
-   `(camera.orthographicSize * 2) / 720`. Cuphead usa un encuadre base de 720
-   unidades, pero algunos jefes alejan la cámara; sin esta corrección el mismo
-   actor se ve mucho más pequeño. Se escala el root completo para conservar la
-   alineación entre sprite y `Collider2D`, no sólo el renderer. La etiqueta
-   calcula su escala sólo desde la cámara actual, sin heredar la escala nativa
-   ni la reducción corporal del actor. El fallback local de los ataques
-   estándar ya recibe la escala del actor mediante `TransformPoint` y no debe
-   multiplicarse una segunda vez.
+7. `PrepareActor` utiliza `MatchGameplayBodyScale`: las 12 molestias leves e
+   intensas comparten las proporciones de los minijefes. El factor geométrico
+   de cámara sigue siendo `orthographicSize / 360`, pero el corporal es `1` en
+   Chef Saleroso, Granitoviejo y Diablo inferior; cámara × `0.8` en aviones y
+   Perritos Pilotos; cámara en los demás escenarios. La arena inferior del
+   Diablo se reconoce por `phase3Platforms.activeSelf`, no por el enum de fase
+   que avanza antes del zoom. El tamaño se resuelve al crear cada actor.
+   Sprite y `Collider2D` se escalan juntos, preservando orientación y variación
+   nativa. La etiqueta conserva su propia escala de cámara en vivo.
 
-Esta normalización no se hereda automáticamente por objetos que el actor crea
-después como roots independientes. Es una limitación conocida de los mini
-zepelines: `FireSingle` y `FireSpreadshot` llaman a `BasicProjectile.Create`,
-que instancia cada bala sin padre, por lo que en peleas con cámara alejada las
-balas aún se ven más pequeñas aunque el zepelín conserve su tamaño. La futura
-corrección debe aplicar el mismo factor sólo a proyectiles nacidos de un
-zepelín del catálogo, escalar su root completo para mantener el `Collider2D` y
-no modificar velocidad, daño ni los prefabs nativos compartidos.
+   `GetGameplayCameraScale` se usa para recorridos, velocidades y márgenes;
+   `GetGameplayBodyScale` para cuerpos y wrappers. El marker de escala guarda
+   el factor corporal ya aplicado o heredado: `PrepareActor` no lo repite.
+   `MatchGameplayCameraScale` conserva su contrato anterior para los minijefes,
+   que siguen aplicando su política existente. El fallback local estándar ya
+   recibe escala por `TransformPoint` y no debe multiplicarla otra vez.
+
+Los objetos creados como roots independientes reciben el ajuste corporal al
+nacer: cabezas lanzadas, meteoros y balas de zepelín. `FireSingle` y
+`FireSpreadshot` ajustan sólo las balas nuevas de zepelines del catálogo, tras
+la guardia de propiedad existente. Se conservan velocidades, daño y prefabs
+compartidos. Planta y llamas orbitales heredan el factor una vez; los wrappers
+de planta, luciérnaga, bomba, huesos y perros protegen los cambios nativos de
+escala durante sus animaciones. El polvo de los huesos sigue el cuerpo. Los
+efectos decorativos independientes sin collider conservan su presentación
+nativa salvo los que ya tenían integración explícita.
 
 ### Posición y seguimiento
 
@@ -696,8 +749,8 @@ la etiqueta, por lo que cuerpo y nombre empiezan completamente fuera de cámara.
 No se añade TTL: ocupa su cupo hasta morir por daño o colisión, y se limpia al
 terminar el nivel.
 
-La animación nativa fuerza `localScale.x = 1` al comenzar. La normalización de
-cámara vive por ello en un wrapper y el actor conserva su escala local nativa;
+La animación nativa fuerza `localScale.x = 1` al comenzar. La corrección corporal
+vive por ello en un wrapper y el actor conserva su escala local nativa;
 así no pierde la corrección de tamaño ni deforma sprite y `Collider2D` en jefes
 con zoom alejado.
 
@@ -738,7 +791,7 @@ se conservan tanto el límite nativo del homing como los respaldos originales
 de `AbstractProjectile`. El cupo se libera cuando se destruye el actor, después
 de la explosión cuando corresponde, no al primer evento `Die`.
 
-La escala de cámara vive en un wrapper que incluye sprite y colisiones durante
+La escala corporal vive en un wrapper que incluye sprite y colisiones durante
 vuelo y explosión. El nombre y el icono de regalo reutilizan la presentación
 compartida, con el hueco base de 14 px y el fade de 0.6 segundos al destruirse.
 Salir del nivel o reintentar elimina también el wrapper.
@@ -818,8 +871,8 @@ salida del dragón.
 
 Todas las bolas salen del transform animado `MouthRoot` y usan `speedX` y
 `timeY` de la dificultad actual. La velocidad horizontal y la amplitud vertical
-se ajustan a la misma escala de cámara que el cuerpo; los extremos verticales
-se centran en la cámara. Conservan las corutinas, tiempos, animación, humo,
+se ajustan a la escala geométrica de cámara, separada del tamaño corporal;
+los extremos verticales se centran en la cámara. Conservan las corutinas, tiempos, animación, humo,
 sonido, daño y collider nativos. En las copias de la interacción se desactiva
 la muerte nativa en X = -840: esa muerte detiene el movimiento sin destruir
 el objeto y deja la animación en pantalla con el zoom de Perritos Pilotos.

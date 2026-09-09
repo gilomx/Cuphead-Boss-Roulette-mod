@@ -77,20 +77,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!AllReady)
-                CaptureFromLoadedHilda();
             if (AllReady || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(HildaSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedHilda();
+                if (AllReady || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(HildaSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)

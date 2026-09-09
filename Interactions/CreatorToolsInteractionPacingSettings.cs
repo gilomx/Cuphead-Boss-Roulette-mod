@@ -12,10 +12,17 @@ namespace Gilomx.CupheadBossRoulette
         internal const string FileName = "mx.gilomx.cuphead.bossroulette.interaction-pacing.json";
         private readonly string path;
         private readonly Action<string> warning;
+        private CreatorToolsSpawnGroupSettings spawnGroups = new CreatorToolsSpawnGroupSettings();
         internal bool Enabled { get; private set; }
         internal float MinimumInterval { get; private set; } = 1.25f;
         internal float MaximumInterval { get; private set; } = 3.25f;
-        internal float MiniBossCooldownSeconds { get; private set; } = 30f;
+        internal float MiniBossCooldownSeconds { get { return MiniBossMinimumInterval; } }
+        internal float MiniBossMinimumInterval { get { return spawnGroups.MiniBossMinimumInterval; } }
+        internal float MiniBossMaximumInterval { get { return spawnGroups.MiniBossMaximumInterval; } }
+        internal int LightMinimumBatch { get { return spawnGroups.LightMinimumBatch; } }
+        internal int LightMaximumBatch { get { return spawnGroups.LightMaximumBatch; } }
+        internal int StrongMinimumBatch { get { return spawnGroups.StrongMinimumBatch; } }
+        internal int StrongMaximumBatch { get { return spawnGroups.StrongMaximumBatch; } }
         internal float MiniBossIntervalMultiplier { get; private set; } = 2f;
         internal int MaximumCompanionsDuringMiniBoss { get; private set; } = 1;
 
@@ -45,9 +52,16 @@ namespace Gilomx.CupheadBossRoulette
             try
             {
                 Dictionary<string, string> values;
-                return File.Exists(candidate) &&
-                    CreatorToolsFlatJson.TryParse(File.ReadAllText(candidate), out values) &&
-                    TrySet(values, "");
+                if (!File.Exists(candidate) ||
+                    !CreatorToolsFlatJson.TryParse(File.ReadAllText(candidate), out values)) return false;
+                // Use the same atomic request validator for stored settings. Old files
+                // omit the group fields; their cooldown migrates into both endpoints.
+                if (!TrySet(values, "")) return false;
+                var needsMigration = false;
+                foreach (var property in CreatorToolsSpawnGroupSettings.PropertyNames)
+                    if (!values.ContainsKey(property)) needsMigration = true;
+                if (needsMigration && candidate == path) Save();
+                return true;
             }
             catch { return false; }
         }
@@ -55,25 +69,32 @@ namespace Gilomx.CupheadBossRoulette
         // A complete balance request is validated before committing any value.
         internal bool TrySet(Dictionary<string, string> values, string prefix)
         {
+            if (values == null) return false;
             bool enabled;
             var enabledToken = CreatorToolsFlatJson.Value(values, prefix + "enabled");
             if (enabledToken == "1") enabled = true;
             else if (enabledToken == "0") enabled = false;
             else if (!bool.TryParse(enabledToken, out enabled)) return false;
-            float minimum, maximum, cooldown, multiplier, companions;
+            float minimum, maximum, multiplier, companions;
+            CreatorToolsSpawnGroupSettings updated;
             if (!Number(values, prefix + "minimumInterval", 0.35f, 300f, out minimum) ||
                 !Number(values, prefix + "maximumInterval", 0.35f, 300f, out maximum) || minimum > maximum ||
-                !Number(values, prefix + "miniBossCooldownSeconds", 0f, 300f, out cooldown) ||
                 !Number(values, prefix + "miniBossIntervalMultiplier", 1f, 10f, out multiplier) ||
                 !Number(values, prefix + "maximumCompanionsDuringMiniBoss", 0f, 20f, out companions) ||
-                companions != Math.Floor(companions)) return false;
+                companions != Math.Floor(companions) ||
+                !spawnGroups.TryUpdate(values, prefix, out updated)) return false;
             Enabled = enabled;
             MinimumInterval = minimum;
             MaximumInterval = maximum;
-            MiniBossCooldownSeconds = cooldown;
             MiniBossIntervalMultiplier = multiplier;
             MaximumCompanionsDuringMiniBoss = (int)companions;
+            spawnGroups = updated;
             return true;
+        }
+
+        internal bool TrySetFromValues(Dictionary<string, string> values, string prefix)
+        {
+            return TrySet(values, prefix);
         }
 
         private static bool Number(Dictionary<string, string> values, string key, float min, float max, out float result)
@@ -90,8 +111,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"maximumInterval\":").Append(MaximumInterval.ToString("R", CultureInfo.InvariantCulture))
                 .Append(",\"miniBossCooldownSeconds\":").Append(MiniBossCooldownSeconds.ToString("R", CultureInfo.InvariantCulture))
                 .Append(",\"miniBossIntervalMultiplier\":").Append(MiniBossIntervalMultiplier.ToString("R", CultureInfo.InvariantCulture))
-                .Append(",\"maximumCompanionsDuringMiniBoss\":").Append(MaximumCompanionsDuringMiniBoss)
-                .Append('}');
+                .Append(",\"maximumCompanionsDuringMiniBoss\":").Append(MaximumCompanionsDuringMiniBoss);
+            spawnGroups.AppendJson(builder);
+            builder.Append('}');
         }
 
         internal static void AppendDefaultsJson(StringBuilder builder)

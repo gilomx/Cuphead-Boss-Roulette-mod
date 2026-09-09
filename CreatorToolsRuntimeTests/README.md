@@ -18,6 +18,43 @@ explicit opt-in for regular interactions, migration defaults, persistence and
 atomic panel updates. Unity scene discovery and the physical dispatch queues
 are not exercised by these policy tests.
 
+Spawn-group tests cover the six new persisted fields, atomic validation,
+legacy cooldown migration with backups, and independent settings. The production
+automatic selector is exercised with a large common catalog, overdue mini-bosses,
+incompatible arenas, opt-in cross-queue reservation, and separate clocks. Batch
+policy tests retain object identity/donors/delays and recheck capacity/exclusivity.
+They use recording delegates; physical queues and Unity controller wiring still
+need in-game verification.
+
+Body-scale tests link the production common-interaction policy and verify screen
+proportions under ordinary, aircraft/Howling, and native-size ground cameras,
+including intermediate zoom values and native-ground precedence. Unity level
+detection, inherited transforms, animated colliders and labels still need in-game
+verification.
+
+Balance tests verify all five mini-bosses' 65% HP in normal and expert modes,
+the default single-intense admission policy, same-frame batch rechecks, selector
+eligibility, atomic validation, independent persistence and v8 migration backups.
+The deprecated category toggle cannot exclude intense attacks anymore. Item IDs in the recording
+fixture include the catalog plus the stream harness's synthetic test item.
+The selector probe-budget test verifies that due minis, earned reservations,
+full slots and waiting clocks avoid irrelevant scene queries, while incompatible
+minis retain the common fallback. This measures delegate calls, not Unity frame times.
+The visual-snapshot hierarchy test retains inactive sprite branches and their
+complete animator/transform paths, while skipping collider/spawn metadata and
+ancestors outside the actor. Actual Unity animation playback still needs in-game QA.
+The current harness has 76 test groups.
+
+The UI mock's separate HTTP contract tests run with:
+
+```powershell
+cd creator-tools-ui
+node scripts/test-spawn-settings.mjs
+```
+
+They use a temporary local port and stop their child server after testing. They
+validate settings/persistence projections, not gameplay scheduling or physics.
+
 Run it from the repository root:
 
 ```powershell

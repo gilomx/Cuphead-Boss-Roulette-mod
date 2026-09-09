@@ -23,6 +23,7 @@ import type {
   StreamRulesConfigState,
   TapFarmingConfigState,
 } from "../model";
+import { validPacing, type PacingValues } from "../features/interactions/pacingValues";
 
 interface ConfigValue {
   config: RouletteConfigState | null;
@@ -47,8 +48,8 @@ interface ConfigValue {
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
-  applyPeskyIntervals: (minimum: number, maximum: number, cooldown: number, multiplier: number, companions: number) => void;
-  applyPacingToBoth: (pacing: Omit<InteractionPacingConfig, "enabled">) => void;
+  applyPeskyIntervals: (pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => void;
+  applyPacingToBoth: (pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => void;
   applyPeskyBattleGift: (giftId: string) => void;
   applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
   applyPeskyBattleItem: (item: string, enabled: boolean) => void;
@@ -620,12 +621,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const applyInteractionSettings = useCallback(
     (value: number, showGiftImage: boolean, pacing: InteractionPacingConfig) => {
-      if (!interaction?.ready || !Number.isFinite(pacing.minimumInterval) ||
-          !Number.isFinite(pacing.maximumInterval) || pacing.minimumInterval < 0.35 ||
-          pacing.maximumInterval > 300 || pacing.minimumInterval > pacing.maximumInterval ||
-          !Number.isFinite(pacing.miniBossCooldownSeconds) || pacing.miniBossCooldownSeconds < 0 || pacing.miniBossCooldownSeconds > 300 ||
-          !Number.isFinite(pacing.miniBossIntervalMultiplier) || pacing.miniBossIntervalMultiplier < 1 || pacing.miniBossIntervalMultiplier > 10 ||
-          !Number.isInteger(pacing.maximumCompanionsDuringMiniBoss) || pacing.maximumCompanionsDuringMiniBoss < 0 || pacing.maximumCompanionsDuringMiniBoss > 20) return;
+      if (!interaction?.ready || !validPacing(pacing)) return;
       const normalized = Math.max(
         1,
         Math.min(interaction.maxActiveLimit ?? 20, Math.floor(value) || 1),
@@ -668,6 +664,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         "pacing.miniBossCooldownSeconds": String(pacing.miniBossCooldownSeconds),
         "pacing.miniBossIntervalMultiplier": String(pacing.miniBossIntervalMultiplier),
         "pacing.maximumCompanionsDuringMiniBoss": String(pacing.maximumCompanionsDuringMiniBoss),
+        "pacing.miniBossMinimumInterval": String(pacing.miniBossMinimumInterval),
+        "pacing.miniBossMaximumInterval": String(pacing.miniBossMaximumInterval),
+        "pacing.lightMinimumBatch": String(pacing.lightMinimumBatch),
+        "pacing.lightMaximumBatch": String(pacing.lightMaximumBatch),
+        "pacing.strongMinimumBatch": String(pacing.strongMinimumBatch),
+        "pacing.strongMaximumBatch": String(pacing.strongMaximumBatch),
       });
       const send = () => fetch(
         "/api/config/interactions/set?" + query,
@@ -987,28 +989,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPeskyIntervals = useCallback(
-    (minimum: number, maximum: number, cooldown: number, multiplier: number, companions: number) => {
-      if (!pesky?.ready || !Number.isFinite(minimum) ||
-          !Number.isFinite(maximum) || minimum < pesky.intervalLowerLimit ||
-          maximum > pesky.intervalUpperLimit || minimum > maximum ||
-          !Number.isFinite(cooldown) || cooldown < 0 || cooldown > 300 ||
-          !Number.isFinite(multiplier) || multiplier < 1 || multiplier > 10 ||
-          !Number.isInteger(companions) || companions < 0 || companions > 20) return;
+    (pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => {
+      if (!pesky?.ready || !validPacing(pacing)) return;
+      const changes = allowConcurrentStrongInteractions === undefined ? pacing : { ...pacing, allowConcurrentStrongInteractions };
       sendPeskyUpdate(
-        new URLSearchParams({
-          minimumInterval: String(minimum),
-          maximumInterval: String(maximum),
-          miniBossCooldownSeconds: String(cooldown),
-          miniBossIntervalMultiplier: String(multiplier),
-          maximumCompanionsDuringMiniBoss: String(companions),
-        }),
+        new URLSearchParams(Object.fromEntries(Object.entries(changes).map(([key, value]) => [key, String(value)]))),
         (state) => ({
           ...state,
-          minimumInterval: minimum,
-          maximumInterval: maximum,
-          miniBossCooldownSeconds: cooldown,
-          miniBossIntervalMultiplier: multiplier,
-          maximumCompanionsDuringMiniBoss: companions,
+          ...changes,
           error: false,
         }),
       );
@@ -1017,11 +1005,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPacingToBoth = useCallback(
-    (pacing: Omit<InteractionPacingConfig, "enabled">) => {
+    (pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => {
       if (!pesky?.ready || !interaction?.ready || !interaction.pacing) return;
-      applyPeskyIntervals(pacing.minimumInterval, pacing.maximumInterval,
-        pacing.miniBossCooldownSeconds, pacing.miniBossIntervalMultiplier,
-        pacing.maximumCompanionsDuringMiniBoss);
+      applyPeskyIntervals(pacing, allowConcurrentStrongInteractions);
       applyInteractionSettings(interaction.maxActive, interaction.showGiftImage !== false,
         { ...pacing, enabled: interaction.pacing.enabled });
     },

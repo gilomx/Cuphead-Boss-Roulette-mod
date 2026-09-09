@@ -1,0 +1,227 @@
+using System;
+using System.Collections.Generic;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunSpawnSchedulingTests()
+        {
+            Run("A first compatible mini-boss is ready without spending the common clock", TestFirstMiniBossSchedule);
+            Run("Automatic selection prioritizes due mini-bosses and falls back in incompatible arenas", TestAutomaticSpawnSelection);
+            Run("Automatic selection avoids expensive probes for reserved or blocked common attacks", TestAutomaticSpawnProbeBudget);
+            Run("Opted-in modes reserve common slots across queues without changing bypass mode", TestSharedMiniBossReservation);
+            Run("Mini-boss recovery is independent and freezes through pauses and transitions", TestSplitSpawnClocks);
+            Run("Spawn groups classify all seventeen attacks independently of difficulty", TestInteractionGroups);
+            Run("Batches retain donor identity, delayed gifts and incompatible siblings", TestEarnedSpawnBatches);
+            Run("Batches recheck capacity and exclusivity after each admission", TestSpawnBatchCapacity);
+        }
+
+        private static void TestFirstMiniBossSchedule()
+        {
+            var pacing = new CreatorToolsPeskyPacing();
+            // The controller calls this only after the existing level safety
+            // gate opens. Even a very long normal interval cannot postpone it.
+            pacing.ScheduleInterval(300f);
+            pacing.Advance(0f, false, 30f);
+            True(pacing.MiniBossReady, "no inherited recovery on first arena");
+            True(pacing.CanDispatchInteraction(true, true, 0, 1), "first mini ignores common countdown");
+            False(pacing.CanDispatchInteraction(true, false, 0, 1), "common clock remains independent");
+            False(pacing.CanSelect(true, 2, 1), "crowded arena drains before mini admission");
+            for (var i = 0; i < 10; i++)
+                pacing.ScheduleInterval(12f);
+            True(pacing.MiniBossReady, "other admissions cannot restart mini clock");
+        }
+
+        private static void TestAutomaticSpawnSelection()
+        {
+            var catalog = new List<string>();
+            for (var i = 0; i < 30; i++) catalog.Add("rootpack_homing_carrot");
+            catalog.Add("baroness_waffle");
+            Func<string, bool> yes = delegate { return true; };
+            var plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                true, true, yes, yes, yes);
+            True(plan.MiniBossReserved, "due mini wins even behind thirty common candidates");
+            Equal(1, plan.Candidates.Count, "common entries never enter mini lottery");
+            Equal("baroness_waffle", plan.Candidates[0], "only compatible mini can be chosen");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                true, false, yes, yes, delegate { return false; });
+            True(plan.MiniBossReserved, "common wait and crowded arena do not remove the mini reservation");
+            Equal(1, plan.Candidates.Count, "reserve allows existing companions to drain");
+            Func<string, bool> commonsOnly = delegate(string item) { return item != "baroness_waffle"; };
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                true, true, yes, commonsOnly, yes);
+            False(plan.MiniBossReserved, "incompatible arena does not reserve a mini");
+            Equal(30, plan.Candidates.Count, "common generation continues in incompatible arena");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                true, true, commonsOnly, yes, yes);
+            False(plan.MiniBossReserved, "disabled mini never reserves the arena");
+            Equal(30, plan.Candidates.Count, "disabled mini leaves ordinary selection intact");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                false, true, yes, yes, yes);
+            False(plan.MiniBossReserved, "recovery blocks mini lottery only");
+            Equal(30, plan.Candidates.Count, "normal work continues during mini recovery");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                false, false, yes, yes, yes);
+            Equal(0, plan.Candidates.Count, "no work is generated before either independent timer is due");
+        }
+
+        private static void TestAutomaticSpawnProbeBudget()
+        {
+            var catalog = new[] { "rootpack_homing_carrot", "robot_homing_bomb", "baroness_waffle" };
+            Func<string, bool> yes = delegate { return true; };
+            var probes = new List<string>();
+            Func<string, bool> available = delegate(string item) { probes.Add(item); return true; };
+            var plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog, true, true,
+                yes, available, yes);
+            True(plan.MiniBossReserved, "priority remains unchanged");
+            Equal(1, probes.Count, "due mini avoids every common scene query");
+            Equal("baroness_waffle", probes[0], "only mini compatibility is queried");
+
+            probes.Clear();
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog, false, true,
+                yes, available, delegate { return false; });
+            Equal(0, probes.Count, "full slots never query scene availability");
+            Equal(0, plan.Candidates.Count, "blocked attacks remain excluded");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog, false, true,
+                yes, available, yes, true);
+            Equal(0, probes.Count, "earned mini reservation avoids common scene queries");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog, false, false,
+                yes, available, yes);
+            Equal(0, probes.Count, "waiting clocks avoid scene queries");
+
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog, true, true,
+                yes, delegate(string item) { probes.Add(item); return item != "baroness_waffle"; }, yes);
+            False(plan.MiniBossReserved, "incompatible mini still allows common fallback");
+            Equal(2, plan.Candidates.Count, "fallback preserves both eligible common attacks");
+            Equal(3, probes.Count, "fallback probes each eligible candidate once");
+        }
+
+        private static void TestSplitSpawnClocks()
+        {
+            var pacing = new CreatorToolsPeskyPacing();
+            pacing.ScheduleInterval(20f);
+            pacing.Advance(0f, true, 12f);
+            pacing.ScaleInterval(2f);
+            Equal(40f, pacing.IntervalRemaining, "arrival scales remaining common wait once");
+            pacing.Advance(5f, true, 12f);
+            False(pacing.MiniBossReady, "existing mini always keeps the physical slot");
+            pacing.Advance(0f, false, 12f);
+            pacing.ScaleInterval(0.5f);
+            Equal(12f, pacing.CooldownRemaining, "sampled mini gap begins at disappearance");
+            Equal(17.5f, pacing.IntervalRemaining, "disappearance scales rather than restarts common wait");
+            pacing.ScheduleInterval(1f);
+            pacing.Advance(0f, false, 99f);
+            Equal(12f, pacing.CooldownRemaining, "pause does not consume or resample mini wait");
+            pacing.Advance(1f, false, 99f);
+            True(pacing.CanDispatchInteraction(true, false, 0, 1), "common work resumes during mini recovery");
+            False(pacing.CanDispatchInteraction(true, true, 0, 1), "mini still waits on its own clock");
+            pacing.ResetInterval();
+            Equal(11f, pacing.CooldownRemaining, "phase reset retains earned mini recovery");
+            pacing.ScheduleInterval(100f);
+            pacing.Advance(11f, false, 99f);
+            True(pacing.CanDispatchInteraction(true, true, 0, 1), "mini ready exactly at gap endpoint despite common wait");
+            pacing.Reset();
+            True(pacing.MiniBossReady, "retry clears recovery from old arena");
+            False(pacing.IntervalScheduled, "retry starts a fresh common schedule");
+        }
+
+        private static void TestSharedMiniBossReservation()
+        {
+            var catalog = new[] { "rootpack_homing_carrot", "baroness_waffle" };
+            Func<string, bool> yes = delegate { return true; };
+            // A queued, due interaction mini waits for shared companions. A
+            // still-recovering automatic mode must stop refilling those slots.
+            var plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                false, true, yes, yes, yes, true);
+            Equal(0, plan.Candidates.Count, "earned mini reservation drains automatic common pressure");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                false, true, yes, yes, yes, false);
+            Equal(1, plan.Candidates.Count, "disabled, paused or unavailable reservation does not stop generation");
+            plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(catalog,
+                true, true, yes, yes, yes, true);
+            True(plan.MiniBossReserved, "two ready mini sources retain normal queue arbitration");
+            var interactions = new CreatorToolsPeskyPacing();
+            True(interactions.CanDispatchInteraction(true, false, 0, 1), "common gift initially eligible");
+            False(interactions.CanDispatchInteraction(true, false, 0, 1, true),
+                "automatic mini reservation drains opted-in earned common pressure");
+            True(interactions.CanDispatchInteraction(true, true, 0, 1, true),
+                "shared reservation never blocks either ready mini lane");
+            True(interactions.CanDispatchInteraction(false, false, 0, 1, true),
+                "explicit pacing bypass remains unaffected");
+        }
+
+        private static void TestInteractionGroups()
+        {
+            foreach (var id in new[] { "hilda_purple_zeppelin", "rootpack_homing_carrot",
+                "cagney_homing_plant", "frogs_firefly", "beppi_pink_balloon_dog" })
+                Equal("light", CreatorToolsInteractionGroups.ForItem(id), id);
+            foreach (var id in new[] { "hilda_green_zeppelin", "robot_homing_bomb",
+                "baroness_head_toss", "dragon_fireballs", "train_bone_ring",
+                "devil_fire_circle", "beppi_balloon_dog" })
+                Equal("strong", CreatorToolsInteractionGroups.ForItem(id), id);
+            foreach (var id in new[] { "baroness_cupcake", "baroness_gumball", "baroness_waffle",
+                "baroness_candy_corn", "baroness_jawbreaker" })
+                Equal("mini_boss", CreatorToolsInteractionGroups.ForItem(id), id);
+            Equal("strong", CreatorToolsInteractionGroups.ForItem("future_attack"), "future IDs start conservatively");
+        }
+
+        private sealed class SpawnBatchEntry
+        {
+            internal string Item;
+            internal string Donor;
+            internal bool Ready = true;
+        }
+
+        private static void TestEarnedSpawnBatches()
+        {
+            var first = new SpawnBatchEntry { Item = "rootpack_homing_carrot", Donor = "Ana" };
+            var delayed = new SpawnBatchEntry { Item = "frogs_firefly", Donor = "Beto", Ready = false };
+            var otherGroup = new SpawnBatchEntry { Item = "robot_homing_bomb", Donor = "Carla" };
+            var second = new SpawnBatchEntry { Item = "beppi_pink_balloon_dog", Donor = "Diego" };
+            var pending = new List<SpawnBatchEntry> { first, delayed, otherGroup, second };
+            var delivered = new List<SpawnBatchEntry>();
+            var count = CreatorToolsInteractionGroups.DispatchBatch(first, 3,
+                delegate(SpawnBatchEntry entry) { pending.Remove(entry); delivered.Add(entry); return true; },
+                delegate { return pending.Find(delegate(SpawnBatchEntry entry)
+                    { return entry.Ready && CreatorToolsInteractionGroups.ForItem(entry.Item) == "light"; }); });
+            Equal(2, count, "only existing eligible entries are admitted");
+            Equal(2, pending.Count, "delayed and other-group gifts remain queued");
+            Equal("Ana", delivered[0].Donor, "first original attribution survives");
+            Equal("Diego", delivered[1].Donor, "second original attribution survives");
+            True(object.ReferenceEquals(second, delivered[1]), "entries are consumed directly, never copied or multiplied");
+            True(pending.Contains(delayed), "no early dispatch of delayed gift");
+            True(pending.Contains(otherGroup), "another group's clock is not spent");
+        }
+
+        private static void TestSpawnBatchCapacity()
+        {
+            var first = new SpawnBatchEntry { Item = "dragon_fireballs", Donor = "Ana" };
+            var exclusive = new SpawnBatchEntry { Item = "dragon_fireballs", Donor = "Beto" };
+            var sibling = new SpawnBatchEntry { Item = "train_bone_ring", Donor = "Carla" };
+            var leftover = new SpawnBatchEntry { Item = "robot_homing_bomb", Donor = "Diego" };
+            var pending = new List<SpawnBatchEntry> { first, exclusive, sibling, leftover };
+            var active = 0;
+            var dragonActive = false;
+            var count = CreatorToolsInteractionGroups.DispatchBatch(first, 4,
+                delegate(SpawnBatchEntry entry)
+                {
+                    if (active >= 2 || (dragonActive && entry.Item == "dragon_fireballs")) return false;
+                    pending.Remove(entry);
+                    dragonActive |= entry.Item == "dragon_fireballs";
+                    active++;
+                    return true;
+                },
+                delegate { return active >= 2 ? null : pending.Find(delegate(SpawnBatchEntry entry)
+                    { return entry.Ready && !(dragonActive && entry.Item == "dragon_fireballs"); }); });
+            Equal(2, count, "available capacity overrides sampled group size");
+            True(pending.Contains(exclusive), "temporarily exclusive earned gift remains intact");
+            True(pending.Contains(leftover), "unfilled part of group remains earned work");
+            Equal(2, pending.Count, "capacity rechecked after each admission");
+            Equal(0, CreatorToolsInteractionGroups.DispatchBatch(exclusive, 3,
+                delegate(SpawnBatchEntry entry) { return false; },
+                delegate { throw new Exception("A rejected first entry cannot consume siblings."); }),
+                "rejected admission never advances group");
+        }
+    }
+}

@@ -89,16 +89,38 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   porque al desactivarlo puede borrar pendientes y actores activos sin perder
   donaciones. Si ambos modos están activos, la vista informa que los ataques de
   donaciones continuarán junto con los del modo.
-- Sólo en Modo Molestoso, `Ctrl+I` abre o cierra un panel secreto para configurar
-  el intervalo de aparición. No tiene botón ni entrada visible de navegación;
-  `Escape` y la X también lo cierran. El diálogo contiene el foco y lo restaura
-  al cerrar; el listener se retira al abandonar la sección.
-  Mínimo y máximo se guardan juntos, en segundos, entre 0.35 y 300, con mínimo
-  menor o igual al máximo. Valores iguales dan una espera fija; los valores
-  originales son 1.25 y 3.25. Restablecer modifica el formulario y requiere
-  Guardar. El juego persiste los valores, reinicia la siguiente espera y conserva
-  las colas, los cupos y la disponibilidad de actores. Batalla Molestosa conserva
-  sus propios tiempos. El indicador de guardado espera la confirmación del mod.
+- Modo Molestoso muestra la configuración a la derecha de Molestias pendientes
+  en escritorio, apilada en pantallas estrechas (hasta 68rem). Cantidades por
+  aparición, ajustes durante minijefe y resumen usan desplegables. El botón superior
+  y `Ctrl+I` enfocan su primer campo. Interacciones usa el mismo componente de
+  controles, con su propio interruptor de espaciado y sus valores independientes.
+  Los campos se agrupan en Ataques normales y Minijefes; las ayudas y el resumen
+  explican tiempos y cantidades, sin exponer nombres de implementación.
+- El intervalo de molestias normales admite 0.35–300 s y el descanso entre
+  minijefes 0–300 s, con mínimo <= máximo. El primer mini compatible no consume
+  ese descanso: puede entrar tras el margen seguro de inicio de 3 s. Los relojes
+  se congelan en pausa, se reinician al reintentar y no se consumen entre sí.
+- Los grupos `light`, `strong` y `mini_boss` se muestran como Molestias leves,
+  Molestias intensas y Minijefes. Son independientes de la dificultad de Cuphead.
+  Catálogo y pruebas comparten filtro de grupo, conservando borradores por ID.
+  Cada rango de cantidad para leves/intensas admite enteros 1–20. El runtime
+  revalida espacio y exclusividad por alta, por lo que puede salir un grupo menor.
+  El modo automático mezcla artículos del mismo grupo; las Interacciones agrupan
+  únicamente unidades pendientes y conservan sus donadores, regalos y retrasos.
+- Permitir varias molestias intensas a la vez está apagado por defecto.
+  Las intensas seleccionadas siempre son elegibles; sin marcar, Modo Molestoso
+  sólo añade una cuando no queda ninguna intensa activa, contando ambas colas.
+  Se revalida después de cada aparición del grupo y entre grupos distintos.
+  Marcar permite concurrencia respetando los demás límites; desmarcar no retira
+  los actores vivos. Interacciones conserva su admisión independiente. La lista
+  individual permanece habilitada y no cambia al tocar la casilla.
+  `allowConcurrentStrongInteractions` reemplaza el ajuste incorrecto
+  `allowStrongInteractions`; v8 migra al nuevo default false sin traducir el
+  antiguo opt-in de categoría a permiso de concurrencia.
+- Guardar cambios sólo guarda la sección actual. Usar estos ajustes en ambos
+  modos copia tiempos y cantidades, conservando interruptores y otros ajustes.
+  Volver a los ajustes originales prepara un borrador y requiere guardar.
+  El estado de conexión/guardado siempre refleja la confirmación autoritativa.
 - `Nombres aleatorios` es una configuración opcional. Cero nombres no es un
   error ni bloquea el interruptor: el panel debe explicar que los ataques se
   mostrarán sin nombre y permitir guardar la lista vacía.
@@ -109,15 +131,23 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 
 ## Contrato con el mod
 
-`GET /api/config/pesky` expone los intervalos actuales `minimumInterval` y
-`maximumInterval`, sus límites `intervalLowerLimit`/`intervalUpperLimit` y sus
-valores originales `defaultMinimumInterval`/`defaultMaximumInterval`.
-`GET /api/config/pesky/set` recibe ambos intervalos juntos. Unity valida que
-sean finitos, estén en rango y ordenados antes de cambiar o persistir el par;
-informa `intervals_saved` o `invalid_interval` por el snapshot y su revisión.
-El JSON v2 de Modo Molestoso conserva nombres y selecciones; los archivos
-anteriores adquieren los intervalos originales. Un par corrupto recupera sólo
-los intervalos, sin borrar el resto de la configuración.
+`GET /api/config/pesky` expone los campos actuales y sus defaults con prefijo
+`default`. Ambos modos usan `minimumInterval`/`maximumInterval` para molestias
+normales, `miniBossMinimumInterval`/`miniBossMaximumInterval` para el descanso
+entre minijefes, `lightMinimumBatch`/`lightMaximumBatch` y
+`strongMinimumBatch`/`strongMaximumBatch` para cantidad por aparición. Se conservan
+`miniBossIntervalMultiplier` y `maximumCompanionsDuringMiniBoss` como límites de
+ataques comunes mientras hay un minijefe. `miniBossCooldownSeconds` es alias
+compatible del mínimo del rango; una petición antigua con sólo ese descanso
+actualiza ambos extremos. Un par nuevo omitido conserva sus valores, un par
+incompleto se rechaza. Toda validación precede a cualquier mutación.
+
+`GET /api/config/pesky/set` acepta los campos sin prefijo. Interacciones los
+recibe en `/api/config/interactions/set` con prefijo `pacing.` y requiere su
+propio `pacing.enabled`. La confirmación de Interacciones compara todos los
+campos y `settingsRevision`. La migración a Pesky JSON v6 y la del archivo
+independiente de Interacciones conservan ajustes y guardan respaldo. El descanso
+antiguo se copia a ambos tiempos y los tamaños de grupo nuevos inician en 1.
 
 `GET /api/dashboard` entrega un snapshot con `schemaVersion`, `revision`,
 estado del motor, conexiones, contadores y eventos ordenados del más reciente al
@@ -188,7 +218,7 @@ React. El contrato completo para artículos futuros está en
 [INTERACTION_CATALOG.md](../INTERACTION_CATALOG.md).
 
 El mod bloquea despachos durante carga, pausa, derrota, cierre del nivel y los
-primeros 2.5 segundos de una partida. Los actores ya presentes permanecen
+primeros 3 segundos de una partida. Los actores ya presentes permanecen
 congelados al perder; la limpieza definitiva ocurre al destruirse la escena.
 
 La validación importante siempre se repite en C#. React puede impedir una

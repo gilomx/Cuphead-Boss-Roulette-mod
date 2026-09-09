@@ -1,0 +1,230 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunSpawnGroupSettingsTests()
+        {
+            Run("Spawn groups default to single attacks and keep separate mini-boss intervals", TestSpawnGroupDefaults);
+            Run("Legacy cooldown migrates into both mini-boss endpoints with original backups", TestSpawnGroupMigration);
+            Run("Every spawn group request validates atomically including optional pairs", TestSpawnGroupAtomicValidation);
+            Run("Spawn group ranges persist independently and legacy requests preserve omitted fields", TestSpawnGroupPersistence);
+            Run("Invalid stored Pesky group pairs recover without losing other groups", TestSpawnGroupStoredRecovery);
+        }
+
+        private static Dictionary<string, string> SpawnGroupValues(string prefix = "")
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { prefix + "enabled", "1" },
+                { prefix + "minimumInterval", "4" }, { prefix + "maximumInterval", "8" },
+                { prefix + "miniBossIntervalMultiplier", "3" }, { prefix + "maximumCompanionsDuringMiniBoss", "2" },
+                { prefix + "miniBossMinimumInterval", "12.5" }, { prefix + "miniBossMaximumInterval", "17" },
+                { prefix + "lightMinimumBatch", "2" }, { prefix + "lightMaximumBatch", "5" },
+                { prefix + "strongMinimumBatch", "1" }, { prefix + "strongMaximumBatch", "3" }
+            };
+        }
+
+        private static string SpawnGroupJson(CreatorToolsPeskyModeSettings settings)
+        {
+            var builder = new StringBuilder("{\"minimumInterval\":");
+            builder.Append(settings.MinimumInterval.ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\"maximumInterval\":").Append(settings.MaximumInterval.ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\"miniBossIntervalMultiplier\":").Append(settings.MiniBossIntervalMultiplier.ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\"maximumCompanionsDuringMiniBoss\":").Append(settings.MaximumCompanionsDuringMiniBoss);
+            settings.AppendSpawnSettingsJson(builder);
+            return builder.Append('}').ToString();
+        }
+
+        private static string SpawnGroupJson(CreatorToolsInteractionPacingSettings settings)
+        {
+            var builder = new StringBuilder();
+            settings.AppendJson(builder);
+            return builder.ToString();
+        }
+
+        private static void TestSpawnGroupDefaults()
+        {
+            using (var scope = new TestScope("spawn-group-defaults"))
+            {
+                var pesky = LoadPeskySettings(scope);
+                var interactions = LoadInteractionPacing(scope);
+                Equal(30f, pesky.MiniBossMinimumInterval, "Pesky mini minimum default");
+                Equal(30f, pesky.MiniBossMaximumInterval, "Pesky mini maximum default");
+                Equal(30f, interactions.MiniBossMinimumInterval, "Interactions mini minimum default");
+                Equal(30f, interactions.MiniBossMaximumInterval, "Interactions mini maximum default");
+                Equal(1, pesky.LightMinimumBatch, "Pesky light minimum default");
+                Equal(1, pesky.LightMaximumBatch, "Pesky light maximum default");
+                Equal(1, pesky.StrongMinimumBatch, "Pesky strong minimum default");
+                Equal(1, pesky.StrongMaximumBatch, "Pesky strong maximum default");
+                var builder = new StringBuilder("{\"ready\":true");
+                pesky.AppendSpawnSettingsJson(builder, true);
+                builder.Append('}');
+                using (var json = JsonDocument.Parse(builder.ToString()))
+                {
+                    Equal(30f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "controller default prefix");
+                    Equal(1, json.RootElement.GetProperty("defaultStrongMaximumBatch").GetInt32(), "controller batch default");
+                }
+                builder.Length = 0;
+                CreatorToolsInteractionPacingSettings.AppendDefaultsJson(builder);
+                using (var json = JsonDocument.Parse(builder.ToString()))
+                {
+                    Equal(1, json.RootElement.GetProperty("lightMinimumBatch").GetInt32(), "Interactions JSON batch default");
+                    Equal(1, json.RootElement.GetProperty("strongMaximumBatch").GetInt32(), "Interactions JSON strong default");
+                }
+            }
+        }
+
+        private static void TestSpawnGroupMigration()
+        {
+            using (var scope = new TestScope("spawn-group-migration"))
+            {
+                var peskyPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                var legacyPesky = BalanceJson("47.5", "4", "0").Replace("\"version\":3", "\"version\":5");
+                File.WriteAllText(peskyPath, legacyPesky);
+                var pesky = LoadPeskySettings(scope);
+                Equal(47.5f, pesky.MiniBossMinimumInterval, "legacy Pesky cooldown becomes minimum");
+                Equal(47.5f, pesky.MiniBossMaximumInterval, "legacy Pesky cooldown becomes maximum");
+                Equal(6f, pesky.MinimumInterval, "normal cadence remains customized");
+                Equal(legacyPesky, File.ReadAllText(peskyPath + ".bak"), "original Pesky backup");
+                using (var json = JsonDocument.Parse(File.ReadAllText(peskyPath)))
+                    Equal(8, json.RootElement.GetProperty("version").GetInt32(), "new schema version");
+
+                var interactionPath = Path.Combine(scope.ConfigDirectory, CreatorToolsInteractionPacingSettings.FileName);
+                const string legacyInteractions = "{\"enabled\":true,\"minimumInterval\":2,\"maximumInterval\":5," +
+                    "\"miniBossCooldownSeconds\":91,\"miniBossIntervalMultiplier\":2,\"maximumCompanionsDuringMiniBoss\":1}";
+                File.WriteAllText(interactionPath, legacyInteractions);
+                var interactions = LoadInteractionPacing(scope);
+                Equal(91f, interactions.MiniBossMinimumInterval, "own legacy interaction minimum");
+                Equal(91f, interactions.MiniBossMaximumInterval, "own legacy interaction maximum");
+                True(interactions.Enabled, "existing enabled interaction setting retained");
+                Equal(legacyInteractions, File.ReadAllText(interactionPath + ".bak"), "original Interactions backup");
+                Equal(47.5f, LoadPeskySettings(scope).MiniBossMinimumInterval, "migration does not cross modes");
+                using (var json = JsonDocument.Parse(File.ReadAllText(interactionPath)))
+                    Equal(91f, json.RootElement.GetProperty("miniBossMaximumInterval").GetSingle(), "migrated Interactions saved immediately");
+            }
+        }
+
+        private static void TestSpawnGroupAtomicValidation()
+        {
+            using (var scope = new TestScope("spawn-group-atomic"))
+            {
+                var pesky = LoadPeskySettings(scope);
+                var interactions = LoadInteractionPacing(scope);
+                True(pesky.TrySetPacing(SpawnGroupValues()), "initial Pesky groups");
+                True(interactions.TrySetFromValues(SpawnGroupValues("pacing."), "pacing."), "initial interaction groups");
+                var originalPesky = SpawnGroupJson(pesky);
+                var originalInteractions = SpawnGroupJson(interactions);
+                foreach (var bad in new[]
+                {
+                    new[] { "minimumInterval", "9" }, new[] { "miniBossMinimumInterval", "18" },
+                    new[] { "miniBossMinimumInterval", "-0.1" }, new[] { "miniBossMaximumInterval", "301" },
+                    new[] { "miniBossMaximumInterval", "NaN" }, new[] { "lightMinimumBatch", "0" },
+                    new[] { "lightMaximumBatch", "21" }, new[] { "lightMaximumBatch", "Infinity" },
+                    new[] { "lightMinimumBatch", "6" }, new[] { "strongMinimumBatch", "1.5" },
+                    new[] { "strongMaximumBatch", "0" }, new[] { "strongMaximumBatch", "1e100" },
+                    new[] { "miniBossCooldownSeconds", "NaN" }, new[] { "miniBossIntervalMultiplier", "0" },
+                    new[] { "maximumCompanionsDuringMiniBoss", "1.5" }
+                })
+                {
+                    var peskyValues = SpawnGroupValues();
+                    peskyValues["minimumInterval"] = "5";
+                    peskyValues[bad[0]] = bad[1];
+                    False(pesky.TrySetPacing(peskyValues), "Pesky rejects " + bad[0]);
+                    Equal(originalPesky, SpawnGroupJson(pesky), "Pesky request leaves every value untouched");
+                    var interactionValues = SpawnGroupValues("pacing.");
+                    interactionValues["pacing.enabled"] = "0";
+                    interactionValues["pacing." + bad[0]] = bad[1];
+                    False(interactions.TrySet(interactionValues, "pacing."), "Interactions rejects " + bad[0]);
+                    Equal(originalInteractions, SpawnGroupJson(interactions), "Interactions rejection also preserves enabled state");
+                }
+                foreach (var key in CreatorToolsSpawnGroupSettings.PropertyNames)
+                {
+                    var values = SpawnGroupValues();
+                    values.Remove(key);
+                    False(pesky.TrySetPacing(values), "half supplied Pesky pair rejected");
+                    var interactionValues = SpawnGroupValues("pacing.");
+                    interactionValues.Remove("pacing." + key);
+                    False(interactions.TrySet(interactionValues, "pacing."), "half supplied interaction pair rejected");
+                }
+                Equal(originalPesky, SpawnGroupJson(pesky), "partial pairs keep original values");
+                Equal(originalInteractions, SpawnGroupJson(interactions), "partial interaction pairs keep original values");
+                var boundaries = SpawnGroupValues();
+                boundaries["miniBossMinimumInterval"] = "0";
+                boundaries["miniBossMaximumInterval"] = "300";
+                boundaries["lightMinimumBatch"] = "1";
+                boundaries["lightMaximumBatch"] = "20";
+                boundaries["strongMinimumBatch"] = boundaries["strongMaximumBatch"] = "20";
+                True(pesky.TrySetPacing(boundaries), "inclusive range and fixed batch boundaries accepted");
+            }
+        }
+
+        private static void TestSpawnGroupPersistence()
+        {
+            using (var scope = new TestScope("spawn-group-persistence"))
+            {
+                var pesky = LoadPeskySettings(scope);
+                True(pesky.TrySetPacing(SpawnGroupValues()), "set Pesky groups");
+                pesky.Save();
+                var originalPesky = SpawnGroupJson(pesky);
+                Equal(originalPesky, SpawnGroupJson(LoadPeskySettings(scope)), "all Pesky group fields round trip");
+                var peskyPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                var persistedPesky = File.ReadAllText(peskyPath);
+                var interactions = LoadInteractionPacing(scope);
+                var values = SpawnGroupValues("pacing.");
+                values["pacing.miniBossMinimumInterval"] = "40";
+                values["pacing.miniBossMaximumInterval"] = "80";
+                values["pacing.lightMaximumBatch"] = "10";
+                values["pacing.miniBossCooldownSeconds"] = "123";
+                True(interactions.TrySet(values, "pacing."), "new interval pair supersedes valid old alias");
+                Equal(40f, interactions.MiniBossCooldownSeconds, "old alias always projects new minimum");
+                interactions.Save();
+                Equal(SpawnGroupJson(interactions), SpawnGroupJson(LoadInteractionPacing(scope)), "interaction ranges round trip");
+                Equal(persistedPesky, File.ReadAllText(peskyPath), "saving interactions never rewrites Pesky");
+
+                True(pesky.TrySetPacing("2", "4", null, null, null), "old interval-only Pesky client");
+                Equal(17f, pesky.MiniBossMaximumInterval, "omitting cooldown preserves variable maximum");
+                Equal(5, pesky.LightMaximumBatch, "omitted batch range preserved");
+                True(pesky.TrySetPacing("2", "4", "50", "2", "1"), "old complete Pesky client");
+                Equal(50f, pesky.MiniBossMinimumInterval, "old cooldown changes new minimum");
+                Equal(50f, pesky.MiniBossMaximumInterval, "old cooldown changes new maximum");
+                Equal(3, pesky.StrongMaximumBatch, "legacy client does not reset group batching");
+                var oldValues = InteractionPacingValues();
+                oldValues.Remove("pacing.miniBossCooldownSeconds");
+                True(interactions.TrySet(oldValues, "pacing."), "omitted interaction extensions accepted");
+                Equal(80f, interactions.MiniBossMaximumInterval, "omitted interaction interval pair preserved");
+                oldValues["pacing.miniBossCooldownSeconds"] = "25";
+                True(interactions.TrySet(oldValues, "pacing."), "old interaction cooldown accepted");
+                Equal(25f, interactions.MiniBossMinimumInterval, "legacy interaction cooldown updates minimum");
+                Equal(25f, interactions.MiniBossMaximumInterval, "legacy interaction cooldown updates maximum");
+                Equal(10, interactions.LightMaximumBatch, "legacy interaction request keeps batches");
+            }
+        }
+
+        private static void TestSpawnGroupStoredRecovery()
+        {
+            using (var scope = new TestScope("spawn-group-stored-recovery"))
+            {
+                var settings = LoadPeskySettings(scope);
+                True(settings.TrySetPacing(SpawnGroupValues()), "initial valid groups");
+                settings.SetNames(new[] { "Conservar nombre" });
+                settings.Save();
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                var stored = File.ReadAllText(path).Replace("\"lightMinimumBatch\":2", "\"lightMinimumBatch\":9");
+                File.WriteAllText(path, stored);
+                settings = LoadPeskySettings(scope);
+                Equal(1, settings.LightMinimumBatch, "invalid light pair falls back together");
+                Equal(1, settings.LightMaximumBatch, "invalid light maximum falls back");
+                Equal(3, settings.StrongMaximumBatch, "valid strong pair survives");
+                Equal(17f, settings.MiniBossMaximumInterval, "valid mini-boss range survives");
+                Equal("Conservar nombre", settings.Names[0], "stored repair retains names");
+            }
+        }
+    }
+}

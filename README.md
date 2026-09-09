@@ -149,60 +149,85 @@ donaciones. Al apagarlo se eliminan únicamente sus molestias pendientes y las
 que sigan activas en pantalla. La lista de nombres aleatorios es opcional; si se
 deja vacía, los ataques aparecen sin nombre.
 
-El ritmo predeterminado es de **1.25–3.25 segundos**. Mientras haya un minijefe,
-Modo Molestoso duplica ese intervalo y permite como máximo una molestia común
-adicional. Antes de introducir un minijefe espera a que queden como máximo esas
-mismas molestias comunes. Al desaparecer el minijefe, recupera el ritmo normal,
-pero espera **30 segundos de juego** antes de volver a incluir minijefes en el
-sorteo. La pausa no consume ese descanso y reintentar empieza una cuenta nueva.
+Los controles separan **Ataques normales** y **Minijefes**, con un resumen
+que muestra las esperas resultantes. Modo Molestoso e Interacciones conservan
+sus propios ajustes. En Interacciones hay que activar **Espaciar los ataques
+de los regalos** y guardar para usar estos tiempos y grupos; no crea ataques
+aleatorios ni aumenta la cantidad recibida por un regalo.
 
-Los ajustes de balance se guardan en
-`BepInEx/config/mx.gilomx.cuphead.bossroulette.pesky-mode.json` y se pueden
-editar en el bloque visible **Configuración de Modo Molestoso**, debajo del
-control del modo (el botón superior y `Ctrl+I` llevan al primer campo). Guardar
-aplica sólo los ajustes de este modo; Restablecer predeterminados los prepara
-para guardar. Si prefieres editar el
-archivo, hazlo con el juego cerrado:
+Los minijefes tienen su propio turno. El primero puede entrar en cuanto termina
+el margen seguro de inicio de la pelea (3 segundos) y hay un minijefe habilitado
+compatible y preparado. No compite con las molestias normales en el sorteo.
+Después de que desaparece uno, se elige una nueva espera entre los valores de
+**Descanso antes del siguiente minijefe**. Los ataques comunes pueden continuar
+durante ese descanso. La pausa no consume las esperas y reintentar empieza de
+nuevo. Los límites de espacio y la disponibilidad del nivel pueden retrasar una
+entrada; los tiempos no prometen una aparición exacta.
 
-| Campo | Predeterminado | Valores admitidos |
-| --- | --- | --- |
-| `minimumInterval` | `1.25` segundos | 0.35–300, menor o igual al máximo |
-| `maximumInterval` | `3.25` segundos | 0.35–300, mayor o igual al mínimo |
-| `miniBossCooldownSeconds` | `30` segundos | 0–300 |
-| `miniBossIntervalMultiplier` | `2` | 1–10 |
-| `maximumCompanionsDuringMiniBoss` | `1` | Enteros de 0–20; 0 elimina el acompañamiento automático |
+El catálogo añade grupos independientes de la dificultad de Cuphead:
 
-Se conservan los intervalos personalizados, nombres y artículos de archivos
-anteriores; los campos nuevos se añaden al cargar, con respaldo `.bak`. Los
-cinco ajustes están disponibles en el mismo bloque. El descanso nuevo se usa
-cuando desaparece el siguiente minijefe; no reinicia un descanso ya en curso.
-**Interacciones tiene una configuración independiente**, directamente en
-Interacciones → Configuración → Ritmo y minijefes de Interacciones. Incluye su
-propia casilla **Activar balance de Interacciones**, intervalo mínimo/máximo,
-descanso, multiplicador, máximo de acompañantes y botón para restaurar sólo su
-balance. El botón Guardar de esa sección aplica sus cambios. No abre los ajustes
-de Modo Molestoso ni comparte valores o temporizadores con él.
+- **Molestias leves**: zepelín morado, zanahoria, semilla azul, luciérnaga y perrito rosa.
+- **Molestias intensas**: zepelín verde, bomba, cabeza de la Baronesa, bolas del
+  dragón, aro de huesos, círculo de fuego y perrito globo aleatorio.
+- **Minijefes**: los cinco mini jefes de la Baronesa. Se conserva el límite de uno.
 
-Ambos bloques incluyen **Aplicar valores a ambos**: guarda los cinco valores
-numéricos del bloque actual en las dos configuraciones una sola vez. No vincula
-ediciones futuras ni cambia interruptores, nombres, artículos u otros ajustes.
-Restablecer prepara sólo los predeterminados del modo actual; después puedes
-guardarlos para ese modo o aplicar los valores numéricos a ambos.
+**Permitir varias molestias intensas a la vez** empieza desactivado en Modo
+Molestoso. Las intensas seleccionadas pueden aparecer siempre: sin marcar,
+el modo espera a que termine la intensa actual antes de añadir otra; marcado,
+permite varias respetando espacio, cantidades y exclusividades. Se comprueba
+también entre apariciones distintas. Al desmarcar, las que ya están vivas
+terminan normalmente. Las leves y los minijefes conservan sus propios límites,
+igual que los canjes y las pruebas de Interacciones.
 
-El balance de Interacciones está desactivado por defecto, conservando el ritmo
-anterior de TikFinity y pruebas manuales. Sus valores iniciales son 1.25–3.25 s,
-30 s de descanso, multiplicador 2 y un acompañante. Se guardan por separado en
-`BepInEx/config/mx.gilomx.cuphead.bossroulette.interaction-pacing.json`: los mismos
-cinco nombres de campo de la tabla y `enabled` (booleano). Al activarlo, los
-canjeos esperan hasta que su propio balance permita entrar, sin descartarse por
-estas reglas. Funciona aunque Modo Molestoso esté apagado.
+Los minijefes del mod conservan el 65% de su vida original: en Fácil/Normal,
+Cupcake 121, Máquina de chicles 176, Waffle 163, Maíz dulce 147 y Rompemandíbulas 117.
+En Experto tienen 153, 208, 199, 163 y 143 respectivamente. La máquina de chicles
+espera el doble entre disparos y lanza aproximadamente la mitad por ráfaga.
+El Maíz dulce espera 2.1–2.9 s en Normal y 1.9–2.6 s en Experto después de
+crear un pequeño, antes de poder generar otro durante un giro.
+La pelea original de la Baronesa conserva sus valores.
 
-Cambiar, activar o restaurar el balance de una fuente no modifica el de la otra.
-Cada fuente tiene su propia espera entre apariciones y su propio descanso de
-minijefes. Ambas observan los actores que ya hay en la arena para calcular el
-acompañamiento. Batalla Molestosa mantiene sus reglas independientes. El límite
-global de un minijefe y el máximo general de cada cola siguen aplicándose. El
-acompañamiento cuenta artículos activos, no cada proyectil que produzcan.
+El tamaño de las molestias y sus proyectiles se adapta automáticamente al
+escenario, igual que el de los minijefes: 20% más pequeñas en avión y Perritos
+Pilotos, tamaño natural en Chef Saleroso, Granitoviejo y la zona inferior del
+Diablo, y tamaño habitual en los demás. Los nombres y regalos mantienen su
+tamaño legible. Este ajuste no necesita una opción nueva en el panel.
+
+**Cantidad por aparición** permite elegir un rango distinto para leves e
+intensas. Modo Molestoso elige un grupo y genera sus ataques juntos, mezclando
+artículos habilitados de ese grupo. Interacciones agrupa únicamente ataques ya
+pendientes del mismo grupo, conservando cantidad, donador, regalo y espera de
+cada uno. Los que no pueden entrar siguen pendientes. El espacio disponible y
+las restricciones de cada ataque se revisan después de cada aparición; un grupo
+puede ser menor al solicitado. Las bolas del dragón mantienen su exclusividad.
+Los grupos automáticos no acumulan ataques sobrantes para enviarlos después.
+
+Mientras hay un minijefe, **Espera entre los otros ataques** alarga la espera
+normal (por ejemplo, 2–4 segundos y el doble de tiempo dan 4–8 segundos).
+**Otros ataques permitidos a la vez** limita las molestias comunes que lo
+acompañan. Con 0, se espera a que terminen las comunes y no se añaden otras
+mientras esté presente. No se eliminan ataques para hacer espacio. Se cuentan
+interacciones completas, no cada proyectil que produzcan.
+
+**Guardar cambios** aplica sólo la sección actual. **Usar estos ajustes en ambos
+modos** guarda los tiempos y cantidades de esa sección en ambos, conservando
+los interruptores y los demás ajustes; después pueden editarse por separado.
+**Restaurar ajustes** prepara los valores y requiere guardar.
+
+| Ajuste | Valor original |
+| --- | --- |
+| Espera entre molestias normales | 1.25–3.25 segundos |
+| Descanso antes de otro minijefe | 30–30 segundos |
+| Espera normal mientras hay minijefe | El doble de tiempo |
+| Otros ataques junto al minijefe | 1 |
+| Molestias leves por aparición | 1–1 |
+| Molestias intensas por aparición | 1–1 |
+
+Se conservan los valores guardados: el descanso antiguo pasa a ambos extremos
+del nuevo rango, y las cantidades empiezan en 1–1. Los archivos independientes
+siguen en `BepInEx/config/mx.gilomx.cuphead.bossroulette.pesky-mode.json` (v6) y
+`mx.gilomx.cuphead.bossroulette.interaction-pacing.json`, con respaldo `.bak`
+al migrar. Batalla Molestosa conserva sus reglas y la exclusividad del minijefe.
 
 `Batalla Molestosa` se arma desde el Dashboard eligiendo un regalo de TikTok.
 Los primeros cinco donadores distintos que envíen ese regalo ocupan los cinco

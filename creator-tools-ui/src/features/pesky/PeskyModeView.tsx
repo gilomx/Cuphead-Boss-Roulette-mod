@@ -129,8 +129,6 @@ export function PeskyModeView() {
         </div>
       </section>
 
-      <PeskyIntervalPanel />
-
       {blockedByPeskyBattle ? (
         <p
           className="pesky-interactions-notice"
@@ -241,6 +239,7 @@ export function PeskyModeView() {
         </section>
 
         <div className="interaction-workspace__tools">
+        <PeskyIntervalPanel />
         <section className="interaction-panel pesky-names" aria-labelledby="pesky-names-title">
           <div className="interaction-panel__heading">
             <div>
@@ -305,7 +304,7 @@ export function PeskyModeView() {
                   <img src={item.image} alt="" />
                   <span>
                     <strong>{t(item.titleKey)}</strong>
-                    <small>{t(item.typeKey)}</small>
+                    <small>{t(`interactions.groups.${item.group}`)}</small>
                   </span>
                   <input
                     type="checkbox"

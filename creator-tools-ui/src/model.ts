@@ -93,9 +93,17 @@ export interface InteractionPacingConfig {
   miniBossCooldownSeconds: number;
   miniBossIntervalMultiplier: number;
   maximumCompanionsDuringMiniBoss: number;
+  miniBossMinimumInterval: number;
+  miniBossMaximumInterval: number;
+  lightMinimumBatch: number;
+  lightMaximumBatch: number;
+  strongMinimumBatch: number;
+  strongMaximumBatch: number;
 }
 
-export interface PeskyModeConfigState {
+export interface PeskyModeConfigState extends Omit<InteractionPacingConfig, "enabled"> {
+  allowConcurrentStrongInteractions: boolean;
+  defaultAllowConcurrentStrongInteractions: boolean;
   ready: boolean;
   available: boolean;
   enabled: boolean;
@@ -116,6 +124,12 @@ export interface PeskyModeConfigState {
   defaultMiniBossCooldownSeconds: number;
   defaultMiniBossIntervalMultiplier: number;
   defaultMaximumCompanionsDuringMiniBoss: number;
+  defaultMiniBossMinimumInterval: number;
+  defaultMiniBossMaximumInterval: number;
+  defaultLightMinimumBatch: number;
+  defaultLightMaximumBatch: number;
+  defaultStrongMinimumBatch: number;
+  defaultStrongMaximumBatch: number;
   names: string[];
   items: string[];
   disabledItems: string[];

@@ -71,20 +71,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!Ready)
-                CaptureFromLoadedTrain();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(TrainSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedTrain();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(TrainSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -159,17 +164,20 @@ namespace Gilomx.CupheadBossRoulette
                     "CreatorTools_NativeTrainBoneRing";
                 actor.gameObject.SetActive(true);
                 var cameraScale = CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(actor.gameObject, logWarning);
+                    GetGameplayCameraScale();
+                var bodyScale = CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(actor.gameObject, logWarning);
                 scaleRoot = WrapScaleWithoutChangingNativeAnimation(
                     actor,
-                    cameraScale);
+                    bodyScale);
                 CreatorToolsInteractionPresentation.
                     MarkInheritedGameplayCameraScale(
                         actor.gameObject,
-                        cameraScale);
-                MoveFullyAboveCamera(actor, parameters.Position.y, cameraScale);
+                        bodyScale);
+                MoveFullyAboveCamera(actor, parameters.Position.y,
+                    bodyScale, cameraScale);
                 var state = scaleRoot.AddComponent<TrainBoneRingInteractionState>();
-                state.Initialize(actor, cameraScale, logWarning);
+                state.Initialize(actor, bodyScale, logWarning);
                 CreatorToolsInteractionPresentation.PrepareActor(
                     actor.gameObject,
                     FindLabelAnchor(actor.gameObject),
@@ -459,15 +467,15 @@ namespace Gilomx.CupheadBossRoulette
 
         private static GameObject WrapScaleWithoutChangingNativeAnimation(
             TrainLevelEngineBossDropperProjectile actor,
-            float cameraScale)
+            float bodyScale)
         {
             var actorTransform = actor.transform;
             var worldPosition = actorTransform.position;
             var worldRotation = actorTransform.rotation;
             var scaledNative = actorTransform.localScale;
             var nativeScale = new Vector3(
-                scaledNative.x / cameraScale,
-                scaledNative.y / cameraScale,
+                scaledNative.x / bodyScale,
+                scaledNative.y / bodyScale,
                 scaledNative.z);
 
             var scaleRoot = new GameObject(
@@ -475,8 +483,8 @@ namespace Gilomx.CupheadBossRoulette
             scaleRoot.transform.position = worldPosition;
             scaleRoot.transform.rotation = Quaternion.identity;
             scaleRoot.transform.localScale = new Vector3(
-                cameraScale,
-                cameraScale,
+                bodyScale,
+                bodyScale,
                 1f);
             actorTransform.SetParent(scaleRoot.transform, false);
             actorTransform.localPosition = Vector3.zero;
@@ -488,14 +496,15 @@ namespace Gilomx.CupheadBossRoulette
         private static void MoveFullyAboveCamera(
             TrainLevelEngineBossDropperProjectile actor,
             float topBoundary,
+            float bodyScale,
             float cameraScale)
         {
             var renderer = actor.GetComponent<SpriteRenderer>();
             // Init starts at half scale and grows to one. Reserve the full
             // native sprite below its pivot before letting the ring fall in.
             var lowerExtent = renderer == null || renderer.sprite == null
-                ? 100f * cameraScale
-                : Mathf.Max(0f, -renderer.sprite.bounds.min.y) * cameraScale;
+                ? 100f * bodyScale
+                : Mathf.Max(0f, -renderer.sprite.bounds.min.y) * bodyScale;
             var position = actor.transform.position;
             position.y = topBoundary + lowerExtent + 16f * cameraScale;
             actor.transform.position = position;

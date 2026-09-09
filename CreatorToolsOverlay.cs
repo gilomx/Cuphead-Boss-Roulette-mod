@@ -62,6 +62,7 @@ namespace Gilomx.CupheadBossRoulette
         private TikFinityCompanionHost creatorToolsTikFinityCompanion;
         private CreatorToolsStreamWorker creatorToolsStreamWorker;
         private bool creatorToolsShuttingDown;
+        private bool creatorToolsNativePreloadWindow;
         private readonly object creatorToolsInteractionsSettingLock =
             new object();
         private volatile bool creatorToolsInteractionsEnabled;
@@ -251,19 +252,11 @@ namespace Gilomx.CupheadBossRoulette
         private bool CanPreloadNativeInteractionAssets()
         {
             if (SceneLoader.CurrentlyLoading)
-                return false;
+                return creatorToolsNativePreloadWindow;
 
-            // The map remains the preferred preload window, but a player may
-            // enter a native boss before the serialized cache queue finishes
-            // or enable Creator Tools after the fight has already begun.
-            // Scoped lifecycle guards make those remaining additive captures
-            // safe without requiring a roulette-started session.
-            if (CanUseRouletteOnMap())
-                return true;
-            // Inside gameplay, wait for the same stable, unpaused start gate
-            // used by dispatch. This avoids additive scene I/O during the
-            // intro, pause, defeat and result transitions.
-            return CanSpawnCreatorToolsInteraction();
+            // Finish pending work behind the native loading screen. Additive
+            // activation/unloading can stall Unity even in a stable fight.
+            return CanUseRouletteOnMap();
         }
 
         private bool CanSpawnCreatorToolsInteraction()
@@ -687,6 +680,57 @@ namespace Gilomx.CupheadBossRoulette
             harmony.Patch(
                 loadLevel,
                 prefix: new HarmonyLib.HarmonyMethod(loadLevelPrefix));
+
+            var loadCoroutine = HarmonyLib.AccessTools.Method(
+                typeof(SceneLoader), "load_cr");
+            var loadPostfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin), "CreatorToolsNativeSceneLoadPostfix");
+            if (loadCoroutine == null || loadPostfix == null)
+            {
+                Logger.LogWarning(
+                    "Could not prepare the interaction catalog during scene loading.");
+                return;
+            }
+            harmony.Patch(loadCoroutine,
+                postfix: new HarmonyLib.HarmonyMethod(loadPostfix));
+        }
+
+        private static void CreatorToolsNativeSceneLoadPostfix(
+            ref System.Collections.IEnumerator __result,
+            ref bool ___doneLoadingSceneAsync)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || plugin.creatorToolsInteractions == null)
+                return;
+
+            // load_cr is called only after in_cr covers the old scene. Its
+            // original iterator has not run or queued a native scene yet.
+            // Reset this before our first yield: a reused loader must not
+            // mistake its previous completion flag for this transition.
+            ___doneLoadingSceneAsync = false;
+            var sceneName = SceneLoader.SceneName ?? string.Empty;
+            var prepare = sceneName.StartsWith(
+                "scene_level_", StringComparison.OrdinalIgnoreCase);
+            if (prepare && !plugin.creatorToolsInteractions.NativeAssetsSettled)
+                plugin.Logger.LogInfo(
+                    "Preparing the native interaction catalog before " + sceneName + ".");
+            __result = NativeInteractionLoadingBarrier.BeforeSceneLoad(
+                __result, prepare,
+                delegate
+                {
+                    return plugin.creatorToolsInteractions == null ||
+                        plugin.creatorToolsInteractions.NativeAssetsSettled;
+                },
+                delegate { return NativeInteractionPreloadCoordinator.IsBusy; },
+                delegate(bool allowed) { plugin.creatorToolsNativePreloadWindow = allowed; },
+                delegate { return Time.realtimeSinceStartup; },
+                delegate
+                {
+                    plugin.Logger.LogWarning(
+                        "Catalog preparation exceeded 30 seconds. Finishing the " +
+                        "current preload; remaining assets will wait for the map " +
+                        "or a later loading screen, never load during combat.");
+                });
         }
 
         private static void CreatorToolsGameplayLevelLoadPrefix()

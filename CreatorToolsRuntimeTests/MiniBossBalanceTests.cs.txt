@@ -1,0 +1,136 @@
+using System;
+using System.IO;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunMiniBossBalanceTests()
+        {
+            Run("Catalog mini-bosses retain sixty-five percent health in all difficulties", TestCatalogMiniBossHealth);
+            Run("Intense attacks stay eligible with concurrency disabled", TestPeskyStrongOptIn);
+            Run("Strong concurrency limits live actors and rechecks each batch admission", TestStrongConcurrency);
+            Run("Strong concurrency validates atomically and persists independently", TestPeskyStrongPersistence);
+            Run("Legacy group toggle migrates to single intense attacks", TestPeskyStrongMigration);
+        }
+
+        private static void TestCatalogMiniBossHealth()
+        {
+            var native = new[] { 185, 270, 250, 225, 180, 235, 320, 305, 250, 220 };
+            var expected = new[] { 121, 176, 163, 147, 117, 153, 208, 199, 163, 143 };
+            for (var i = 0; i < native.Length; i++)
+                Equal(expected[i], CreatorToolsMiniBossHealth.ForCatalog(native[i]), "mini-boss health " + i);
+            Equal(1, CreatorToolsMiniBossHealth.ForCatalog(1), "never create a dead mini-boss");
+            Equal(3, CreatorToolsMiniBossHealth.ForCatalog(4), "fractional health rounds up");
+        }
+
+        private static void TestPeskyStrongOptIn()
+        {
+            using (var scope = new TestScope("pesky-strong-opt-in"))
+            {
+                var settings = LoadPeskySettings(scope);
+                False(settings.AllowConcurrentStrongInteractions, "default opt-in");
+                Equal(CreatorToolsInteractionIds.All.Length, settings.EnabledItemCount, "every selected type remains eligible");
+                foreach (var item in CreatorToolsInteractionIds.All)
+                    True(settings.IsItemEnabled(item), "default pool " + item);
+                settings.DisabledItems.Add("robot_homing_bomb");
+                var values = SpawnGroupValues();
+                values["allowConcurrentStrongInteractions"] = "true";
+                True(settings.TrySetPacing(values), "opt in");
+                True(settings.IsItemEnabled("dragon_fireballs"), "strong attack becomes eligible");
+                False(settings.IsItemEnabled("robot_homing_bomb"), "individual exclusion retained");
+                var plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(
+                    new[] { "robot_homing_bomb", "dragon_fireballs", "rootpack_homing_carrot" },
+                    false, true, settings.IsItemEnabled, delegate { return true; }, delegate { return true; });
+                Equal(2, plan.Candidates.Count, "selector honors both opt-in and individual selection");
+                values["allowConcurrentStrongInteractions"] = "0";
+                True(settings.TrySetPacing(values), "opt out");
+                plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(
+                    new[] { "dragon_fireballs", "rootpack_homing_carrot" },
+                    false, true, settings.IsItemEnabled, delegate { return true; }, delegate { return true; });
+                Equal(2, plan.Candidates.Count, "an intense candidate stays available with concurrency off");
+                True(settings.DisabledItems.Contains("robot_homing_bomb"), "concurrency never rewrites item choices");
+            }
+        }
+
+        private static void TestStrongConcurrency()
+        {
+            var intense = new[] { "hilda_green_zeppelin", "robot_homing_bomb", "baroness_head_toss",
+                "dragon_fireballs", "train_bone_ring", "devil_fire_circle", "beppi_balloon_dog" };
+            foreach (var item in intense)
+            {
+                True(CreatorToolsInteractionGroups.CanAddStrongInteraction(item, false, 0), "first intense " + item);
+                False(CreatorToolsInteractionGroups.CanAddStrongInteraction(item, false, 1), "second intense " + item);
+                False(CreatorToolsInteractionGroups.CanAddStrongInteraction(item, false, 3), "existing actors drain after disabling");
+                True(CreatorToolsInteractionGroups.CanAddStrongInteraction(item, true, 3), "opt-in permits concurrency");
+                True(CreatorToolsInteractionGroups.CanAddStrongInteraction(item, false, 0), "slot is reusable after completion");
+            }
+            True(CreatorToolsInteractionGroups.CanAddStrongInteraction("rootpack_homing_carrot", false, 3), "light attacks retain their own limits");
+            True(CreatorToolsInteractionGroups.CanAddStrongInteraction("baroness_cupcake", false, 3), "mini-boss admission remains independent");
+            foreach (var allowMultiple in new[] { false, true })
+            {
+                var liveStrong = 0;
+                var dispatched = CreatorToolsInteractionGroups.DispatchBatch("robot_homing_bomb", 3,
+                    delegate(string item)
+                    {
+                        if (!CreatorToolsInteractionGroups.CanAddStrongInteraction(item, allowMultiple, liveStrong)) return false;
+                        liveStrong++;
+                        return true;
+                    }, delegate { return "beppi_balloon_dog"; });
+                Equal(allowMultiple ? 3 : 1, dispatched, "same-frame admissions recheck live count");
+            }
+        }
+
+        private static void TestPeskyStrongPersistence()
+        {
+            using (var scope = new TestScope("pesky-strong-persist"))
+            {
+                var settings = LoadPeskySettings(scope);
+                var values = SpawnGroupValues();
+                values["allowConcurrentStrongInteractions"] = "1";
+                True(settings.TrySetPacing(values), "initial opt-in");
+                var snapshot = SpawnGroupJson(settings);
+                foreach (var invalid in new[] { "yes", "2", "", "null", "on" })
+                {
+                    values["allowConcurrentStrongInteractions"] = invalid;
+                    values["minimumInterval"] = "6";
+                    False(settings.TrySetPacing(values), "invalid switch rejected");
+                    Equal(snapshot, SpawnGroupJson(settings), "all settings preserved on rejection");
+                }
+                values.Remove("allowConcurrentStrongInteractions");
+                True(settings.TrySetPacing(values), "legacy numeric update");
+                True(settings.AllowConcurrentStrongInteractions, "omitted switch preserved");
+                settings.Save();
+                True(LoadPeskySettings(scope).AllowConcurrentStrongInteractions, "opt-in persists after reload");
+                var interactions = LoadInteractionPacing(scope);
+                False(SpawnGroupJson(interactions).Contains("allowConcurrentStrongInteractions"), "no gate added to gifts or manual interactions");
+            }
+        }
+
+        private static void TestPeskyStrongMigration()
+        {
+            using (var scope = new TestScope("pesky-strong-migration"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                const string legacy = "{\"version\":7,\"allowStrongInteractions\":true,\"enabled\":true,\"names\":[\"Viewer\"]," +
+                    "\"disabledItems\":[\"robot_homing_bomb\"],\"minimumInterval\":4,\"maximumInterval\":7}";
+                File.WriteAllText(path, legacy);
+                var settings = LoadPeskySettings(scope);
+                False(settings.AllowConcurrentStrongInteractions, "old files default off");
+                True(settings.Enabled, "mode continues with all individually selected groups");
+                True(settings.IsItemEnabled("devil_fire_circle"), "old toggle cannot suppress intense attacks");
+                True(settings.DisabledItems.Contains("robot_homing_bomb"), "stored selections survive");
+                Equal("Viewer", settings.Names[0], "names survive");
+                Equal(4f, settings.MinimumInterval, "timing survives");
+                Equal(legacy, File.ReadAllText(path + ".bak"), "migration keeps original backup");
+                using (var json = JsonDocument.Parse(File.ReadAllText(path)))
+                {
+                    Equal(8, json.RootElement.GetProperty("version").GetInt32(), "migrated version");
+                    False(json.RootElement.GetProperty("allowConcurrentStrongInteractions").GetBoolean(), "saved default");
+                    False(json.RootElement.TryGetProperty("allowStrongInteractions", out _), "incorrect old setting removed");
+                }
+            }
+        }
+    }
+}

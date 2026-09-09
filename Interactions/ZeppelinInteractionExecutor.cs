@@ -46,6 +46,13 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        public bool NativeAssetsSettled
+        {
+            get { return nativeCache.Failed ||
+                (nativeCache.Ready(NativeZeppelinVariant.Purple) &&
+                 nativeCache.Ready(NativeZeppelinVariant.Green)); }
+        }
+
         public bool Supports(string item)
         {
             NativeZeppelinVariant variant;

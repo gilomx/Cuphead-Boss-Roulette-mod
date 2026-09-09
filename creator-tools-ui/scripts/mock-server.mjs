@@ -23,9 +23,15 @@ let interactionQueue = [];
 let interactionMaxActive = 1;
 const interactionMaxMiniBosses = 1;
 let interactionShowGiftImage = true;
+const spawnGroupDefaults = {
+  miniBossMinimumInterval: 30, miniBossMaximumInterval: 30,
+  lightMinimumBatch: 1, lightMaximumBatch: 1,
+  strongMinimumBatch: 1, strongMaximumBatch: 1,
+};
 const interactionPacingDefaults = {
   enabled: false, minimumInterval: 1.25, maximumInterval: 3.25,
   miniBossCooldownSeconds: 30, miniBossIntervalMultiplier: 2, maximumCompanionsDuringMiniBoss: 1,
+  ...spawnGroupDefaults,
 };
 let interactionPacing = { ...interactionPacingDefaults };
 let interactionSettingsRevision = 0;
@@ -78,6 +84,7 @@ function resetStreamRuleAccumulators(ruleId) {
 }
 
 let peskyEnabled = false;
+let peskyAllowConcurrentStrongInteractions = false;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
 let peskyError = false;
@@ -91,7 +98,67 @@ let peskyIntervals = {
   miniBossCooldownSeconds: 30,
   miniBossIntervalMultiplier: 2,
   maximumCompanionsDuringMiniBoss: 1,
+  ...spawnGroupDefaults,
 };
+
+// Settings contract only: the mock does not reproduce Unity's spawn scheduler.
+// Keep validation aligned with CreatorToolsSpawnGroupSettings and both owners.
+function settingNumber(raw, minimum, maximum, integer = false) {
+  if (raw === null || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim())) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= minimum && value <= maximum &&
+    (!integer || Number.isInteger(value)) ? value : null;
+}
+
+function settingSwitch(raw) {
+  if (["1", "true", "on"].includes(raw?.toLowerCase())) return true;
+  if (["0", "false", "off"].includes(raw?.toLowerCase())) return false;
+  return null;
+}
+
+function pacingCandidate(params, current, prefix = "") {
+  const candidate = { ...current };
+  const number = (key, minimum, maximum, integer = false, required = true) => {
+    if (!required && !params.has(prefix + key)) return true;
+    const value = settingNumber(params.get(prefix + key), minimum, maximum, integer);
+    if (value === null) return false;
+    candidate[key] = value;
+    return true;
+  };
+  if (prefix) {
+    const enabled = params.get(prefix + "enabled");
+    if (enabled === "1" || enabled?.trim().toLowerCase() === "true") candidate.enabled = true;
+    else if (enabled === "0" || enabled?.trim().toLowerCase() === "false") candidate.enabled = false;
+    else return null;
+  }
+  if (!number("minimumInterval", 0.35, 300) || !number("maximumInterval", 0.35, 300) ||
+      candidate.minimumInterval > candidate.maximumInterval ||
+      !number("miniBossIntervalMultiplier", 1, 10, false, Boolean(prefix)) ||
+      !number("maximumCompanionsDuringMiniBoss", 0, 20, true, Boolean(prefix))) return null;
+
+  const hasMinimum = params.has(prefix + "miniBossMinimumInterval");
+  const hasMaximum = params.has(prefix + "miniBossMaximumInterval");
+  if (params.has(prefix + "miniBossCooldownSeconds")) {
+    // Validate even when the new pair takes precedence over this legacy alias.
+    const legacy = settingNumber(params.get(prefix + "miniBossCooldownSeconds"), 0, 300);
+    if (legacy === null) return null;
+    if (!hasMinimum && !hasMaximum) {
+      candidate.miniBossMinimumInterval = legacy;
+      candidate.miniBossMaximumInterval = legacy;
+    }
+  }
+  for (const [minimumKey, maximumKey, lower, upper, integer] of [
+    ["miniBossMinimumInterval", "miniBossMaximumInterval", 0, 300, false],
+    ["lightMinimumBatch", "lightMaximumBatch", 1, 20, true],
+    ["strongMinimumBatch", "strongMaximumBatch", 1, 20, true],
+  ]) {
+    if (!params.has(prefix + minimumKey) && !params.has(prefix + maximumKey)) continue;
+    if (!number(minimumKey, lower, upper, integer) || !number(maximumKey, lower, upper, integer) ||
+        candidate[minimumKey] > candidate[maximumKey]) return null;
+  }
+  candidate.miniBossCooldownSeconds = candidate.miniBossMinimumInterval;
+  return candidate;
+}
 let peskyNames = [];
 let peskyDisabledItems = [];
 let peskyBattleRevision = 0;
@@ -1396,27 +1463,20 @@ createServer((req, res) => {
     const maxMiniBossesValue = url.searchParams.get("maxMiniBosses");
     const showGiftImageValue = url.searchParams.get("showGiftImage");
     const pacingRequested = [...url.searchParams.keys()].some((key) => key.startsWith("pacing."));
-    if (pacingRequested) {
-      const raw = Object.fromEntries(Object.keys(interactionPacingDefaults).map((key) => [key, url.searchParams.get("pacing." + key)]));
-      const candidate = {
-        enabled: ["true", "1"].includes(raw.enabled?.toLowerCase()),
-        minimumInterval: Number(raw.minimumInterval), maximumInterval: Number(raw.maximumInterval),
-        miniBossCooldownSeconds: Number(raw.miniBossCooldownSeconds),
-        miniBossIntervalMultiplier: Number(raw.miniBossIntervalMultiplier),
-        maximumCompanionsDuringMiniBoss: Number(raw.maximumCompanionsDuringMiniBoss),
-      };
-      if (Object.values(raw).some((value) => value === null || value.trim() === "") ||
-          !["true", "false", "0", "1"].includes(raw.enabled?.toLowerCase()) ||
-          !Number.isFinite(candidate.minimumInterval) || !Number.isFinite(candidate.maximumInterval) ||
-          candidate.minimumInterval < 0.35 || candidate.maximumInterval > 300 || candidate.minimumInterval > candidate.maximumInterval ||
-          !Number.isFinite(candidate.miniBossCooldownSeconds) || candidate.miniBossCooldownSeconds < 0 || candidate.miniBossCooldownSeconds > 300 ||
-          !Number.isFinite(candidate.miniBossIntervalMultiplier) || candidate.miniBossIntervalMultiplier < 1 || candidate.miniBossIntervalMultiplier > 10 ||
-          !Number.isInteger(candidate.maximumCompanionsDuringMiniBoss) || candidate.maximumCompanionsDuringMiniBoss < 0 || candidate.maximumCompanionsDuringMiniBoss > 20) {
-        json(res, { ok: false, feedback: "invalid_setting" }, 400);
-        return;
-      }
-      interactionPacing = candidate;
+    const nextPacing = pacingRequested
+      ? pacingCandidate(url.searchParams, interactionPacing, "pacing.")
+      : interactionPacing;
+    const integerSetting = (raw) => raw !== null && /^[+-]?\d+$/.test(raw.trim()) &&
+      Number(raw) >= -2147483648 && Number(raw) <= 2147483647;
+    if (!nextPacing ||
+        (maxActiveValue !== null && !integerSetting(maxActiveValue)) ||
+        (maxMiniBossesValue !== null && !integerSetting(maxMiniBossesValue)) ||
+        (showGiftImageValue !== null && settingSwitch(showGiftImageValue) === null)) {
+      json(res, { ok: false, feedback: "invalid_setting" }, 400);
+      return;
     }
+    // Commit only after all settings have passed validation.
+    interactionPacing = nextPacing;
     let nextFeedback = "settings_saved";
     if (interactionsEnabledValue !== null) {
       interactionsEnabled = interactionsEnabledValue === "1";
@@ -1450,7 +1510,7 @@ createServer((req, res) => {
       );
     }
     if (showGiftImageValue !== null) {
-      interactionShowGiftImage = showGiftImageValue === "1";
+      interactionShowGiftImage = settingSwitch(showGiftImageValue);
     }
     if (maxActiveValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null || pacingRequested) {
       interactionSettingsRevision += 1;
@@ -1687,6 +1747,8 @@ createServer((req, res) => {
       feedback: peskyFeedback,
       error: peskyError,
       ...peskyIntervals,
+      allowConcurrentStrongInteractions: peskyAllowConcurrentStrongInteractions,
+      defaultAllowConcurrentStrongInteractions: false,
       intervalLowerLimit: peskyIntervalLowerLimit,
       intervalUpperLimit: peskyIntervalUpperLimit,
       defaultMinimumInterval: peskyDefaultMinimumInterval,
@@ -1694,6 +1756,8 @@ createServer((req, res) => {
       defaultMiniBossCooldownSeconds: 30,
       defaultMiniBossIntervalMultiplier: 2,
       defaultMaximumCompanionsDuringMiniBoss: 1,
+      ...Object.fromEntries(Object.entries(spawnGroupDefaults).map(([key, value]) =>
+        ["default" + key[0].toUpperCase() + key.slice(1), value])),
       names: peskyNames,
       items: interactionItems,
       disabledItems: peskyDisabledItems,
@@ -1713,24 +1777,17 @@ createServer((req, res) => {
     const maximumIntervalValue = url.searchParams.get("maximumInterval");
     peskyError = false;
     if (minimumIntervalValue !== null || maximumIntervalValue !== null) {
-      const minimumInterval = Number(minimumIntervalValue);
-      const maximumInterval = Number(maximumIntervalValue);
-      const miniBossCooldownSeconds = Number(url.searchParams.get("miniBossCooldownSeconds") ?? peskyIntervals.miniBossCooldownSeconds);
-      const miniBossIntervalMultiplier = Number(url.searchParams.get("miniBossIntervalMultiplier") ?? peskyIntervals.miniBossIntervalMultiplier);
-      const maximumCompanionsDuringMiniBoss = Number(url.searchParams.get("maximumCompanionsDuringMiniBoss") ?? peskyIntervals.maximumCompanionsDuringMiniBoss);
-      if (minimumIntervalValue === null || maximumIntervalValue === null ||
-          !Number.isFinite(minimumInterval) || !Number.isFinite(maximumInterval) ||
-          minimumInterval < peskyIntervalLowerLimit || maximumInterval > peskyIntervalUpperLimit ||
-          minimumInterval > maximumInterval ||
-          ["minimumInterval", "maximumInterval", "miniBossCooldownSeconds", "miniBossIntervalMultiplier", "maximumCompanionsDuringMiniBoss"]
-            .some((key) => url.searchParams.has(key) && url.searchParams.get(key).trim() === "") ||
-          !Number.isFinite(miniBossCooldownSeconds) || miniBossCooldownSeconds < 0 || miniBossCooldownSeconds > 300 ||
-          !Number.isFinite(miniBossIntervalMultiplier) || miniBossIntervalMultiplier < 1 || miniBossIntervalMultiplier > 10 ||
-          !Number.isInteger(maximumCompanionsDuringMiniBoss) || maximumCompanionsDuringMiniBoss < 0 || maximumCompanionsDuringMiniBoss > 20) {
+      const candidate = pacingCandidate(url.searchParams, peskyIntervals);
+      const strongToken = url.searchParams.get("allowConcurrentStrongInteractions");
+      const strong = strongToken === null ? peskyAllowConcurrentStrongInteractions
+        : strongToken === "1" || strongToken.trim().toLowerCase() === "true" ? true
+        : strongToken === "0" || strongToken.trim().toLowerCase() === "false" ? false : null;
+      if (!candidate || strong === null) {
         peskyFeedback = "invalid_interval";
         peskyError = true;
       } else {
-        peskyIntervals = { minimumInterval, maximumInterval, miniBossCooldownSeconds, miniBossIntervalMultiplier, maximumCompanionsDuringMiniBoss };
+        peskyIntervals = candidate;
+        peskyAllowConcurrentStrongInteractions = strong;
         peskyFeedback = "intervals_saved";
       }
     } else if (enabledValue !== null) {
@@ -1751,6 +1808,9 @@ createServer((req, res) => {
         peskyDisabledItems.push(itemValue);
       }
       peskyFeedback = "items_saved";
+    } else {
+      peskyFeedback = "invalid_setting";
+      peskyError = true;
     }
     peskyRevision += 1;
     json(res, { ok: !peskyError, feedback: peskyFeedback, error: peskyError }, 202);

@@ -66,20 +66,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedStates();
-            if (!Ready)
-                CaptureFromLoadedFlower();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(FlowerSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedFlower();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(FlowerSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -141,7 +146,9 @@ namespace Gilomx.CupheadBossRoulette
                     true);
 
                 var cameraScale = CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(seedObject, logWarning);
+                    GetGameplayCameraScale();
+                var bodyScale = CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(seedObject, logWarning);
                 MoveFullyAboveUpperEdge(
                     seedObject,
                     parameters.Position.y,
@@ -160,6 +167,7 @@ namespace Gilomx.CupheadBossRoulette
                     seedLabel,
                     donor,
                     cameraScale,
+                    bodyScale,
                     parameters.UseVirtualGroundOnly,
                     logWarning);
                 spawnedStates.Add(state);

@@ -220,7 +220,7 @@ namespace Gilomx.CupheadBossRoulette
                     animator.SetBool(TossParameterName, false);
 
                 CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(head.gameObject, logWarning);
+                    MatchGameplayBodyScale(head.gameObject, logWarning);
                 CreatorToolsInteractionPresentation.BringActorToFront(
                     head.gameObject);
                 TransferPresentationToHead();

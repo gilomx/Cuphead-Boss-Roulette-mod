@@ -7,6 +7,20 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsDonorLabel : MonoBehaviour
     {
+        internal static readonly List<CreatorToolsDonorLabel> Instances =
+            new List<CreatorToolsDonorLabel>();
+
+        private void OnEnable()
+        {
+            if (!Instances.Contains(this))
+                Instances.Add(this);
+        }
+
+        private void OnDestroy()
+        {
+            Instances.Remove(this);
+        }
+
         private const float FallbackVerticalOffset = 350f;
         private const float VisualGap = 14f;
         private const float LabelWidth = 320f;

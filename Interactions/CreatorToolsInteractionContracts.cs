@@ -47,6 +47,10 @@ namespace Gilomx.CupheadBossRoulette
 
     internal interface ICreatorToolsInteractionExecutor : IDisposable
     {
+        // Failure also settles preparation so one unavailable asset cannot
+        // hold the native loading screen indefinitely.
+        bool NativeAssetsSettled { get; }
+
         bool Supports(string item);
         bool IsAvailable(string item);
         void Update();

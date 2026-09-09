@@ -15,6 +15,70 @@ namespace Gilomx.CupheadBossRoulette
         private const int FrontActorSortingOrder = short.MaxValue - 64;
         private const float ReferenceViewportHeight = 720f;
 
+        internal static float GetGameplayCameraScale()
+        {
+            var camera = FindGameplayCamera();
+            return camera == null ? 1f : Mathf.Max(
+                0.01f, camera.orthographicSize * 2f / ReferenceViewportHeight);
+        }
+
+        internal static float GetGameplayBodyScale(float cameraScale)
+        {
+            var level = Level.Current;
+            var usesNativeWorldSize = level != null &&
+                (level.CurrentLevel == Levels.Saltbaker ||
+                 level.CurrentLevel == Levels.OldMan ||
+                 BaronessMiniBossInteractionState.IsDevilLowerArena());
+            var usesAircraftSize =
+                (level != null && level.CurrentLevel == Levels.Airplane) ||
+                (!usesNativeWorldSize && HasAircraftPlayer());
+            return CreatorToolsInteractionBodyScalePolicy.Calculate(
+                cameraScale, usesNativeWorldSize, usesAircraftSize);
+        }
+
+        internal static bool HasAircraftPlayer()
+        {
+            // PlayerManager already holds the real players. Looking through
+            // the entire scene for a missing plane player is costly on ground
+            // levels, especially while repeatedly checking spawn candidates.
+            foreach (var player in PlayerManager.GetAllPlayers())
+                if (player is PlanePlayerController && player != null &&
+                    player.gameObject.activeInHierarchy)
+                    return true;
+            return false;
+        }
+
+        internal static float MatchGameplayBodyScale(
+            GameObject actor,
+            Action<string> logWarning)
+        {
+            if (actor == null)
+                return 1f;
+            try
+            {
+                var existing = actor.GetComponent<
+                    CreatorToolsInteractionCameraScale>();
+                if (existing != null)
+                    return existing.Factor;
+
+                var factor = GetGameplayBodyScale(GetGameplayCameraScale());
+                var nativeScale = actor.transform.localScale;
+                actor.transform.localScale = new Vector3(
+                    nativeScale.x * factor,
+                    nativeScale.y * factor,
+                    nativeScale.z);
+                MarkInheritedGameplayCameraScale(actor, factor);
+                return factor;
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning,
+                    "Could not adapt the interaction actor body size: ",
+                    exception);
+                return 1f;
+            }
+        }
+
         internal static float MatchGameplayCameraScale(
             GameObject actor,
             Action<string> logWarning)
@@ -110,7 +174,7 @@ namespace Gilomx.CupheadBossRoulette
             if (actor == null)
                 return;
 
-            MatchGameplayCameraScale(actor, logWarning);
+            MatchGameplayBodyScale(actor, logWarning);
 
             try
             {
@@ -185,6 +249,7 @@ namespace Gilomx.CupheadBossRoulette
             if (level == null || HasLevelEndSnapshot())
                 return;
 
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             GameObject snapshotRoot = null;
             try
             {
@@ -201,17 +266,16 @@ namespace Gilomx.CupheadBossRoulette
                 var capturedCount = 0;
                 // Capture label visibility before cloning disables the source
                 // sprites. Hidden or detached labels must not become snapshots.
-                var labels = UnityEngine.Object.FindObjectsOfType<
-                    CreatorToolsDonorLabel>();
-                for (var i = 0; i < labels.Length; i++)
+                var labels = CreatorToolsDonorLabel.Instances;
+                for (var i = 0; i < labels.Count; i++)
                     if (labels[i] != null &&
+                        labels[i].gameObject.activeInHierarchy &&
                         labels[i].CreateLevelEndSnapshot(
                             snapshotRoot.transform))
                         capturedCount++;
 
-                var priorities = UnityEngine.Object.FindObjectsOfType<
-                    CreatorToolsInteractionRenderPriority>();
-                for (var i = 0; i < priorities.Length; i++)
+                var priorities = CreatorToolsInteractionRenderPriority.Instances;
+                for (var i = 0; i < priorities.Count; i++)
                 {
                     var priority = priorities[i];
                     if (priority == null ||
@@ -225,6 +289,12 @@ namespace Gilomx.CupheadBossRoulette
 
                 if (capturedCount == 0)
                     UnityEngine.Object.Destroy(snapshotRoot);
+                var elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - started) *
+                    1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (elapsedMs >= 8.0 && logWarning != null)
+                    logWarning(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "Performance: level-end visual snapshot {0:F1} ms ({1} sprites/labels).",
+                        elapsedMs, capturedCount));
             }
             catch (Exception exception)
             {
@@ -238,12 +308,9 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static void ClearLevelEndSnapshots()
         {
-            var snapshots = Resources.FindObjectsOfTypeAll<
-                CreatorToolsInteractionLevelEndSnapshot>();
-            for (var i = 0; i < snapshots.Length; i++)
-                if (snapshots[i] != null)
-                    UnityEngine.Object.Destroy(
-                        snapshots[i].gameObject);
+            var snapshot = CreatorToolsInteractionLevelEndSnapshot.Current;
+            if (snapshot != null)
+                UnityEngine.Object.Destroy(snapshot.gameObject);
         }
 
         internal static int ClearActiveActorsForPhaseTransition()
@@ -292,9 +359,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool HasLevelEndSnapshot()
         {
-            var snapshots = Resources.FindObjectsOfTypeAll<
-                CreatorToolsInteractionLevelEndSnapshot>();
-            return snapshots != null && snapshots.Length > 0;
+            return CreatorToolsInteractionLevelEndSnapshot.Current != null;
         }
 
         private static bool HasPriorityAncestor(Transform transform)
@@ -319,6 +384,17 @@ namespace Gilomx.CupheadBossRoulette
             if (source == null || parent == null)
                 return 0;
 
+            // Preserve every sprite (including currently hidden animation
+            // frames) and its complete transform path. Collider/spawn-point
+            // branches with no sprites need no visual copy at level end.
+            var renderers = source.GetComponentsInChildren<SpriteRenderer>(true);
+            if (renderers.Length == 0)
+                return 0;
+            var visualTransforms = new HashSet<Transform>();
+            for (var i = 0; i < renderers.Length; i++)
+                CreatorToolsVisualSnapshotHierarchy.RetainBranch(
+                    visualTransforms, renderers[i].transform, source.transform,
+                    delegate(Transform node) { return node.parent; });
             var animators = new List<FrozenAnimatorPair>();
             var rendererCount = 0;
             var frozen = CloneAnimatedVisualHierarchy(
@@ -326,6 +402,7 @@ namespace Gilomx.CupheadBossRoulette
                 parent,
                 true,
                 animators,
+                visualTransforms,
                 ref rendererCount);
             if (frozen == null || rendererCount == 0)
             {
@@ -346,9 +423,10 @@ namespace Gilomx.CupheadBossRoulette
             Transform parent,
             bool root,
             List<FrozenAnimatorPair> animators,
+            HashSet<Transform> visualTransforms,
             ref int rendererCount)
         {
-            if (source == null)
+            if (source == null || !visualTransforms.Contains(source))
                 return null;
 
             var frozenObject = new GameObject(
@@ -397,6 +475,7 @@ namespace Gilomx.CupheadBossRoulette
                     frozen,
                     false,
                     animators,
+                    visualTransforms,
                     ref rendererCount);
 
             frozenObject.SetActive(source.gameObject.activeSelf);
@@ -526,12 +605,23 @@ namespace Gilomx.CupheadBossRoulette
 
     internal sealed class CreatorToolsInteractionCameraScale : MonoBehaviour
     {
+        // Actual applied body factor, including a parent's inherited scale.
+        // Geometric camera measurements must use GetGameplayCameraScale.
         internal float Factor = 1f;
     }
 
     internal sealed class CreatorToolsInteractionLevelEndSnapshot :
         MonoBehaviour
     {
+        internal static CreatorToolsInteractionLevelEndSnapshot Current;
+
+        private void Awake() { Current = this; }
+
+        private void OnDestroy()
+        {
+            if (ReferenceEquals(Current, this))
+                Current = null;
+        }
     }
 
     internal sealed class CreatorToolsFrozenAnimationAnchor : MonoBehaviour
@@ -552,6 +642,20 @@ namespace Gilomx.CupheadBossRoulette
 
     internal sealed class CreatorToolsInteractionRenderPriority : MonoBehaviour
     {
+        internal static readonly List<CreatorToolsInteractionRenderPriority> Instances =
+            new List<CreatorToolsInteractionRenderPriority>();
+
+        private void OnEnable()
+        {
+            if (!Instances.Contains(this))
+                Instances.Add(this);
+        }
+
+        private void OnDestroy()
+        {
+            Instances.Remove(this);
+        }
+
         private static int screenCoverFrame = -1;
         private static bool screenCoverActive;
 

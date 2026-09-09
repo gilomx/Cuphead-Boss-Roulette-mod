@@ -45,7 +45,15 @@ namespace Gilomx.CupheadBossRoulette
 
     internal static class CreatorToolsInteractionIds
     {
-        internal static readonly string[] All = { "test_attack" };
+        internal static readonly string[] All =
+        {
+            "test_attack", "hilda_purple_zeppelin", "hilda_green_zeppelin",
+            "rootpack_homing_carrot", "cagney_homing_plant", "frogs_firefly",
+            "robot_homing_bomb", "baroness_head_toss", "dragon_fireballs",
+            "train_bone_ring", "devil_fire_circle", "beppi_balloon_dog",
+            "beppi_pink_balloon_dog", "baroness_cupcake", "baroness_gumball",
+            "baroness_waffle", "baroness_candy_corn", "baroness_jawbreaker"
+        };
     }
 
     internal sealed class CreatorToolsGiftCatalogEntry

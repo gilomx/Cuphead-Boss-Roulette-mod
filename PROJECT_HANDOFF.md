@@ -2,6 +2,255 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Estado actual: corrección de carga instalada y mod activo (2026-09-09)
+
+El usuario pidió instalar y activar la versión corregida. Con Cuphead cerrado,
+se instaló la DLL preparada como `Gilomx.CupheadBossRoulette.dll` a las 13:03.
+SHA256 instalado: `163B248A8C053932BF7692B898FC3DDD06750BC517696BAD44ACD486579D5A9F`.
+Las 11 configuraciones se respaldaron y conservaron, verificadas por hash.
+La DLL anterior permanece como `.dll.disabled` y también está respaldada.
+Manifiesto, copia anterior, configuraciones y comprobante:
+`installation-backups/catalog-loading-install-20260909-130216/`.
+El mod está habilitado para la próxima apertura de Cuphead. La mejora de
+fluidez de esta corrección sigue pendiente de comprobar en una partida real.
+
+## Comparación anterior con el mod desactivado (2026-09-09)
+
+El usuario pidió desactivar el mod: ahora percibe la pausa sólo al inicio de
+la partida. Con Cuphead cerrado se renombró la DLL instalada a
+`BepInEx/plugins/GilomxBossRoulette/Gilomx.CupheadBossRoulette.dll.disabled`.
+No quedan DLL de plugins activas. BepInEx sigue instalado; assets y las 11
+configuraciones se conservaron (verificados por hash). La DLL desactivada es
+`6AEE3035901EA097F5F1EDCB7BB666D8DBF288945C0530F7435F940A6D00A520`.
+Respaldo y manifiesto: `installation-backups/mod-disabled-20260909-124032/`.
+Esta comparación terminó al solicitar el usuario la instalación y activación
+de la corrección descrita en el estado actual.
+
+### Corrección preparada: catálogo antes de entrar al nivel (2026-09-09)
+
+El usuario confirmó que sin el mod nota diferencia y que los tirones con el
+mod ocurren al iniciar el nivel, antes de que esté listo el catálogo. La ruta
+anterior permitía precargas aditivas después del gate de 3 s dentro del combate;
+los logs guardados muestran cargas/descargas costosas. Es una causa probable,
+todavía pendiente de comprobar en juego con esta corrección.
+
+Ahora `CanPreloadNativeInteractionAssets` sólo permite preparar en el mapa o
+en una ventana explícita de carga. Un postfix de `SceneLoader.load_cr` envuelve
+su IEnumerator: el `in_cr` nativo ya cubrió la pantalla y aún no se ha encolado
+la carga Single intermedia/destino. Para destinos `scene_level_*`, completa
+los 11 executors (10 escenas compartidas, incluidos los cinco minis derivados
+de Baronesa). Ready o Failed cierran cada preparación. Todas las transiciones,
+incluidos menús, esperan además que termine el propietario de la precarga:
+tener el prefab listo no significa que la escena fuente ya se haya descargado.
+El postfix reinicia `doneLoadingSceneAsync` antes del primer yield para que
+un cargador reutilizado no revele el nivel usando su bandera anterior.
+
+La preparación admite trabajo durante hasta 30 s. Si excede ese presupuesto,
+deja de iniciar precargas y espera sólo la operación Unity actual, que no se
+puede cancelar; el resto espera al mapa u otra pantalla de carga. No es un
+timeout duro de una operación Unity atascada. Reintentos con catálogo preparado
+no añaden frames de espera. Los diez caches sólo buscan/copían recursos tras
+obtener el turno de precarga y verificar la ventana; no buscan cada frame
+durante gameplay o mientras otro cache ocupa la cola.
+
+Validación: Release sin warnings/errores, 82 grupos del harness (seis nuevos
+de orden de carga, retry, menú, timeout, cancelación y reanudación), contrato
+nativo con `tools/verify_native_loading_contract.ps1`, y diff --check correcto.
+Durante la preparación no se modificó la instalación ni se ejecutó el mod
+en Cuphead para medir FPS; después se instaló a petición del usuario.
+DLL preparada y manifiesto: `installation-backups/catalog-loading-prepared-20260909-125949/`.
+SHA256: `163B248A8C053932BF7692B898FC3DDD06750BC517696BAD44ACD486579D5A9F`.
+La DLL nueva ya está instalada y activa, con respaldo de la versión 6AEE
+anterior. No renombrar la DLL anterior para activar esta corrección.
+
+## Pausa residual antes del mini y al mostrar derrota (2026-09-09)
+
+El usuario confirmó mejora tras la primera corrección, pero nota una pausa leve
+antes de entrar un minijefe y al aparecer el menú de derrota con uno presente.
+El nuevo log guardado como `performance-investigation-20260909/unity-after-first-fix.log`
+dentro de installation-backups contiene 33 mini spawns y 0 errores HitFlash;
+persisten 9 errores LevelPlatform.OnDestroy durante precargas.
+
+Fuera de la pelea nativa de Baronesa, el recuento de minis usa los estados
+registrados del único executor compartido por ambas colas. PresentItem cuenta
+el actor activo hasta su destrucción, incluida su animación de muerte; no cuenta
+la raíz de estado que sobrevive para limpiar secundarios. En la Baronesa se
+mantiene el escaneo nativo y la reserva completa del castillo. Se conservan las
+revalidaciones antes y después de cada spawn y el límite global de un mini.
+
+Los snapshots de derrota usan registros de etiquetas/render priorities y una
+referencia al snapshot actual, evitando tres búsquedas globales. Los registros
+se incorporan en OnEnable y se retiran en OnDestroy; la captura filtra objetos
+inactivos igual que antes. La copia animada conserva todos los SpriteRenderer,
+incluidos inactivos/sin sprite actual, y todos sus ancestros. Omite ramas sin
+sprites, como puntos de lanzamiento y colliders; mantiene rutas, escala local,
+animadores, parámetros y estado de reproducción. La política de retención de
+ramas está en CreatorToolsVisualSnapshotHierarchy, con prueba de rutas compartidas,
+sprites ocultos, animadores anidados y exclusión del exterior del actor.
+
+Mediciones puntuales: si crear un mini o capturar el fin de nivel tarda >=8 ms,
+el log escribe `Performance:` con tiempo real de Stopwatch. El spawn separa
+clonación y configuración; la captura informa sprites/etiquetas. No mide GPU ni
+el frame entero y no debe presentarse como prueba de ausencia de tirones.
+Release sin advertencias/errores, 76 pruebas runtime, contratos de minis/Dragón
+(36 casos de rumbo) aprobados. Pendiente comparar en partida y revisar esas
+líneas si queda pausa. Balance sigue 65% HP y descansos del maíz/chicles previos.
+
+Instalada con Cuphead cerrado: 1 DLL actualizada, 512 archivos verificados y
+11 configuraciones conservadas por hash. Respaldo:
+`installation-backups/mini-spawn-defeat-performance-20260909-122836/`.
+DLL SHA-256: `6AEE3035901EA097F5F1EDCB7BB666D8DBF288945C0530F7435F940A6D00A520`.
+
+## Pausas reportadas en partida: primera corrección (2026-09-09)
+
+El usuario nota pausas también en Cuphead directamente, sin un disparador claro.
+Se conservaron los logs previos en
+`installation-backups/performance-investigation-20260909/`.
+El log de Unity contiene errores HitFlash.Awake al aparecer los cuerpos visuales
+de Baronesa y Dragón: RendererProperties recibe referencias de renderers que
+pertenecían a la escena original. Desactivar el componente no evita Awake.
+Ahora ambos caches instalan un guard de HitFlash.Awake limitado a sus marcadores
+de cuerpos decorativos. Los HitFlash de minijefes y combates nativos siguen activos.
+
+La selección automática comprueba primero los minis y sólo consulta disponibilidad
+común si necesita elegir comunes y hay cupo. Evita consultas de escena cuando
+la admisión está bloqueada o una reserva de mini tiene prioridad, y no construye
+planes durante la espera vacía de ambos relojes. La detección de avión del tamaño
+y de la arena de minis consulta PlayerManager en vez de recorrer toda la escena;
+en Granitoviejo/Saleroso/Diablo inferior el tamaño nativo evita esa consulta.
+Se conservan 65% de HP, intervalos del maíz, chicles, grupos y reglas.
+
+Validación: Release sin errores/advertencias; 75 pruebas del harness; contratos
+nativos de minijefes y Dragón (36 casos de rumbo). Inspección de DLL confirma
+registro de guards con comprobación de propiedad y ausencia de los escaneos
+globales de PlanePlayerController en esos dos módulos. Sin medición de frame
+times ni prueba en combate todavía: esta corrección no demuestra que las pausas
+estén resueltas. Los logs de OBS también muestran intentos reiterados de cargar
+una imagen de regalo con file://; es un fallo del overlay pendiente de revisar,
+sin evidencia de que sea la causa de los tirones. Las descargas de assets de
+Unity durante precargas/reintentos toman 30–116 ms; también hay errores de
+LevelPlatform.OnDestroy durante precargas, pendientes y distintos de HitFlash.
+
+Instalada esta primera corrección con Cuphead cerrado; 512 archivos verificados,
+1 DLL actualizada y 11 configuraciones conservadas por hash. Respaldo:
+`installation-backups/spawn-performance-20260909-120606/`.
+DLL SHA-256: `B68A7634B21257467807EF7072B1447BFAE41B6367E19EF3DBAB20D67640FFD7`.
+Siguiente paso: comparar otra pelea con la misma configuración de OBS y revisar
+el nuevo log si persisten las pausas; el usuario iba a observar cuándo ocurren.
+
+## Vida de minijefes, intensas opcionales y panel compacto (2026-09-09)
+
+La intención aclarada es **Permitir varias molestias intensas a la vez**, off
+por defecto. El antiguo bloqueo de toda la categoría fue una interpretación
+incorrecta y está retirado. Pesky v8 usa `allowConcurrentStrongInteractions`;
+v7 `allowStrongInteractions` se descarta sin traducirlo a permiso de concurrencia.
+Todas las intensas seleccionadas permanecen elegibles. `CanSelectPeskyItem`
+consulta la política pura `CanAddStrongInteraction` y cuenta intensas activas
+de ambas colas: con la casilla off sólo añade si el recuento es cero. Tanto
+selección como despacho por miembro de lote revalidan; SampleBatchSize limita
+a una intensa cuando está off. Desmarcar deja terminar los actores vivos.
+Canjes/Batalla conservan sus propias admisiones; Pesky no añade otra intensa
+encima de las que ya hayan creado. Se conservan selecciones, nombres y rangos.
+
+`CreatorToolsMiniBossHealth.ForCatalog` aplica 65% de los HP nativos, redondeo
+hacia arriba y mínimo 1, en propiedades y parámetros Init de las cinco copias.
+Fácil/Normal: Cupcake 121, chicles 176, Waffle 163, maíz 147, Rompemandíbulas 117.
+Experto: 153, 208, 199, 163, 143. La copia de chicles duplica el intervalo entre proyectiles:
+Normal 0.23 → 0.46 s; Experto 0.16 → 0.32 s. Conserva duración de ráfaga y
+descanso; produce aproximadamente la mitad. Contrato leído del IL real:
+on_cr compara rateTime > rateOfFire y fireProjectiles crea un proyectil.
+El combate original y las propiedades compartidas no cambian.
+Maíz dulce suma 0.6 s a ambos extremos de la espera de hijos sólo en Normal
+(2.1–2.9 s) y Experto (1.9–2.6 s). Fácil conserva spawnMinis=false; hijos con
+10 HP. Se copia MinMax, sin modificar propiedades compartidas ni escalar tiempo
+con la cámara. El IL nativo crea un pequeño al girar y espera antes de repetir.
+
+Configuración pasa a la columna derecha de Molestias pendientes, con apilado
+bajo 68rem. Cantidades, ajustes durante minijefe y resumen son desplegables.
+Ayudas/botones más cortos y anchos numéricos corregidos; se verificó a 1266px
+la alineación y ausencia de desbordamiento. Guardar/restaurar/copy, persistencia,
+ES/EN y desactivar intensas con un borrador numérico inválido se probaron en mock.
+Build Release 0 advertencias/errores; frontend y catálogos 17/43 correctos;
+74 pruebas runtime y 8 HTTP aprobadas; contrato nativo de minijefes verificado.
+El harness usa políticas reales con fakes de Unity; no se probó en combate.
+
+Instalado el ajuste a 65% de vida y espera de hijos del Maíz dulce con Cuphead cerrado: DLL y config.js. Verificados 512
+archivos y conservadas 11 configuraciones por hash. Respaldo completo:
+`installation-backups/mini-health65-corn-delay-20260909-114953/`.
+DLL SHA-256: `84465496BF0F0A8C6FEA8F03FB7ACBD24C038416B172389907AAF9B4B0F93788`.
+Para este último ajuste se repitieron build Release, frontend/catálogos, las
+74 pruebas runtime y el contrato nativo de minijefes; todo pasó. Los 8 casos
+HTTP y la revisión visual del panel corresponden a la corrección de concurrencia.
+
+## Tamaño de molestias comunes según arena y cámara (2026-09-09)
+
+Las 12 molestias leves/intensas comparten las proporciones de los minijefes:
+tamaño nativo en Chef Saleroso, Granitoviejo y Diablo inferior; cámara × 0.8
+en aviones y Perritos Pilotos; cámara en el resto. Se reutiliza la detección
+real de plataformas inferiores del Diablo. La política pura está en
+`CreatorToolsInteractionBodyScalePolicy`; `PrepareActor` aplica cuerpo una vez.
+Recorridos, velocidades, márgenes y órbitas conservan el factor de cámara.
+Wrappers preservan animaciones/colliders, la planta hereda el cuerpo de su
+semilla, y cabezas, meteoros y balas independientes reciben la política al nacer.
+Las balas de zepelín siguen acotadas al actor marcado del mod. Los minijefes
+conservan su integración existente y nombres/regalos su escala en vivo.
+
+Validación: build Release sin advertencias/errores, 69 pruebas del harness,
+cuatro contratos nativos (Dragón, tren, perros, círculo Diablo), incluidos 36
+casos de rumbo de Dragón. Revisión independiente de herencia y hooks sin
+defectos concretos. No se ha probado visualmente en combate.
+
+El usuario cerró Cuphead y se instaló la DLL; 512 archivos verificados y 11
+configuraciones conservadas por SHA-256. Respaldo completo y manifiesto en
+`installation-backups/common-body-zoom-20260909-101615/`.
+DLL SHA-256: `172BA8B8FB903DE0777E6924F486779F7C8BFC3304E624A0E3D9713A83E064C6`.
+
+## Grupos de molestias y tiempos separados (2026-09-09)
+
+A petición del usuario se simplificaron los controles y se añadieron grupos
+**Molestias leves / Molestias intensas / Minijefes**, conservando un solo minijefe.
+Los rangos de descanso de minijefes son independientes del intervalo común.
+El primer mini compatible y preparado tiene prioridad al terminar el margen
+seguro existente de 3 s; ya no compite en el sorteo con los 12 artículos comunes.
+Los logs de la instalación anterior mostraban seis/siete comunes antes del primer
+mini, con precarga ya completa; carecen de timestamps para medir demora exacta.
+
+`CreatorToolsInteractionGroups.PlanAutomaticSpawn` es el selector puro usado por
+el controller y por las pruebas. Cuando un mini está listo se permite drenar las
+molestias comunes para que obtenga espacio; ambas fuentes con espaciado activo
+cooperan. Interacciones sin espaciado y Batalla conservan su bypass, y sus ataques
+pueden aplazar la llegada si mantienen la arena ocupada. Pausa congela los relojes,
+retry los reinicia y el descanso mini se sortea al desaparecer uno, no al llegar.
+
+Cantidad por aparición tiene rangos leves/intensas 1–20. Pesky genera un grupo
+mixto del mismo tipo y descarta sobrantes de la oportunidad. Interacciones sólo
+agrupa unidades existentes listas, conservando donador/regalo/tiempo y el resto
+pendiente. Dentro del grupo las altas ocurren en el mismo frame; cada alta vuelve
+a comprobar espacio y exclusividad. Se conserva .35 s entre grupos, arbitraje
+entre fuentes, reserva para Batalla y exclusividad de bolas del dragón.
+
+El panel comparte SpawnPacingFields/pacingValues y muestra tiempos explícitos,
+frases Entre/y, cantidades de cada grupo y resumen calculado. Catálogo y pruebas
+filtran por grupo, y reglas/lista Pesky muestran la clasificación. El validador
+exige que los 17 IDs coincidan con C#. Guardar/copy/defaults conservan independencia
+y los interruptores. Migración de Pesky JSON v6 y del archivo de Interacciones
+con respaldo; el cooldown antiguo pasa a los dos extremos, nuevos grupos 1–1.
+
+Validación: Release sin advertencias/errores; 65 pruebas del harness; build
+TypeScript/Vite y catálogos 17/43; 7 pruebas HTTP del mock con más de 80 solicitudes
+inválidas/atómicas y aislamiento/copy/restore. Navegador: controles, guardado,
+copy entre modos conservando interruptores, edición independiente, validación,
+resumen sin variables crudas y traducción ES/EN. Harness prueba políticas reales
+extraídas, pero no el controller Unity ni física en combate.
+
+Instalado con Cuphead cerrado, sin abrir el juego ni editar preferencias: DLL,
+config.js y config.css actualizados; 512 archivos verificados por SHA-256 y los
+11 archivos de configuración conservados por hash. Respaldo completo en
+`installation-backups/spawn-groups-20260909-095224/`.
+DLL SHA-256: `1882E6EF43CE4786B9FF07BAA27271BEF04A6B1B8F56E19A528937EC06C0C4FF`.
+**Pendiente: comprobar arranque y comportamiento visual en una pelea real**, en
+especial primer mini, grupos simultáneos y cooperación de los dos modos.
+
 ## Balance independiente de Modo Molestoso e Interacciones (2026-09-09)
 
 Implementado, compilado e instalado en Cuphead; **todavía no probado visualmente

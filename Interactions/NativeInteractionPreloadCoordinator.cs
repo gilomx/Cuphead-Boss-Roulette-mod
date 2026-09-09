@@ -12,6 +12,10 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static object owner;
 
+        // A template can be ready before its source scene finishes unloading.
+        // Native scene changes must wait for both conditions.
+        internal static bool IsBusy { get { return owner != null; } }
+
         internal static bool TryAcquire(object candidate)
         {
             if (candidate == null)

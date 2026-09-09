@@ -1,11 +1,14 @@
 export const interactionCategories = ["attack", "mini_boss"] as const;
 export type InteractionCategory = typeof interactionCategories[number];
-export type InteractionCategoryFilter = "all" | InteractionCategory;
+export const interactionGroups = ["light", "strong", "mini_boss"] as const;
+export type InteractionGroup = typeof interactionGroups[number];
+export type InteractionCategoryFilter = "all" | InteractionGroup;
 
 export const interactionItems = [
   {
     id: "hilda_green_zeppelin",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.zeppelin.green.title",
     imageAltKey: "interactions.zeppelin.green.imageAlt",
     typeKey: "interactions.zeppelin.type",
@@ -14,6 +17,7 @@ export const interactionItems = [
   {
     id: "hilda_purple_zeppelin",
     category: "attack",
+    group: "light",
     titleKey: "interactions.zeppelin.purple.title",
     imageAltKey: "interactions.zeppelin.purple.imageAlt",
     typeKey: "interactions.zeppelin.type",
@@ -22,6 +26,7 @@ export const interactionItems = [
   {
     id: "rootpack_homing_carrot",
     category: "attack",
+    group: "light",
     titleKey: "interactions.rootpack.homingCarrot.title",
     imageAltKey: "interactions.rootpack.homingCarrot.imageAlt",
     typeKey: "interactions.rootpack.type",
@@ -30,6 +35,7 @@ export const interactionItems = [
   {
     id: "cagney_homing_plant",
     category: "attack",
+    group: "light",
     titleKey: "interactions.cagney.homingPlant.title",
     imageAltKey: "interactions.cagney.homingPlant.imageAlt",
     typeKey: "interactions.cagney.type",
@@ -38,6 +44,7 @@ export const interactionItems = [
   {
     id: "frogs_firefly",
     category: "attack",
+    group: "light",
     titleKey: "interactions.frogs.firefly.title",
     imageAltKey: "interactions.frogs.firefly.imageAlt",
     typeKey: "interactions.frogs.type",
@@ -46,6 +53,7 @@ export const interactionItems = [
   {
     id: "robot_homing_bomb",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.robot.homingBomb.title",
     imageAltKey: "interactions.robot.homingBomb.imageAlt",
     typeKey: "interactions.robot.type",
@@ -54,6 +62,7 @@ export const interactionItems = [
   {
     id: "baroness_head_toss",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.baroness.headToss.title",
     imageAltKey: "interactions.baroness.headToss.imageAlt",
     typeKey: "interactions.baroness.type",
@@ -62,6 +71,7 @@ export const interactionItems = [
   {
     id: "dragon_fireballs",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.dragon.fireballs.title",
     imageAltKey: "interactions.dragon.fireballs.imageAlt",
     typeKey: "interactions.dragon.type",
@@ -70,6 +80,7 @@ export const interactionItems = [
   {
     id: "train_bone_ring",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.train.boneRing.title",
     imageAltKey: "interactions.train.boneRing.imageAlt",
     typeKey: "interactions.train.type",
@@ -78,6 +89,7 @@ export const interactionItems = [
   {
     id: "devil_fire_circle",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.devil.fireCircle.title",
     imageAltKey: "interactions.devil.fireCircle.imageAlt",
     typeKey: "interactions.devil.type",
@@ -86,6 +98,7 @@ export const interactionItems = [
   {
     id: "beppi_balloon_dog",
     category: "attack",
+    group: "strong",
     titleKey: "interactions.beppi.balloonDog.title",
     imageAltKey: "interactions.beppi.balloonDog.imageAlt",
     typeKey: "interactions.beppi.type",
@@ -94,6 +107,7 @@ export const interactionItems = [
   {
     id: "beppi_pink_balloon_dog",
     category: "attack",
+    group: "light",
     titleKey: "interactions.beppi.pinkBalloonDog.title",
     imageAltKey: "interactions.beppi.pinkBalloonDog.imageAlt",
     typeKey: "interactions.beppi.type",
@@ -102,6 +116,7 @@ export const interactionItems = [
   {
     id: "baroness_cupcake",
     category: "mini_boss",
+    group: "mini_boss",
     titleKey: "interactions.baroness.cupcake.title",
     imageAltKey: "interactions.baroness.cupcake.imageAlt",
     typeKey: "interactions.miniBoss.type",
@@ -110,6 +125,7 @@ export const interactionItems = [
   {
     id: "baroness_gumball",
     category: "mini_boss",
+    group: "mini_boss",
     titleKey: "interactions.baroness.gumball.title",
     imageAltKey: "interactions.baroness.gumball.imageAlt",
     typeKey: "interactions.miniBoss.type",
@@ -118,6 +134,7 @@ export const interactionItems = [
   {
     id: "baroness_waffle",
     category: "mini_boss",
+    group: "mini_boss",
     titleKey: "interactions.baroness.waffle.title",
     imageAltKey: "interactions.baroness.waffle.imageAlt",
     typeKey: "interactions.miniBoss.type",
@@ -126,6 +143,7 @@ export const interactionItems = [
   {
     id: "baroness_candy_corn",
     category: "mini_boss",
+    group: "mini_boss",
     titleKey: "interactions.baroness.candyCorn.title",
     imageAltKey: "interactions.baroness.candyCorn.imageAlt",
     typeKey: "interactions.miniBoss.type",
@@ -134,6 +152,7 @@ export const interactionItems = [
   {
     id: "baroness_jawbreaker",
     category: "mini_boss",
+    group: "mini_boss",
     titleKey: "interactions.baroness.jawbreaker.title",
     imageAltKey: "interactions.baroness.jawbreaker.imageAlt",
     typeKey: "interactions.miniBoss.type",

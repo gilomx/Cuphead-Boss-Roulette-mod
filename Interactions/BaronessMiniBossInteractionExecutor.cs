@@ -31,6 +31,11 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
         }
 
+        public bool NativeAssetsSettled
+        {
+            get { return cache.Ready || cache.Failed; }
+        }
+
         public bool Supports(string item) { return NativeBaronessMiniBossCache.Supports(item); }
 
         internal bool HasPresentMiniBoss
@@ -73,6 +78,19 @@ namespace Gilomx.CupheadBossRoulette
             presenceFrame = Time.frameCount;
             presentItems.Clear();
             nativeMiniBossRoundPending = false;
+            if (!(Level.Current is BaronessLevel))
+            {
+                // Both interaction queues share this executor. Outside the
+                // original Baroness fight its tracked actors are the complete
+                // mini-boss population; no whole-scene search is necessary.
+                for (var i = 0; i < active.Count; i++)
+                {
+                    var item = active[i] == null ? null : active[i].PresentItem;
+                    if (!string.IsNullOrEmpty(item))
+                        presentItems.Add(item);
+                }
+                return;
+            }
             if (Level.Current is BaronessLevel)
             {
                 // The head-toss interaction also has an inert castle object;
@@ -142,15 +160,25 @@ namespace Gilomx.CupheadBossRoulette
                 return false;
             }
             GameObject root = null;
+            var spawnStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
                 root = new GameObject("CreatorTools_" + item + "_State");
                 var state = root.AddComponent<BaronessMiniBossInteractionState>();
                 var actor = cache.CreateInactive(item, root.transform);
+                var cloneFinished = System.Diagnostics.Stopwatch.GetTimestamp();
                 state.Initialize(actor, item, donor, giftImagePath, logWarning);
                 active.Add(state);
                 presenceFrame = -1;
                 handle = new CreatorToolsUnityObjectInteractionHandle(state);
+                var finished = System.Diagnostics.Stopwatch.GetTimestamp();
+                var elapsedMs = (finished - spawnStarted) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (elapsedMs >= 8.0 && logWarning != null)
+                    logWarning(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "Performance: mini-boss {0} spawn {1:F1} ms (clone {2:F1}, setup {3:F1}).",
+                        item, elapsedMs,
+                        (cloneFinished - spawnStarted) * 1000.0 / System.Diagnostics.Stopwatch.Frequency,
+                        (finished - cloneFinished) * 1000.0 / System.Diagnostics.Stopwatch.Frequency));
                 return true;
             }
             catch (Exception exception)

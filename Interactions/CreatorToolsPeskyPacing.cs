@@ -10,8 +10,10 @@ namespace Gilomx.CupheadBossRoulette
         internal bool MiniBossPresent { get; private set; }
         internal float CooldownRemaining { get; private set; }
         internal float IntervalRemaining { get; private set; }
+        internal bool IntervalScheduled { get; private set; }
 
         internal bool IntervalReady { get { return IntervalRemaining <= 0f; } }
+        internal bool MiniBossReady { get { return !MiniBossPresent && CooldownRemaining <= 0f; } }
 
         internal bool Advance(float gameplaySeconds, bool miniBossPresent,
             float cooldownSeconds)
@@ -34,22 +36,36 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal bool CanDispatchInteraction(bool applyPacing, bool miniBoss,
-            int activeCompanions, int maximumCompanions)
+            int activeCompanions, int maximumCompanions, bool miniBossReserved = false)
         {
-            return !applyPacing || (IntervalReady &&
+            // Common admissions spend only the common clock. A mini-boss
+            // never waits for that clock or restarts it on admission.
+            return !applyPacing || ((miniBoss || (IntervalReady && !miniBossReserved)) &&
                 CanSelect(miniBoss, activeCompanions, maximumCompanions));
         }
 
         internal void ScheduleInterval(float seconds)
         {
             IntervalRemaining = seconds;
+            IntervalScheduled = true;
+        }
+
+        internal void ResetInterval()
+        {
+            IntervalRemaining = 0f;
+            IntervalScheduled = false;
+        }
+
+        internal void ScaleInterval(float factor)
+        {
+            IntervalRemaining *= factor;
         }
 
         internal void Reset()
         {
             MiniBossPresent = false;
             CooldownRemaining = 0f;
-            IntervalRemaining = 0f;
+            ResetInterval();
         }
     }
 }

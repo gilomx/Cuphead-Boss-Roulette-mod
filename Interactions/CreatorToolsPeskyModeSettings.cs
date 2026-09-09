@@ -17,7 +17,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const float DefaultMiniBossCooldownSeconds = 30f;
         internal const float DefaultMiniBossIntervalMultiplier = 2f;
         internal const int DefaultMaximumCompanionsDuringMiniBoss = 1;
-        private const int CurrentVersion = 5;
+        private const int CurrentVersion = 8;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -31,11 +31,19 @@ namespace Gilomx.CupheadBossRoulette
         private readonly string path;
         private readonly Action<string> logWarning;
         private bool needsMigration;
+        private CreatorToolsSpawnGroupSettings spawnGroups = new CreatorToolsSpawnGroupSettings();
 
         internal bool Enabled;
+        internal bool AllowConcurrentStrongInteractions { get; private set; }
         internal float MinimumInterval { get; private set; }
         internal float MaximumInterval { get; private set; }
-        internal float MiniBossCooldownSeconds { get; private set; }
+        internal float MiniBossCooldownSeconds { get { return MiniBossMinimumInterval; } }
+        internal float MiniBossMinimumInterval { get { return spawnGroups.MiniBossMinimumInterval; } }
+        internal float MiniBossMaximumInterval { get { return spawnGroups.MiniBossMaximumInterval; } }
+        internal int LightMinimumBatch { get { return spawnGroups.LightMinimumBatch; } }
+        internal int LightMaximumBatch { get { return spawnGroups.LightMaximumBatch; } }
+        internal int StrongMinimumBatch { get { return spawnGroups.StrongMinimumBatch; } }
+        internal int StrongMaximumBatch { get { return spawnGroups.StrongMaximumBatch; } }
         internal float MiniBossIntervalMultiplier { get; private set; }
         internal int MaximumCompanionsDuringMiniBoss { get; private set; }
         internal readonly List<string> Names = new List<string>();
@@ -136,23 +144,56 @@ namespace Gilomx.CupheadBossRoulette
         internal bool TrySetPacing(string minimum, string maximum,
             string cooldown, string multiplier, string companions)
         {
-            float cooldownValue;
-            float multiplierValue;
-            float companionsValue;
-            // Validate the entire request before changing any field. Older
-            // clients may still send only the original interval pair.
-            if (!TryBalanceNumber(cooldown ?? MiniBossCooldownSeconds.ToString(
-                    "R", CultureInfo.InvariantCulture), 0f, 300f, false, out cooldownValue) ||
-                !TryBalanceNumber(multiplier ?? MiniBossIntervalMultiplier.ToString(
-                    "R", CultureInfo.InvariantCulture), 1f, 10f, false, out multiplierValue) ||
-                !TryBalanceNumber(companions ?? MaximumCompanionsDuringMiniBoss.ToString(
-                    CultureInfo.InvariantCulture), 0f, 20f, true, out companionsValue) ||
-                !TrySetIntervals(minimum, maximum))
-                return false;
-            MiniBossCooldownSeconds = cooldownValue;
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "minimumInterval", minimum }, { "maximumInterval", maximum }
+            };
+            if (cooldown != null) values["miniBossCooldownSeconds"] = cooldown;
+            if (multiplier != null) values["miniBossIntervalMultiplier"] = multiplier;
+            if (companions != null) values["maximumCompanionsDuringMiniBoss"] = companions;
+            return TrySetPacing(values);
+        }
+
+        internal bool TrySetPacing(Dictionary<string, string> values)
+        {
+            if (values == null) return false;
+            float minimum, maximum, multiplierValue, companionsValue;
+            string multiplier, companions;
+            if (!values.TryGetValue("miniBossIntervalMultiplier", out multiplier))
+                multiplier = MiniBossIntervalMultiplier.ToString("R", CultureInfo.InvariantCulture);
+            if (!values.TryGetValue("maximumCompanionsDuringMiniBoss", out companions))
+                companions = MaximumCompanionsDuringMiniBoss.ToString(CultureInfo.InvariantCulture);
+            CreatorToolsSpawnGroupSettings updated;
+            var allowStrong = AllowConcurrentStrongInteractions;
+            string strongToken;
+            if (values.TryGetValue("allowConcurrentStrongInteractions", out strongToken))
+            {
+                if (strongToken == "1") allowStrong = true;
+                else if (strongToken == "0") allowStrong = false;
+                else if (!bool.TryParse(strongToken, out allowStrong)) return false;
+            }
+            // Nothing is committed until every provided field and pair passes validation.
+            if (!TryBalanceNumber(CreatorToolsFlatJson.Value(values, "minimumInterval"),
+                    IntervalLowerLimit, IntervalUpperLimit, false, out minimum) ||
+                !TryBalanceNumber(CreatorToolsFlatJson.Value(values, "maximumInterval"),
+                    IntervalLowerLimit, IntervalUpperLimit, false, out maximum) || minimum > maximum ||
+                !TryBalanceNumber(multiplier, 1f, 10f, false, out multiplierValue) ||
+                !TryBalanceNumber(companions, 0f, 20f, true, out companionsValue) ||
+                !spawnGroups.TryUpdate(values, "", out updated)) return false;
+            MinimumInterval = minimum;
+            MaximumInterval = maximum;
             MiniBossIntervalMultiplier = multiplierValue;
             MaximumCompanionsDuringMiniBoss = (int)companionsValue;
+            spawnGroups = updated;
+            AllowConcurrentStrongInteractions = allowStrong;
             return true;
+        }
+
+        internal void AppendSpawnSettingsJson(StringBuilder builder, bool defaults = false)
+        {
+            spawnGroups.AppendJson(builder, defaults);
+            builder.Append(defaults ? ",\"defaultAllowConcurrentStrongInteractions\":" : ",\"allowConcurrentStrongInteractions\":")
+                .Append(!defaults && AllowConcurrentStrongInteractions ? "true" : "false");
         }
 
         internal void Save()
@@ -190,8 +231,9 @@ namespace Gilomx.CupheadBossRoulette
         private void ResetToDefaults()
         {
             Enabled = false;
+            AllowConcurrentStrongInteractions = false;
             ResetIntervalsToDefaults();
-            MiniBossCooldownSeconds = DefaultMiniBossCooldownSeconds;
+            spawnGroups = new CreatorToolsSpawnGroupSettings();
             MiniBossIntervalMultiplier = DefaultMiniBossIntervalMultiplier;
             MaximumCompanionsDuringMiniBoss = DefaultMaximumCompanionsDuringMiniBoss;
             DisabledItems.Clear();
@@ -226,9 +268,6 @@ namespace Gilomx.CupheadBossRoulette
                 for (var i = 0; i < disabledItems.Count; i++)
                     if (IsKnownItem(disabledItems[i]))
                         DisabledItems.Add(disabledItems[i]);
-                if (EnabledItemCount == 0)
-                    Enabled = false;
-
                 // Older files have no interval fields. Recover only this pair
                 // if a later file has invalid values, retaining names/items.
                 ResetIntervalsToDefaults();
@@ -242,8 +281,22 @@ namespace Gilomx.CupheadBossRoulette
                     Warn("Los intervalos de Modo Molestoso no eran validos; " +
                         "se usaran los intervalos predeterminados.");
                 needsMigration = false;
-                MiniBossCooldownSeconds = ReadBalanceNumber(json,
-                    "miniBossCooldownSeconds", DefaultMiniBossCooldownSeconds, 0f, 300f, false);
+                var spawnValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var property in CreatorToolsSpawnGroupSettings.PropertyNames)
+                {
+                    var position = FindPropertyValue(json, property);
+                    if (position >= 0) spawnValues[property] = ReadNumberToken(json, position);
+                }
+                var cooldownPosition = FindPropertyValue(json, "miniBossCooldownSeconds");
+                if (cooldownPosition >= 0)
+                    spawnValues["miniBossCooldownSeconds"] = ReadNumberToken(json, cooldownPosition);
+                spawnGroups = CreatorToolsSpawnGroupSettings.Load(spawnValues, Warn, out needsMigration);
+                bool allowStrong;
+                if (!TryReadBoolean(json, "allowConcurrentStrongInteractions", out allowStrong))
+                    needsMigration = true;
+                AllowConcurrentStrongInteractions = allowStrong;
+                if (EnabledItemCount == 0)
+                    Enabled = false;
                 MiniBossIntervalMultiplier = ReadBalanceNumber(json,
                     "miniBossIntervalMultiplier", DefaultMiniBossIntervalMultiplier, 1f, 10f, false);
                 MaximumCompanionsDuringMiniBoss = (int)ReadBalanceNumber(json,
@@ -303,8 +356,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\n  \"miniBossIntervalMultiplier\": ")
                 .Append(MiniBossIntervalMultiplier.ToString("R", CultureInfo.InvariantCulture))
                 .Append(",\n  \"maximumCompanionsDuringMiniBoss\": ")
-                .Append(MaximumCompanionsDuringMiniBoss.ToString(CultureInfo.InvariantCulture))
-                .Append(",\n  \"names\": [");
+                .Append(MaximumCompanionsDuringMiniBoss.ToString(CultureInfo.InvariantCulture));
+            AppendSpawnSettingsJson(builder);
+            builder.Append(",\n  \"names\": [");
             for (var i = 0; i < Names.Count; i++)
             {
                 if (i > 0)
@@ -333,8 +387,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var count = 0;
                 for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
-                    if (!DisabledItems.Contains(
-                        CreatorToolsInteractionIds.All[i]))
+                    if (IsItemEnabled(CreatorToolsInteractionIds.All[i]))
                         count++;
                 return count;
             }

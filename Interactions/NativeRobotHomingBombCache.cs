@@ -71,20 +71,25 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             RemoveDestroyedActors();
-            if (!Ready)
-                CaptureFromLoadedRobot();
             if (Ready || preloadStarted || preloadFailed ||
-                coroutineHost == null || !Evaluate(canPreload) ||
-                NativeInteractionPreloadCoordinator.
-                    IsCurrentGameplayScene(RobotSceneName))
+                coroutineHost == null || !Evaluate(canPreload))
                 return;
 
             if (!NativeInteractionPreloadCoordinator.TryAcquire(this))
                 return;
 
-            preloadStarted = true;
             try
             {
+                // Search/copy only in a safe preload window, and only for the
+                // cache that owns the serialized queue.
+                CaptureFromLoadedRobot();
+                if (Ready || NativeInteractionPreloadCoordinator.
+                    IsCurrentGameplayScene(RobotSceneName))
+                {
+                    NativeInteractionPreloadCoordinator.Release(this);
+                    return;
+                }
+                preloadStarted = true;
                 coroutineHost.StartCoroutine(PreloadNativeAssets());
             }
             catch (Exception exception)
@@ -157,14 +162,16 @@ namespace Gilomx.CupheadBossRoulette
                 actor.transform.right = Vector3.down;
                 actor.gameObject.SetActive(true);
                 var cameraScale = CreatorToolsInteractionPresentation.
-                    MatchGameplayCameraScale(actor.gameObject, logWarning);
+                    GetGameplayCameraScale();
+                var bodyScale = CreatorToolsInteractionPresentation.
+                    MatchGameplayBodyScale(actor.gameObject, logWarning);
                 scaleRoot = WrapScaleWithoutChangingNativeAnimation(
                     actor,
-                    cameraScale);
+                    bodyScale);
                 CreatorToolsInteractionPresentation.
                     MarkInheritedGameplayCameraScale(
                         actor.gameObject,
-                        cameraScale);
+                        bodyScale);
                 MoveFullyBeyondRightEdge(
                     actor.gameObject,
                     parameters.Position.x,
@@ -458,15 +465,15 @@ namespace Gilomx.CupheadBossRoulette
 
         private static GameObject WrapScaleWithoutChangingNativeAnimation(
             RobotLevelHatchBombBot actor,
-            float cameraScale)
+            float bodyScale)
         {
             var actorTransform = actor.transform;
             var worldPosition = actorTransform.position;
             var worldRotation = actorTransform.rotation;
             var scaledNative = actorTransform.localScale;
             var nativeScale = new Vector3(
-                scaledNative.x / cameraScale,
-                scaledNative.y / cameraScale,
+                scaledNative.x / bodyScale,
+                scaledNative.y / bodyScale,
                 scaledNative.z);
 
             var scaleRoot = new GameObject(
@@ -474,8 +481,8 @@ namespace Gilomx.CupheadBossRoulette
             scaleRoot.transform.position = worldPosition;
             scaleRoot.transform.rotation = Quaternion.identity;
             scaleRoot.transform.localScale = new Vector3(
-                cameraScale,
-                cameraScale,
+                bodyScale,
+                bodyScale,
                 1f);
             actorTransform.SetParent(scaleRoot.transform, false);
             actorTransform.localPosition = Vector3.zero;
