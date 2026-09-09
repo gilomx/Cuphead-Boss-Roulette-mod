@@ -607,6 +607,15 @@ namespace Gilomx.CupheadBossRoulette
             NativeDragonFireballsCache.InstallLifecyclePatches(
                 harmony,
                 delegate(string message) { Logger.LogWarning(message); });
+            NativeTrainBoneRingCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
+            NativeBeppiBalloonDogCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
+            NativeDevilFireCircleCache.InstallLifecyclePatches(
+                harmony,
+                delegate(string message) { Logger.LogWarning(message); });
             InstallCreatorToolsGameplayLoadPatch();
             InstallCreatorToolsPhaseTransitionPatches();
 

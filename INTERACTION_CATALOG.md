@@ -6,11 +6,145 @@ los mini zepelines verde y morado, la zanahoria teledirigida de La pandilla
 raíz, la semilla azul de Clavel de Cagney y la luciérnaga incendiada de Hosco
 y Tosco, la bomba teledirigida del Dr. Kahl, el lanzamiento de cabeza de la
 Baronesa Von Bon Bon, las bolas de fuego de Fósforo Sombrío y los cinco
-mini jefes de la Baronesa.
+mini jefes de la Baronesa, el aro de huesos del Expreso Fantasma y el círculo
+de fuego del Diablo y los perritos globo de Beppi.
+
+## Perritos globo de Beppi
+
+Dos artículos comparten `BeppiBalloonDogInteractionExecutor`:
+
+- `beppi_balloon_dog`: cada envío elige 80 % normal y 20 % rosa, por decisión
+  del usuario. Es una probabilidad por aparición, no una secuencia garantizada.
+- `beppi_pink_balloon_dog`: siempre usa el prefab rosa parriable.
+
+Cada artículo crea un perrito. Ambos usan `ClownLevelDogBalloon`, capturado
+desde `ClownLevelClownHelium.regularDog`/`pinkDog` de `scene_level_clown`.
+Se precargan las dos plantillas inactivas mediante el coordinador común,
+aislando los lifecycle de la escena temporal. No se instancia el jefe.
+
+El perrito aparece completamente sobre el borde superior, en una X aleatoria
+entre 10 % y 90 % del encuadre; se procura separar los envíos simultáneos.
+Primero se activa la copia para inicializar sus componentes de daño y luego
+se llama al `Init` nativo con HP y velocidad de la dificultad actual. Apunta
+una vez al jugador seleccionado por `PlayerManager.GetNext`, espera su
+animación `Intro` y avanza con su ondulación original, sin perseguirlo después.
+El parry del rosa, colisión, daño, disparos y animación de reventar son nativos.
+
+Un padre de escala conserva sprite e hitbox juntos. Velocidad y vector
+perpendicular de la onda se adaptan a la cámara sin cambiar el reloj nativo.
+El único parche de movimiento sustituye el límite absoluto Y=-560 por limpieza
+contra el encuadre, exclusivamente en copias con la marca de esta interacción.
+Tras verse en cámara se retira al salir completamente; el respaldo de vida
+nativo de 20 segundos permanece. No se agrega un TTL. Pausa, derrota, cambio
+de nivel y reintento siguen el contrato común. La etiqueta y el regalo usan
+la presentación compartida con seguimiento del sprite durante sus animaciones.
+
+Los dos IDs están en tarjetas, pruebas, reglas, Modo Molestoso, Batalla,
+mock y traducciones ES/EN. Sus previews son los sprites
+`balloon_dog_chomp_0001` y `pink_balloon_dog_chomp_0001` de `atlas_clownlevel`,
+extraídos con `tools/extract_native_beppi_balloon_dog_previews.py`.
+`tools/verify_native_beppi_balloon_dog_contract.ps1` valida por IL prefabs,
+selección de jugador, Init, trayectoria, reloj, punto del parche, daño y parry.
+
+Pendiente de prueba manual en combate: ambos artículos en tierra y avión,
+mezcla normal/rosa en varios envíos, parry del rosa fijo, muerte por disparos,
+nombre/regalo, varios simultáneos, cooperativo, pausa, derrota, reintento y
+liberación de cupo al salir. Comparar cámaras con zoom y desplazamiento, y
+comprobar que los perritos de la pelea original de Beppi no cambian.
+
+## Círculo de fuego del Diablo
+
+`devil_fire_circle` reutiliza los prefabs `spinnerProjectilePrefab` y
+`spinnerOrbitingProjectilePrefab` de `DevilLevelSittingDevil`, precargados
+desde `scene_level_devil` mediante el coordinador común. Un padre nativo
+inactivo satisface la referencia que ambos proyectiles requieren, sin iniciar
+el jefe ni conectar sus fases. Sus lifecycle se aíslan durante la precarga.
+
+Son cinco fuegos en total: cuatro azules orbitando un centro rosa parriable.
+La formación aparece centrada en la cámara y 50 unidades por encima de su
+centro; conserva el radio nativo de 300 y la anticipación de un segundo sin
+colisión. Las propiedades de la dificultad gobiernan aceleración, velocidad,
+giro y duración de la persecución. La selección de jugador, animación, daño,
+sonido y parry son nativos. Hacer parry desactiva el collider y el dibujo del
+centro; los cuatro fuegos siguen orbitando y la formación conserva su cupo.
+
+El grupo mantiene su padre en el origen con escala 1 porque
+`GroundHomingMovement` escribe coordenadas locales. El centro y sus hijos
+adaptan tamaño, radio, velocidad, aceleración y oscilación vertical a la cámara.
+Un parche limitado a centros con `DevilFireCircleInteractionState` adapta la
+oscilación y sustituye el límite absoluto de X por limpieza de cámara. Al
+terminar la persecución nativa, el grupo se retira cuando todos sus sprites
+visibles salen del encuadre. No se añade un TTL. El ataque original del Diablo
+conserva sus valores y su límite de posición.
+
+La presentación compartida sigue el centro, considera también las llamas
+hijas para visibilidad y conserva nombre/regalo después del parry. El handle
+agrupa los cinco fuegos para pausa, derrota, reintento y limpieza. Está
+integrado en tarjetas, pruebas manuales, reglas, Modo Molestoso, Batalla,
+mock y traducciones ES/EN; todos consumen las listas comunes de artículos.
+
+El preview se extrae de `devil_ph1_fire_dance_0001` y
+`devil_ph1_fire_dance_pink_0001` en `atlas_devillevelp1` con
+`tools/extract_native_devil_fire_circle_preview.py`. El contrato IL
+`tools/verify_native_devil_fire_circle_contract.ps1` verifica prefabs,
+cantidad, fábricas, parry, relojes, homing, constantes adaptadas y destrucción.
+
+Prueba manual pendiente antes de distribuir: tierra y avión, parry del centro
+con los cuatro satélites todavía vivos, daño azul, nombre/regalo, varios
+círculos, cooperativo, pausa, derrota, reintento y liberación del cupo al salir.
+Comparar cámaras alejadas y niveles con desplazamiento, además del ataque
+original en la pelea del Diablo.
+
+## Aro de huesos del tren
+
+`train_bone_ring` es un ataque de tipo `Proyectil`. Reutiliza
+`TrainLevelEngineBoss.dropperPrefab` (`TrainLevelEngineBossDropperProjectile`)
+de `scene_level_train`. La precarga pasa por el coordinador común y aísla los
+lifecycle de la escena temporal del tren antes de retener una plantilla
+inactiva; no clona un proyectil que ya esté atacando.
+
+Cada canje crea un aro sobre el borde superior, en una X aleatoria entre el
+10 % y el 90 % del encuadre, procurando separar las apariciones. Conserva
+`Create`/`Init`, el impulso ascendente inicial, la gravedad, el crecimiento
+de media escala a escala completa y el giro `Horizontal` al alcanzar la altura
+del jugador. Elige al jugador y el sentido horizontal con `PlayerManager.GetNext`
+y `player.center` nativos. Velocidad y gravedad proceden de las propiedades
+de la dificultad y se adaptan a la escala de cámara; no se usa el suelo del nivel
+para decidir el giro. Funciona con jugadores terrestres y de avión.
+
+Un padre de escala conserva los cambios nativos de tamaño y orientación sin
+separar sprites y hitboxes. El círculo vertical, la caja horizontal, el daño
+y la muerte por impacto siguen siendo los del juego. La etiqueta y el regalo
+usan `PrepareActor` y `FollowAnimatedBody` compartidos para seguir el crecimiento
+y el cambio de dibujo al girar. No se añade ningún TTL: se retira cuando ya fue
+visible, giró y sus bounds salen completamente de cámara; el respaldo temporal
+nativo continúa disponible. Pausa, derrota, reintento y limpieza de cola usan
+el mismo contrato que los demás ataques.
+
+El único parche al recorrido nativo registra el `Effect.Create` del polvo de
+giro en el padre de la interacción, aplica su escala y prioridad, y conserva
+el `Play` nativo. Los proyectiles del combate original no tienen ese padre y
+atraviesan el parche sin cambios. El polvo se destruye con el handle del aro.
+
+Está integrado en el catálogo, las pruebas manuales, reglas, Modo Molestoso,
+Batalla Molestosa, mock y traducciones ES/EN. El preview local procede de
+`train_bone_spiral_vertical_0001` de `atlas_trainlevel`; se regenera con
+`tools/extract_native_train_bone_ring_preview.py`. El extractor recorta el
+margen reservado por el canvas nativo para centrar el aro visible.
+
+`tools/verify_native_train_bone_ring_contract.ps1` verifica la fábrica, orden
+de activación, elección/relevo del jugador, movimiento, relojes, ambos colliders,
+polvo, daño y parámetros de dificultad mediante IL del juego instalado.
+
+Prueba manual pendiente antes de distribuir: enviar `train_bone_ring` en tierra
+y avión; comprobar entrada desde arriba, caída, giro a la altura del jugador,
+daño durante ambas orientaciones, nombre/regalo y liberación del cupo al salir.
+Repetir en cooperativo, con varios aros, pausa, derrota, reintento y desactivación
+de Modo Molestoso. En el tren, comprobar que los aros originales sigan su curso.
 
 ## Tipo Mini jefes: Baronesa
 
-El catálogo contiene 13 artículos. El panel distingue `attack` y `mini_boss`
+El catálogo contiene 17 artículos. El panel distingue `attack` y `mini_boss`
 y ofrece el filtro Todos / Ataques / Mini jefes, compartido con las pruebas
 manuales. Las reglas, Modo Molestoso y Batalla Molestosa consumen los mismos
 IDs del catálogo.
@@ -434,9 +568,45 @@ antes de apagar los sprites originales; no congelan nombres huérfanos.
 - Modo Molestoso conserva su estado aunque el panel se abra con el juego
   pausado. No depende del interruptor ni de los controles de cola de
   Interacciones: ambas fuentes pueden atacar durante la misma partida. Sólo
-  genera durante una partida disponible, espera entre 1.25 y 3.25 segundos y
+  genera durante una partida disponible, espera entre 1.25 y 3.25 segundos por
+  defecto (conservando cualquier intervalo guardado) y
   usa su propia cola sin construir un backlog automático. Desactivarlo elimina
   sus pendientes y dispone sus actores activos sin tocar canjeos de donaciones.
+- El modo libre usa `CreatorToolsPeskyPacing`: con un minijefe presente duplica
+  el intervalo y admite una molestia común adicional como máximo. Cuenta
+  artículos activos de ambas colas y espera a que se despeje la pantalla antes
+  de introducir un minijefe. Observa también minijefes nativos y de otros
+  orígenes, hasta su destrucción, y empieza un descanso de 30 segundos de juego
+  al desaparecer el último. Durante el descanso siguen los ataques comunes;
+  terminarlo sólo permite volver a sortear minijefes. Revalida antes de despachar
+  y descarta selecciones automáticas pendientes que ya no caben. La pausa no
+  consume descanso, la limpieza de fase sí inicia el descanso al desaparecer el
+  actor, y la salida/reintento reinicia la política. No altera vida, daño,
+  velocidad ni probabilidades relativas del catálogo. El JSON v5 permite
+  ajustar `miniBossCooldownSeconds` (0–300),
+  `miniBossIntervalMultiplier` (1–10) y `maximumCompanionsDuringMiniBoss`
+  (entero 0–20). El botón visible Ritmo y minijefes (también Ctrl+I) permite
+  guardar los cinco ajustes de forma atómica y restaurar predeterminados.
+  Los valores ausentes se migran con respaldo y los inválidos recuperan sólo
+  su propio predeterminado. Ver `README.md` para controles y edición del archivo.
+- Interacciones usa `CreatorToolsInteractionPacingSettings`, con archivo
+  `mx.gilomx.cuphead.bossroulette.interaction-pacing.json`, y otra instancia de
+  `CreatorToolsPeskyPacing`. Su balance es opcional y viene desactivado. Los
+  cinco campos y el interruptor se editan directamente en Configuración de
+  Interacciones; no hay enlace al diálogo de Modo Molestoso. Su JSON contiene
+  `enabled`, `minimumInterval`, `maximumInterval`, `miniBossCooldownSeconds`,
+  `miniBossIntervalMultiplier` y `maximumCompanionsDuringMiniBoss`.
+  Manual/Stream usan sólo esos valores y relojes; los despachos y guardados de
+  una cola no reinician la espera de la otra. Ambas observan presencia física
+  de minijefes y artículos activos para respetar los límites de pantalla.
+  `CanDispatchInteraction` bloquea admisión sin descartar entradas/cantidades;
+  otros canjeos elegibles pueden avanzar. Batalla se evalúa antes del balance
+  opcional y no consume su intervalo. El endpoint de Interacciones recibe seis
+  campos `pacing.*` juntos, valida antes de cambiar settings y publica `pacing`
+  y `defaultPacing`; el panel confirma todos los campos y su revisión.
+  Clientes antiguos que omiten esos campos no cambian el balance. Los archivos
+  viejos de Modo Molestoso retiran la opción compartida al guardarse en v5;
+  Interacciones empieza desactivado y con sus propios valores predeterminados.
 - La lista de nombres de Modo Molestoso es opcional. Si está vacía, se encola
   `string.Empty` y el actor aparece sin texto ni sustituto predeterminado; la
   configuración vacía sigue siendo válida y puede permanecer activada entre

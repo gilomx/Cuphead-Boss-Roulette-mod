@@ -33,6 +33,15 @@ namespace Gilomx.CupheadBossRoulette
 
         public bool Supports(string item) { return NativeBaronessMiniBossCache.Supports(item); }
 
+        internal bool HasPresentMiniBoss
+        {
+            get
+            {
+                RefreshPresentMiniBosses();
+                return presentItems.Count > 0;
+            }
+        }
+
         public bool SupportsCurrentLevel(string item)
         {
             return BaronessMiniBossInteractionState.CanSpawnInCurrentLevel(item);

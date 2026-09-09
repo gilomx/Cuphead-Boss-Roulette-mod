@@ -1,0 +1,218 @@
+using System;
+using System.IO;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunPeskyPacingTests()
+        {
+            Run("Pesky recovery starts after disappearance, not arrival", TestPeskyRecovery);
+            Run("Pesky avoids crowded arrivals and caps live companions", TestPeskyCompanions);
+            Run("Pesky recovery pauses, survives transitions, and resets on retry", TestPeskyRecoveryLifecycle);
+            Run("Pesky v2 migrates balance defaults and preserves customized intervals", TestPeskyBalanceMigration);
+            Run("Pesky custom tuning survives panel saves", TestPeskyBalancePersistence);
+            Run("Pesky invalid balance fields recover independently", TestPeskyBalanceValidation);
+            Run("Pesky panel updates are atomic and retain legacy client compatibility", TestPeskyPanelUpdates);
+            Run("Interaction pacing is opt-in, reversible and uses gameplay time", TestOptionalInteractionPacing);
+            RunIndependentPacingTests();
+        }
+
+        private static void TestPeskyRecovery()
+        {
+            var pacing = new CreatorToolsPeskyPacing();
+            True(pacing.CanSelect(true, 0, 1), "initial mini-boss eligible");
+            True(pacing.Advance(0f, true, 30f), "arrival changes cadence");
+            pacing.Advance(120f, true, 30f);
+            False(pacing.CanSelect(true, 0, 1), "long-lived actor blocks all mini-bosses");
+            True(pacing.Advance(1f, false, 30f), "disappearance restores normal cadence");
+            Equal(30f, pacing.CooldownRemaining, "full cooldown after disappearance");
+            True(pacing.CanSelect(false, 5, 1), "normal pressure resumes during recovery");
+            pacing.Advance(29f, false, 30f);
+            False(pacing.CanSelect(true, 0, 1), "no early admission");
+            pacing.Advance(1f, false, 30f);
+            True(pacing.CanSelect(true, 0, 1), "eligible exactly at end, no forced spawn");
+            False(pacing.Advance(90f, false, 30f), "empty frames do not restart recovery");
+            Equal(0f, pacing.CooldownRemaining, "recovery floors at zero");
+        }
+
+        private static void TestPeskyCompanions()
+        {
+            var pacing = new CreatorToolsPeskyPacing();
+            False(pacing.CanSelect(true, 2, 1), "wait for old companions to clear before arrival");
+            True(pacing.CanSelect(false, 2, 1), "ordinary selection unaffected without mini-boss");
+            True(pacing.CanSelect(true, 1, 1), "one companion permits arrival");
+            pacing.Advance(0f, true, 30f);
+            True(pacing.CanSelect(false, 0, 1), "first companion allowed");
+            False(pacing.CanSelect(false, 1, 1), "second companion blocked on dispatch recheck");
+            False(pacing.CanSelect(false, 3, 1), "external actors suppress extra automatic pressure");
+            False(pacing.CanSelect(false, 0, 0), "zero config disables all accompaniment");
+            True(pacing.CanSelect(false, 1, 2), "custom companion capacity is respected");
+        }
+
+        private static void TestPeskyRecoveryLifecycle()
+        {
+            var pacing = new CreatorToolsPeskyPacing();
+            pacing.Advance(0f, true, 30f);
+            pacing.Advance(0f, false, 30f); // Also covers phase cleanup disappearance.
+            pacing.Advance(0f, false, 30f);
+            Equal(30f, pacing.CooldownRemaining, "no gameplay time means no cooldown progress");
+            pacing.Advance(15f, false, 30f);
+            pacing.Advance(0f, true, 30f); // Another source can supply a mini-boss.
+            pacing.Advance(0f, false, 30f);
+            Equal(30f, pacing.CooldownRemaining, "external mini-boss disappearance grants full recovery");
+            pacing.Reset();
+            False(pacing.MiniBossPresent, "retry forgets the previous arena");
+            Equal(0f, pacing.CooldownRemaining, "retry has no stale cooldown");
+            pacing.Advance(0f, true, 0f);
+            pacing.Advance(0f, false, 0f);
+            True(pacing.CanSelect(true, 0, 1), "explicit zero cooldown is supported");
+        }
+
+        private static void TestPeskyBalanceMigration()
+        {
+            using (var scope = new TestScope("pesky-balance-migration"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                File.WriteAllText(path, "{\"version\":2,\"enabled\":true," +
+                    "\"minimumInterval\":6,\"maximumInterval\":9," +
+                    "\"names\":[\"Conservar\"],\"disabledItems\":[]}");
+                var settings = LoadPeskySettings(scope);
+                Equal(6f, settings.MinimumInterval, "existing customized minimum retained");
+                Equal(9f, settings.MaximumInterval, "existing customized maximum retained");
+                True(settings.Enabled, "enabled retained");
+                Equal("Conservar", settings.Names[0], "names retained");
+                Equal(30f, settings.MiniBossCooldownSeconds, "default recovery");
+                Equal(2f, settings.MiniBossIntervalMultiplier, "default multiplier");
+                Equal(1, settings.MaximumCompanionsDuringMiniBoss, "default companion cap");
+                using (var json = JsonDocument.Parse(File.ReadAllText(path)))
+                {
+                    Equal(5, json.RootElement.GetProperty("version").GetInt32(), "automatic migration");
+                    Equal(30f, json.RootElement.GetProperty("miniBossCooldownSeconds").GetSingle(),
+                        "new tuning visible in file without a panel save");
+                }
+                True(File.ReadAllText(path + ".bak").Contains("\"version\":2"), "legacy backup retained");
+            }
+        }
+
+        private static void TestPeskyBalancePersistence()
+        {
+            using (var scope = new TestScope("pesky-balance-persistence"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                File.WriteAllText(path, BalanceJson("12.5", "3", "0"));
+                var settings = LoadPeskySettings(scope);
+                True(settings.TrySetIntervals("4", "8"), "panel-style interval change");
+                settings.SetNames(new[] { "Editado" });
+                settings.Save();
+                var reloaded = LoadPeskySettings(scope);
+                Equal(12.5f, reloaded.MiniBossCooldownSeconds, "custom recovery retained");
+                Equal(3f, reloaded.MiniBossIntervalMultiplier, "custom multiplier retained");
+                Equal(0, reloaded.MaximumCompanionsDuringMiniBoss, "no accompaniment retained");
+                Equal(4f, reloaded.MinimumInterval, "panel minimum saved");
+                Equal("Editado", reloaded.Names[0], "panel names saved");
+            }
+        }
+
+        private static void TestPeskyBalanceValidation()
+        {
+            using (var scope = new TestScope("pesky-balance-validation"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                foreach (var invalid in new[] { "-1", "301", "1e100", "null", "\"NaN\"" })
+                {
+                    File.WriteAllText(path, BalanceJson(invalid, "3", "2"));
+                    var settings = LoadPeskySettings(scope);
+                    Equal(30f, settings.MiniBossCooldownSeconds, "invalid recovery falls back");
+                    Equal(3f, settings.MiniBossIntervalMultiplier, "valid multiplier survives");
+                    Equal(2, settings.MaximumCompanionsDuringMiniBoss, "valid capacity survives");
+                }
+                foreach (var invalid in new[] { "0", "0.5", "11", "1e100", "null", "\"NaN\"" })
+                {
+                    File.WriteAllText(path, BalanceJson("0", invalid, "1"));
+                    var settings = LoadPeskySettings(scope);
+                    Equal(0f, settings.MiniBossCooldownSeconds, "valid zero recovery survives");
+                    Equal(2f, settings.MiniBossIntervalMultiplier, "invalid multiplier falls back");
+                }
+                foreach (var invalid in new[] { "-1", "21", "0.5", "null", "1e100" })
+                {
+                    File.WriteAllText(path, BalanceJson("300", "10", invalid));
+                    var settings = LoadPeskySettings(scope);
+                    Equal(300f, settings.MiniBossCooldownSeconds, "upper recovery boundary");
+                    Equal(10f, settings.MiniBossIntervalMultiplier, "upper multiplier boundary");
+                    Equal(1, settings.MaximumCompanionsDuringMiniBoss, "invalid capacity falls back");
+                    Equal(6f, settings.MinimumInterval, "bad balance does not reset base interval");
+                }
+            }
+        }
+
+        private static void TestPeskyPanelUpdates()
+        {
+            using (var scope = new TestScope("pesky-panel-updates"))
+            {
+                var settings = LoadPeskySettings(scope);
+                True(settings.TrySetPacing("2", "4", "12.5", "3", "0"), "all panel values accepted");
+                foreach (var invalid in new[] {
+                    new[] { "6", "5", "30", "2", "1" },
+                    new[] { "1", "3", "-1", "2", "1" },
+                    new[] { "1", "3", "30", "0.5", "1" },
+                    new[] { "1", "3", "30", "2", "1.5" },
+                    new[] { "1", "3", "30", "2", "21" },
+                    new[] { "1", "3", "NaN", "2", "1" },
+                    new[] { "1", "3", "30", "Infinity", "1" },
+                    new[] { "1", "3", "", "2", "1" }
+                })
+                {
+                    False(settings.TrySetPacing(invalid[0], invalid[1], invalid[2], invalid[3], invalid[4]), "bad panel request rejected");
+                    Equal(2f, settings.MinimumInterval, "rejection preserves minimum");
+                    Equal(4f, settings.MaximumInterval, "rejection preserves maximum");
+                    Equal(12.5f, settings.MiniBossCooldownSeconds, "rejection preserves cooldown");
+                    Equal(3f, settings.MiniBossIntervalMultiplier, "rejection preserves multiplier");
+                    Equal(0, settings.MaximumCompanionsDuringMiniBoss, "rejection preserves companions");
+                }
+                True(settings.TrySetPacing("1.25", "3.25", null, null, null), "legacy interval-only request accepted");
+                Equal(12.5f, settings.MiniBossCooldownSeconds, "legacy client does not reset balance");
+                settings.Save();
+                var saved = LoadPeskySettings(scope);
+                Equal(1.25f, saved.MinimumInterval, "panel update persists");
+                Equal(3f, saved.MiniBossIntervalMultiplier, "balance persists together");
+                True(settings.TrySetPacing("1.25", "3.25", "30", "2", "1"), "restore complete defaults");
+                Equal(30f, settings.MiniBossCooldownSeconds, "restored cooldown");
+                Equal(1, settings.MaximumCompanionsDuringMiniBoss, "restored companion cap");
+            }
+        }
+
+        private static void TestOptionalInteractionPacing()
+        {
+            var pacing = new CreatorToolsPeskyPacing();
+            pacing.Advance(0f, true, 30f);
+            pacing.ScheduleInterval(6f);
+            True(pacing.CanDispatchInteraction(false, false, 5, 1), "default bypasses companion and interval restrictions");
+            False(pacing.CanDispatchInteraction(true, false, 0, 1), "opt-in interval blocks an otherwise eligible companion");
+            pacing.Advance(0f, true, 30f);
+            Equal(6f, pacing.IntervalRemaining, "pause cannot consume paced interval");
+            pacing.Advance(6f, true, 30f);
+            True(pacing.CanDispatchInteraction(true, false, 0, 1), "eligible after paced interval");
+            False(pacing.CanDispatchInteraction(true, false, 1, 1), "opt-in respects the shared companion limit");
+            pacing.Advance(0f, false, 30f);
+            True(pacing.CanDispatchInteraction(false, true, 0, 1), "default ignores the new cooldown; native single-slot policy is separate");
+            False(pacing.CanDispatchInteraction(true, true, 0, 1), "earned mini-boss waits during cooldown");
+            True(pacing.CanDispatchInteraction(true, false, 0, 1), "a common sibling can advance during cooldown");
+            pacing.Advance(30f, false, 30f);
+            True(pacing.CanDispatchInteraction(true, true, 0, 1), "waiting mini-boss becomes eligible");
+            pacing.ScheduleInterval(4f); // A regular admission spends only the interaction clock.
+            False(pacing.IntervalReady, "successful admission blocks an immediate interaction burst");
+            True(pacing.CanDispatchInteraction(false, false, 0, 1), "turning option off immediately releases pacing");
+            pacing.Reset();
+            True(pacing.IntervalReady, "retry clears stale paced interval");
+        }
+
+        private static string BalanceJson(string cooldown, string multiplier, string companions)
+        {
+            return "{\"version\":3,\"enabled\":false,\"minimumInterval\":6,\"maximumInterval\":9," +
+                "\"miniBossCooldownSeconds\":" + cooldown + ",\"miniBossIntervalMultiplier\":" + multiplier +
+                ",\"maximumCompanionsDuringMiniBoss\":" + companions + ",\"names\":[],\"disabledItems\":[]}";
+        }
+    }
+}

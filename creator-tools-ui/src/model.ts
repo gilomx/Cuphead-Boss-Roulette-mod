@@ -54,6 +54,8 @@ export interface RouletteConfigState {
 }
 
 export interface InteractionConfigState {
+  pacing: InteractionPacingConfig;
+  defaultPacing: InteractionPacingConfig;
   ready: boolean;
   available: boolean;
   interactionsEnabled: boolean;
@@ -84,6 +86,15 @@ export interface InteractionConfigState {
   queue: InteractionQueueEntry[];
 }
 
+export interface InteractionPacingConfig {
+  enabled: boolean;
+  minimumInterval: number;
+  maximumInterval: number;
+  miniBossCooldownSeconds: number;
+  miniBossIntervalMultiplier: number;
+  maximumCompanionsDuringMiniBoss: number;
+}
+
 export interface PeskyModeConfigState {
   ready: boolean;
   available: boolean;
@@ -99,6 +110,12 @@ export interface PeskyModeConfigState {
   intervalUpperLimit: number;
   defaultMinimumInterval: number;
   defaultMaximumInterval: number;
+  miniBossCooldownSeconds: number;
+  miniBossIntervalMultiplier: number;
+  maximumCompanionsDuringMiniBoss: number;
+  defaultMiniBossCooldownSeconds: number;
+  defaultMiniBossIntervalMultiplier: number;
+  defaultMaximumCompanionsDuringMiniBoss: number;
   names: string[];
   items: string[];
   disabledItems: string[];

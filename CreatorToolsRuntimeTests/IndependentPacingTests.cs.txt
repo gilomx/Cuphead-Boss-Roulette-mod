@@ -1,0 +1,141 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunIndependentPacingTests()
+        {
+            Run("Interaction balance defaults do not inherit the former Pesky opt-in", TestIndependentPacingMigration);
+            Run("Saving or restoring one balance leaves the other file and values untouched", TestIndependentPacingPersistence);
+            Run("Pacing clocks have independent cooldowns, intervals and resets", TestIndependentPacingClocks);
+            Run("Interaction balance validates atomically and recovers its own backup", TestIndependentPacingValidation);
+        }
+
+        private static CreatorToolsInteractionPacingSettings LoadInteractionPacing(TestScope scope)
+        {
+            return CreatorToolsInteractionPacingSettings.Load(Path.Combine(scope.ConfigDirectory, "plugin.cfg"), null);
+        }
+
+        private static Dictionary<string, string> InteractionPacingValues(string minimum = "2", string maximum = "4")
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "pacing.enabled", "1" }, { "pacing.minimumInterval", minimum },
+                { "pacing.maximumInterval", maximum }, { "pacing.miniBossCooldownSeconds", "60" },
+                { "pacing.miniBossIntervalMultiplier", "3" }, { "pacing.maximumCompanionsDuringMiniBoss", "2" }
+            };
+        }
+
+        private static void TestIndependentPacingMigration()
+        {
+            using (var scope = new TestScope("independent-pacing-migration"))
+            {
+                var peskyPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                File.WriteAllText(peskyPath, BalanceJson("90", "5", "0").Replace(
+                    "\"version\":3", "\"version\":4,\"applyToInteractions\":true"));
+                var pesky = LoadPeskySettings(scope);
+                var interactions = LoadInteractionPacing(scope);
+                False(interactions.Enabled, "old shared opt-in cannot enable independent interaction pacing");
+                Equal(1.25f, interactions.MinimumInterval, "own original minimum default");
+                Equal(3.25f, interactions.MaximumInterval, "own original maximum default");
+                Equal(30f, interactions.MiniBossCooldownSeconds, "no inherited cooldown");
+                Equal(2f, interactions.MiniBossIntervalMultiplier, "no inherited multiplier");
+                Equal(1, interactions.MaximumCompanionsDuringMiniBoss, "no inherited companion cap");
+                Equal(90f, pesky.MiniBossCooldownSeconds, "existing Pesky balance retained");
+                False(File.ReadAllText(peskyPath).Contains("applyToInteractions"), "retired shared switch removed");
+            }
+        }
+
+        private static void TestIndependentPacingPersistence()
+        {
+            using (var scope = new TestScope("independent-pacing-persistence"))
+            {
+                var pesky = LoadPeskySettings(scope);
+                pesky.Enabled = true;
+                True(pesky.TrySetPacing("7", "9", "45", "4", "0"), "custom Pesky balance");
+                pesky.Save();
+                var peskyPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                var originalPeskyFile = File.ReadAllText(peskyPath);
+                var interactions = LoadInteractionPacing(scope);
+                True(interactions.TrySet(InteractionPacingValues(), "pacing."), "custom Interactions balance");
+                interactions.Save();
+                Equal(originalPeskyFile, File.ReadAllText(peskyPath), "saving Interactions does not write Pesky config");
+                var interactionPath = Path.Combine(scope.ConfigDirectory, CreatorToolsInteractionPacingSettings.FileName);
+                var originalInteractionFile = File.ReadAllText(interactionPath);
+                True(pesky.TrySetPacing("1.25", "3.25", "30", "2", "1"), "restore Pesky defaults");
+                pesky.Save();
+                Equal(originalInteractionFile, File.ReadAllText(interactionPath), "restoring Pesky does not write Interactions config");
+                interactions = LoadInteractionPacing(scope);
+                True(interactions.Enabled, "Interactions remains enabled independently");
+                Equal(60f, interactions.MiniBossCooldownSeconds, "Interactions retains custom cooldown");
+                var defaults = InteractionPacingValues("1.25", "3.25");
+                defaults["pacing.enabled"] = "0";
+                defaults["pacing.miniBossCooldownSeconds"] = "30";
+                defaults["pacing.miniBossIntervalMultiplier"] = "2";
+                defaults["pacing.maximumCompanionsDuringMiniBoss"] = "1";
+                True(interactions.TrySet(defaults, "pacing."), "restore independent defaults");
+                interactions.Save();
+                True(LoadPeskySettings(scope).Enabled, "restoring Interactions does not disable Pesky generation");
+                False(LoadInteractionPacing(scope).Enabled, "own disabled default persists");
+            }
+        }
+
+        private static void TestIndependentPacingClocks()
+        {
+            var pesky = new CreatorToolsPeskyPacing();
+            var interactions = new CreatorToolsPeskyPacing();
+            pesky.Advance(0, true, 30);
+            interactions.Advance(0, true, 60);
+            pesky.Advance(0, false, 30);
+            interactions.Advance(0, false, 60);
+            pesky.Advance(30, false, 30);
+            interactions.Advance(30, false, 60);
+            True(pesky.CanSelect(true, 0, 1), "Pesky's cooldown finished");
+            False(interactions.CanDispatchInteraction(true, true, 0, 2), "Interactions still has its own cooldown");
+            interactions.ScheduleInterval(7);
+            pesky.ScheduleInterval(2);
+            pesky.Reset();
+            Equal(7f, interactions.IntervalRemaining, "resetting Pesky never resets Interactions interval");
+            Equal(30f, interactions.CooldownRemaining, "resetting Pesky never resets Interactions recovery");
+            interactions.Advance(0, false, 60);
+            Equal(7f, interactions.IntervalRemaining, "pause freezes independent interval");
+            interactions.Advance(7, false, 60);
+            True(interactions.IntervalReady, "own gameplay time releases regular entries");
+        }
+
+        private static void TestIndependentPacingValidation()
+        {
+            using (var scope = new TestScope("independent-pacing-validation"))
+            {
+                var interactions = LoadInteractionPacing(scope);
+                True(interactions.TrySet(InteractionPacingValues(), "pacing."), "initial valid request");
+                foreach (var bad in new[] {
+                    new[] { "enabled", "maybe" }, new[] { "minimumInterval", "5" },
+                    new[] { "maximumInterval", "301" }, new[] { "miniBossCooldownSeconds", "NaN" },
+                    new[] { "miniBossIntervalMultiplier", "0.5" }, new[] { "maximumCompanionsDuringMiniBoss", "1.5" }
+                })
+                {
+                    var values = InteractionPacingValues();
+                    values["pacing." + bad[0]] = bad[1];
+                    False(interactions.TrySet(values, "pacing."), "invalid field rejected atomically");
+                    Equal(2f, interactions.MinimumInterval, "rejected request preserves minimum");
+                    Equal(60f, interactions.MiniBossCooldownSeconds, "rejected request preserves cooldown");
+                    True(interactions.Enabled, "rejected request preserves enabled state");
+                }
+                var missing = InteractionPacingValues();
+                missing.Remove("pacing.minimumInterval");
+                False(interactions.TrySet(missing, "pacing."), "partial request rejected");
+                interactions.Save();
+                True(interactions.TrySet(InteractionPacingValues("6", "8"), "pacing."), "second version");
+                interactions.Save();
+                File.WriteAllText(Path.Combine(scope.ConfigDirectory, CreatorToolsInteractionPacingSettings.FileName), "broken");
+                var recovered = LoadInteractionPacing(scope);
+                Equal(2f, recovered.MinimumInterval, "own backup restored");
+                Equal(60f, recovered.MiniBossCooldownSeconds, "own backup values restored together");
+            }
+        }
+    }
+}

@@ -13,6 +13,10 @@ namespace Gilomx.CupheadBossRoulette
         internal const string RobotHomingBomb = "robot_homing_bomb";
         internal const string BaronessHeadToss = "baroness_head_toss";
         internal const string DragonFireballs = "dragon_fireballs";
+        internal const string TrainBoneRing = "train_bone_ring";
+        internal const string DevilFireCircle = "devil_fire_circle";
+        internal const string BeppiBalloonDog = "beppi_balloon_dog";
+        internal const string BeppiPinkBalloonDog = "beppi_pink_balloon_dog";
         internal const string BaronessCupcake = "baroness_cupcake";
         internal const string BaronessGumball = "baroness_gumball";
         internal const string BaronessWaffle = "baroness_waffle";
@@ -29,6 +33,10 @@ namespace Gilomx.CupheadBossRoulette
             RobotHomingBomb,
             BaronessHeadToss,
             DragonFireballs,
+            TrainBoneRing,
+            DevilFireCircle,
+            BeppiBalloonDog,
+            BeppiPinkBalloonDog,
             BaronessCupcake,
             BaronessGumball,
             BaronessWaffle,

@@ -18,6 +18,10 @@
     <Compile Include="MiniBossSpawnPolicyTests.cs.txt" Link="MiniBossSpawnPolicyTests.cs" />
     <Compile Include="DonorLabelLifetimeTests.cs.txt" Link="DonorLabelLifetimeTests.cs" />
     <Compile Include="PeskyModeSettingsTests.cs.txt" Link="PeskyModeSettingsTests.cs" />
+    <Compile Include="PeskyPacingTests.cs.txt" Link="PeskyPacingTests.cs" />
+    <Compile Include="IndependentPacingTests.cs.txt" Link="IndependentPacingTests.cs" />
+    <Compile Include="..\Interactions\CreatorToolsInteractionPacingSettings.cs"
+             Link="Product\Interactions\CreatorToolsInteractionPacingSettings.cs" />
     <Compile Include="RuntimeStubs.cs.txt" Link="RuntimeStubs.cs" />
 
     <Compile Include="..\Interactions\CreatorToolsMiniBossSpawnPolicy.cs"
@@ -26,6 +30,8 @@
              Link="Product\Interactions\CreatorToolsDonorLabelLifetime.cs" />
     <Compile Include="..\Interactions\CreatorToolsPeskyModeSettings.cs"
              Link="Product\Interactions\CreatorToolsPeskyModeSettings.cs" />
+    <Compile Include="..\Interactions\CreatorToolsPeskyPacing.cs"
+             Link="Product\Interactions\CreatorToolsPeskyPacing.cs" />
 
     <Compile Include="..\CreatorToolsDashboardController.cs"
              Link="Product\CreatorToolsDashboardController.cs" />

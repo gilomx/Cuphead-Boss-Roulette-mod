@@ -12,6 +12,7 @@ import type {
   ConnectionStatus,
   ForceDraft,
   InteractionConfigState,
+  InteractionPacingConfig,
   InteractionQueueEntry,
   LiveEventsConfigState,
   PeskyBattleConfigState,
@@ -38,7 +39,7 @@ interface ConfigValue {
   status: ConnectionStatus;
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
-  applyInteractionSettings: (maxActive: number, showGiftImage: boolean) => void;
+  applyInteractionSettings: (maxActive: number, showGiftImage: boolean, pacing: InteractionPacingConfig) => void;
   applyInteractionsEnabled: (enabled: boolean) => void;
   applyInteractionQueuePaused: (paused: boolean) => void;
   clearPendingInteractions: () => void;
@@ -46,7 +47,8 @@ interface ConfigValue {
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
-  applyPeskyIntervals: (minimum: number, maximum: number) => void;
+  applyPeskyIntervals: (minimum: number, maximum: number, cooldown: number, multiplier: number, companions: number) => void;
+  applyPacingToBoth: (pacing: Omit<InteractionPacingConfig, "enabled">) => void;
   applyPeskyBattleGift: (giftId: string) => void;
   applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
   applyPeskyBattleItem: (item: string, enabled: boolean) => void;
@@ -97,6 +99,7 @@ type InteractionSettingsStatus =
   | "error";
 
 interface DesiredInteractionSettings {
+  pacing: InteractionPacingConfig;
   maxActive: number;
   showGiftImage: boolean;
   baselineRevision: number;
@@ -422,7 +425,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             desiredInteractionSettings.baselineRevision &&
           nextInteraction.maxActive === desiredInteractionSettings.maxActive &&
           (nextInteraction.showGiftImage !== false) ===
-            desiredInteractionSettings.showGiftImage;
+            desiredInteractionSettings.showGiftImage &&
+          Object.keys(desiredInteractionSettings.pacing).every((key) =>
+            nextInteraction.pacing?.[key as keyof InteractionPacingConfig] ===
+              desiredInteractionSettings.pacing[key as keyof InteractionPacingConfig]);
         if (confirmed) {
           const confirmedRequestRevision =
             desiredInteractionSettings.requestRevision;
@@ -451,6 +457,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             ...visibleInteraction,
             maxActive: desiredInteractionSettings.maxActive,
             showGiftImage: desiredInteractionSettings.showGiftImage,
+            pacing: desiredInteractionSettings.pacing,
           };
         }
       }
@@ -612,8 +619,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyInteractionSettings = useCallback(
-    (value: number, showGiftImage: boolean) => {
-      if (!interaction?.ready) return;
+    (value: number, showGiftImage: boolean, pacing: InteractionPacingConfig) => {
+      if (!interaction?.ready || !Number.isFinite(pacing.minimumInterval) ||
+          !Number.isFinite(pacing.maximumInterval) || pacing.minimumInterval < 0.35 ||
+          pacing.maximumInterval > 300 || pacing.minimumInterval > pacing.maximumInterval ||
+          !Number.isFinite(pacing.miniBossCooldownSeconds) || pacing.miniBossCooldownSeconds < 0 || pacing.miniBossCooldownSeconds > 300 ||
+          !Number.isFinite(pacing.miniBossIntervalMultiplier) || pacing.miniBossIntervalMultiplier < 1 || pacing.miniBossIntervalMultiplier > 10 ||
+          !Number.isInteger(pacing.maximumCompanionsDuringMiniBoss) || pacing.maximumCompanionsDuringMiniBoss < 0 || pacing.maximumCompanionsDuringMiniBoss > 20) return;
       const normalized = Math.max(
         1,
         Math.min(interaction.maxActiveLimit ?? 20, Math.floor(value) || 1),
@@ -621,6 +633,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const requestRevision = interactionSettingsRequestRevisionRef.current + 1;
       interactionSettingsRequestRevisionRef.current = requestRevision;
       desiredInteractionSettingsRef.current = {
+        pacing: { ...pacing },
         maxActive: normalized,
         showGiftImage,
         baselineRevision: interaction.settingsRevision ?? 0,
@@ -635,6 +648,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         ? {
             ...current,
             maxActive: normalized,
+            pacing: { ...pacing },
             maxMiniBosses: 1,
             showGiftImage,
             feedback: "settings_saved",
@@ -648,6 +662,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         maxActive: String(normalized),
         maxMiniBosses: "1",
         showGiftImage: showGiftImage ? "1" : "0",
+        "pacing.enabled": pacing.enabled ? "1" : "0",
+        "pacing.minimumInterval": String(pacing.minimumInterval),
+        "pacing.maximumInterval": String(pacing.maximumInterval),
+        "pacing.miniBossCooldownSeconds": String(pacing.miniBossCooldownSeconds),
+        "pacing.miniBossIntervalMultiplier": String(pacing.miniBossIntervalMultiplier),
+        "pacing.maximumCompanionsDuringMiniBoss": String(pacing.maximumCompanionsDuringMiniBoss),
       });
       const send = () => fetch(
         "/api/config/interactions/set?" + query,
@@ -967,24 +987,45 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPeskyIntervals = useCallback(
-    (minimum: number, maximum: number) => {
+    (minimum: number, maximum: number, cooldown: number, multiplier: number, companions: number) => {
       if (!pesky?.ready || !Number.isFinite(minimum) ||
           !Number.isFinite(maximum) || minimum < pesky.intervalLowerLimit ||
-          maximum > pesky.intervalUpperLimit || minimum > maximum) return;
+          maximum > pesky.intervalUpperLimit || minimum > maximum ||
+          !Number.isFinite(cooldown) || cooldown < 0 || cooldown > 300 ||
+          !Number.isFinite(multiplier) || multiplier < 1 || multiplier > 10 ||
+          !Number.isInteger(companions) || companions < 0 || companions > 20) return;
       sendPeskyUpdate(
         new URLSearchParams({
           minimumInterval: String(minimum),
           maximumInterval: String(maximum),
+          miniBossCooldownSeconds: String(cooldown),
+          miniBossIntervalMultiplier: String(multiplier),
+          maximumCompanionsDuringMiniBoss: String(companions),
         }),
         (state) => ({
           ...state,
           minimumInterval: minimum,
           maximumInterval: maximum,
+          miniBossCooldownSeconds: cooldown,
+          miniBossIntervalMultiplier: multiplier,
+          maximumCompanionsDuringMiniBoss: companions,
           error: false,
         }),
       );
     },
     [pesky, sendPeskyUpdate],
+  );
+
+  const applyPacingToBoth = useCallback(
+    (pacing: Omit<InteractionPacingConfig, "enabled">) => {
+      if (!pesky?.ready || !interaction?.ready || !interaction.pacing) return;
+      applyPeskyIntervals(pacing.minimumInterval, pacing.maximumInterval,
+        pacing.miniBossCooldownSeconds, pacing.miniBossIntervalMultiplier,
+        pacing.maximumCompanionsDuringMiniBoss);
+      applyInteractionSettings(interaction.maxActive, interaction.showGiftImage !== false,
+        { ...pacing, enabled: interaction.pacing.enabled });
+    },
+    [pesky?.ready, interaction, applyPeskyIntervals, applyInteractionSettings],
   );
 
   const applyPeskyNames = useCallback(
@@ -1457,6 +1498,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyNames,
       applyPeskyItem,
       applyPeskyIntervals,
+      applyPacingToBoth,
       applyPeskyBattleGift,
       applyPeskyBattleStreamAttacks,
       applyPeskyBattleItem,
@@ -1499,6 +1541,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyNames,
       applyPeskyItem,
       applyPeskyIntervals,
+      applyPacingToBoth,
       applyPeskyBattleGift,
       applyPeskyBattleStreamAttacks,
       applyPeskyBattleItem,

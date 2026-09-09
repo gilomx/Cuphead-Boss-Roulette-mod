@@ -2,6 +2,154 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
+## Balance independiente de Modo Molestoso e Interacciones (2026-09-09)
+
+Implementado, compilado e instalado en Cuphead; **todavía no probado visualmente
+en combate**. Los intervalos originales predeterminados
+son 1.25/3.25 segundos; los archivos existentes conservan sus ajustes. El
+usuario pidió controles visibles y configuraciones independientes en cada página.
+
+Modo Molestoso muestra un bloque visible Configuración de Modo Molestoso debajo
+del interruptor, con sus cinco valores. El botón superior y Ctrl+I enfocan su
+primer campo. Interacciones muestra sus propios campos directamente en Configuración:
+activar balance, mínimo/máximo, descanso, multiplicador y acompañantes, más
+restaurar balance. Comparte el botón Guardar con sus ajustes generales. No abre
+otro bloque de Modo Molestoso ni depende de sus valores. El balance opcional de
+TikFinity/pruebas manuales está apagado inicialmente, y funciona sin activar
+Modo Molestoso ni generar ataques aleatorios.
+
+`CreatorToolsInteractionPacingSettings` guarda un archivo independiente
+`mx.gilomx.cuphead.bossroulette.interaction-pacing.json` con `enabled` y los cinco
+valores. Sus defaults son false, 1.25/3.25 s, 30 s, x2 y un acompañante. El
+endpoint Interacciones acepta seis campos `pacing.*` completos; valida antes
+de modificar ajustes y devuelve objetos `pacing`/`defaultPacing`. La confirmación
+optimista verifica todos los campos y `settingsRevision`. Peticiones antiguas
+sin `pacing.*` preservan estos ajustes.
+
+Cada fuente tiene una instancia propia de `CreatorToolsPeskyPacing`, con su
+propio descanso e intervalo. Un canje regular sólo consume su reloj; guardar
+Modo Molestoso no reinicia el de Interacciones. Ambas observan presencia real
+de minijefes (hasta destrucción, también nativos) y artículos en ambas colas
+para evitar saturación. El descanso comienza al desaparecer el minijefe; pausa
+no lo consume, limpieza de fase lo inicia y reintento/salida reinicia ambas
+políticas. Los canjeos limitados por balance esperan sin descartarse. Batalla
+permanece independiente y el límite global de un minijefe sigue fijo. No se
+cambian vida, daño, velocidad o probabilidades relativas del catálogo.
+
+Modo Molestoso usa JSON v5 y retira `applyToInteractions` de archivos anteriores.
+Ese viejo opt-in no se copia a Interacciones: ésta inicia con su propio balance
+apagado. Los parámetros anteriores de Modo Molestoso se conservan. Ver README
+para archivos, rangos y restauración independiente. También se corrigieron el
+cortocircuito de limpieza de colas. El diálogo de ritmo se sustituyó por el bloque
+visible a petición del usuario.
+
+Cada bloque ofrece Guardar para su modo, Restablecer predeterminados (prepara
+el borrador) y Aplicar valores a ambos (guarda los cinco números actuales en los
+dos archivos mediante sus endpoints existentes). Copiar no vincula cambios
+futuros ni modifica interruptores u otros ajustes. El estado del guardado de la
+otra fuente aparece también en el bloque desde el que se aplicaron los valores.
+Se probaron en navegador con mock la copia en ambas direcciones, los cinco
+valores, los interruptores conservados, la edición posterior aislada y la
+restauración de cada modo. Build TypeScript/React y catálogos correctos.
+
+Validación: build .NET Release sin advertencias/errores, 53 grupos de pruebas,
+build React/TypeScript y catálogos correctos. Pruebas de persistencia separada,
+restauración sin afectar la otra fuente, migración, validación atómica, respaldo
+y relojes independientes. El harness no ejecuta el controlador Unity ni simula
+combate. Panel verificado con mock local. Falta evaluar el balance en el juego.
+
+Instalación solicitada por el usuario: reemplazados DLL, `config.js` y `config.css`;
+512 archivos de distribución verificados por SHA-256. Respaldo del plugin y de
+la configuración en `installation-backups/independent-pacing-20260909-002153/`.
+DLL instalada: `4D1B7F31CC776EDC377713ECDC53B54D5F5873EE9E15EB37A5226B438EEA2091`.
+Cuphead estaba cerrado y no se inició durante esta instalación. Los ajustes
+guardados se conservaron; falta validar el arranque y el balance en combate.
+
+Actualización posterior del panel con bloques visibles y Aplicar valores a ambos:
+instalados `config.js` y `config.css`, 512 archivos verificados y DLL sin cambios.
+Respaldo: `installation-backups/independent-pacing-20260909-003005/`. Cuphead
+continuaba cerrado y se conservaron los ajustes reales del usuario.
+
+## Catálogo: perritos globo de Beppi (2026-09-08)
+
+Se añadieron dos artículos, siguiendo la aclaración del usuario:
+`beppi_balloon_dog` elige 80 % normal / 20 % rosa por aparición;
+`beppi_pink_balloon_dog` siempre es rosa parriable. El catálogo tiene 17 IDs.
+Comparten precarga de los prefabs `regularDog`/`pinkDog` y el ejecutor de
+`ClownLevelDogBalloon`. Cada canje crea un perrito desde arriba, apuntando
+una vez al jugador, con Intro, onda, HP, velocidad, daño y parry nativos.
+Ver `INTERACTION_CATALOG.md` para escala y limpieza de cámara.
+
+Build .NET Release sin advertencias ni errores, 41 grupos del harness,
+contrato IL nativo y build del panel correctos. Verificados en los assets
+los dos prefabs, sus colliders trigger y animaciones de muerte con evento
+`OnDieAnimationComplete`; no tienen curvas de escala. Previews del atlas
+nativo, tarjetas/fila manual y traducciones ES/EN integrados; las listas comunes
+alimentan reglas, Modo Molestoso y Batalla.
+
+Instalados 512 archivos verificados por hash, con respaldo en
+`installation-backups/beppi-balloon-dogs-20260908-225137/`.
+SHA-256 de la DLL:
+`3E3C8EB0F3A0EDCE8976BF2D3D600CEA00CB2A5CDD4AB11C95A7D1B5AF181B0E`.
+Cuphead se cerró normalmente y se abrió por Steam. API y catálogo instalado
+comprobados. El usuario entró a Mouse y activó Modo Molestoso: el log confirmó
+la precarga de ambos prefabs y dos despachos de `beppi_balloon_dog` sin errores
+nuevos. Falta su evaluación visual y probar el rosa fijo, parry, disparos,
+avión, cooperativo, pausa/reintento y salida de pantalla. El agente no modificó
+ajustes del usuario ni encoló pruebas durante la instalación.
+
+## Catálogo: círculo de fuego del Diablo (2026-09-08)
+
+Se añadió `devil_fire_circle` como decimoquinto artículo. Usa los dos prefabs
+nativos de `PitchforkFiveFlameSpinner`: cuatro llamas orbitando una quinta rosa
+central. Conserva fábricas, anticipación de un segundo, movimiento y propiedades
+por dificultad, daño, animación y parry originales. El parry oculta el centro,
+pero la formación sigue activa. Ver `INTERACTION_CATALOG.md` para las
+adaptaciones de cámara, padre inactivo, etiqueta y limpieza del grupo.
+
+Integrado en runtime, catálogo React, mock, ES/EN y preview extraído del atlas
+nativo. Las listas comunes lo incluyen en pruebas, reglas, Modo Molestoso y
+Batalla. Build Release sin advertencias ni errores; 41 grupos del harness,
+contrato IL del nuevo ataque y build del panel correctos (15 IDs).
+
+Instalado en `E:\SteamLibrary\steamapps\common\Cuphead`, con respaldo en
+`installation-backups/devil-fire-circle-20260908-213236/`. Verificados por hash
+los 510 archivos del manifiesto. SHA-256 de la DLL:
+`97A98AA647FABCFC89880FB36EA1D8F1945EFC0F2F0F7F25A8AAD125FF77BB82`.
+Cuphead se cerró normalmente y se abrió por Steam. Arranque sin nuevos errores
+del mod; API lista y sin error con los 15 artículos. El panel instalado incluye
+la tarjeta y la fila de prueba con donador, cantidad y espera. Sigue pendiente
+la comprobación dentro de combate, especialmente parry, avión, cooperativo y
+limpieza. El agente no cambió ajustes ni encoló pruebas. La velocidad del aro
+de huesos se conserva por decisión del usuario.
+
+## Catálogo: aro de huesos del tren (2026-09-08)
+
+Se añadió `train_bone_ring` como decimocuarto artículo. Conserva el prefab y
+las corutinas de `TrainLevelEngineBossDropperProjectile`: entra por arriba,
+cae con gravedad y cambia al recorrido horizontal hacia el jugador al llegar
+a su altura. Las propiedades son las del tren para la dificultad actual.
+Ver `INTERACTION_CATALOG.md` para entrada, escala, etiquetas, efecto de polvo
+y prueba manual requerida.
+
+Integrado en runtime, catálogo React, mock, traducciones ES/EN y preview nativo.
+Las listas compartidas lo incorporan a pruebas, reglas, Modo Molestoso y Batalla.
+El build .NET Release terminó sin advertencias ni errores; pasaron los 41 grupos
+del harness y el nuevo contrato IL nativo. El panel compiló y validó 14 IDs.
+
+Instalado en `E:\SteamLibrary\steamapps\common\Cuphead`, con respaldo en
+`installation-backups/train-bone-ring-20260908-202106/`. Se verificaron los 509
+archivos del manifiesto; SHA-256 de la DLL:
+`6E137F50F36F2ADD95D80781BC9BEE87BE0D8FFD86E340B381E4750683A032D8`.
+Cuphead se cerró normalmente y se abrió por Steam. El log confirmó carga del
+mod sin errores nuevos del parche y la API publicó los 14 artículos sin error.
+Se verificaron visualmente la tarjeta y la fila de prueba del aro en el panel
+instalado. El usuario entró después a la Baronesa y activó Modo Molestoso con
+el aro seleccionado: el log confirmó la precarga y ocho despachos consecutivos
+sin errores nuevos. La consulta posterior mostró cero actores y cero pendientes.
+Falta su evaluación visual de trayectoria, colisiones y etiqueta, además de las
+pruebas en avión y cooperativo. El agente no cambió sus ajustes ni encoló pruebas.
+
 ## Granitoviejo: proporción de los mini jefes (2026-09-08)
 
 Después de guardar el ajuste de Chef Saleroso en el commit `2a7fcc5`, el

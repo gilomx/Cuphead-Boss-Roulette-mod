@@ -668,6 +668,13 @@
       "maxMiniBossesLabel": "One mini boss at a time",
       "maxMiniBossesHint": "Only one mini boss can be on screen across Interactions, Pesky Mode and Pesky Battle. The next ones wait until the current one disappears, even if they are different. The general item limit also applies.",
       "showGiftImage": "Show gift image",
+      "pacingTitle": "Interactions pacing and mini-bosses",
+      "pacingIndependent": "Settings exclusively for TikFinity and manual tests. Pesky Mode has its own values and timers.",
+      "pacingEnable": "Enable balancing for Interactions",
+      "pacingEnableHint": "Off by default. When enabled, redemptions wait their turn without being discarded. Does not enable Pesky Mode or affect Pesky Battle.",
+      "pacingHint": "Cooldown starts when the mini-boss disappears and freezes while paused. While one is present, the interval is multiplied; 0 companions prevents adding regular attacks. Saving restarts only the wait between interactions; the new cooldown applies to the next disappearance.",
+      "pacingInvalid": "Intervals: 0.35–300 s, minimum ≤ maximum. Cooldown: 0–300 s. Multiplier: 1–10. Companions: a whole number from 0–20.",
+      "pacingRestore": "Restore Interactions balancing defaults",
       "showGiftImageHint": "It will appear next to the donor name.",
       "save": "Save",
       "status": {
@@ -747,6 +754,20 @@
         "imageAlt": "Original sprite of Baroness Von Bon Bon's jawbreaker mini-boss"
       }
     },
+    "devil": {
+      "type": "Attack",
+      "fireCircle": {
+        "title": "The Devil's fire circle",
+        "imageAlt": "Four blue Devil flames surrounding a pink parryable flame"
+      }
+    },
+    "train": {
+      "type": "Projectile",
+      "boneRing": {
+        "title": "Phantom Express bone ring",
+        "imageAlt": "Original Phantom Express bone ring sprite"
+      }
+    },
     "dragon": {
       "type": "Attack",
       "fireballs": {
@@ -816,6 +837,17 @@
       "queue_full": "The queue reached its temporary limit.",
       "sent": "The item was sent into the fight.",
       "spawn_failed": "The item could not be created. Check the fight state."
+    },
+    "beppi": {
+      "type": "Enemy",
+      "balloonDog": {
+        "title": "Beppi's random balloon dog",
+        "imageAlt": "Original sprite of Beppi's regular balloon dog"
+      },
+      "pinkBalloonDog": {
+        "title": "Beppi's pink balloon dog",
+        "imageAlt": "Original sprite of Beppi's pink parryable balloon dog"
+      }
     }
   },
   "pesky": {
@@ -824,16 +856,29 @@
     "interactionsNotice": "Interactions are enabled, so donation attacks will continue arriving in addition to this mode's attacks.",
     "battleBlocked": "Pesky Battle has exclusive control. Finish or cancel that battle before enabling the free mode again.",
     "intervals": {
-      "title": "Spawn interval",
-      "description": "Pesky Mode's secret panel. Set the delay between actors in seconds.",
+      "title": "Pesky Mode settings",
+      "description": "Pacing and mini-boss settings for this mode only. Saving changes Pesky Mode; Interactions keeps its own settings.",
       "minimum": "Minimum (seconds)",
       "maximum": "Maximum (seconds)",
       "hint": "The delay is picked randomly between these values. Use the same value for a fixed delay. Saving starts a new wait; actor capacity and availability still apply.",
       "invalid": "Enter values between {minimum} and {maximum} seconds. The minimum cannot exceed the maximum.",
-      "restore": "Restore defaults",
-      "save": "Save interval",
+      "restore": "Restore Pesky Mode defaults",
+      "save": "Save Pesky Mode",
+      "applyBoth": "Apply values to both",
+      "applyBothHint": "Saves this block's five numeric values to both modes once. You can then edit each separately. Toggles and other settings stay unchanged. Restore prepares this mode's defaults: choose Save or Apply values to both.",
       "unsaved": "Unsaved changes",
-      "close": "Close interval panel"
+      "close": "Close pacing settings",
+      "open": "Pesky Mode settings",
+      "miniBossTitle": "Mini-bosses",
+      "previewNone": "Sources using this balancing will not add regular nuisances while a mini-boss is active.",
+      "cooldown": "Mini-boss cooldown (seconds)",
+      "cooldownHint": "0 to 300. Starts when the mini-boss disappears and freezes while paused. The new value applies to the next cooldown.",
+      "multiplier": "Interval multiplier",
+      "multiplierHint": "1 to 10. While a mini-boss is active, multiplies the wait between other nuisances.",
+      "companions": "Maximum companions",
+      "companionsHint": "0 to 20 active regular items. Set 0 to stop adding companions during a mini-boss. These values apply only to Pesky Mode.",
+      "preview": "During a mini-boss, the wait between nuisances will be {minimum} to {maximum} seconds.",
+      "invalidBalance": "Use a cooldown of 0 to 300 seconds, a multiplier of 1 to 10, and a whole-number companion limit of 0 to 20."
     },
     "control": {
       "title": "Mode control",
@@ -887,8 +932,8 @@
       "enabled": "Pesky Mode is enabled.",
       "disabled": "Pesky Mode is disabled.",
       "names_saved": "The names were saved.",
-      "intervals_saved": "The spawn interval was saved.",
-      "invalid_interval": "The submitted interval is invalid. Check the minimum and maximum.",
+      "intervals_saved": "Pacing settings were saved.",
+      "invalid_interval": "Check the intervals and mini-boss settings.",
       "items_saved": "The attack selection was saved.",
       "blocked_by_pesky_battle": "Free Pesky Mode cannot be enabled during a Pesky Battle.",
       "disabled_by_pesky_battle": "Free Pesky Mode was disabled because a Pesky Battle was armed.",

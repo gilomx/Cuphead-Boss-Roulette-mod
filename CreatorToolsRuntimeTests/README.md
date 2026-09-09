@@ -12,6 +12,12 @@ settings above one, slot release and preservation of the active snapshot.
 Unity scene discovery and the water-floor integration still require in-game
 verification.
 
+The production Pesky pacing/settings policies are linked too. Tests cover
+post-disappearance recovery, companion capacity, gameplay-time intervals,
+explicit opt-in for regular interactions, migration defaults, persistence and
+atomic panel updates. Unity scene discovery and the physical dispatch queues
+are not exercised by these policy tests.
+
 Run it from the repository root:
 
 ```powershell

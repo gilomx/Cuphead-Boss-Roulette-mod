@@ -149,6 +149,61 @@ donaciones. Al apagarlo se eliminan únicamente sus molestias pendientes y las
 que sigan activas en pantalla. La lista de nombres aleatorios es opcional; si se
 deja vacía, los ataques aparecen sin nombre.
 
+El ritmo predeterminado es de **1.25–3.25 segundos**. Mientras haya un minijefe,
+Modo Molestoso duplica ese intervalo y permite como máximo una molestia común
+adicional. Antes de introducir un minijefe espera a que queden como máximo esas
+mismas molestias comunes. Al desaparecer el minijefe, recupera el ritmo normal,
+pero espera **30 segundos de juego** antes de volver a incluir minijefes en el
+sorteo. La pausa no consume ese descanso y reintentar empieza una cuenta nueva.
+
+Los ajustes de balance se guardan en
+`BepInEx/config/mx.gilomx.cuphead.bossroulette.pesky-mode.json` y se pueden
+editar en el bloque visible **Configuración de Modo Molestoso**, debajo del
+control del modo (el botón superior y `Ctrl+I` llevan al primer campo). Guardar
+aplica sólo los ajustes de este modo; Restablecer predeterminados los prepara
+para guardar. Si prefieres editar el
+archivo, hazlo con el juego cerrado:
+
+| Campo | Predeterminado | Valores admitidos |
+| --- | --- | --- |
+| `minimumInterval` | `1.25` segundos | 0.35–300, menor o igual al máximo |
+| `maximumInterval` | `3.25` segundos | 0.35–300, mayor o igual al mínimo |
+| `miniBossCooldownSeconds` | `30` segundos | 0–300 |
+| `miniBossIntervalMultiplier` | `2` | 1–10 |
+| `maximumCompanionsDuringMiniBoss` | `1` | Enteros de 0–20; 0 elimina el acompañamiento automático |
+
+Se conservan los intervalos personalizados, nombres y artículos de archivos
+anteriores; los campos nuevos se añaden al cargar, con respaldo `.bak`. Los
+cinco ajustes están disponibles en el mismo bloque. El descanso nuevo se usa
+cuando desaparece el siguiente minijefe; no reinicia un descanso ya en curso.
+**Interacciones tiene una configuración independiente**, directamente en
+Interacciones → Configuración → Ritmo y minijefes de Interacciones. Incluye su
+propia casilla **Activar balance de Interacciones**, intervalo mínimo/máximo,
+descanso, multiplicador, máximo de acompañantes y botón para restaurar sólo su
+balance. El botón Guardar de esa sección aplica sus cambios. No abre los ajustes
+de Modo Molestoso ni comparte valores o temporizadores con él.
+
+Ambos bloques incluyen **Aplicar valores a ambos**: guarda los cinco valores
+numéricos del bloque actual en las dos configuraciones una sola vez. No vincula
+ediciones futuras ni cambia interruptores, nombres, artículos u otros ajustes.
+Restablecer prepara sólo los predeterminados del modo actual; después puedes
+guardarlos para ese modo o aplicar los valores numéricos a ambos.
+
+El balance de Interacciones está desactivado por defecto, conservando el ritmo
+anterior de TikFinity y pruebas manuales. Sus valores iniciales son 1.25–3.25 s,
+30 s de descanso, multiplicador 2 y un acompañante. Se guardan por separado en
+`BepInEx/config/mx.gilomx.cuphead.bossroulette.interaction-pacing.json`: los mismos
+cinco nombres de campo de la tabla y `enabled` (booleano). Al activarlo, los
+canjeos esperan hasta que su propio balance permita entrar, sin descartarse por
+estas reglas. Funciona aunque Modo Molestoso esté apagado.
+
+Cambiar, activar o restaurar el balance de una fuente no modifica el de la otra.
+Cada fuente tiene su propia espera entre apariciones y su propio descanso de
+minijefes. Ambas observan los actores que ya hay en la arena para calcular el
+acompañamiento. Batalla Molestosa mantiene sus reglas independientes. El límite
+global de un minijefe y el máximo general de cada cola siguen aplicándose. El
+acompañamiento cuenta artículos activos, no cada proyectil que produzcan.
+
 `Batalla Molestosa` se arma desde el Dashboard eligiendo un regalo de TikTok.
 Los primeros cinco donadores distintos que envíen ese regalo ocupan los cinco
 lugares con su nombre y, cuando TikFinity la proporciona, su foto. Una donación

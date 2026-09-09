@@ -309,8 +309,8 @@ textarea:focus-visible {
 }
 
 .pesky-interval-panel {
-  width: min(32rem, calc(100% - 2 * var(--space-3)));
-  max-height: calc(100dvh - 2 * var(--space-3));
+  width: 100%;
+  margin-top: var(--space-4);
   padding: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
@@ -318,8 +318,35 @@ textarea:focus-visible {
   background: var(--color-background-raised);
 }
 
-.pesky-interval-panel::backdrop {
-  background: color-mix(in srgb, var(--color-background) 78%, transparent);
+.pesky-settings-button {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  background: var(--color-control);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pesky-settings-button:hover {
+  background: var(--color-control-hover);
+}
+
+.pesky-interval-panel__section {
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-size: 1rem;
+}
+
+.pesky-interval-panel__preview {
+  color: var(--color-text-soft);
+}
+
+.interaction-pacing-settings {
+  border-top: 1px solid var(--color-border);
 }
 
 .pesky-interval-panel__close {

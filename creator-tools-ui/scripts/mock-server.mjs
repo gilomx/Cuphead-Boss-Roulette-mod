@@ -23,6 +23,11 @@ let interactionQueue = [];
 let interactionMaxActive = 1;
 const interactionMaxMiniBosses = 1;
 let interactionShowGiftImage = true;
+const interactionPacingDefaults = {
+  enabled: false, minimumInterval: 1.25, maximumInterval: 3.25,
+  miniBossCooldownSeconds: 30, miniBossIntervalMultiplier: 2, maximumCompanionsDuringMiniBoss: 1,
+};
+let interactionPacing = { ...interactionPacingDefaults };
 let interactionSettingsRevision = 0;
 let interactionsEnabled = false;
 let interactionMasterRevision = 0;
@@ -83,6 +88,9 @@ const peskyDefaultMaximumInterval = 3.25;
 let peskyIntervals = {
   minimumInterval: peskyDefaultMinimumInterval,
   maximumInterval: peskyDefaultMaximumInterval,
+  miniBossCooldownSeconds: 30,
+  miniBossIntervalMultiplier: 2,
+  maximumCompanionsDuringMiniBoss: 1,
 };
 let peskyNames = [];
 let peskyDisabledItems = [];
@@ -291,6 +299,10 @@ const interactionItems = [
   "robot_homing_bomb",
   "baroness_head_toss",
   "dragon_fireballs",
+  "train_bone_ring",
+  "devil_fire_circle",
+  "beppi_balloon_dog",
+  "beppi_pink_balloon_dog",
   "baroness_cupcake",
   "baroness_gumball",
   "baroness_waffle",
@@ -1286,6 +1298,8 @@ createServer((req, res) => {
       phaseTransitionProtectionEnabled,
       phaseTransitionProtectionRevision,
       showGiftImage: interactionShowGiftImage,
+      pacing: interactionPacing,
+      defaultPacing: interactionPacingDefaults,
       settingsRevision: interactionSettingsRevision,
       item: "hilda_green_zeppelin",
       items: interactionItems,
@@ -1381,6 +1395,28 @@ createServer((req, res) => {
     const maxActiveValue = url.searchParams.get("maxActive");
     const maxMiniBossesValue = url.searchParams.get("maxMiniBosses");
     const showGiftImageValue = url.searchParams.get("showGiftImage");
+    const pacingRequested = [...url.searchParams.keys()].some((key) => key.startsWith("pacing."));
+    if (pacingRequested) {
+      const raw = Object.fromEntries(Object.keys(interactionPacingDefaults).map((key) => [key, url.searchParams.get("pacing." + key)]));
+      const candidate = {
+        enabled: ["true", "1"].includes(raw.enabled?.toLowerCase()),
+        minimumInterval: Number(raw.minimumInterval), maximumInterval: Number(raw.maximumInterval),
+        miniBossCooldownSeconds: Number(raw.miniBossCooldownSeconds),
+        miniBossIntervalMultiplier: Number(raw.miniBossIntervalMultiplier),
+        maximumCompanionsDuringMiniBoss: Number(raw.maximumCompanionsDuringMiniBoss),
+      };
+      if (Object.values(raw).some((value) => value === null || value.trim() === "") ||
+          !["true", "false", "0", "1"].includes(raw.enabled?.toLowerCase()) ||
+          !Number.isFinite(candidate.minimumInterval) || !Number.isFinite(candidate.maximumInterval) ||
+          candidate.minimumInterval < 0.35 || candidate.maximumInterval > 300 || candidate.minimumInterval > candidate.maximumInterval ||
+          !Number.isFinite(candidate.miniBossCooldownSeconds) || candidate.miniBossCooldownSeconds < 0 || candidate.miniBossCooldownSeconds > 300 ||
+          !Number.isFinite(candidate.miniBossIntervalMultiplier) || candidate.miniBossIntervalMultiplier < 1 || candidate.miniBossIntervalMultiplier > 10 ||
+          !Number.isInteger(candidate.maximumCompanionsDuringMiniBoss) || candidate.maximumCompanionsDuringMiniBoss < 0 || candidate.maximumCompanionsDuringMiniBoss > 20) {
+        json(res, { ok: false, feedback: "invalid_setting" }, 400);
+        return;
+      }
+      interactionPacing = candidate;
+    }
     let nextFeedback = "settings_saved";
     if (interactionsEnabledValue !== null) {
       interactionsEnabled = interactionsEnabledValue === "1";
@@ -1416,7 +1452,7 @@ createServer((req, res) => {
     if (showGiftImageValue !== null) {
       interactionShowGiftImage = showGiftImageValue === "1";
     }
-    if (maxActiveValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null) {
+    if (maxActiveValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null || pacingRequested) {
       interactionSettingsRevision += 1;
     }
     const phaseTransitionProtectionValue = url.searchParams.get(
@@ -1655,6 +1691,9 @@ createServer((req, res) => {
       intervalUpperLimit: peskyIntervalUpperLimit,
       defaultMinimumInterval: peskyDefaultMinimumInterval,
       defaultMaximumInterval: peskyDefaultMaximumInterval,
+      defaultMiniBossCooldownSeconds: 30,
+      defaultMiniBossIntervalMultiplier: 2,
+      defaultMaximumCompanionsDuringMiniBoss: 1,
       names: peskyNames,
       items: interactionItems,
       disabledItems: peskyDisabledItems,
@@ -1676,14 +1715,22 @@ createServer((req, res) => {
     if (minimumIntervalValue !== null || maximumIntervalValue !== null) {
       const minimumInterval = Number(minimumIntervalValue);
       const maximumInterval = Number(maximumIntervalValue);
+      const miniBossCooldownSeconds = Number(url.searchParams.get("miniBossCooldownSeconds") ?? peskyIntervals.miniBossCooldownSeconds);
+      const miniBossIntervalMultiplier = Number(url.searchParams.get("miniBossIntervalMultiplier") ?? peskyIntervals.miniBossIntervalMultiplier);
+      const maximumCompanionsDuringMiniBoss = Number(url.searchParams.get("maximumCompanionsDuringMiniBoss") ?? peskyIntervals.maximumCompanionsDuringMiniBoss);
       if (minimumIntervalValue === null || maximumIntervalValue === null ||
           !Number.isFinite(minimumInterval) || !Number.isFinite(maximumInterval) ||
           minimumInterval < peskyIntervalLowerLimit || maximumInterval > peskyIntervalUpperLimit ||
-          minimumInterval > maximumInterval) {
+          minimumInterval > maximumInterval ||
+          ["minimumInterval", "maximumInterval", "miniBossCooldownSeconds", "miniBossIntervalMultiplier", "maximumCompanionsDuringMiniBoss"]
+            .some((key) => url.searchParams.has(key) && url.searchParams.get(key).trim() === "") ||
+          !Number.isFinite(miniBossCooldownSeconds) || miniBossCooldownSeconds < 0 || miniBossCooldownSeconds > 300 ||
+          !Number.isFinite(miniBossIntervalMultiplier) || miniBossIntervalMultiplier < 1 || miniBossIntervalMultiplier > 10 ||
+          !Number.isInteger(maximumCompanionsDuringMiniBoss) || maximumCompanionsDuringMiniBoss < 0 || maximumCompanionsDuringMiniBoss > 20) {
         peskyFeedback = "invalid_interval";
         peskyError = true;
       } else {
-        peskyIntervals = { minimumInterval, maximumInterval };
+        peskyIntervals = { minimumInterval, maximumInterval, miniBossCooldownSeconds, miniBossIntervalMultiplier, maximumCompanionsDuringMiniBoss };
         peskyFeedback = "intervals_saved";
       }
     } else if (enabledValue !== null) {

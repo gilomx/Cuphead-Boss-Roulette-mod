@@ -668,6 +668,13 @@
       "maxMiniBossesLabel": "Un solo mini jefe",
       "maxMiniBossesHint": "Solo puede haber un mini jefe en pantalla entre Interacciones, Modo Molestoso y Batalla Molestosa. Los siguientes esperan a que desaparezca el actual, aunque sean distintos. También se respeta el máximo general de elementos.",
       "showGiftImage": "Mostrar imagen del regalo",
+      "pacingTitle": "Ritmo y minijefes de Interacciones",
+      "pacingIndependent": "Ajustes exclusivos de TikFinity y pruebas manuales. Modo Molestoso tiene sus propios valores y temporizadores.",
+      "pacingEnable": "Activar balance de Interacciones",
+      "pacingEnableHint": "Desactivado por defecto. Si lo activas, los canjeos esperan su turno sin descartarse. No activa Modo Molestoso ni afecta a Batalla Molestosa.",
+      "pacingHint": "El descanso empieza al desaparecer el minijefe y no avanza en pausa. Mientras haya uno, se multiplica el intervalo; 0 acompañantes impide añadir ataques comunes. Guardar reinicia sólo la espera entre interacciones; el descanso nuevo se aplica a la siguiente desaparición.",
+      "pacingInvalid": "Intervalos: 0.35–300 s, mínimo ≤ máximo. Descanso: 0–300 s. Multiplicador: 1–10. Acompañantes: entero de 0–20.",
+      "pacingRestore": "Restablecer predeterminados de Interacciones",
       "showGiftImageHint": "Aparecerá junto al nombre del donador.",
       "save": "Guardar",
       "status": {
@@ -747,6 +754,20 @@
         "imageAlt": "Sprite original del mini jefe rompemandíbulas de la Baronesa Von Bon Bon"
       }
     },
+    "devil": {
+      "type": "Ataque",
+      "fireCircle": {
+        "title": "Círculo de fuego del Diablo",
+        "imageAlt": "Cuatro llamas azules del Diablo alrededor de una llama rosa parriable"
+      }
+    },
+    "train": {
+      "type": "Proyectil",
+      "boneRing": {
+        "title": "Aro de huesos del tren",
+        "imageAlt": "Sprite original del aro de huesos del Expreso Fantasma"
+      }
+    },
     "dragon": {
       "type": "Ataque",
       "fireballs": {
@@ -816,6 +837,17 @@
       "queue_full": "La cola alcanzó su límite temporal.",
       "sent": "El elemento fue enviado al combate.",
       "spawn_failed": "No se pudo crear el elemento. Revisa el estado del combate."
+    },
+    "beppi": {
+      "type": "Enemigo",
+      "balloonDog": {
+        "title": "Perrito globo aleatorio de Beppi",
+        "imageAlt": "Sprite original del perrito globo normal de Beppi"
+      },
+      "pinkBalloonDog": {
+        "title": "Perrito globo rosa de Beppi",
+        "imageAlt": "Sprite original del perrito globo rosa parriable de Beppi"
+      }
     }
   },
   "pesky": {
@@ -824,16 +856,29 @@
     "interactionsNotice": "Las interacciones están activadas, por lo que seguirás recibiendo ataques de donaciones además de los ataques de este modo.",
     "battleBlocked": "Batalla Molestosa tiene el control exclusivo. Termina o cancela esa batalla para volver a activar el modo libre.",
     "intervals": {
-      "title": "Intervalo de aparición",
-      "description": "Panel secreto de Modo Molestoso. Configura la espera entre actores en segundos.",
+      "title": "Configuración de Modo Molestoso",
+      "description": "Ritmo y minijefes exclusivos de este modo. Guardar sólo cambia Modo Molestoso; Interacciones conserva sus propios ajustes.",
       "minimum": "Mínimo (segundos)",
       "maximum": "Máximo (segundos)",
       "hint": "La espera se elige al azar entre ambos valores. Usa el mismo valor para una espera fija. Al guardar comienza una nueva espera; se siguen respetando los cupos y la disponibilidad de actores.",
       "invalid": "Introduce valores entre {minimum} y {maximum} segundos. El mínimo no puede superar al máximo.",
-      "restore": "Restablecer valores",
-      "save": "Guardar intervalo",
+      "restore": "Restablecer predeterminados de Modo Molestoso",
+      "save": "Guardar Modo Molestoso",
+      "applyBoth": "Aplicar valores a ambos",
+      "applyBothHint": "Guarda los cinco valores numéricos de este bloque en ambos modos una sola vez. Después puedes editarlos por separado. No cambia los interruptores ni otros ajustes. Restablecer prepara los predeterminados de este modo: pulsa Guardar o Aplicar valores a ambos.",
       "unsaved": "Cambios sin guardar",
-      "close": "Cerrar panel de intervalo"
+      "close": "Cerrar ajustes de ritmo",
+      "open": "Configuración de Modo Molestoso",
+      "miniBossTitle": "Minijefes",
+      "previewNone": "Las fuentes que usen este balance no añadirán molestias comunes mientras haya un minijefe activo.",
+      "cooldown": "Descanso entre minijefes (segundos)",
+      "cooldownHint": "De 0 a 300. Empieza cuando desaparece el minijefe; la pausa no lo consume. El nuevo valor se usa en el siguiente descanso.",
+      "multiplier": "Multiplicador del intervalo",
+      "multiplierHint": "De 1 a 10. Con un minijefe activo, multiplica la espera entre las otras molestias.",
+      "companions": "Máximo de acompañantes",
+      "companionsHint": "De 0 a 20 artículos comunes activos. Usa 0 para no añadir acompañantes al minijefe. Estos valores se aplican sólo a Modo Molestoso.",
+      "preview": "Con minijefe, la espera entre molestias será de {minimum} a {maximum} segundos.",
+      "invalidBalance": "Usa un descanso de 0 a 300 segundos, un multiplicador de 1 a 10 y un máximo entero de 0 a 20 acompañantes."
     },
     "control": {
       "title": "Control del modo",
@@ -887,8 +932,8 @@
       "enabled": "Modo Molestoso está activado.",
       "disabled": "Modo Molestoso está desactivado.",
       "names_saved": "Los nombres fueron guardados.",
-      "intervals_saved": "El intervalo de aparición fue guardado.",
-      "invalid_interval": "El intervalo enviado no es válido. Revisa el mínimo y el máximo.",
+      "intervals_saved": "Los ajustes de ritmo fueron guardados.",
+      "invalid_interval": "Revisa los intervalos y los ajustes de minijefes.",
       "items_saved": "La selección de ataques fue guardada.",
       "blocked_by_pesky_battle": "Modo Molestoso libre no puede activarse durante Batalla Molestosa.",
       "disabled_by_pesky_battle": "Modo Molestoso libre se desactivó porque Batalla Molestosa fue armada.",

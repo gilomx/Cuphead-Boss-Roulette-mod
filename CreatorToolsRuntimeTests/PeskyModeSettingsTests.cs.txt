@@ -154,7 +154,7 @@ namespace Gilomx.CupheadBossRoulette
                 settings.Save();
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(2, json.RootElement.GetProperty("version").GetInt32(),
+                    Equal(5, json.RootElement.GetProperty("version").GetInt32(),
                         "saved file uses the interval schema");
                     Equal(1.25f, json.RootElement.GetProperty("minimumInterval")
                         .GetSingle(), "new minimum is serialized");

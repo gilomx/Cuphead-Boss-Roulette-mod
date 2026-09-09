@@ -189,6 +189,15 @@ namespace Gilomx.CupheadBossRoulette
             return count;
         }
 
+        internal int ActiveCountMatching(Func<string, bool> predicate)
+        {
+            var count = 0;
+            for (var i = 0; i < active.Count; i++)
+                if (!IsFinished(active[i]) && predicate(active[i].Item))
+                    count++;
+            return count;
+        }
+
         internal int PendingCountFor(CreatorToolsInteractionSource source)
         {
             var count = 0;

@@ -30,7 +30,6 @@ export function PeskyModeView() {
   const { t } = useLocalization();
   const [namesDraft, setNamesDraft] = useState("");
   const [namesDirty, setNamesDirty] = useState(false);
-  const [intervalPanelOpen, setIntervalPanelOpen] = useState(false);
   // Preserved for a future diagnostics build. Transition protection remains
   // enabled by default, but its public panel control is intentionally hidden.
   // const phaseTransitionProtectionEnabled =
@@ -48,7 +47,7 @@ export function PeskyModeView() {
           event.isComposing || event.key.toLowerCase() !== "i") return;
       event.preventDefault();
       event.stopPropagation();
-      if (!event.repeat) setIntervalPanelOpen((open) => !open);
+      if (!event.repeat) document.getElementById("pesky-minimum-interval")?.focus();
     };
     window.addEventListener("keydown", toggleIntervals, true);
     return () => window.removeEventListener("keydown", toggleIntervals, true);
@@ -75,14 +74,18 @@ export function PeskyModeView() {
 
   return (
     <div className="page page--pesky">
-      {intervalPanelOpen ? (
-        <PeskyIntervalPanel onClose={() => setIntervalPanelOpen(false)} />
-      ) : null}
       <header className="page-header pesky-page-header">
         <div>
           <h1>{t("pesky.title")}</h1>
           <p>{t("pesky.description")}</p>
         </div>
+        <button
+          className="pesky-settings-button"
+          type="button"
+          onClick={() => document.getElementById("pesky-minimum-interval")?.focus()}
+        >
+          {t("pesky.intervals.open")}
+        </button>
       </header>
 
       <section
@@ -125,6 +128,8 @@ export function PeskyModeView() {
           </div>
         </div>
       </section>
+
+      <PeskyIntervalPanel />
 
       {blockedByPeskyBattle ? (
         <p

@@ -14,7 +14,10 @@ namespace Gilomx.CupheadBossRoulette
         internal const float IntervalUpperLimit = 300f;
         internal const float DefaultMinimumInterval = 1.25f;
         internal const float DefaultMaximumInterval = 3.25f;
-        private const int CurrentVersion = 2;
+        internal const float DefaultMiniBossCooldownSeconds = 30f;
+        internal const float DefaultMiniBossIntervalMultiplier = 2f;
+        internal const int DefaultMaximumCompanionsDuringMiniBoss = 1;
+        private const int CurrentVersion = 5;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -27,10 +30,14 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly string path;
         private readonly Action<string> logWarning;
+        private bool needsMigration;
 
         internal bool Enabled;
         internal float MinimumInterval { get; private set; }
         internal float MaximumInterval { get; private set; }
+        internal float MiniBossCooldownSeconds { get; private set; }
+        internal float MiniBossIntervalMultiplier { get; private set; }
+        internal int MaximumCompanionsDuringMiniBoss { get; private set; }
         internal readonly List<string> Names = new List<string>();
         internal readonly HashSet<string> DisabledItems =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -60,7 +67,11 @@ namespace Gilomx.CupheadBossRoulette
             settings.ResetToDefaults();
 
             if (settings.TryLoadFile(path))
+            {
+                if (settings.needsMigration)
+                    settings.Save();
                 return settings;
+            }
 
             var backupPath = path + ".bak";
             if (settings.TryLoadFile(backupPath))
@@ -122,6 +133,28 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
+        internal bool TrySetPacing(string minimum, string maximum,
+            string cooldown, string multiplier, string companions)
+        {
+            float cooldownValue;
+            float multiplierValue;
+            float companionsValue;
+            // Validate the entire request before changing any field. Older
+            // clients may still send only the original interval pair.
+            if (!TryBalanceNumber(cooldown ?? MiniBossCooldownSeconds.ToString(
+                    "R", CultureInfo.InvariantCulture), 0f, 300f, false, out cooldownValue) ||
+                !TryBalanceNumber(multiplier ?? MiniBossIntervalMultiplier.ToString(
+                    "R", CultureInfo.InvariantCulture), 1f, 10f, false, out multiplierValue) ||
+                !TryBalanceNumber(companions ?? MaximumCompanionsDuringMiniBoss.ToString(
+                    CultureInfo.InvariantCulture), 0f, 20f, true, out companionsValue) ||
+                !TrySetIntervals(minimum, maximum))
+                return false;
+            MiniBossCooldownSeconds = cooldownValue;
+            MiniBossIntervalMultiplier = multiplierValue;
+            MaximumCompanionsDuringMiniBoss = (int)companionsValue;
+            return true;
+        }
+
         internal void Save()
         {
             try
@@ -158,6 +191,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             Enabled = false;
             ResetIntervalsToDefaults();
+            MiniBossCooldownSeconds = DefaultMiniBossCooldownSeconds;
+            MiniBossIntervalMultiplier = DefaultMiniBossIntervalMultiplier;
+            MaximumCompanionsDuringMiniBoss = DefaultMaximumCompanionsDuringMiniBoss;
             DisabledItems.Clear();
             SetNames(DefaultNames);
         }
@@ -205,12 +241,48 @@ namespace Gilomx.CupheadBossRoulette
                         ReadNumberToken(json, maximumPosition)))
                     Warn("Los intervalos de Modo Molestoso no eran validos; " +
                         "se usaran los intervalos predeterminados.");
+                needsMigration = false;
+                MiniBossCooldownSeconds = ReadBalanceNumber(json,
+                    "miniBossCooldownSeconds", DefaultMiniBossCooldownSeconds, 0f, 300f, false);
+                MiniBossIntervalMultiplier = ReadBalanceNumber(json,
+                    "miniBossIntervalMultiplier", DefaultMiniBossIntervalMultiplier, 1f, 10f, false);
+                MaximumCompanionsDuringMiniBoss = (int)ReadBalanceNumber(json,
+                    "maximumCompanionsDuringMiniBoss", DefaultMaximumCompanionsDuringMiniBoss,
+                    0f, 20f, true);
+                // Retire the former shared opt-in. Interactions owns its own file.
+                if (FindPropertyValue(json, "applyToInteractions") >= 0)
+                    needsMigration = true;
                 return true;
             }
             catch
             {
                 return false;
             }
+        }
+
+        private float ReadBalanceNumber(string json, string property,
+            float fallback, float minimum, float maximum, bool integer)
+        {
+            var position = FindPropertyValue(json, property);
+            if (position < 0)
+            {
+                needsMigration = true;
+                return fallback;
+            }
+            float value;
+            if (TryBalanceNumber(ReadNumberToken(json, position), minimum, maximum, integer, out value))
+                return value;
+            Warn("Valor no valido para " + property +
+                " en Modo Molestoso; se usara el predeterminado.");
+            return fallback;
+        }
+
+        private static bool TryBalanceNumber(string token, float minimum,
+            float maximum, bool integer, out float value)
+        {
+            return float.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+                !float.IsNaN(value) && !float.IsInfinity(value) &&
+                value >= minimum && value <= maximum && (!integer || value == Math.Floor(value));
         }
 
         private string BuildJson()
@@ -226,6 +298,12 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\n  \"maximumInterval\": ")
                 .Append(MaximumInterval.ToString(
                     "R", CultureInfo.InvariantCulture))
+                .Append(",\n  \"miniBossCooldownSeconds\": ")
+                .Append(MiniBossCooldownSeconds.ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\n  \"miniBossIntervalMultiplier\": ")
+                .Append(MiniBossIntervalMultiplier.ToString("R", CultureInfo.InvariantCulture))
+                .Append(",\n  \"maximumCompanionsDuringMiniBoss\": ")
+                .Append(MaximumCompanionsDuringMiniBoss.ToString(CultureInfo.InvariantCulture))
                 .Append(",\n  \"names\": [");
             for (var i = 0; i < Names.Count; i++)
             {
