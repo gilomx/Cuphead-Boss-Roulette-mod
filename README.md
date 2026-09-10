@@ -214,18 +214,22 @@ modos** guarda los tiempos y cantidades de esa sección en ambos, conservando
 los interruptores y los demás ajustes; después pueden editarse por separado.
 **Restaurar ajustes** prepara los valores y requiere guardar.
 
-| Ajuste | Valor original |
-| --- | --- |
-| Espera entre molestias normales | 1.25–3.25 segundos |
-| Descanso antes de otro minijefe | 30–30 segundos |
-| Espera normal mientras hay minijefe | El doble de tiempo |
-| Otros ataques junto al minijefe | 1 |
-| Molestias leves por aparición | 1–1 |
-| Molestias intensas por aparición | 1–1 |
+| Ajuste | Predeterminado de Modo Molestoso | Predeterminado de Interacciones |
+| --- | --- | --- |
+| Espera entre molestias normales | 3–5.2 segundos | 1.25–3.25 segundos |
+| Descanso antes de otro minijefe | 12–18 segundos | 30–30 segundos |
+| Espera normal mientras hay minijefe | 1.5 veces el intervalo | El doble de tiempo |
+| Otros ataques junto al minijefe | 8 | 1 |
+| Molestias leves por aparición | 1–3 | 1–1 |
+| Molestias intensas por aparición | 1–1 | 1–1 |
 
 Se conservan los valores guardados: el descanso antiguo pasa a ambos extremos
-del nuevo rango, y las cantidades empiezan en 1–1. Los archivos independientes
-siguen en `BepInEx/config/mx.gilomx.cuphead.bossroulette.pesky-mode.json` (v6) y
+del nuevo rango, y las cantidades ausentes usan el predeterminado de su modo.
+Los nuevos predeterminados de Modo Molestoso afectan sólo al ritmo y las cantidades;
+el modo sigue desactivado al crear una configuración nueva y conserva sus nombres
+de fábrica. Permitir varias molestias intensas sigue desactivado por defecto.
+Los archivos independientes siguen en
+`BepInEx/config/mx.gilomx.cuphead.bossroulette.pesky-mode.json` (v8) y
 `mx.gilomx.cuphead.bossroulette.interaction-pacing.json`, con respaldo `.bak`
 al migrar. Batalla Molestosa conserva sus reglas y la exclusividad del minijefe.
 

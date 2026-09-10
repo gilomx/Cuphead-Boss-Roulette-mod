@@ -621,22 +621,25 @@ antes de apagar los sprites originales; no congelan nombres huérfanos.
 - Modo Molestoso conserva su estado aunque el panel se abra con el juego
   pausado. No depende del interruptor ni de los controles de cola de
   Interacciones: ambas fuentes pueden atacar durante la misma partida. Sólo
-  genera durante una partida disponible, espera entre 1.25 y 3.25 segundos por
+  genera durante una partida disponible, espera entre 3 y 5.2 segundos por
   defecto (conservando cualquier intervalo guardado) y
   usa su propia cola sin construir un backlog automático. Desactivarlo elimina
   sus pendientes y dispone sus actores activos sin tocar canjeos de donaciones.
-- El modo libre usa `CreatorToolsPeskyPacing`: con un minijefe presente duplica
-  el intervalo y admite una molestia común adicional como máximo. Cuenta
+- El modo libre usa `CreatorToolsPeskyPacing`: con un minijefe presente multiplica
+  el intervalo por 1.5 y admite hasta ocho molestias comunes, sujeto también
+  al límite de pantalla. Sus lotes predeterminados son 1–3 leves y 1–1 intensas,
+  con concurrencia intensa desactivada. Cuenta
   artículos activos de ambas colas y espera a que se despeje la pantalla antes
   de introducir un minijefe. Observa también minijefes nativos y de otros
-  orígenes, hasta su destrucción, y empieza un descanso de 30 segundos de juego
+  orígenes, hasta su destrucción, y empieza un descanso de 12–18 segundos de juego
   al desaparecer el último. Durante el descanso siguen los ataques comunes;
   terminarlo sólo permite volver a sortear minijefes. Revalida antes de despachar
   y descarta selecciones automáticas pendientes que ya no caben. La pausa no
   consume descanso, la limpieza de fase sí inicia el descanso al desaparecer el
   actor, y la salida/reintento reinicia la política. No altera vida, daño,
-  velocidad ni probabilidades relativas del catálogo. El JSON v5 permite
-  ajustar `miniBossCooldownSeconds` (0–300),
+  velocidad ni probabilidades relativas del catálogo. El JSON v8 permite
+  ajustar los intervalos de minijefes (0–300), conserva el alias
+  `miniBossCooldownSeconds`,
   `miniBossIntervalMultiplier` (1–10) y `maximumCompanionsDuringMiniBoss`
   (entero 0–20). El botón visible Ritmo y minijefes (también Ctrl+I) permite
   guardar los cinco ajustes de forma atómica y restaurar predeterminados.

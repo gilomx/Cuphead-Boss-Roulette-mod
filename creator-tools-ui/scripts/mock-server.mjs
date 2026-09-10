@@ -90,16 +90,19 @@ let peskyFeedback = "ready";
 let peskyError = false;
 const peskyIntervalLowerLimit = 0.35;
 const peskyIntervalUpperLimit = 300;
-const peskyDefaultMinimumInterval = 1.25;
-const peskyDefaultMaximumInterval = 3.25;
-let peskyIntervals = {
+const peskyDefaultMinimumInterval = 3;
+const peskyDefaultMaximumInterval = 5.2;
+const peskyPacingDefaults = {
   minimumInterval: peskyDefaultMinimumInterval,
   maximumInterval: peskyDefaultMaximumInterval,
-  miniBossCooldownSeconds: 30,
-  miniBossIntervalMultiplier: 2,
-  maximumCompanionsDuringMiniBoss: 1,
+  miniBossCooldownSeconds: 12,
+  miniBossIntervalMultiplier: 1.5,
+  maximumCompanionsDuringMiniBoss: 8,
   ...spawnGroupDefaults,
+  miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
+  lightMaximumBatch: 3,
 };
+let peskyIntervals = { ...peskyPacingDefaults };
 
 // Settings contract only: the mock does not reproduce Unity's spawn scheduler.
 // Keep validation aligned with CreatorToolsSpawnGroupSettings and both owners.
@@ -1751,12 +1754,7 @@ createServer((req, res) => {
       defaultAllowConcurrentStrongInteractions: false,
       intervalLowerLimit: peskyIntervalLowerLimit,
       intervalUpperLimit: peskyIntervalUpperLimit,
-      defaultMinimumInterval: peskyDefaultMinimumInterval,
-      defaultMaximumInterval: peskyDefaultMaximumInterval,
-      defaultMiniBossCooldownSeconds: 30,
-      defaultMiniBossIntervalMultiplier: 2,
-      defaultMaximumCompanionsDuringMiniBoss: 1,
-      ...Object.fromEntries(Object.entries(spawnGroupDefaults).map(([key, value]) =>
+      ...Object.fromEntries(Object.entries(peskyPacingDefaults).map(([key, value]) =>
         ["default" + key[0].toUpperCase() + key.slice(1), value])),
       names: peskyNames,
       items: interactionItems,

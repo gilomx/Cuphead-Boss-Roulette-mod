@@ -83,13 +83,14 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(9f, settings.MaximumInterval, "existing customized maximum retained");
                 True(settings.Enabled, "enabled retained");
                 Equal("Conservar", settings.Names[0], "names retained");
-                Equal(30f, settings.MiniBossCooldownSeconds, "default recovery");
-                Equal(2f, settings.MiniBossIntervalMultiplier, "default multiplier");
-                Equal(1, settings.MaximumCompanionsDuringMiniBoss, "default companion cap");
+                Equal(12f, settings.MiniBossCooldownSeconds, "default recovery minimum");
+                Equal(18f, settings.MiniBossMaximumInterval, "default recovery maximum");
+                Equal(1.5f, settings.MiniBossIntervalMultiplier, "default multiplier");
+                Equal(8, settings.MaximumCompanionsDuringMiniBoss, "default companion cap");
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
                     Equal(8, json.RootElement.GetProperty("version").GetInt32(), "automatic migration");
-                    Equal(30f, json.RootElement.GetProperty("miniBossCooldownSeconds").GetSingle(),
+                    Equal(12f, json.RootElement.GetProperty("miniBossCooldownSeconds").GetSingle(),
                         "new tuning visible in file without a panel save");
                 }
                 True(File.ReadAllText(path + ".bak").Contains("\"version\":2"), "legacy backup retained");
@@ -124,7 +125,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     File.WriteAllText(path, BalanceJson(invalid, "3", "2"));
                     var settings = LoadPeskySettings(scope);
-                    Equal(30f, settings.MiniBossCooldownSeconds, "invalid recovery falls back");
+                    Equal(12f, settings.MiniBossCooldownSeconds, "invalid recovery falls back");
                     Equal(3f, settings.MiniBossIntervalMultiplier, "valid multiplier survives");
                     Equal(2, settings.MaximumCompanionsDuringMiniBoss, "valid capacity survives");
                 }
@@ -133,7 +134,7 @@ namespace Gilomx.CupheadBossRoulette
                     File.WriteAllText(path, BalanceJson("0", invalid, "1"));
                     var settings = LoadPeskySettings(scope);
                     Equal(0f, settings.MiniBossCooldownSeconds, "valid zero recovery survives");
-                    Equal(2f, settings.MiniBossIntervalMultiplier, "invalid multiplier falls back");
+                    Equal(1.5f, settings.MiniBossIntervalMultiplier, "invalid multiplier falls back");
                 }
                 foreach (var invalid in new[] { "-1", "21", "0.5", "null", "1e100" })
                 {
@@ -141,7 +142,7 @@ namespace Gilomx.CupheadBossRoulette
                     var settings = LoadPeskySettings(scope);
                     Equal(300f, settings.MiniBossCooldownSeconds, "upper recovery boundary");
                     Equal(10f, settings.MiniBossIntervalMultiplier, "upper multiplier boundary");
-                    Equal(1, settings.MaximumCompanionsDuringMiniBoss, "invalid capacity falls back");
+                    Equal(8, settings.MaximumCompanionsDuringMiniBoss, "invalid capacity falls back");
                     Equal(6f, settings.MinimumInterval, "bad balance does not reset base interval");
                 }
             }

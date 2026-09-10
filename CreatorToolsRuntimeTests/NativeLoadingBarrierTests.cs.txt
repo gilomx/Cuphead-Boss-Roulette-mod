@@ -9,6 +9,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             internal bool Settled;
             internal bool Busy;
+            internal int NativeAssetRequests;
             internal bool Window;
             internal float Now;
             internal int Timeouts;
@@ -19,13 +20,15 @@ namespace Gilomx.CupheadBossRoulette
             internal IEnumerator Wrap(bool prepare = true)
             {
                 return NativeInteractionLoadingBarrier.BeforeSceneLoad(
-                    NativeLoad(), prepare, () => Settled, () => Busy,
+                    NativeLoad(), prepare, () => Settled,
+                    () => Busy || NativeAssetRequests > 0,
                     allowed => Window = allowed, () => Now, () => Timeouts++);
             }
 
             private IEnumerator NativeLoad()
             {
-                True(!Busy && !Window, "native load starts after capture and unload");
+                True(!Busy && !Window && NativeAssetRequests == 0,
+                    "native load starts after capture, unload and native asset completion");
                 NativeStarts++;
                 try { yield return NativeYield; }
                 finally { NativeDisposals++; }
@@ -34,6 +37,35 @@ namespace Gilomx.CupheadBossRoulette
 
         private static void RunNativeLoadingBarrierTests()
         {
+            Run("Ready catalog waits for native texture requests after its source releases", () =>
+            {
+                var p = new LoadingProbe { Settled = true, NativeAssetRequests = 2 };
+                var load = p.Wrap();
+                True(load.MoveNext(), "completed scene still has two pending atlas requests");
+                False(p.Window, "draining textures never starts new catalog work");
+                Equal(0, p.NativeStarts, "native loader cannot close the pending atlas bundles");
+                p.NativeAssetRequests = 1;
+                True(load.MoveNext(), "wait for every request");
+                Equal(0, p.NativeStarts, "partial completion is insufficient");
+                p.NativeAssetRequests = 0;
+                True(load.MoveNext(), "native loading proceeds as soon as all requests finish");
+                Equal(1, p.NativeStarts, "no arbitrary extra delay");
+                ((IDisposable)load).Dispose();
+            });
+            Run("Preparation timeout cannot close bundles with pending native textures", () =>
+            {
+                var p = new LoadingProbe { NativeAssetRequests = 1 };
+                var load = p.Wrap();
+                True(load.MoveNext(), "preparing");
+                p.Now = NativeInteractionLoadingBarrier.PreparationBudgetSeconds;
+                True(load.MoveNext(), "timeout still drains native I/O");
+                Equal(1, p.Timeouts, "preparation timeout reported");
+                Equal(0, p.NativeStarts, "pending textures survive the preparation timeout");
+                False(p.Window, "no new catalog loads");
+                p.NativeAssetRequests = 0;
+                True(load.MoveNext(), "safe to load destination");
+                ((IDisposable)load).Dispose();
+            });
             Run("Catalog completes and unloads before the native scene is queued", () =>
             {
                 var p = new LoadingProbe();

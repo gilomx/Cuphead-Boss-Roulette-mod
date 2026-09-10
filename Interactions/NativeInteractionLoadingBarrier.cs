@@ -35,6 +35,8 @@ namespace Gilomx.CupheadBossRoulette
                 // Also drain map preloads when returning to a menu or map.
                 // On timeout stop admitting new work, then let the current
                 // Unity operation unload safely; Unity cannot cancel it.
+                // Busy also includes native atlas requests, even if the
+                // template is ready and the source preload has released.
                 while (busy())
                     yield return null;
 

@@ -12,9 +12,19 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static object owner;
 
-        // A template can be ready before its source scene finishes unloading.
-        // Native scene changes must wait for both conditions.
-        internal static bool IsBusy { get { return owner != null; } }
+        // Scene activation can finish while Cuphead's atlas bundle requests
+        // are still running. Match SceneLoader.load_cr's completion contract
+        // before unloading a source scene or letting the native loader close
+        // its bundles. Otherwise retained actors can collide with no texture.
+        internal static bool HasPendingNativeAssetLoads
+        {
+            get { return AssetBundleLoader.loadCounter > 0; }
+        }
+
+        internal static bool IsBusy
+        {
+            get { return owner != null || HasPendingNativeAssetLoads; }
+        }
 
         internal static bool TryAcquire(object candidate)
         {

@@ -43,7 +43,17 @@ minis retain the common fallback. This measures delegate calls, not Unity frame 
 The visual-snapshot hierarchy test retains inactive sprite branches and their
 complete animator/transform paths, while skipping collider/spawn metadata and
 ancestors outside the actor. Actual Unity animation playback still needs in-game QA.
-The current harness has 76 test groups.
+Loading-barrier tests preserve the original native iterator's yields and cleanup,
+avoid extra retry frames, drain source-scene and native texture requests, and
+cover timeout/cancellation/resumption. A ready prefab does not permit the native
+loader to close bundles while their textures are still loading. These tests do
+not run Unity or verify the rendered actors.
+The current harness has 84 test groups.
+
+`tools/verify_native_loading_contract.ps1` reads the installed game's IL and the
+compiled mod. It checks the covered loading window and verifies that all ten
+catalog source scenes follow Cuphead's own scene-plus-asset completion loop
+before unloading, with native asset requests also included in the final barrier.
 
 The UI mock's separate HTTP contract tests run with:
 

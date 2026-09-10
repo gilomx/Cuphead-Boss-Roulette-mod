@@ -12,11 +12,13 @@ namespace Gilomx.CupheadBossRoulette
         internal const int MaximumNames = 200;
         internal const float IntervalLowerLimit = 0.35f;
         internal const float IntervalUpperLimit = 300f;
-        internal const float DefaultMinimumInterval = 1.25f;
-        internal const float DefaultMaximumInterval = 3.25f;
-        internal const float DefaultMiniBossCooldownSeconds = 30f;
-        internal const float DefaultMiniBossIntervalMultiplier = 2f;
-        internal const int DefaultMaximumCompanionsDuringMiniBoss = 1;
+        internal const float DefaultMinimumInterval = 3f;
+        internal const float DefaultMaximumInterval = 5.2f;
+        internal const float DefaultMiniBossCooldownSeconds = 12f;
+        internal const float DefaultMiniBossMaximumInterval = 18f;
+        internal const int DefaultLightMaximumBatch = 3;
+        internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
+        internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
         private const int CurrentVersion = 8;
         private static readonly string[] DefaultNames =
         {
@@ -31,7 +33,15 @@ namespace Gilomx.CupheadBossRoulette
         private readonly string path;
         private readonly Action<string> logWarning;
         private bool needsMigration;
-        private CreatorToolsSpawnGroupSettings spawnGroups = new CreatorToolsSpawnGroupSettings();
+        private CreatorToolsSpawnGroupSettings spawnGroups = CreateDefaultSpawnGroups();
+
+        private static CreatorToolsSpawnGroupSettings CreateDefaultSpawnGroups()
+        {
+            // Pesky's tuned preset is independent from Manual/Stream defaults.
+            return new CreatorToolsSpawnGroupSettings(
+                DefaultMiniBossCooldownSeconds, DefaultMiniBossMaximumInterval,
+                1, DefaultLightMaximumBatch, 1, 1);
+        }
 
         internal bool Enabled;
         internal bool AllowConcurrentStrongInteractions { get; private set; }
@@ -191,7 +201,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void AppendSpawnSettingsJson(StringBuilder builder, bool defaults = false)
         {
-            spawnGroups.AppendJson(builder, defaults);
+            (defaults ? CreateDefaultSpawnGroups() : spawnGroups).AppendJson(builder, defaults);
             builder.Append(defaults ? ",\"defaultAllowConcurrentStrongInteractions\":" : ",\"allowConcurrentStrongInteractions\":")
                 .Append(!defaults && AllowConcurrentStrongInteractions ? "true" : "false");
         }
@@ -233,7 +243,7 @@ namespace Gilomx.CupheadBossRoulette
             Enabled = false;
             AllowConcurrentStrongInteractions = false;
             ResetIntervalsToDefaults();
-            spawnGroups = new CreatorToolsSpawnGroupSettings();
+            spawnGroups = CreateDefaultSpawnGroups();
             MiniBossIntervalMultiplier = DefaultMiniBossIntervalMultiplier;
             MaximumCompanionsDuringMiniBoss = DefaultMaximumCompanionsDuringMiniBoss;
             DisabledItems.Clear();
@@ -290,7 +300,8 @@ namespace Gilomx.CupheadBossRoulette
                 var cooldownPosition = FindPropertyValue(json, "miniBossCooldownSeconds");
                 if (cooldownPosition >= 0)
                     spawnValues["miniBossCooldownSeconds"] = ReadNumberToken(json, cooldownPosition);
-                spawnGroups = CreatorToolsSpawnGroupSettings.Load(spawnValues, Warn, out needsMigration);
+                spawnGroups = CreatorToolsSpawnGroupSettings.Load(
+                    spawnValues, Warn, out needsMigration, CreateDefaultSpawnGroups());
                 bool allowStrong;
                 if (!TryReadBoolean(json, "allowConcurrentStrongInteractions", out allowStrong))
                     needsMigration = true;

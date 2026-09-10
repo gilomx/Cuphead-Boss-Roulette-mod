@@ -1,10 +1,11 @@
 #requires -Version 7.0
 param(
     [string]$CupheadDir = 'C:\Program Files (x86)\Steam\steamapps\common\Cuphead',
+    [string]$ModPath = (Join-Path $PSScriptRoot '..\bin\Release\net35\Gilomx.CupheadBossRoulette.dll'),
     [string]$CecilPath = "$env:USERPROFILE\.nuget\packages\mono.cecil\0.10.4\lib\net40\Mono.Cecil.dll"
 )
 
-# Read native IL only. Verify the safe insertion point without launching Unity
+# Read native and compiled mod IL. Verify loading order without launching Unity
 # or claiming that an IL check measures real frame times.
 $ErrorActionPreference = 'Stop'
 Add-Type -Path $CecilPath
@@ -53,6 +54,11 @@ try {
     })
     Require ($reset.Count -eq 1 -and $reset[0].Offset -lt $nativeLoads[0].Offset) 'Native completion reset moved'
     Require (@(Calls $loadMove 'UnityEngine.AsyncOperation' 'set_allowSceneActivation').Count -eq 0) 'Native loader now holds an async activation barrier'
+    $assetWait = @(Calls $loadMove 'AssetBundleLoader' 'get_loadCounter')
+    Require ($assetWait.Count -eq 1 -and $assetWait[0].Next.OpCode.Code -eq 'Ldc_I4_0') 'Native asset request counter wait changed'
+    Require ($assetWait[0].Next.Next.OpCode.Code -in @('Bgt', 'Bgt_S')) 'Native loader no longer waits while assets are pending'
+    $sceneWait = @(Calls $loadMove 'UnityEngine.AsyncOperation' 'get_isDone')[-1]
+    Require ($sceneWait.Next.Operand.Offset -eq $assetWait[0].Next.Next.Operand.Offset) 'Native scene/asset waits no longer share a completion loop'
 
     # Transition.None still covers the old scene, rather than bypassing the
     # loading screen on retries or programmatic native door transitions.
@@ -63,4 +69,34 @@ try {
 }
 finally {
     $module.Dispose()
+}
+
+$mod = [Mono.Cecil.ModuleDefinition]::ReadModule($ModPath)
+try {
+    $coordinator = $mod.Types | Where-Object Name -eq 'NativeInteractionPreloadCoordinator'
+    $nativePending = $coordinator.Methods | Where-Object Name -eq 'get_HasPendingNativeAssetLoads'
+    $counter = @(Calls $nativePending 'AssetBundleLoader' 'get_loadCounter')
+    Require ($counter.Count -eq 1 -and $counter[0].Next.OpCode.Code -eq 'Ldc_I4_0' -and
+        $counter[0].Next.Next.OpCode.Code -eq 'Cgt') 'Mod must use the native pending asset counter'
+    $busy = $coordinator.Methods | Where-Object Name -eq 'get_IsBusy'
+    Require (@(Calls $busy $coordinator.FullName 'get_HasPendingNativeAssetLoads').Count -eq 1) 'Loading barrier does not drain native assets'
+    $cacheCount = 0
+    foreach ($cache in $mod.Types | Where-Object Name -like 'Native*Cache') {
+        $iterator = $cache.NestedTypes | Where-Object Name -like '<PreloadNativeAssetsCore>*'
+        if ($null -eq $iterator) { continue }
+        $move = $iterator.Methods | Where-Object Name -eq 'MoveNext'
+        $pending = @(Calls $move $coordinator.FullName 'get_HasPendingNativeAssetLoads')
+        $unload = @(Calls $move 'UnityEngine.SceneManagement.SceneManager' 'UnloadSceneAsync')
+        $activation = @(Calls $move 'UnityEngine.AsyncOperation' 'get_isDone')[0]
+        Require ($pending.Count -eq 1 -and $unload.Count -eq 1) "Missing asset wait in $($cache.Name)"
+        Require ($activation.Offset -lt $pending[0].Offset -and $pending[0].Offset -lt $unload[0].Offset) "Source scene unload races assets in $($cache.Name)"
+        Require ($activation.Next.Operand.Offset -eq $pending[0].Next.Operand.Offset) "Scene and asset requests must both finish in $($cache.Name)"
+        Require ($pending[0].Next.OpCode.Code -in @('Brtrue', 'Brtrue_S')) "Pending assets no longer yield in $($cache.Name)"
+        $cacheCount++
+    }
+    Require ($cacheCount -eq 10) 'Expected all ten native source scene caches'
+    Write-Output 'Compiled catalog contract passed: all ten caches await native resources before unloading; the final loading barrier also drains asset requests.'
+}
+finally {
+    $mod.Dispose()
 }

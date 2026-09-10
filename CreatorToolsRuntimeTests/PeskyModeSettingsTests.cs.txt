@@ -12,7 +12,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static void RunPeskyModeSettingsTests()
         {
-            Run("Pesky interval defaults preserve the existing cadence",
+            Run("Pesky interval defaults use the saved pacing preset without enabling the mode",
                 TestPeskyIntervalDefaults);
             Run("Pesky interval validation is atomic, finite and culture independent",
                 TestPeskyIntervalValidation);
@@ -29,8 +29,8 @@ namespace Gilomx.CupheadBossRoulette
             using (var scope = new TestScope("pesky-interval-defaults"))
             {
                 var settings = LoadPeskySettings(scope);
-                Equal(1.25f, settings.MinimumInterval, "default minimum seconds");
-                Equal(3.25f, settings.MaximumInterval, "default maximum seconds");
+                Equal(3f, settings.MinimumInterval, "default minimum seconds");
+                Equal(5.2f, settings.MaximumInterval, "default maximum seconds");
                 Equal(0.35f, CreatorToolsPeskyModeSettings.IntervalLowerLimit,
                     "minimum supported seconds");
                 Equal(300f, CreatorToolsPeskyModeSettings.IntervalUpperLimit,
@@ -149,16 +149,16 @@ namespace Gilomx.CupheadBossRoulette
                 var settings = LoadPeskySettings(scope);
                 True(settings.Enabled, "legacy enabled mode remains enabled");
                 Equal("Nombre anterior", settings.Names[0], "legacy name retained");
-                Equal(1.25f, settings.MinimumInterval, "legacy minimum default");
-                Equal(3.25f, settings.MaximumInterval, "legacy maximum default");
+                Equal(3f, settings.MinimumInterval, "legacy minimum default");
+                Equal(5.2f, settings.MaximumInterval, "legacy maximum default");
                 settings.Save();
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
                     Equal(8, json.RootElement.GetProperty("version").GetInt32(),
                         "saved file uses the interval schema");
-                    Equal(1.25f, json.RootElement.GetProperty("minimumInterval")
+                    Equal(3f, json.RootElement.GetProperty("minimumInterval")
                         .GetSingle(), "new minimum is serialized");
-                    Equal(3.25f, json.RootElement.GetProperty("maximumInterval")
+                    Equal(5.2f, json.RootElement.GetProperty("maximumInterval")
                         .GetSingle(), "new maximum is serialized");
                 }
             }
@@ -185,9 +185,9 @@ namespace Gilomx.CupheadBossRoulette
                         ",\"names\":[\"Nombre protegido\"],\"disabledItems\":[\"" +
                         CreatorToolsInteractionIds.All[0] + "\"]}");
                     var settings = LoadPeskySettings(scope);
-                    Equal(1.25f, settings.MinimumInterval,
+                    Equal(3f, settings.MinimumInterval,
                         "bad stored pair recovers the entire default minimum");
-                    Equal(3.25f, settings.MaximumInterval,
+                    Equal(5.2f, settings.MaximumInterval,
                         "bad stored pair recovers the entire default maximum");
                     Equal("Nombre protegido", settings.Names[0],
                         "bad intervals do not erase names");

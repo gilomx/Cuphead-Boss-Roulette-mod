@@ -292,7 +292,8 @@ namespace Gilomx.CupheadBossRoulette
                 CaptureFromLoadedResources();
 
             load.allowSceneActivation = true;
-            while (!load.isDone)
+            while (!load.isDone ||
+                NativeInteractionPreloadCoordinator.HasPendingNativeAssetLoads)
                 yield return null;
 
             if (preloadedScene.IsValid() && preloadedScene.isLoaded)

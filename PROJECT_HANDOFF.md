@@ -2,7 +2,67 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
-## Estado actual: corrección de carga instalada y mod activo (2026-09-09)
+## Estado actual: ritmo y cantidades guardados como predeterminados, instalado (2026-09-09)
+
+El usuario pidió convertir sus ajustes guardados de Modo Molestoso en los
+predeterminados y aclaró: «Sólo ritmo y cantidades». Los nuevos valores son:
+molestias cada 3–5,2 s, minijefes cada 12–18 s, leves de 1 a 3 e intensas de
+1 en 1; con un minijefe, intervalo ×1,5 y hasta 8 acompañantes (sujeto al
+límite global). Permitir varias intensas sigue desactivado por defecto.
+Se conservan los nombres de fábrica y el modo apagado al crear una configuración;
+Interacciones mantiene sus propios predeterminados. La configuración existente
+del usuario sigue activada, con sus nombres y valores guardados intactos.
+
+Los valores se aplican a archivos nuevos, campos ausentes o inválidos y a
+«Restaurar ajustes». No se fuerza una migración de archivos válidos: la versión
+del formato sigue siendo 8. El mock del panel refleja los mismos predeterminados.
+Validación: Release sin warnings/errores, 84 grupos del harness, 8 pruebas HTTP
+del mock, contrato IL nativo y compilado de los diez caches, y diff --check.
+
+Con Cuphead cerrado, se instaló y verificó la DLL a las 17:58, conservando las
+11 configuraciones por hash. Respaldo, preset de referencia y comprobante:
+`installation-backups/pesky-saved-defaults-20260909-175531/`.
+SHA256 instalado: `34D7FF5A5E4C4E305227051B6D91340EB31D5DE9813F0B57F1A28358627A1525`.
+Incluye la corrección de recursos nativos descrita abajo; todavía falta la
+confirmación visual del usuario sobre el círculo en Granito Viejo.
+El usuario solicitó commit y push de estos cambios y de la corrección anterior,
+sobre la rama `codex/creator-tools-config-panel`, después de `b1a18ea`.
+
+## Versión previa: espera de recursos nativos instalada a las 16:34 (2026-09-09)
+
+El usuario detectó el círculo de fuego del Diablo invisible en Granito Viejo
+(OldMan), pero haciendo daño. Se guardaron los logs y la inspección IL en
+`installation-backups/invisible-devil-investigation-20260909/`. El log Unity
+contiene 12 fallos de carga de textura DevilLevelP1 y 32 de DevilLevelP3:
+`async texture load: failed to load ...` y `.resS` que ya no se pueden abrir,
+inmediatamente después de preparar el círculo y antes de entrar a OldMan.
+No se ha confirmado que otros actores presenten el mismo síntoma.
+
+Los diez caches esperaban `LoadSceneAsync.isDone`, pero Cuphead nativo también
+espera `AssetBundleLoader.loadCounter == 0` antes de dar por cargado el nivel.
+Ahora las diez precargas esperan ese contador antes de descargar su escena
+fuente; `NativeInteractionPreloadCoordinator.IsBusy` incluye esas solicitudes
+nativas para que la barrera final no dé paso a `UnloadAssetBundles` prematuramente.
+La espera ocurre después de permitir la activación de la escena (evita bloquear
+la cola async), sigue en la pantalla de carga y tampoco se salta por el presupuesto
+de 30 s. No se agregaron búsquedas de recursos ni cargas durante el combate.
+Esta corrección aborda una causa probable demostrada por el orden de carga y
+los errores de texturas; su efecto visual aún requiere confirmar en una partida.
+
+Validación: Release sin warnings/errores, 84 grupos del harness, contrato IL
+nativo y compilado de los diez caches, y diff --check. Las nuevas pruebas cubren
+texturas pendientes tras liberar el cache y durante el timeout de preparación.
+El usuario autorizó instalar y cerró Cuphead; se instaló a las 16:34 conservando
+las 11 configuraciones, verificadas por hash. Paquete, copia de DLL anterior,
+configs y comprobante: `installation-backups/native-asset-readiness-20260909-163347/`.
+SHA256 instalado: `0A2E7AC3D17090D942B3804A87FE0C3D076F916059CA083360D224A6E92D275A`.
+La anterior DLL activa era 163B...; se conserva también la 6AEE... desactivada.
+Pendiente: comprobar el círculo en Granito Viejo tras reiniciar y revisar que
+desaparezcan los errores de texturas. Si persiste, capturar el nuevo log antes
+de atribuirlo a las capas de dibujo o forzar renderers (el parry del centro sí
+lo oculta intencionalmente y debe conservar ese comportamiento).
+
+## Versión previa: corrección de carga instalada a las 13:03 (2026-09-09)
 
 El usuario pidió instalar y activar la versión corregida. Con Cuphead cerrado,
 se instaló la DLL preparada como `Gilomx.CupheadBossRoulette.dll` a las 13:03.

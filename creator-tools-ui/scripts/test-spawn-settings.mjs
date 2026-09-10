@@ -12,6 +12,11 @@ const groupDefaults = {
   lightMinimumBatch: 1, lightMaximumBatch: 1,
   strongMinimumBatch: 1, strongMaximumBatch: 1,
 };
+const peskyGroupDefaults = {
+  ...groupDefaults,
+  miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
+  lightMaximumBatch: 3,
+};
 const numericKeys = [
   "minimumInterval", "maximumInterval", "miniBossCooldownSeconds",
   "miniBossIntervalMultiplier", "maximumCompanionsDuringMiniBoss",
@@ -96,8 +101,14 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
   ]));
 
   await t.test("snapshots expose all six current values and restore defaults", () => {
-    assert.deepEqual(select(initialPesky, Object.keys(groupDefaults)), groupDefaults);
-    assert.deepEqual(select(peskyDefaults, Object.keys(groupDefaults)), groupDefaults);
+    assert.deepEqual(select(initialPesky, Object.keys(groupDefaults)), peskyGroupDefaults);
+    assert.deepEqual(select(peskyDefaults, Object.keys(groupDefaults)), peskyGroupDefaults);
+    assert.deepEqual(peskyDefaults, {
+      minimumInterval: 3, maximumInterval: 5.2, miniBossCooldownSeconds: 12,
+      miniBossIntervalMultiplier: 1.5, maximumCompanionsDuringMiniBoss: 8,
+      ...peskyGroupDefaults,
+    });
+    assert.equal(initialPesky.enabled, false);
     assert.deepEqual(select(initialInteractions.pacing, Object.keys(groupDefaults)), groupDefaults);
     assert.deepEqual(select(initialInteractions.defaultPacing, Object.keys(groupDefaults)), groupDefaults);
     assert.equal(initialInteractions.defaultPacing.enabled, false);

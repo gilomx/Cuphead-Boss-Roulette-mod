@@ -17,6 +17,20 @@ namespace Gilomx.CupheadBossRoulette
         internal int StrongMinimumBatch { get; private set; } = DefaultBatch;
         internal int StrongMaximumBatch { get; private set; } = DefaultBatch;
 
+        internal CreatorToolsSpawnGroupSettings(
+            float miniMinimum = DefaultMiniBossInterval,
+            float miniMaximum = DefaultMiniBossInterval,
+            int lightMinimum = DefaultBatch, int lightMaximum = DefaultBatch,
+            int strongMinimum = DefaultBatch, int strongMaximum = DefaultBatch)
+        {
+            MiniBossMinimumInterval = miniMinimum;
+            MiniBossMaximumInterval = miniMaximum;
+            LightMinimumBatch = lightMinimum;
+            LightMaximumBatch = lightMaximum;
+            StrongMinimumBatch = strongMinimum;
+            StrongMaximumBatch = strongMaximum;
+        }
+
         internal static readonly string[] PropertyNames =
         {
             "miniBossMinimumInterval", "miniBossMaximumInterval",
@@ -78,10 +92,11 @@ namespace Gilomx.CupheadBossRoulette
 
         // Recover a bad stored pair independently so names, selections and other pairs survive.
         internal static CreatorToolsSpawnGroupSettings Load(Dictionary<string, string> values,
-            Action<string> warning, out bool needsMigration)
+            Action<string> warning, out bool needsMigration,
+            CreatorToolsSpawnGroupSettings defaults = null)
         {
             needsMigration = false;
-            var result = new CreatorToolsSpawnGroupSettings();
+            var result = defaults ?? new CreatorToolsSpawnGroupSettings();
             for (var index = 0; index < PropertyNames.Length; index += 2)
             {
                 var pair = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -107,19 +122,18 @@ namespace Gilomx.CupheadBossRoulette
             return result;
         }
 
-        internal void AppendJson(StringBuilder builder, bool defaults = false)
+        internal void AppendJson(StringBuilder builder, bool defaultKeys = false)
         {
-            var settings = defaults ? new CreatorToolsSpawnGroupSettings() : this;
             var values = new[]
             {
-                settings.MiniBossMinimumInterval, settings.MiniBossMaximumInterval,
-                settings.LightMinimumBatch, settings.LightMaximumBatch,
-                settings.StrongMinimumBatch, settings.StrongMaximumBatch
+                MiniBossMinimumInterval, MiniBossMaximumInterval,
+                LightMinimumBatch, LightMaximumBatch,
+                StrongMinimumBatch, StrongMaximumBatch
             };
             for (var i = 0; i < PropertyNames.Length; i++)
             {
                 var key = PropertyNames[i];
-                if (defaults) key = "default" + char.ToUpperInvariant(key[0]) + key.Substring(1);
+                if (defaultKeys) key = "default" + char.ToUpperInvariant(key[0]) + key.Substring(1);
                 builder.Append(",\"").Append(key).Append("\":")
                     .Append(values[i].ToString("R", CultureInfo.InvariantCulture));
             }

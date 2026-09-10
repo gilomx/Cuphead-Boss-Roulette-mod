@@ -11,7 +11,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static void RunSpawnGroupSettingsTests()
         {
-            Run("Spawn groups default to single attacks and keep separate mini-boss intervals", TestSpawnGroupDefaults);
+            Run("Pesky spawn defaults use its saved preset and remain independent of Interactions", TestSpawnGroupDefaults);
             Run("Legacy cooldown migrates into both mini-boss endpoints with original backups", TestSpawnGroupMigration);
             Run("Every spawn group request validates atomically including optional pairs", TestSpawnGroupAtomicValidation);
             Run("Spawn group ranges persist independently and legacy requests preserve omitted fields", TestSpawnGroupPersistence);
@@ -55,12 +55,12 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var pesky = LoadPeskySettings(scope);
                 var interactions = LoadInteractionPacing(scope);
-                Equal(30f, pesky.MiniBossMinimumInterval, "Pesky mini minimum default");
-                Equal(30f, pesky.MiniBossMaximumInterval, "Pesky mini maximum default");
+                Equal(12f, pesky.MiniBossMinimumInterval, "Pesky mini minimum default");
+                Equal(18f, pesky.MiniBossMaximumInterval, "Pesky mini maximum default");
                 Equal(30f, interactions.MiniBossMinimumInterval, "Interactions mini minimum default");
                 Equal(30f, interactions.MiniBossMaximumInterval, "Interactions mini maximum default");
                 Equal(1, pesky.LightMinimumBatch, "Pesky light minimum default");
-                Equal(1, pesky.LightMaximumBatch, "Pesky light maximum default");
+                Equal(3, pesky.LightMaximumBatch, "Pesky light maximum default");
                 Equal(1, pesky.StrongMinimumBatch, "Pesky strong minimum default");
                 Equal(1, pesky.StrongMaximumBatch, "Pesky strong maximum default");
                 var builder = new StringBuilder("{\"ready\":true");
@@ -68,7 +68,8 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append('}');
                 using (var json = JsonDocument.Parse(builder.ToString()))
                 {
-                    Equal(30f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "controller default prefix");
+                    Equal(18f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "controller default prefix");
+                    Equal(3, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "controller light batch default");
                     Equal(1, json.RootElement.GetProperty("defaultStrongMaximumBatch").GetInt32(), "controller batch default");
                 }
                 builder.Length = 0;
@@ -78,6 +79,30 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(1, json.RootElement.GetProperty("lightMinimumBatch").GetInt32(), "Interactions JSON batch default");
                     Equal(1, json.RootElement.GetProperty("strongMaximumBatch").GetInt32(), "Interactions JSON strong default");
                 }
+                // A customized live value must never replace the restore preset.
+                True(pesky.TrySetPacing(new Dictionary<string, string>
+                {
+                    { "minimumInterval", "9" }, { "maximumInterval", "11" },
+                    { "miniBossMinimumInterval", "45" }, { "miniBossMaximumInterval", "55" },
+                    { "lightMinimumBatch", "4" }, { "lightMaximumBatch", "6" }
+                }), "customize groups before requesting restore defaults");
+                builder = new StringBuilder("{\"ready\":true");
+                pesky.AppendSpawnSettingsJson(builder, true);
+                builder.Append('}');
+                using (var json = JsonDocument.Parse(builder.ToString()))
+                {
+                    Equal(12f, json.RootElement.GetProperty("defaultMiniBossMinimumInterval").GetSingle(), "restore mini minimum is stable");
+                    Equal(18f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "restore mini maximum is stable");
+                    Equal(3, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "restore light batch is stable");
+                }
+                Equal(45f, pesky.MiniBossMinimumInterval, "reading defaults does not mutate current settings");
+                pesky.Save();
+                var savedPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
+                var original = File.ReadAllText(savedPath);
+                var reloaded = LoadPeskySettings(scope);
+                Equal(45f, reloaded.MiniBossMinimumInterval, "valid saved settings beat the new preset");
+                Equal(6, reloaded.LightMaximumBatch, "saved batches survive new defaults");
+                Equal(original, File.ReadAllText(savedPath), "no unnecessary migration or rewrite");
             }
         }
 
@@ -220,7 +245,7 @@ namespace Gilomx.CupheadBossRoulette
                 File.WriteAllText(path, stored);
                 settings = LoadPeskySettings(scope);
                 Equal(1, settings.LightMinimumBatch, "invalid light pair falls back together");
-                Equal(1, settings.LightMaximumBatch, "invalid light maximum falls back");
+                Equal(3, settings.LightMaximumBatch, "invalid light maximum falls back");
                 Equal(3, settings.StrongMaximumBatch, "valid strong pair survives");
                 Equal(17f, settings.MiniBossMaximumInterval, "valid mini-boss range survives");
                 Equal("Conservar nombre", settings.Names[0], "stored repair retains names");
