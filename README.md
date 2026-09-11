@@ -262,6 +262,12 @@ grupo sobreviven a reintentos, pero se cancelan al cerrar Cuphead.
 
 ## Instalación
 
+Para **La Pichi Ruleta · Dev**, sigue el
+[procedimiento portable del launcher](docs/launcher-dev-deployment.md).
+Dev publica un paquete local y no instala ni arranca sobre el juego original.
+La carga compartida del launcher todavía está pendiente. Las instrucciones
+siguientes corresponden al paquete público de instalación manual.
+
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su
 contenido directamente en la carpeta del juego y acepta combinar carpetas y
 reemplazar los archivos del mod. El paquete no incluye configuraciones,
@@ -299,17 +305,17 @@ la investigación y las pruebas necesarias antes de implementar cada idea.
 
 ## Compilación
 
-La ruta predeterminada del proyecto es la instalación habitual de Steam:
+Para compilar y publicar el paquete Dev en cualquiera de las dos PCs:
 
 ```powershell
-dotnet build -c Release
+pwsh -NoProfile -File ./tools/deploy-launcher-dev.ps1
 ```
 
-Para otra instalación:
-
-```powershell
-dotnet build -c Release -p:CupheadDir="D:\Juegos\Cuphead"
-```
+El script detecta las referencias locales de Cuphead y prepara BepInEx por
+separado. No hay una ruta absoluta predeterminada en el proyecto. Para compilar
+la DLL directamente, proporciona las propiedades MSBuild `CupheadDir` y
+`BepInExCoreDir`. Consulta la [guía Dev](docs/launcher-dev-deployment.md) para
+configuración local, destino fijo, publicación atómica y conservación de datos.
 
 El acompañante de TikFinity se prueba y publica por separado como un único EXE
 autocontenido:

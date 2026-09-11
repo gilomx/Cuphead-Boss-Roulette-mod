@@ -1,0 +1,27 @@
+{
+  "release": "v0.5.129",
+  "url": "https://github.com/gilomx/Cuphead-Boss-Roulette-mod/releases/download/v0.5.129/la-pichi-ruleta-gilomx-0.5.129.zip",
+  "sha256": "028fd359eb109739dcc0369edbce1ee4a7eff7c6bab6a6f2a1eb9afe0f7bfeb6",
+  "files": [
+    "winhttp.dll",
+    "doorstop_config.ini",
+    "BepInEx/core/0Harmony.dll",
+    "BepInEx/core/0Harmony.xml",
+    "BepInEx/core/0Harmony20.dll",
+    "BepInEx/core/BepInEx.dll",
+    "BepInEx/core/BepInEx.Harmony.dll",
+    "BepInEx/core/BepInEx.Harmony.xml",
+    "BepInEx/core/BepInEx.Preloader.dll",
+    "BepInEx/core/BepInEx.Preloader.xml",
+    "BepInEx/core/BepInEx.xml",
+    "BepInEx/core/HarmonyXInterop.dll",
+    "BepInEx/core/Mono.Cecil.dll",
+    "BepInEx/core/Mono.Cecil.Mdb.dll",
+    "BepInEx/core/Mono.Cecil.Pdb.dll",
+    "BepInEx/core/Mono.Cecil.Rocks.dll",
+    "BepInEx/core/MonoMod.RuntimeDetour.dll",
+    "BepInEx/core/MonoMod.RuntimeDetour.xml",
+    "BepInEx/core/MonoMod.Utils.dll",
+    "BepInEx/core/MonoMod.Utils.xml"
+  ]
+}

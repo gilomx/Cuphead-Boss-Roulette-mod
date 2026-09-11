@@ -5,11 +5,10 @@
     <RootNamespace>Gilomx.CupheadBossRoulette</RootNamespace>
     <AssemblyName>Gilomx.CupheadBossRoulette</AssemblyName>
     <Version>0.6.0</Version>
-    <CupheadDir Condition="'$(CupheadDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Cuphead</CupheadDir>
     <RestoreAdditionalProjectSources>https://api.nuget.org/v3/index.json;https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
     <!-- Keep the modern, self-contained companion (including its publish
          output) completely outside the .NET 3.5 reference candidate set. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);TikFinityCompanion\**;CreatorToolsRuntimeTests\**;MugmanSkinMod\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);TikFinityCompanion\**;CreatorToolsRuntimeTests\**;MugmanSkinMod\**;.deployment-cache\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,7 +25,7 @@
 
   <ItemGroup>
     <Reference Include="0Harmony">
-      <HintPath>$(CupheadDir)\BepInEx\core\0Harmony.dll</HintPath>
+      <HintPath>$(BepInExCoreDir)\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
@@ -93,4 +92,10 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+  <Target Name="ValidatePortableReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(CupheadDir)\Cuphead_Data\Managed\Assembly-CSharp.dll')"
+           Text="Set CupheadDir to local game references, or use tools/deploy-launcher-dev.ps1 for automatic detection." />
+    <Error Condition="!Exists('$(BepInExCoreDir)\0Harmony.dll')"
+           Text="Set BepInExCoreDir to the clean packaged loader. tools/deploy-launcher-dev.ps1 prepares it without installing into Cuphead." />
+  </Target>
 </Project>
