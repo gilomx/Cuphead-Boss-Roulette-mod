@@ -2,7 +2,43 @@
 
 Current release: **La Pichi Ruleta 0.6.0**.
 
-## Estado actual: ritmo y cantidades guardados como predeterminados, instalado (2026-09-09)
+## Despliegue Dev mediante el launcher (2026-09-12)
+
+El usuario cambió el procedimiento al contrato `docs/RULETA-DEV-DEPLOYMENT.md`
+del repositorio `cuphead-mod-launcher`. El remoto añadió en `3d6becc` el proceso
+principal `tools/deploy-launcher-dev.ps1`, descrito en `AGENTS.md` y
+[su guía](docs/launcher-dev-deployment.md). Se conserva `tools/Publish-RuletaDev.ps1`
+como [alternativa para Windows PowerShell 5](docs/RULETA-DEV-DEPLOYMENT.md), con
+preparación y publicación separables. Ambos compilan panel, DLL y
+companion, incluye BepInEx 5 x64, valida y publica atómicamente en
+`%LOCALAPPDATA%\CupheadModLauncher\dev\pichi-ruleta\current.zip`.
+La ruta se calcula para el usuario actual; no fijar una ruta absoluta por PC.
+
+No volver a desplegar en el original de Steam ni reutilizar los instaladores
+históricos bajo `installation-backups/`. No escribir directamente en el runtime
+compartido, perfiles ni catálogo del launcher. No cerrar Cuphead para publicar:
+la entrega queda lista para el siguiente inicio compatible desde **La Pichi Ruleta · Dev**.
+El launcher gestiona ajustes, migración y limpieza del original; el agente de
+la ruleta no borra las instalaciones previas. La guía documenta todos los
+archivos de configuración y confirma que el companion aún no escribe datos.
+
+Publicado y verificado el 2026-09-12 a las 14:59: 524 archivos, con el cargador,
+508 recursos, DLL y companion autocontenido. SHA256 del ZIP:
+`D1E7FECE460FB694211567617C3088FF61F2360E3B0BBB093741F29CA5C1D101`.
+Preparación y comprobante locales bajo
+`installation-backups/launcher-dev-20260912-145832-f2408ba2c0ee43e28e79c07385c3ed4f/`.
+Validación: panel compilado (17 interacciones y 43 regalos), Release sin warnings
+ni errores, companion win-x64 publicado, hashes de todos los archivos y 11
+pruebas de despliegue en Windows PowerShell 5, incluidos bloqueos y lectores
+concurrentes. No se arrancó el juego; la entrega está lista para el siguiente
+inicio Dev. Publicar no comprueba la integración del launcher instalado.
+El usuario solicitó commit y push; durante el envío se detectó `3d6becc` y se
+integró conservando su proceso principal y las validaciones de referencias
+locales, en la rama `codex/creator-tools-config-panel`.
+Tras resolver la integración: Release sin warnings/errores, 11 pruebas de la
+alternativa Windows PowerShell y 15 del publicador principal aprobadas.
+
+## Versión previa: ritmo y cantidades como predeterminados, instalado (2026-09-09)
 
 El usuario pidió convertir sus ajustes guardados de Modo Molestoso en los
 predeterminados y aclaró: «Sólo ritmo y cantidades». Los nuevos valores son:

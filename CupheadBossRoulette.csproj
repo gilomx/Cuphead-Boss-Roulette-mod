@@ -5,6 +5,7 @@
     <RootNamespace>Gilomx.CupheadBossRoulette</RootNamespace>
     <AssemblyName>Gilomx.CupheadBossRoulette</AssemblyName>
     <Version>0.6.0</Version>
+    <CupheadDir Condition="'$(CupheadDir)' == ''">$(CUPHEAD_DIR)</CupheadDir>
     <RestoreAdditionalProjectSources>https://api.nuget.org/v3/index.json;https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
     <!-- Keep the modern, self-contained companion (including its publish
          output) completely outside the .NET 3.5 reference candidate set. -->

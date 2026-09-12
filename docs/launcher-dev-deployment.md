@@ -5,6 +5,11 @@ arranques de desarrollo sobre el Cuphead original. La integración de carga en
 una carpeta compartida del launcher **todavía está pendiente**: el script deja
 listo el paquete, pero no hace que el launcher actual pueda consumirlo.
 
+Se conserva también una [alternativa compatible con Windows PowerShell 5](RULETA-DEV-DEPLOYMENT.md)
+para separar preparación y publicación. Usa el mismo destino; no ejecutar los
+dos publicadores simultáneamente. El procedimiento principal de ambas PCs sigue
+siendo el de este documento.
+
 ## Generar en cualquiera de las dos PCs
 
 Requisitos: Windows x64, PowerShell 7.2 o posterior (`pwsh`), Git, SDK de .NET

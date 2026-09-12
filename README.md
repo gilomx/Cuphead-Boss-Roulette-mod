@@ -268,6 +268,12 @@ Dev publica un paquete local y no instala ni arranca sobre el juego original.
 La carga compartida del launcher todavía está pendiente. Las instrucciones
 siguientes corresponden al paquete público de instalación manual.
 
+También se conserva la [alternativa para Windows PowerShell 5](docs/RULETA-DEV-DEPLOYMENT.md),
+que permite separar la preparación del paquete y su publicación. Ambas entregan
+el ZIP en el mismo destino fijo.
+
+### Instalación manual de una versión publicada
+
 El ZIP publicado ya incluye BepInEx x64 y el mod. Cierra Cuphead, extrae su
 contenido directamente en la carpeta del juego y acepta combinar carpetas y
 reemplazar los archivos del mod. El paquete no incluye configuraciones,
@@ -316,6 +322,13 @@ separado. No hay una ruta absoluta predeterminada en el proyecto. Para compilar
 la DLL directamente, proporciona las propiedades MSBuild `CupheadDir` y
 `BepInExCoreDir`. Consulta la [guía Dev](docs/launcher-dev-deployment.md) para
 configuración local, destino fijo, publicación atómica y conservación de datos.
+
+Para compilar solo la DLL también se acepta la variable local `CUPHEAD_DIR`.
+Las referencias del juego y la carpeta del cargador son de solo lectura:
+
+```powershell
+dotnet build -c Release "-p:CupheadDir=$env:CUPHEAD_DIR" "-p:BepInExCoreDir=$carpetaDelCargador"
+```
 
 El acompañante de TikFinity se prueba y publica por separado como un único EXE
 autocontenido:
