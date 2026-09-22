@@ -41,7 +41,12 @@ export function StreamRuleForm({
   const canSave = Boolean(
     (!needsGift || selectedGift) && selectedInteraction &&
     (!hasThreshold || (draft.every >= 1 && draft.every <= maxEvery)) &&
-    draft.quantity >= 1 && draft.quantity <= maxQuantity,
+    draft.quantity >= 1 && draft.quantity <= maxQuantity &&
+    (selectedInteraction?.group !== "challenge" ||
+      (Number.isInteger(draft.durationSeconds ?? 15) &&
+       (draft.durationSeconds ?? 15) >= 1 && (draft.durationSeconds ?? 15) <= 120 &&
+       Number.isInteger(draft.countdownSeconds ?? 3) &&
+       (draft.countdownSeconds ?? 3) >= 0 && (draft.countdownSeconds ?? 3) <= 30)),
   );
 
   const triggerName = draft.eventType === "gift"
@@ -195,6 +200,23 @@ export function StreamRuleForm({
           </p>
         ) : null}
       </fieldset>
+
+      {selectedInteraction?.group === "challenge" ? (
+        <>
+        <label className="stream-rule-form__wide">
+          <span>{t("interactions.challenges.countdown")}</span>
+          <input type="number" min={0} max={30} step={1} value={draft.countdownSeconds ?? 3}
+            disabled={saving} onChange={(event) => onChange({ ...draft, countdownSeconds: Number(event.target.value) })} />
+          <small>{t("interactions.challenges.countdownHint")}</small>
+        </label>
+        <label className="stream-rule-form__wide">
+          <span>{t("interactions.challenges.duration")}</span>
+          <input type="number" min={1} max={120} step={1} value={draft.durationSeconds ?? 15}
+            disabled={saving} onChange={(event) => onChange({ ...draft, durationSeconds: Number(event.target.value) })} />
+          <small>{t("interactions.challenges.durationHint")}</small>
+        </label>
+        </>
+      ) : null}
 
       <div className="stream-rule-form__actions stream-rule-form__wide">
         <button type="button" onClick={onCancel} disabled={saving}>

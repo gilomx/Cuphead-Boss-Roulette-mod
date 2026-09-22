@@ -9,7 +9,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsStreamRulesController
     {
-        private const int SchemaVersion = 2;
+        private const int SchemaVersion = 4;
         private const int MinimumSupportedSchemaVersion = 1;
         private const string GiftEventType = "gift";
         private const string LikeEventType = "like";
@@ -353,7 +353,7 @@ namespace Gilomx.CupheadBossRoulette
                     rule.Interaction,
                     giftImagePath,
                     streamEvent.UserName,
-                    requestedLong);
+                    requestedLong, rule.DurationSeconds, rule.CountdownSeconds);
                 // Evaluation can run while Unity is suspended. The worker
                 // only records durable in-memory intent here; Update() is the
                 // sole main-thread boundary allowed to drain into the gameplay
@@ -466,6 +466,8 @@ namespace Gilomx.CupheadBossRoulette
                     rules[index].Every != rule.Every ||
                     rules[index].Interaction != rule.Interaction ||
                     rules[index].Quantity != rule.Quantity ||
+                    rules[index].DurationSeconds != rule.DurationSeconds ||
+                    rules[index].CountdownSeconds != rule.CountdownSeconds ||
                     (rules[index].Enabled && !rule.Enabled);
                 var candidate = CloneRules();
                 candidate[index] = rule;
@@ -550,6 +552,13 @@ namespace Gilomx.CupheadBossRoulette
             if (eventType == FollowEventType)
                 every = 1;
 
+            int duration, countdown;
+            if (!CreatorToolsTimedChallenge.TryDuration(Value(values, "durationSeconds"), out duration) ||
+                !CreatorToolsTimedChallenge.TryCountdown(Value(values, "countdownSeconds"), out countdown))
+            {
+                SetFeedback("invalid_rule", true);
+                return false;
+            }
             rule = new StreamRule
             {
                 Id = id,
@@ -564,7 +573,9 @@ namespace Gilomx.CupheadBossRoulette
                     : string.Empty,
                 Every = every,
                 Interaction = interaction,
-                Quantity = quantity
+                Quantity = quantity,
+                DurationSeconds = duration,
+                CountdownSeconds = countdown
             };
             return true;
         }
@@ -662,7 +673,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"interaction\":\"");
             AppendJson(builder, rule.Interaction);
             builder.Append("\",\"quantity\":")
-                .Append(rule.Quantity);
+                .Append(rule.Quantity)
+                .Append(",\"durationSeconds\":").Append(rule.DurationSeconds)
+                .Append(",\"countdownSeconds\":").Append(rule.CountdownSeconds);
             if (includeGift)
             {
                 GiftEntry gift;
@@ -769,7 +782,9 @@ namespace Gilomx.CupheadBossRoulette
                     "\\\"giftName\\\":\\\"(?<giftName>(?:\\\\.|[^\\\"])*)\\\"," +
                     "\\\"every\\\":(?<every>\\d+)," +
                     "\\\"interaction\\\":\\\"(?<interaction>[^\\\"]+)\\\"," +
-                    "\\\"quantity\\\":(?<quantity>\\d+)\\}",
+                    "\\\"quantity\\\":(?<quantity>\\d+)" +
+                    "(?:,\\\"durationSeconds\\\":(?<duration>\\d+))?" +
+                    "(?:,\\\"countdownSeconds\\\":(?<countdown>\\d+))?\\}",
                     RegexOptions.CultureInvariant);
                 var matches = expression.Matches(json);
                 var ids = new HashSet<long>();
@@ -778,6 +793,7 @@ namespace Gilomx.CupheadBossRoulette
                     long id;
                     int every;
                     int quantity;
+                    int duration, countdown;
                     var eventType =
                         matches[i].Groups["eventType"].Value;
                     var giftId = matches[i].Groups["giftId"].Value;
@@ -797,7 +813,9 @@ namespace Gilomx.CupheadBossRoulette
                         (eventType == GiftEventType &&
                          !gifts.ContainsKey(giftId)) ||
                         (eventType == FollowEventType && every != 1) ||
-                        !IsKnownInteraction(interaction))
+                        !IsKnownInteraction(interaction) ||
+                        !CreatorToolsTimedChallenge.TryDuration(matches[i].Groups["duration"].Value, out duration) ||
+                        !CreatorToolsTimedChallenge.TryCountdown(matches[i].Groups["countdown"].Value, out countdown))
                         return false;
                     loaded.Add(new StreamRule
                     {
@@ -815,7 +833,9 @@ namespace Gilomx.CupheadBossRoulette
                             : string.Empty,
                         Every = every,
                         Interaction = interaction,
-                        Quantity = quantity
+                        Quantity = quantity,
+                        DurationSeconds = duration,
+                        CountdownSeconds = countdown
                     });
                 }
                 if (loaded.Count > MaximumRules ||
@@ -1208,6 +1228,8 @@ namespace Gilomx.CupheadBossRoulette
             internal int Every;
             internal string Interaction;
             internal int Quantity;
+            internal int DurationSeconds = CreatorToolsTimedChallenge.DefaultDuration;
+            internal int CountdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown;
 
             internal StreamRule Clone(long id)
             {
@@ -1221,7 +1243,9 @@ namespace Gilomx.CupheadBossRoulette
                     GiftName = GiftName,
                     Every = Every,
                     Interaction = Interaction,
-                    Quantity = Quantity
+                    Quantity = Quantity,
+                    DurationSeconds = DurationSeconds,
+                    CountdownSeconds = CountdownSeconds
                 };
             }
         }

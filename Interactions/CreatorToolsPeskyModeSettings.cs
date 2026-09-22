@@ -19,7 +19,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const int DefaultLightMaximumBatch = 3;
         internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
         internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
-        private const int CurrentVersion = 8;
+        private const int CurrentVersion = 11;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -44,6 +44,9 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal bool Enabled;
+        internal int ChallengeDurationSeconds = CreatorToolsTimedChallenge.DefaultDuration;
+        internal int ChallengeCountdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown;
+        internal int ChallengeWaitSeconds = CreatorToolsChallengePacing.DefaultWait;
         internal bool AllowConcurrentStrongInteractions { get; private set; }
         internal float MinimumInterval { get; private set; }
         internal float MaximumInterval { get; private set; }
@@ -247,6 +250,10 @@ namespace Gilomx.CupheadBossRoulette
             MiniBossIntervalMultiplier = DefaultMiniBossIntervalMultiplier;
             MaximumCompanionsDuringMiniBoss = DefaultMaximumCompanionsDuringMiniBoss;
             DisabledItems.Clear();
+            DisabledItems.Add(CreatorToolsTimedChallenge.HalfDamage);
+            ChallengeDurationSeconds = CreatorToolsTimedChallenge.DefaultDuration;
+            ChallengeCountdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown;
+            ChallengeWaitSeconds = CreatorToolsChallengePacing.DefaultWait;
             SetNames(DefaultNames);
         }
 
@@ -291,6 +298,26 @@ namespace Gilomx.CupheadBossRoulette
                     Warn("Los intervalos de Modo Molestoso no eran validos; " +
                         "se usaran los intervalos predeterminados.");
                 needsMigration = false;
+                var durationPosition = FindPropertyValue(json, "challengeDurationSeconds");
+                int duration;
+                ChallengeDurationSeconds = CreatorToolsTimedChallenge.TryDuration(
+                    ReadNumberToken(json, durationPosition), out duration)
+                    ? duration : CreatorToolsTimedChallenge.DefaultDuration;
+                if (durationPosition < 0)
+                {
+                    // Existing catalogs gain a new opt-in, never surprise the player.
+                    DisabledItems.Add(CreatorToolsTimedChallenge.HalfDamage);
+                }
+                var countdownPosition = FindPropertyValue(json, "challengeCountdownSeconds");
+                int countdown;
+                ChallengeCountdownSeconds = CreatorToolsTimedChallenge.TryCountdown(
+                    ReadNumberToken(json, countdownPosition), out countdown)
+                    ? countdown : CreatorToolsTimedChallenge.DefaultCountdown;
+                var waitPosition = FindPropertyValue(json, "challengeWaitSeconds");
+                int wait;
+                ChallengeWaitSeconds = CreatorToolsChallengePacing.TryWait(
+                    ReadNumberToken(json, waitPosition), out wait)
+                    ? wait : CreatorToolsChallengePacing.DefaultWait;
                 var spawnValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var property in CreatorToolsSpawnGroupSettings.PropertyNames)
                 {
@@ -302,6 +329,7 @@ namespace Gilomx.CupheadBossRoulette
                     spawnValues["miniBossCooldownSeconds"] = ReadNumberToken(json, cooldownPosition);
                 spawnGroups = CreatorToolsSpawnGroupSettings.Load(
                     spawnValues, Warn, out needsMigration, CreateDefaultSpawnGroups());
+                needsMigration |= durationPosition < 0 || countdownPosition < 0 || waitPosition < 0;
                 bool allowStrong;
                 if (!TryReadBoolean(json, "allowConcurrentStrongInteractions", out allowStrong))
                     needsMigration = true;
@@ -369,6 +397,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\n  \"maximumCompanionsDuringMiniBoss\": ")
                 .Append(MaximumCompanionsDuringMiniBoss.ToString(CultureInfo.InvariantCulture));
             AppendSpawnSettingsJson(builder);
+            builder.Append(",\n  \"challengeDurationSeconds\": ").Append(ChallengeDurationSeconds);
+            builder.Append(",\n  \"challengeCountdownSeconds\": ").Append(ChallengeCountdownSeconds);
+            builder.Append(",\n  \"challengeWaitSeconds\": ").Append(ChallengeWaitSeconds);
             builder.Append(",\n  \"names\": [");
             for (var i = 0; i < Names.Count; i++)
             {

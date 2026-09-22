@@ -223,6 +223,16 @@ namespace Gilomx.CupheadBossRoulette
             TryFindBattleHudNativeLayers(out screenCanvas,
                 out pauseBackground, out textTemplate);
 
+            // A level entered without opening the roulette may not have the
+            // map PauseGUI help hierarchy. Its native HUD is a valid canvas
+            // source too; CreateBattleHudRoot already has a font fallback.
+            if (screenCanvas == null)
+            {
+                Canvas nativeCanvas;
+                if (TryGetNativeBattleHudCanvas(out nativeCanvas))
+                    screenCanvas = nativeCanvas.transform;
+            }
+
             if (battleHudCanvas == null)
             {
                 if (screenCanvas == null)
@@ -887,6 +897,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void MarkBattleResultHudExplicitRestart()
         {
+            ResetTimedChallengeHudForAttempt(true);
             if (!battleHudPresentationActive)
                 return;
 

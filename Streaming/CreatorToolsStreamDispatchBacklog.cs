@@ -46,7 +46,9 @@ namespace Gilomx.CupheadBossRoulette
             string interaction,
             string giftImagePath,
             string donor,
-            long quantity)
+            long quantity,
+            int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration,
+            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown)
         {
             if (quantity <= 0)
                 return null;
@@ -60,7 +62,8 @@ namespace Gilomx.CupheadBossRoulette
                 var current = entries[i];
                 if (current.RuleId != ruleId ||
                     current.ConnectionId != connectionId ||
-                    current.Interaction != interaction)
+                    current.Interaction != interaction || current.DurationSeconds != durationSeconds ||
+                    current.CountdownSeconds != countdownSeconds)
                     continue;
 
                 current.Add(donor, quantity);
@@ -72,7 +75,9 @@ namespace Gilomx.CupheadBossRoulette
                 RuleId = ruleId,
                 ConnectionId = connectionId,
                 Interaction = interaction,
-                GiftImagePath = giftImagePath
+                GiftImagePath = giftImagePath,
+                DurationSeconds = durationSeconds,
+                CountdownSeconds = countdownSeconds
             };
             entry.Add(donor, quantity);
             entries.Add(entry);
@@ -135,7 +140,7 @@ namespace Gilomx.CupheadBossRoulette
                 entry.NextDonor,
                 entry.GiftImagePath,
                 requested,
-                out feedbackCode);
+                out feedbackCode, entry.DurationSeconds, entry.CountdownSeconds);
             entry.Consume(Math.Max(0, added));
             return Math.Max(0, added);
         }
@@ -186,6 +191,8 @@ namespace Gilomx.CupheadBossRoulette
             internal string ConnectionId;
             internal string Interaction;
             internal string GiftImagePath;
+            internal int DurationSeconds;
+            internal int CountdownSeconds;
             internal long Remaining;
 
             internal string NextDonor

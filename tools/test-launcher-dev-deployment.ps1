@@ -1,6 +1,7 @@
 #requires -Version 7.2
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'LauncherDevPackage.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'LauncherDevEnvironment.psm1') -Force
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('pichi-deploy-tests-' + [guid]::NewGuid().ToString('N'))
 $null = [IO.Directory]::CreateDirectory($testRoot)
 $current = Join-Path $testRoot 'current.zip'
@@ -23,6 +24,21 @@ function New-Candidate {
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $candidate)
 }
 try {
+    # A repository file is outside AppData redirection in both process contexts.
+    $modulePath = Join-Path $PSScriptRoot 'LauncherDevPackage.psm1'
+    $moduleStream = [IO.File]::OpenRead($modulePath)
+    try {
+        $null = Assert-LauncherPhysicalPath $moduleStream $modulePath
+        $count++
+        Write-Host 'PASS physical file matches requested deployment path'
+        $rejected = $false
+        try { $null = Assert-LauncherPhysicalPath $moduleStream ($modulePath + '.other') }
+        catch { $rejected = $true }
+        if (!$rejected) { throw 'Physical destination mismatch was not rejected.' }
+        $count++
+        Write-Host 'PASS mismatched physical destination rejected'
+    }
+    finally { $moduleStream.Dispose() }
     [IO.File]::WriteAllText((Join-Path $stage 'winhttp.dll'), 'fixture version 1')
     $manifest = Get-PackageManifest $stage
     New-Candidate

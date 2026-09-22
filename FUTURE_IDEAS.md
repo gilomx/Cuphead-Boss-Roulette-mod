@@ -1,8 +1,30 @@
 # Ideas para versiones futuras
 
-Este documento guarda propuestas que todavía no forman parte del mod. No deben
-tratarse como funciones terminadas ni activarse en una versión pública sin sus
-pruebas correspondientes.
+Este documento conserva propuestas futuras y antecedentes de funciones que ya
+se implementaron. Las secciones marcadas como hechas describen funciones de la
+actualización en desarrollo; sus diseños originales se mantienen como referencia.
+
+## Estado de la nueva actualización (2026-09-22)
+
+La versión pública anterior se publicó sin parte de estos cambios, por lo que
+entonces quedaron desactivados. La rama actual prepara una nueva actualización
+y todos los retos implementados están habilitados, junto con Creator Tools.
+No queda pendiente reactivar RGB, pantalla invertida, HP.1 ni Daño -50%.
+
+| Función | Estado actual en `ExperimentalFeatures.cs` |
+| --- | --- |
+| RGB / Mamá escucho borroso | `EnableRgbShiftChallenge = true` |
+| Pantalla invertida / Volteada de cabeza | `EnableUpsideDownChallenge = true` |
+| HP.1 / Una vida y te callas | `EnableHpOneChallenge = true` |
+| Lluvia de tinta | `EnableInkRainChallenge = true` |
+| Daño -50% / Disparos rebajados | `EnableHalfDamageChallenge = true` |
+| Creator Tools | `EnableCreatorTools = true` |
+
+Los selectores `Force...ForTesting` permanecen en `false`: sirven para forzar
+un resultado de prueba y no controlan la disponibilidad normal de los retos.
+Las comprobaciones de regresión se distinguen de la activación de una función.
+Las propuestas aún no implementadas, como dos Cáliz o el reto aleatorio por
+intervalos, conservan su condición de ideas futuras.
 
 ## Mini jefes de la Baronesa en niveles de avión
 
@@ -95,12 +117,12 @@ armamento de avión.
 
 ## Reto de desfase RGB inspirado en Cagney — HECHO
 
-Estado: funcionalidad terminada y aceptada en 0.5.129. Queda desactivada por
-decisión del proyecto: `EnableRgbShiftChallenge` y
-`ForceRgbShiftChallengeForTesting` están en `false`, por lo que no aparece en
-la ruleta. Para publicarla después se activa sólo el primer interruptor. El arte
-final de tres frames ya está integrado; el nombre localizado continúa siendo
-una decisión de presentación y no un pendiente funcional.
+Estado: funcionalidad terminada y activa en la nueva actualización mediante
+`EnableRgbShiftChallenge = true`. Su desactivación correspondía a la versión
+anterior que se publicó sin este cambio. `ForceRgbShiftChallengeForTesting`
+permanece en `false`, de modo que participa normalmente en el catálogo.
+El arte final de tres frames y el nombre localizado ya están integrados.
+La idea y la investigación siguientes conservan el diseño original.
 
 ### Idea
 
@@ -142,7 +164,13 @@ controla `BlurGamma` sin corutinas: conserva el ciclo nativo de 2.2 segundos a
 70% de fuerza. El arte final usa `rgb_01.png` a `rgb_03.png`, tres PNG
 transparentes de 80 × 80 que la ruleta anima a 12.5 fps.
 
-## Reto de fijado permanente
+## Reto de fijado permanente — HECHO como Modo tieso
+
+El reto ya está implementado y activo como `MODO TIESO` (`Locked Mode`). En
+tierra mantiene el fijado al tocar el suelo y bloquea el dash, conservando el
+movimiento aéreo; en avión bloquea el miniavión. Las variantes y comprobaciones
+que siguen son el planteamiento original, no una implementación por comenzar.
+El comportamiento vigente se describe en [README.md](README.md#retos).
 
 ### Idea
 
@@ -222,10 +250,11 @@ Dados, supers, HUD y restauración del equipamiento al volver al mapa.
 
 ## Reto de jugar al revés (pantalla volteada) — HECHO
 
-Estado: implementación y pruebas manuales terrestres terminadas en 0.5.129.
-`EnableUpsideDownChallenge` y `ForceUpsideDownChallengeForTesting` están en
-`false`, por lo que queda compilado pero dormido hasta completar su matriz final
-de pruebas y decidir su activación pública. Su icono animado ya está integrado.
+Estado: implementación terminada y activa en la nueva actualización mediante
+`EnableUpsideDownChallenge = true`; `ForceUpsideDownChallengeForTesting` permanece
+en `false`. Quedó fuera de la publicación anterior, pero ya forma parte del
+catálogo normal de esta rama. Su icono animado está integrado. Las pruebas
+manuales registradas y las regresiones que siguen no son un bloqueo de activación.
 
 ### Diseño final
 
@@ -255,6 +284,12 @@ controles.
   conectado a la animación normal de la ruleta.
 
 ## Reto aleatorio por intervalos
+
+La primera base reutilizable ya existe como interacción temporal de Daño a la
+mitad (2026-09-22), probada automáticamente y pendiente de balance en combate.
+El usuario decidió incorporar y probar los demás retos progresivamente en Modo
+Molestoso antes de construir el reto Aleatorio. Este modo aleatorio sigue siendo
+una propuesta; los tiempos de abajo aún no son definitivos.
 
 ### Idea
 
@@ -302,9 +337,10 @@ confirmar únicamente si el siguiente reto puede repetir el anterior.
 ### Estado actual
 
 La implementación funcional está terminada, superó su matriz manual y ya usa su
-icono animado definitivo. Permanece desactivada mediante
-`ExperimentalFeatures.EnableHpOneChallenge = false` y
-`ForceHpOneChallengeForTesting = false` hasta decidir su activación pública.
+icono animado definitivo. Está activa en la nueva actualización mediante
+`ExperimentalFeatures.EnableHpOneChallenge = true`.
+`ForceHpOneChallengeForTesting = false` conserva la selección normal de retos.
+La desactivación anotada anteriormente correspondía a la publicación anterior.
 
 El reto funciona en niveles terrestres y de avión y fija la vida actual y
 máxima de cada jugador en exactamente 1 HP durante toda la sesión de batalla.
@@ -337,13 +373,19 @@ volver al mapa restaura el comportamiento normal sin modificar el perfil.
 - El arte final usa `hp1_01.png` a `hp1_03.png`, tres frames transparentes de
   80 × 80 conectados a la ruleta.
 
-### Pendiente antes de reactivarlo
+### Regresión de publicación
 
-Ejecutar una regresión corta de giro, HUD, reintento y cooperativo. Después se
-puede habilitar `EnableHpOneChallenge` cuando se decida publicarlo, manteniendo
-todos los selectores `Force...ForTesting` desactivados.
+Incluir giro, HUD, reintento y cooperativo en la regresión de la nueva versión.
+HP.1 ya está habilitado; no necesita una decisión adicional para reactivarlo.
+Los selectores `Force...ForTesting` deben permanecer desactivados en uso normal.
 
-## Creator Tools: overlay local
+## Creator Tools: overlay local — HECHO
+
+El overlay y Creator Tools están implementados y activos en la actualización
+actual (`EnableCreatorTools = true`). El resto de esta sección conserva la
+propuesta inicial, superada por el panel, los modos y la integración TikFinity
+actuales. Para el estado vigente, consultar [README.md](README.md#creator-tools-y-obs)
+y [CREATOR_TOOLS_STREAMING_HANDOFF.md](CREATOR_TOOLS_STREAMING_HANDOFF.md).
 
 ### Objetivo
 
@@ -520,6 +562,8 @@ dirección entre sesiones, pero no aparece como una opción editable en el menú
 
 ## Criterio general para incorporar estas ideas
 
-Cada idea debe implementarse detrás de un selector temporal, documentarse en
-`PROJECT_HANDOFF.md` y `CHANGELOG.md`, probarse con P1 y cooperativo, y dejar el
-selector desactivado antes de publicar una versión normal.
+Cada idea nueva debe documentarse en `PROJECT_HANDOFF.md` y `CHANGELOG.md` y
+probarse con P1 y cooperativo antes de incorporarla. Los selectores que fuerzan
+pruebas deben quedar desactivados en una versión normal. Los interruptores de
+las funciones aceptadas para esa actualización permanecen habilitados, como
+ocurre con los retos implementados y Creator Tools en esta rama.

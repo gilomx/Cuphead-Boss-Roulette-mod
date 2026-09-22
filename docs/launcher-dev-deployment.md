@@ -30,6 +30,27 @@ del directorio desde el que se invoque. Detecta Steam mediante el registro y
 lee `libraryfolders.vdf` y `appmanifest_268910.acf`. Si no encuentra una única
 instalación, falla sin publicar y pide una referencia local explícita.
 
+Si se ejecuta desde una aplicación MSIX como Codex, Windows puede redirigir
+AppData a una copia privada de esa aplicación. La misma ruta escrita en pantalla
+no garantiza que el Explorador o el launcher normal vean los archivos.
+El publicador detecta la identidad MSIX o una ruta física redirigida (también
+en procesos hijos que no exponen nombre de paquete) y ejecuta el procedimiento en un
+proceso independiente y oculto de PowerShell, iniciado mediante WMI con el mismo
+usuario. Conserva el destino lógico fijo y no cambia permisos ni configuración
+de Windows. Los parámetros, log y resultado quedan en
+`.deployment-cache/unpackaged-<id>/`, excluidos de Git. Si WMI no permite crear
+ese proceso, falla explícitamente; se puede ejecutar el comando principal desde
+una ventana normal de PowerShell.
+
+Además, comprueba la ruta física del bloqueo antes de publicar y la del ZIP al
+terminar. Si Windows las redirige, rechaza la entrega en lugar de anunciar un
+éxito que el launcher no puede ver. No validar el despliegue únicamente con una
+lectura desde el mismo proceso empaquetado; verificar también en el Explorador
+o desde un proceso independiente. No copiar el catálogo ni los ajustes privados
+de Codex sobre los del launcher normal.
+
+Contexto de Windows: [virtualización de AppData en aplicaciones empaquetadas](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes#appdata-operations-on-windows-10-version-1903-and-later).
+
 Para una instalación no detectada, crea **sólo en esa PC**
 `launcher-dev.local.json` en la raíz del checkout. Define `cupheadDir` con la
 ruta local seleccionada. Puedes usar variables de entorno; las rutas relativas

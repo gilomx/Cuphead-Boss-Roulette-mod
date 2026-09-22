@@ -79,8 +79,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var count = 0;
                 for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
-                    if (!DisabledItems.Contains(
-                        CreatorToolsInteractionIds.All[i]))
+                    if (IsItemEnabled(CreatorToolsInteractionIds.All[i]))
                         count++;
                 return count;
             }
@@ -88,7 +87,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal bool IsItemEnabled(string item)
         {
-            return IsKnownItem(item) && !DisabledItems.Contains(item);
+            return IsKnownItem(item) && !DisabledItems.Contains(item) &&
+                CreatorToolsInteractionGroups.ForItem(item) != CreatorToolsInteractionGroups.Challenge;
         }
 
         internal void Save()

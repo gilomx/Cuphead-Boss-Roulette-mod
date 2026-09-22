@@ -1,0 +1,285 @@
+using System;
+using System.IO;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunTimedChallengeTests()
+        {
+            Run("Defeat holds the timed HUD without retaining the gameplay effect", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var hud = new CreatorToolsTimedChallengeHudState();
+                timer.Start(15, 0);
+                timer.Advance(4.5f, true);
+                hud.HoldAfterDefeat(timer, "Viewer");
+                timer.End();
+                False(timer.Active, "damage reduction stops on level end");
+                False(timer.Busy, "gameplay lease is released");
+                Equal(10.5f, hud.DefeatSnapshot.Remaining, "defeat keeps exact remaining time");
+                Equal("Viewer", hud.DefeatDonor, "defeat keeps sender");
+                hud.HoldAfterDefeat(timer, "Other");
+                Equal("Viewer", hud.DefeatDonor, "later cleanup cannot overwrite held presentation");
+                hud.Reset(true);
+                True(hud.WaitingForAttempt, "retry blocks presentation until a new attempt");
+                True(hud.DefeatSnapshot == null, "retry clears held display immediately");
+                timer.Start(20, 3);
+                hud.HoldAfterDefeat(timer, "Late cleanup");
+                True(hud.DefeatSnapshot == null, "restart cannot capture the old attempt again");
+                False(hud.TakeCountdownCue(timer, true), "no cues during reload");
+                hud.Reset(false);
+                True(hud.TakeCountdownCue(timer, true), "new attempt can count normally");
+            });
+            Run("Defeat during the warning preserves its number silently", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var hud = new CreatorToolsTimedChallengeHudState();
+                timer.Start(15, 3);
+                timer.Advance(1f, true);
+                hud.HoldAfterDefeat(timer, "");
+                timer.End();
+                True(hud.DefeatSnapshot.CountingDown, "warning does not become a challenge on death");
+                Equal(2f, hud.DefeatSnapshot.CountdownRemaining, "warning stays on its visible number");
+                False(hud.TakeCountdownCue(hud.DefeatSnapshot, true), "frozen warning stays silent");
+                hud.Reset(false);
+                hud.HoldAfterDefeat(timer, "Nobody");
+                True(hud.DefeatSnapshot == null, "death during rest has no stale challenge");
+            });
+            Run("Countdown cues play once per number and never replay after pause", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var hud = new CreatorToolsTimedChallengeHudState();
+                timer.Start(15, 3);
+                False(hud.TakeCountdownCue(timer, false), "paused first frame is silent");
+                True(hud.TakeCountdownCue(timer, true), "first number plays once");
+                False(hud.TakeCountdownCue(timer, true), "second rendering of same number is silent");
+                timer.Advance(1f, true);
+                True(hud.TakeCountdownCue(timer, true), "second number plays");
+                timer.Advance(20f, false);
+                False(hud.TakeCountdownCue(timer, false), "pause does not tick");
+                False(hud.TakeCountdownCue(timer, true), "resume does not replay previous tick");
+                timer.Advance(1f, true);
+                True(hud.TakeCountdownCue(timer, true), "last number plays");
+                timer.Advance(1f, true);
+                False(hud.TakeCountdownCue(timer, true), "warning exit does not add a tick");
+                timer.End();
+                timer.Start(15, 0);
+                False(hud.TakeCountdownCue(timer, true), "zero warning is silent");
+                timer.End();
+                timer.Start(15, 3);
+                True(hud.TakeCountdownCue(timer, true), "next challenge restarts sound sequence");
+                timer.Advance(2.5f, true);
+                True(hud.TakeCountdownCue(timer, true), "slow frame plays only the current number");
+                False(hud.TakeCountdownCue(timer, true), "no catch-up burst");
+            });
+            Run("Automatic challenges wait five playable seconds before and between effects", delegate
+            {
+                var pacing = new CreatorToolsChallengePacing();
+                var effect = new CreatorToolsTimedChallenge();
+                pacing.Advance(4f, true, effect.Busy, 5);
+                False(pacing.Ready, "first challenge still resting");
+                pacing.Advance(100f, false, effect.Busy, 5);
+                Equal(1f, pacing.Remaining, "pause freezes rest");
+                pacing.Advance(1f, true, effect.Busy, 5);
+                True(pacing.Ready, "first warning due after five seconds");
+                effect.Start(15, 3);
+                for (var i = 0; i < 18; i++)
+                {
+                    effect.Advance(1f, true);
+                    pacing.Advance(1f, true, effect.Busy, 5);
+                    False(pacing.Ready, "warning and effect never consume rest");
+                }
+                effect.Advance(1f, true);
+                pacing.Advance(1f, true, effect.Busy, 5);
+                Equal(5f, pacing.Remaining, "exit frame cannot consume rest");
+                pacing.Advance(4f, true, false, 5);
+                False(pacing.Ready, "full new rest after finishing");
+                pacing.Advance(1f, true, false, 5);
+                True(pacing.Ready, "next warning due independently of actors");
+                pacing.Reset(9);
+                pacing.Advance(float.NaN, true, false, 9);
+                pacing.Advance(float.PositiveInfinity, true, false, 9);
+                Equal(9f, pacing.Remaining, "invalid deltas ignored");
+                pacing.Reset(0);
+                True(pacing.Ready, "zero wait allowed");
+                int wait;
+                True(CreatorToolsChallengePacing.TryWait(null, out wait), "missing field accepted");
+                Equal(5, wait, "old configs default to five seconds");
+                foreach (var value in new[] { "-1", "301", "2.5", "NaN" })
+                    False(CreatorToolsChallengePacing.TryWait(value, out wait), "invalid rest " + value);
+            });
+            Run("Warning reserves the challenge without applying or spending its effect", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                True(timer.Start(15, 3), "warning begins");
+                True(timer.Busy, "warning reserves the only slot");
+                False(timer.Active, "no damage reduction during the warning");
+                False(timer.Start(20, 3), "another source waits during warning");
+                timer.Advance(2f, true);
+                timer.Advance(60f, false);
+                Equal(1f, timer.CountdownRemaining, "pausing freezes warning");
+                Equal(15f, timer.Remaining, "warning never spends effect time");
+                timer.Advance(1f, true);
+                Equal(TimedChallengePhase.CountdownExit, timer.Phase, "warning animates out before the effect");
+                False(timer.Active, "warning exit still has no effect");
+                timer.Advance(CreatorToolsTimedChallenge.ExitSeconds, true);
+                True(timer.Active, "effect starts after warning exit");
+                Equal(15f, timer.Remaining, "full configured duration remains");
+                timer.Advance(15f, true);
+                False(timer.Active, "effect ends before its visual exit");
+                True(timer.Busy, "exit keeps presentation exclusive");
+                timer.Advance(CreatorToolsTimedChallenge.ExitSeconds, true);
+                False(timer.Busy, "next challenge may now begin");
+            });
+            Run("Warning handles cancellation, zero countdown and slow frames", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                timer.Start(15, 3);
+                timer.Advance(1f, true);
+                timer.End();
+                timer.Advance(100f, true);
+                False(timer.Active, "cancelled warning never activates later");
+                True(timer.Start(15, 0), "zero skips warning");
+                True(timer.Active, "zero begins active presentation");
+                timer.End();
+                timer.Start(15, 3);
+                timer.Advance(4.25f, true);
+                Equal(14f, timer.Remaining, "overshoot crosses warning and exit exactly");
+                timer.Advance(100f, true);
+                False(timer.Busy, "slow frame settles every phase");
+                int seconds;
+                True(CreatorToolsTimedChallenge.TryCountdown(null, out seconds), "legacy fallback");
+                Equal(3, seconds, "default three-second warning");
+                foreach (var value in new[] { "-1", "31", "NaN", "Infinity", "2.5" })
+                    False(CreatorToolsTimedChallenge.TryCountdown(value, out seconds), "invalid warning " + value);
+                True(CreatorToolsTimedChallenge.TryCountdown("0", out seconds), "warning can be skipped");
+            });
+            Run("Timed challenge pauses, expires and rejects overlap", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                True(timer.Start(15, 0), "first challenge starts");
+                timer.Advance(6f, true);
+                timer.Advance(40f, false);
+                Equal(9f, timer.Remaining, "pause spends no challenge time");
+                False(timer.Start(30, 0), "a second challenge cannot overwrite the first");
+                timer.Advance(float.NaN, true);
+                timer.Advance(-20f, true);
+                Equal(9f, timer.Remaining, "invalid deltas cannot change duration");
+                timer.Advance(10f, true);
+                False(timer.Active, "expiration clears the effect");
+                Equal(0f, timer.Remaining, "countdown does not go negative");
+            });
+            Run("An old challenge lease cannot clear a new attempt", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                timer.Start(15, 0);
+                var first = timer.Revision;
+                timer.End();
+                False(timer.Active, "level end clears the effect");
+                timer.Start(20, 0);
+                timer.End(first);
+                Equal(20f, timer.Remaining, "late cleanup preserves the replacement");
+                timer.End(timer.Revision);
+                False(timer.Active, "disabling source ends the current lease");
+            });
+            Run("Challenge duration accepts only supported whole seconds", delegate
+            {
+                int seconds;
+                True(CreatorToolsTimedChallenge.TryDuration(null, out seconds), "legacy default");
+                Equal(15, seconds, "recommended duration");
+                foreach (var value in new[] { "0", "121", "NaN", "Infinity", "2.5", "-1", "999999999999" })
+                    False(CreatorToolsTimedChallenge.TryDuration(value, out seconds), "reject " + value);
+                True(CreatorToolsTimedChallenge.TryDuration("120", out seconds), "upper limit");
+            });
+            Run("Pesky challenge opt-in and duration survive save and migration", delegate
+            {
+                using (var scope = new TestScope("timed-challenge-settings"))
+                {
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "default opt-out");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.HalfDamage);
+                    settings.ChallengeDurationSeconds = 27;
+                    settings.ChallengeCountdownSeconds = 6;
+                    settings.Save();
+                    var loaded = LoadPeskySettings(scope);
+                    Equal(27, loaded.ChallengeDurationSeconds, "saved duration");
+                    Equal(6, loaded.ChallengeCountdownSeconds, "saved warning");
+                    Equal(5, loaded.ChallengeWaitSeconds, "new settings rest default");
+                    loaded.ChallengeWaitSeconds = 12;
+                    loaded.Save();
+                    loaded = LoadPeskySettings(scope);
+                    Equal(12, loaded.ChallengeWaitSeconds, "custom rest survives reload");
+                    True(loaded.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "saved opt-in");
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":8,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"hilda_green_zeppelin\"]}");
+                    loaded = LoadPeskySettings(scope);
+                    False(loaded.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "old files opt out");
+                    False(loaded.IsItemEnabled("hilda_green_zeppelin"), "old selection survives");
+                    Equal("Viewer", loaded.Names[0], "names survive");
+                    Equal(3, loaded.ChallengeCountdownSeconds, "old settings receive warning default");
+                    Equal(5, loaded.ChallengeWaitSeconds, "old settings receive independent rest");
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":10,\"enabled\":true,\"names\":[],\"disabledItems\":[],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7}");
+                    loaded = LoadPeskySettings(scope);
+                    True(loaded.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "existing timed challenge remains selected");
+                    True(loaded.Enabled, "existing automatic mode remains enabled");
+                    Equal(24, loaded.ChallengeDurationSeconds, "existing duration retained");
+                    Equal(7, loaded.ChallengeCountdownSeconds, "existing warning retained");
+                    Equal(5, loaded.ChallengeWaitSeconds, "v10 gains only the new rest default");
+                }
+            });
+            Run("Stream backlog keeps different challenge durations separate", delegate
+            {
+                var backlog = new CreatorToolsStreamDispatchBacklog();
+                var first = backlog.Add(1, "connection", CreatorToolsTimedChallenge.HalfDamage, "", "A", 2, 10);
+                var second = backlog.Add(1, "connection", CreatorToolsTimedChallenge.HalfDamage, "", "B", 3, 25);
+                False(object.ReferenceEquals(first, second), "different durations are not coalesced");
+                Equal(10, first.DurationSeconds, "first redemption duration");
+                Equal(25, second.DurationSeconds, "second redemption duration");
+                Equal(5L, backlog.PendingCount, "all redemptions retained");
+            });
+            Run("Stream rules validate and serialize challenge duration", delegate
+            {
+                using (var scope = new TestScope("timed-challenge-rules"))
+                {
+                    var rules = scope.CreateRules(1);
+                    var query = "action=create&name=Timed&eventType=gift&giftId=1&every=1&interaction=challenge_half_damage&quantity=1&enabled=true&countdownSeconds=6&durationSeconds=";
+                    using (var json = JsonDocument.Parse(rules.ProcessServerCommand(query + "24")))
+                    {
+                        Equal("created", json.RootElement.GetProperty("feedback").GetString(), "rule created");
+                        Equal(24, json.RootElement.GetProperty("rules")[1].GetProperty("durationSeconds").GetInt32(), "custom duration published");
+                    }
+                    using (var json = JsonDocument.Parse(rules.ProcessServerCommand(query + "121")))
+                        Equal("invalid_rule", json.RootElement.GetProperty("feedback").GetString(), "invalid duration rejected");
+                    rules = scope.ReloadRules(rules);
+                    using (var json = JsonDocument.Parse(rules.ProcessServerCommand("")))
+                    {
+                        Equal(2, json.RootElement.GetProperty("rules").GetArrayLength(), "rules survive reload");
+                        Equal(24, json.RootElement.GetProperty("rules")[1].GetProperty("durationSeconds").GetInt32(), "duration survives reload");
+                        Equal(6, json.RootElement.GetProperty("rules")[1].GetProperty("countdownSeconds").GetInt32(), "warning survives reload");
+                    }
+                    rules.Evaluate(NewGiftEvent(2, 1), true);
+                    var gameplay = new CreatorToolsInteractionController(200);
+                    rules.Update(null, gameplay, true);
+                    Equal(24, gameplay.LastDurationSeconds, "custom duration reaches gameplay queue");
+                    Equal(6, gameplay.LastCountdownSeconds, "custom warning reaches gameplay queue");
+                    foreach (var file in Directory.GetFiles(scope.ConfigDirectory, "*.stream-rules.json", SearchOption.AllDirectories))
+                    {
+                        var legacy = File.ReadAllText(file).Replace("\"version\": 4", "\"version\": 2");
+                        legacy = System.Text.RegularExpressions.Regex.Replace(legacy, ",\"(?:durationSeconds|countdownSeconds)\":\\d+", "");
+                        File.WriteAllText(file, legacy);
+                    }
+                    rules = scope.ReloadRules(rules);
+                    using (var json = JsonDocument.Parse(rules.ProcessServerCommand("")))
+                    {
+                        Equal(2, json.RootElement.GetProperty("rules").GetArrayLength(), "legacy rules retained");
+                        Equal(15, json.RootElement.GetProperty("rules")[1].GetProperty("durationSeconds").GetInt32(), "legacy duration defaults");
+                        Equal(3, json.RootElement.GetProperty("rules")[1].GetProperty("countdownSeconds").GetInt32(), "legacy warning defaults");
+                    }
+                }
+            });
+        }
+    }
+}

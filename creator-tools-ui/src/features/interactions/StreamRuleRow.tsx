@@ -139,6 +139,7 @@ export function StreamRuleRow({
               <span>
                 <strong>
                   {interaction ? t(interaction.titleKey) : rule.interaction}
+                  {interaction?.group === "challenge" ? ` · ${rule.durationSeconds ?? 15} s` : ""}
                 </strong>
                 <small>
                   {t("interactions.rules.list.quantity").replace(

@@ -48,6 +48,7 @@ interface ConfigValue {
   applyPeskyEnabled: (enabled: boolean) => void;
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
+  applyPeskyChallengeDuration: (seconds: number, countdown: number, wait: number) => void;
   applyPeskyIntervals: (pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => void;
   applyPacingToBoth: (pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => void;
   applyPeskyBattleGift: (giftId: string) => void;
@@ -72,7 +73,7 @@ interface ConfigValue {
   deleteStreamRule: (id: number) => boolean;
   duplicateStreamRule: (id: number) => void;
   toggleStreamRule: (id: number, enabled: boolean) => void;
-  testInteraction: (item: string, donor: string, quantity: number, delay: number) => void;
+  testInteraction: (item: string, donor: string, quantity: number, delay: number, durationSeconds?: number, countdownSeconds?: number) => void;
 }
 
 interface PendingPeskyChange {
@@ -1030,6 +1031,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [sendPeskyUpdate],
   );
 
+  const applyPeskyChallengeDuration = useCallback((seconds: number, countdown: number, wait: number) => {
+    sendPeskyUpdate(new URLSearchParams({ challengeDurationSeconds: String(seconds), challengeCountdownSeconds: String(countdown), challengeWaitSeconds: String(wait) }),
+      (state) => ({ ...state, challengeDurationSeconds: seconds, challengeCountdownSeconds: countdown, challengeWaitSeconds: wait, feedback: "items_saved", error: false }));
+  }, [sendPeskyUpdate]);
+
   const applyPeskyItem = useCallback(
     (item: string, enabled: boolean) => {
       sendPeskyUpdate(
@@ -1323,7 +1329,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }, [sendTapFarmingUpdate, tapFarming]);
 
   const testInteraction = useCallback(
-    (item: string, donor: string, quantity: number, delay: number) => {
+    (item: string, donor: string, quantity: number, delay: number, durationSeconds = 15, countdownSeconds = 3) => {
       if (!interaction?.ready || !interaction.interactionsEnabled) return;
       const normalizedQuantity = Math.max(
         1,
@@ -1356,6 +1362,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         donor: donor.trim(),
         quantity: String(normalizedQuantity),
         delay: String(normalizedDelay),
+        durationSeconds: String(durationSeconds),
+        countdownSeconds: String(countdownSeconds),
       });
       void fetch(`/api/config/interactions/test?${query}`, { cache: "no-store" })
         .then((response) => {
@@ -1426,6 +1434,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         every: String(draft.every),
         interaction: draft.interaction,
         quantity: String(draft.quantity),
+        durationSeconds: String(draft.durationSeconds ?? 15),
+        countdownSeconds: String(draft.countdownSeconds ?? 3),
       });
       if (draft.id !== undefined) query.set("id", String(draft.id));
       return sendStreamRuleUpdate(query);
@@ -1483,6 +1493,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      applyPeskyChallengeDuration,
       applyPeskyIntervals,
       applyPacingToBoth,
       applyPeskyBattleGift,
@@ -1526,6 +1537,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyEnabled,
       applyPeskyNames,
       applyPeskyItem,
+      applyPeskyChallengeDuration,
       applyPeskyIntervals,
       applyPacingToBoth,
       applyPeskyBattleGift,

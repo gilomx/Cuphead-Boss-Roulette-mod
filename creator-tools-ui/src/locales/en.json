@@ -652,7 +652,8 @@
     "categories": {
       "all": "All",
       "attack": "Attacks",
-      "mini_boss": "Mini-bosses"
+      "mini_boss": "Mini-bosses",
+      "challenge": "Timed challenges"
     },
     "miniBoss": {
       "type": "Mini-boss",
@@ -800,7 +801,8 @@
       "queued": "Queued",
       "scheduled": "Waiting for time",
       "waiting_game": "Waiting for game",
-      "morePending": "and {count} more"
+      "morePending": "and {count} more",
+      "countdown": "Challenge incoming"
     },
     "test": {
       "title": "Tests",
@@ -859,7 +861,20 @@
       "lightHint": "Small attacks for which you can allow larger groups.",
       "strongHint": "Attacks that take up more space or demand more attention. You can allow fewer at once.",
       "mini_bossHint": "Enemies with their own health. Only one can appear at a time.",
-      "filter": "Filter by group"
+      "filter": "Filter by group",
+      "challenge": "Timed challenges"
+    },
+    "challenges": {
+      "halfDamage": "Half damage",
+      "description": "Challenges use their own wait time, even while other nuisances are active. Only one challenge at a time; your usual damage returns when it ends.",
+      "wait": "Wait between challenges (seconds)",
+      "waitHint": "Default: 5 seconds. Wait first, then the countdown, then the challenge starts. The wait restarts when the previous challenge ends.",
+      "effect": "Your attacks deal 50% damage. Ground and airplane.",
+      "duration": "Challenge duration (seconds)",
+      "durationHint": "Recommended: 15 seconds. Choose 1 to 120. Pausing stops the countdown.",
+      "save": "Save timing",
+      "countdown": "Advance countdown (seconds)",
+      "countdownHint": "The warning starts after the rest period. Recommended: 3 seconds; 0 skips it. It does not shorten the challenge."
     }
   },
   "pesky": {
@@ -955,7 +970,8 @@
       "active": "Running",
       "queued": "Queued",
       "scheduled": "Waiting for time",
-      "waiting_game": "Waiting for game"
+      "waiting_game": "Waiting for game",
+      "countdown": "Challenge incoming"
     },
     "names": {
       "title": "Random names",

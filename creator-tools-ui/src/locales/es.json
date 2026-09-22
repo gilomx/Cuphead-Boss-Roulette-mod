@@ -652,7 +652,8 @@
     "categories": {
       "all": "Todos",
       "attack": "Ataques",
-      "mini_boss": "Mini jefes"
+      "mini_boss": "Mini jefes",
+      "challenge": "Retos temporales"
     },
     "miniBoss": {
       "type": "Mini jefe",
@@ -800,7 +801,8 @@
       "queued": "En cola",
       "scheduled": "Esperando tiempo",
       "waiting_game": "Esperando al juego",
-      "morePending": "y {count} más"
+      "morePending": "y {count} más",
+      "countdown": "Reto en camino"
     },
     "test": {
       "title": "Pruebas",
@@ -859,7 +861,20 @@
       "lightHint": "Ataques pequeños para los que puedes permitir grupos más grandes.",
       "strongHint": "Ataques que ocupan más espacio o exigen más atención. Puedes permitir menos a la vez.",
       "mini_bossHint": "Enemigos con vida propia. Solo puede aparecer uno a la vez.",
-      "filter": "Filtrar por grupo"
+      "filter": "Filtrar por grupo",
+      "challenge": "Retos temporales"
+    },
+    "challenges": {
+      "halfDamage": "Daño a la mitad",
+      "description": "Aparecen con su propio tiempo de espera, aunque haya otras molestias. Sólo un reto a la vez; al terminar recuperas tu daño habitual.",
+      "wait": "Espera entre retos (segundos)",
+      "waitHint": "Por defecto: 5 segundos. Primero hay una espera, después la cuenta atrás y luego empieza el reto. La espera vuelve a empezar cuando termina el reto anterior.",
+      "effect": "Tus ataques hacen un 50% de daño. Tierra y avión.",
+      "duration": "Duración del reto (segundos)",
+      "durationHint": "Recomendado: 15 segundos. Puedes usar de 1 a 120. La pausa detiene el contador.",
+      "save": "Guardar tiempos",
+      "countdown": "Cuenta atrás previa (segundos)",
+      "countdownHint": "El aviso aparece después del descanso. Recomendado: 3 segundos; 0 lo omite. No resta tiempo al reto."
     }
   },
   "pesky": {
@@ -955,7 +970,8 @@
       "active": "Ejecutándose",
       "queued": "En cola",
       "scheduled": "Esperando tiempo",
-      "waiting_game": "Esperando al juego"
+      "waiting_game": "Esperando al juego",
+      "countdown": "Reto en camino"
     },
     "names": {
       "title": "Nombres aleatorios",

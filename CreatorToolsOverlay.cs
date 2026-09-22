@@ -166,11 +166,15 @@ namespace Gilomx.CupheadBossRoulette
                     BepInEx.Paths.PluginPath,
                 delegate(string message) { Logger.LogInfo(message); },
                 delegate(string message) { Logger.LogWarning(message); });
+            timedChallengeInteractions = new TimedChallengeInteractionExecutor(
+                delegate { return !timedHudState.WaitingForAttempt && creatorToolsApplicationFocused && CanSpawnCreatorToolsInteraction() && PrepareTimedChallengeHud(); },
+                delegate { return activeChallenge == ModifierId.HalfDamage && ShouldShowActiveChallenge(); });
             creatorToolsInteractions = new CreatorToolsInteractionController(
                 this,
                 Config.ConfigFilePath,
                 CanPreloadNativeInteractionAssets,
                 CanSpawnCreatorToolsInteraction,
+                timedChallengeInteractions,
                 GetCreatorToolsInteractionMaximumActive,
                 SetCreatorToolsInteractionMaximumActive,
                 GetCreatorToolsMiniBossMaximumActive,
@@ -531,6 +535,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
             CreatorToolsInteractionPresentation.ClearLevelEndSnapshots();
+            ResetTimedChallengeHudForAttempt(false);
 
             var shouldClearPreviousAttempt =
                 (!sameLevel &&
@@ -744,6 +749,7 @@ namespace Gilomx.CupheadBossRoulette
         private void BeginCreatorToolsInteractionGameplayLevelLoad(
             string source)
         {
+            ResetTimedChallengeHudForAttempt(true);
             if (creatorToolsInteractions == null ||
                 !creatorToolsInteractions.BeginGameplayLevelLoad())
                 return;
@@ -755,6 +761,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void CancelCreatorToolsInteractionGameplayLevelLoad()
         {
+            ResetTimedChallengeHudForAttempt(false);
             creatorToolsInteractionLevelStartObserved = false;
             if (creatorToolsInteractions != null)
                 creatorToolsInteractions.CancelGameplayLevelLoad();
@@ -1174,6 +1181,7 @@ namespace Gilomx.CupheadBossRoulette
                     __instance.GetInstanceID())
                 return;
 
+            plugin.ResetTimedChallengeHudForAttempt(true);
             plugin.creatorToolsInteractionLevelInstanceId = -1;
             plugin.creatorToolsInteractionAllowedAt =
                 float.PositiveInfinity;

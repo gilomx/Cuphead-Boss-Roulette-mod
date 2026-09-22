@@ -56,7 +56,9 @@ namespace Gilomx.CupheadBossRoulette
             string giftImagePath,
             int quantity,
             float delaySeconds,
-            CreatorToolsInteractionSource source)
+            CreatorToolsInteractionSource source,
+            int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration,
+            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown)
         {
             // Battle work shares this physical queue, but owns one reserved
             // pending slot. A paused stream backlog may therefore contain the
@@ -79,6 +81,8 @@ namespace Gilomx.CupheadBossRoulette
                     Donor = donor,
                     GiftImagePath = giftImagePath ?? string.Empty,
                     Source = source,
+                    DurationSeconds = durationSeconds,
+                    CountdownSeconds = countdownSeconds,
                     DelaySeconds = delaySeconds,
                     ReadyAt = Time.realtimeSinceStartup + delaySeconds
                 });
@@ -221,11 +225,15 @@ namespace Gilomx.CupheadBossRoulette
             return changed;
         }
 
-        internal void ClearActive()
+        internal void ClearActive(bool preserveTimed = false)
         {
-            for (var i = 0; i < active.Count; i++)
+            for (var i = active.Count - 1; i >= 0; i--)
+            {
+                if (preserveTimed && active[i].Handle is ICreatorToolsTimedInteractionHandle)
+                    continue;
                 DisposeHandle(active[i]);
-            active.Clear();
+                active.RemoveAt(i);
+            }
         }
 
         internal int ClearPending()
@@ -311,6 +319,7 @@ namespace Gilomx.CupheadBossRoulette
             string status,
             bool first)
         {
+            var timed = entry.Handle as ICreatorToolsTimedInteractionHandle;
             if (!first)
                 builder.Append(',');
             builder.Append("{\"id\":")
@@ -326,7 +335,15 @@ namespace Gilomx.CupheadBossRoulette
                 .Append("\",\"delaySeconds\":")
                 .Append(entry.DelaySeconds.ToString(
                     "0.###", CultureInfo.InvariantCulture))
-                .Append('}');
+                .Append(",\"durationSeconds\":").Append(entry.DurationSeconds);
+            builder.Append(",\"countdownSeconds\":").Append(entry.CountdownSeconds);
+            if (timed != null)
+            {
+                builder.Append(",\"remainingSeconds\":").Append(timed.SecondsRemaining);
+                builder.Append(",\"countdownRemaining\":").Append(timed.CountdownSecondsRemaining);
+                builder.Append(",\"countingDown\":").Append(timed.CountingDown ? "true" : "false");
+            }
+            builder.Append('}');
         }
 
         private static string SourceValue(
@@ -379,6 +396,8 @@ namespace Gilomx.CupheadBossRoulette
             internal string GiftImagePath;
             internal CreatorToolsInteractionSource Source;
             internal float DelaySeconds;
+            internal int DurationSeconds;
+            internal int CountdownSeconds;
             internal float ReadyAt;
             internal ICreatorToolsInteractionHandle Handle;
 

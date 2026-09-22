@@ -8,7 +8,9 @@ export function createStreamRuleDraft(gift?: TikTokGift): StreamRuleDraft {
     eventType: "gift",
     giftId: gift?.giftId ?? "",
     every: 1,
-    interaction: interactionItems[0].id,
+    interaction: interactionItems.find((item) => item.category === "attack")!.id,
+    durationSeconds: 15,
+    countdownSeconds: 3,
     quantity: 1,
   };
 }
@@ -23,5 +25,7 @@ export function draftForStreamRule(rule: StreamRule): StreamRuleDraft {
     every: rule.every,
     interaction: rule.interaction,
     quantity: rule.quantity,
+    durationSeconds: rule.durationSeconds ?? 15,
+    countdownSeconds: rule.countdownSeconds ?? 3,
   };
 }

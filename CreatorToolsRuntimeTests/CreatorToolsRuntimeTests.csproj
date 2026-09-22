@@ -15,6 +15,10 @@
        discovering the harness fakes through its recursive *.cs glob. -->
   <ItemGroup>
     <Compile Include="Program.cs.txt" Link="Program.cs" />
+    <Compile Include="TimedChallengeTests.cs.txt" Link="TimedChallengeTests.cs" />
+    <Compile Include="..\Interactions\CreatorToolsTimedChallenge.cs" Link="Product\Interactions\CreatorToolsTimedChallenge.cs" />
+    <Compile Include="..\Interactions\CreatorToolsTimedChallengeHudState.cs" Link="Product\Interactions\CreatorToolsTimedChallengeHudState.cs" />
+    <Compile Include="..\Interactions\CreatorToolsChallengePacing.cs" Link="Product\Interactions\CreatorToolsChallengePacing.cs" />
     <Compile Include="MiniBossSpawnPolicyTests.cs.txt" Link="MiniBossSpawnPolicyTests.cs" />
     <Compile Include="DonorLabelLifetimeTests.cs.txt" Link="DonorLabelLifetimeTests.cs" />
     <Compile Include="PeskyModeSettingsTests.cs.txt" Link="PeskyModeSettingsTests.cs" />

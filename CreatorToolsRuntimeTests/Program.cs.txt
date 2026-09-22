@@ -19,6 +19,7 @@ namespace Gilomx.CupheadBossRoulette
         private static int Main()
         {
             RunMiniBossSpawnPolicyTests();
+            RunTimedChallengeTests();
             RunDonorLabelLifetimeTests();
             RunPeskyModeSettingsTests();
             RunPeskyPacingTests();
@@ -1774,6 +1775,15 @@ namespace Gilomx.CupheadBossRoulette
             internal string ConfigDirectory
             {
                 get { return configDirectory; }
+            }
+
+            internal CreatorToolsStreamRulesController ReloadRules(CreatorToolsStreamRulesController original)
+            {
+                var path = (string)typeof(CreatorToolsStreamRulesController)
+                    .GetField("settingsPath", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(original);
+                return new CreatorToolsStreamRulesController(assetsDirectory,
+                    Path.Combine(Path.GetDirectoryName(path), "plugin.cfg"),
+                    delegate { return true; }, delegate(string ignored) { });
             }
 
             internal CreatorToolsOverlayComposerController

@@ -102,6 +102,9 @@ export interface InteractionPacingConfig {
 }
 
 export interface PeskyModeConfigState extends Omit<InteractionPacingConfig, "enabled"> {
+  challengeDurationSeconds?: number;
+  challengeCountdownSeconds?: number;
+  challengeWaitSeconds?: number;
   allowConcurrentStrongInteractions: boolean;
   defaultAllowConcurrentStrongInteractions: boolean;
   ready: boolean;
@@ -256,6 +259,11 @@ export interface TapFarmingConfigState {
 }
 
 export interface InteractionQueueEntry {
+  durationSeconds?: number;
+  countdownSeconds?: number;
+  remainingSeconds?: number;
+  countdownRemaining?: number;
+  countingDown?: boolean;
   id: number;
   item: string;
   donor: string;
@@ -284,6 +292,8 @@ export interface TikTokGiftCatalog {
 export type StreamRuleTrigger = "gift" | "like" | "follow";
 
 export interface StreamRule {
+  durationSeconds?: number;
+  countdownSeconds?: number;
   id: number;
   name: string;
   enabled: boolean;
@@ -299,6 +309,8 @@ export interface StreamRule {
 }
 
 export interface StreamRuleDraft {
+  durationSeconds?: number;
+  countdownSeconds?: number;
   id?: number;
   name: string;
   enabled: boolean;

@@ -36,9 +36,11 @@ namespace Gilomx.CupheadBossRoulette
             new CreatorToolsInteractionQueue();
         private readonly CreatorToolsPeskyModeSettings peskySettings;
         private readonly CreatorToolsPeskyPacing peskyPacing = new CreatorToolsPeskyPacing();
+        private readonly CreatorToolsChallengePacing peskyChallengePacing = new CreatorToolsChallengePacing();
         private readonly CreatorToolsInteractionPacingSettings interactionPacingSettings;
         private readonly CreatorToolsPeskyPacing interactionPacing = new CreatorToolsPeskyPacing();
         private readonly BaronessMiniBossInteractionExecutor miniBossExecutor;
+        private readonly TimedChallengeInteractionExecutor timedChallenges;
         private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly CreatorToolsPeskyBattleController peskyBattle;
         private readonly CreatorToolsTapFarmingController tapFarming;
@@ -74,6 +76,7 @@ namespace Gilomx.CupheadBossRoulette
             string pluginConfigPath,
             Func<bool> canPreloadNativeAssets,
             Func<bool> canSpawnInteraction,
+            TimedChallengeInteractionExecutor timedChallenges,
             Func<int> getMaximumActive,
             Action<int> setMaximumActive,
             Func<int> getMaximumMiniBosses,
@@ -92,6 +95,7 @@ namespace Gilomx.CupheadBossRoulette
             Action<string> logWarning)
         {
             this.logInfo = logInfo;
+            this.timedChallenges = timedChallenges;
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
             this.setMaximumActive = setMaximumActive;
@@ -111,8 +115,10 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsDonorLabel.SetGiftImagesVisible(ShowGiftImage);
             peskySettings = CreatorToolsPeskyModeSettings.Load(
                 pluginConfigPath, logWarning);
+            peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             interactionPacingSettings = CreatorToolsInteractionPacingSettings.Load(pluginConfigPath, logWarning);
             liveEvents = new CreatorToolsLiveEventsCoordinator();
+            executors.Add(timedChallenges);
             executors.Add(new ZeppelinInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
                 logInfo, logWarning));
@@ -279,6 +285,9 @@ namespace Gilomx.CupheadBossRoulette
             }
             ProcessReadyQueues(
                 canDispatchInteractions, canDispatchPesky);
+            // Earned challenges have first opportunity. The free challenge
+            // clock is independent of actor availability and dispatch gaps.
+            UpdatePeskyChallenges(gameplayDispatchAllowed);
             peskyBattle.Update(
                 server, gameplayAvailable, gameplayDispatchAllowed);
             tapFarming.Update(server, gameplayLevelActive);
@@ -474,7 +483,9 @@ namespace Gilomx.CupheadBossRoulette
             string donor,
             string giftImagePath,
             int quantity,
-            out string feedbackCode)
+            out string feedbackCode,
+            int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration,
+            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown)
         {
             if (!InteractionsEnabled)
             {
@@ -493,7 +504,7 @@ namespace Gilomx.CupheadBossRoulette
             donor = NormalizeDonor(donor);
             var added = interactionQueue.Enqueue(
                 item, donor, giftImagePath, quantity, 0f,
-                CreatorToolsInteractionSource.Stream);
+                CreatorToolsInteractionSource.Stream, durationSeconds, countdownSeconds);
             lastItem = item ?? string.Empty;
             if (added <= 0)
             {
@@ -567,10 +578,12 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void SuspendGameplayLevel()
         {
+            timedChallenges.EndGameplayLevel();
             gameplayLevelActive = false;
             gameplayAvailabilityObserved = false;
             peskyQueue.Clear();
             peskyPacing.Reset();
+            peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             interactionPacing.Reset();
             nextAnyDispatchAt = -1f;
             nextInteractionDispatchAt = -1f;
@@ -583,12 +596,14 @@ namespace Gilomx.CupheadBossRoulette
         {
             var cleared = CreatorToolsInteractionPresentation
                 .ClearActiveActorsForPhaseTransition();
-            interactionQueue.ClearActive();
-            peskyQueue.Clear();
+            interactionQueue.ClearActive(true);
+            peskyQueue.ClearActive(true);
+            peskyQueue.ClearPending();
             peskyBattle.OnPhaseTransition();
             tapFarming.OnPhaseTransition();
             for (var i = 0; i < executors.Count; i++)
-                executors[i].EndGameplayLevel();
+                if (executors[i] != timedChallenges)
+                    executors[i].EndGameplayLevel();
             peskyPacing.ResetInterval();
             nextAnyDispatchAt = -1f;
             nextInteractionDispatchAt = -1f;
@@ -744,7 +759,33 @@ namespace Gilomx.CupheadBossRoulette
         private void ProcessPeskyCommand(
             Dictionary<string, string> values)
         {
-            if (values.ContainsKey("minimumInterval") ||
+            if (values.ContainsKey("challengeDurationSeconds") || values.ContainsKey("challengeCountdownSeconds") ||
+                values.ContainsKey("challengeWaitSeconds"))
+            {
+                int duration, countdown, wait;
+                string durationToken, countdownToken, waitToken;
+                if (!values.TryGetValue("challengeDurationSeconds", out durationToken))
+                    durationToken = peskySettings.ChallengeDurationSeconds.ToString(CultureInfo.InvariantCulture);
+                if (!values.TryGetValue("challengeCountdownSeconds", out countdownToken))
+                    countdownToken = peskySettings.ChallengeCountdownSeconds.ToString(CultureInfo.InvariantCulture);
+                if (!values.TryGetValue("challengeWaitSeconds", out waitToken))
+                    waitToken = peskySettings.ChallengeWaitSeconds.ToString(CultureInfo.InvariantCulture);
+                if (!CreatorToolsTimedChallenge.TryDuration(durationToken, out duration) ||
+                    !CreatorToolsTimedChallenge.TryCountdown(countdownToken, out countdown) ||
+                    !CreatorToolsChallengePacing.TryWait(waitToken, out wait))
+                    SetPeskyFeedback("invalid_setting", true);
+                else
+                {
+                    peskySettings.ChallengeDurationSeconds = duration;
+                    peskySettings.ChallengeCountdownSeconds = countdown;
+                    if (peskySettings.ChallengeWaitSeconds != wait)
+                        peskyChallengePacing.Reset(wait);
+                    peskySettings.ChallengeWaitSeconds = wait;
+                    peskySettings.Save();
+                    SetPeskyFeedback("items_saved", false);
+                }
+            }
+            else if (values.ContainsKey("minimumInterval") ||
                 values.ContainsKey("maximumInterval"))
                 SetPeskyIntervals(values);
             else if (values.ContainsKey("names"))
@@ -853,6 +894,8 @@ namespace Gilomx.CupheadBossRoulette
                 peskySettings.DisabledItems.Remove(item);
             else
                 peskySettings.DisabledItems.Add(item);
+            if (IsTimedChallenge(item))
+                peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             if (peskySettings.Enabled && peskySettings.EnabledItemCount == 0)
             {
                 peskySettings.Enabled = false;
@@ -885,7 +928,8 @@ namespace Gilomx.CupheadBossRoulette
             var plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(
                 CreatorToolsInteractionIds.All, peskyPacing.MiniBossReady,
                 peskyPacing.IntervalReady && peskyQueue.PendingCount == 0 &&
-                    peskyQueue.ActiveCount < MaximumActive, peskySettings.IsItemEnabled,
+                    ActiveActorCount(peskyQueue) < MaximumActive,
+                delegate(string item) { return !IsTimedChallenge(item) && peskySettings.IsItemEnabled(item); },
                 IsItemAvailable, CanSelectPeskyItem, HasWaitingInteractionMiniBoss());
             peskyMiniBossReserved = plan.MiniBossReserved;
             if (plan.MiniBossReserved)
@@ -902,7 +946,7 @@ namespace Gilomx.CupheadBossRoulette
                     peskyQueue.Reject(obsolete);
                     InvalidateState();
                 }
-                if (chosen == null && peskyQueue.ActiveCount < MaximumActive &&
+                if (chosen == null && ActiveActorCount(peskyQueue) < MaximumActive &&
                     CanSelectPeskyItem(miniBosses[0]))
                     EnqueuePeskyItem(miniBosses[UnityEngine.Random.Range(0, miniBosses.Count)]);
                 return;
@@ -923,7 +967,7 @@ namespace Gilomx.CupheadBossRoulette
                 InvalidateState();
             }
             if (!peskyPacing.IntervalReady || peskyQueue.PendingCount > 0 ||
-                peskyQueue.ActiveCount >= MaximumActive)
+                ActiveActorCount(peskyQueue) >= MaximumActive)
                 return;
 
             var availableItems = plan.Candidates;
@@ -934,7 +978,7 @@ namespace Gilomx.CupheadBossRoulette
             availableItems.RemoveAll(delegate(string item)
                 { return CreatorToolsInteractionGroups.ForItem(item) != group; });
             var quantity = Math.Min(SampleBatchSize(group, true),
-                MaximumActive - peskyQueue.ActiveCount);
+                MaximumActive - ActiveActorCount(peskyQueue));
             if (peskyPacing.MiniBossPresent)
                 quantity = Math.Min(quantity, Math.Max(0,
                     peskySettings.MaximumCompanionsDuringMiniBoss - CountActiveCompanions()));
@@ -948,6 +992,36 @@ namespace Gilomx.CupheadBossRoulette
                 if (FindExecutor(item) is ICreatorToolsExclusiveInteractionExecutor)
                     availableItems.Remove(item);
             }
+        }
+
+        private void UpdatePeskyChallenges(bool gameplayDispatchAllowed)
+        {
+            var enabled = peskySettings.Enabled && peskySettings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage);
+            var playing = enabled && gameplayDispatchAllowed && timedChallenges.GameplayAvailable;
+            peskyChallengePacing.Advance(Time.deltaTime, playing, timedChallenges.Busy,
+                peskySettings.ChallengeWaitSeconds);
+            if (!playing || !peskyChallengePacing.Ready ||
+                !timedChallenges.IsAvailable(CreatorToolsTimedChallenge.HalfDamage)) return;
+            // Never build a free backlog. Queue and activate a single entry in
+            // this update so actor reservations cannot discard its warning.
+            EnqueuePeskyItem(CreatorToolsTimedChallenge.HalfDamage);
+            var entry = peskyQueue.Peek(delegate(CreatorToolsInteractionQueue.Entry candidate)
+                { return IsTimedChallenge(candidate.Item); });
+            if (entry == null) return;
+            if (TryDispatchEntry(peskyQueue, entry, true))
+                peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
+            else
+                peskyQueue.Reject(entry);
+        }
+
+        private static bool IsTimedChallenge(string item)
+        {
+            return CreatorToolsInteractionGroups.ForItem(item) == CreatorToolsInteractionGroups.Challenge;
+        }
+
+        private static int ActiveActorCount(CreatorToolsInteractionQueue queue)
+        {
+            return queue.ActiveCount - queue.ActiveCountMatching(IsTimedChallenge);
         }
 
         internal bool NativeAssetsSettled
@@ -969,7 +1043,8 @@ namespace Gilomx.CupheadBossRoulette
                     0, peskySettings.Names.Count)];
             if (peskyQueue.Enqueue(
                     item, name, string.Empty, 1, 0f,
-                    CreatorToolsInteractionSource.Pesky) <= 0)
+                    CreatorToolsInteractionSource.Pesky,
+                    peskySettings.ChallengeDurationSeconds, peskySettings.ChallengeCountdownSeconds) <= 0)
                 return;
 
             lastItem = item;
@@ -1014,12 +1089,13 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool IsCommonInteraction(string item)
         {
-            return !miniBossExecutor.Supports(item);
+            return !miniBossExecutor.Supports(item) && !IsTimedChallenge(item);
         }
 
         private void ResetPeskySchedule()
         {
             peskyPacing.ResetInterval();
+            peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             nextPeskyDispatchAt = -1f;
             InvalidateState();
         }
@@ -1039,7 +1115,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private int SampleBatchSize(string group, bool pesky)
         {
-            if (group == CreatorToolsInteractionGroups.MiniBoss ||
+            if (group == CreatorToolsInteractionGroups.Challenge ||
+                group == CreatorToolsInteractionGroups.MiniBoss ||
                 (pesky && group == CreatorToolsInteractionGroups.Strong &&
                  !peskySettings.AllowConcurrentStrongInteractions))
                 return 1;
@@ -1078,6 +1155,16 @@ namespace Gilomx.CupheadBossRoulette
             }
             lastItem = item;
 
+            int duration, countdown;
+            string durationToken, countdownToken;
+            values.TryGetValue("durationSeconds", out durationToken);
+            values.TryGetValue("countdownSeconds", out countdownToken);
+            if (!CreatorToolsTimedChallenge.TryDuration(durationToken, out duration) ||
+                !CreatorToolsTimedChallenge.TryCountdown(countdownToken, out countdown))
+            {
+                SetInteractionFeedback("invalid_setting", true);
+                return 0;
+            }
             string donor;
             values.TryGetValue("donor", out donor);
             donor = NormalizeDonor(donor);
@@ -1094,7 +1181,7 @@ namespace Gilomx.CupheadBossRoulette
                 string.Empty,
                 requested,
                 ParseDelaySeconds(values),
-                CreatorToolsInteractionSource.Manual);
+                CreatorToolsInteractionSource.Manual, duration, countdown);
             if (added > 0)
             {
                 SetInteractionFeedback(
@@ -1222,7 +1309,15 @@ namespace Gilomx.CupheadBossRoulette
         private bool ProcessQueue(
             CreatorToolsInteractionQueue queue, bool pesky)
         {
-            if (queue.ActiveCount >= MaximumActive)
+            // Timed effects reserve their own single slot, never an actor
+            // slot or a mini-boss companion slot.
+            if (!pesky)
+            {
+                var challenge = queue.Peek(delegate(CreatorToolsInteractionQueue.Entry candidate)
+                    { return candidate.IsReady && IsTimedChallenge(candidate.Item) && CanDispatchEntry(candidate, false); });
+                if (challenge != null && TryDispatchEntry(queue, challenge, false)) return true;
+            }
+            if (ActiveActorCount(queue) >= MaximumActive)
                 return false;
 
             var now = Time.realtimeSinceStartup;
@@ -1237,7 +1332,7 @@ namespace Gilomx.CupheadBossRoulette
             Func<CreatorToolsInteractionQueue.Entry, bool> canDispatch =
                 delegate(CreatorToolsInteractionQueue.Entry candidate)
                 {
-                    return candidate.IsReady &&
+                    return candidate.IsReady && !IsTimedChallenge(candidate.Item) &&
                         CanDispatchEntry(candidate, pesky);
                 };
             if (pesky)
@@ -1279,7 +1374,7 @@ namespace Gilomx.CupheadBossRoulette
             var dispatched = CreatorToolsInteractionGroups.DispatchBatch(first, maximum,
                 delegate(CreatorToolsInteractionQueue.Entry entry)
                 {
-                    return queue.ActiveCount < MaximumActive &&
+                    return ActiveActorCount(queue) < MaximumActive &&
                         CanDispatchEntry(entry, pesky) &&
                         TryDispatchEntry(queue, entry, pesky);
                 },
@@ -1288,7 +1383,7 @@ namespace Gilomx.CupheadBossRoulette
                     // Keep the battle's existing reserved opportunity when a
                     // regular group reaches the shared queue's last slot.
                     if (!pesky && !battle &&
-                        queue.ActiveCount == MaximumActive - 1 &&
+                        ActiveActorCount(queue) == MaximumActive - 1 &&
                         queue.ActiveCountFor(CreatorToolsInteractionSource.PeskyBattle) == 0 &&
                         queue.Peek(delegate(CreatorToolsInteractionQueue.Entry candidate)
                         {
@@ -1337,14 +1432,14 @@ namespace Gilomx.CupheadBossRoulette
             if (regularEntry == null)
                 return battleEntry;
 
-            var remainingCapacity = MaximumActive - queue.ActiveCount;
+            var remainingCapacity = MaximumActive - ActiveActorCount(queue);
             if (remainingCapacity == 1)
             {
                 // Do not let either lane consume the final slot while only
                 // the other lane is represented among active entries.
                 var activeBattle = queue.ActiveCountFor(
                     CreatorToolsInteractionSource.PeskyBattle);
-                var activeRegular = queue.ActiveCount - activeBattle;
+                var activeRegular = ActiveActorCount(queue) - activeBattle;
                 if (activeBattle == 0 && activeRegular > 0)
                     return battleEntry;
                 if (activeRegular == 0 && activeBattle > 0)
@@ -1376,12 +1471,17 @@ namespace Gilomx.CupheadBossRoulette
             ICreatorToolsInteractionHandle handle;
             string feedbackCode;
             string error;
-            if (executor.TrySpawn(
+            var timedExecutor = executor as ICreatorToolsTimedInteractionExecutor;
+            var spawned = timedExecutor != null
+                ? timedExecutor.TrySpawn(entry.Item, entry.Donor, entry.GiftImagePath,
+                    entry.DurationSeconds, entry.CountdownSeconds, out handle, out feedbackCode, out error)
+                : executor.TrySpawn(
                 entry.Item,
                 entry.Donor,
                 entry.GiftImagePath,
                 out handle,
-                out feedbackCode, out error))
+                out feedbackCode, out error);
+            if (spawned)
             {
                 queue.Activate(entry, handle);
                 InvalidateState();
@@ -1391,7 +1491,7 @@ namespace Gilomx.CupheadBossRoulette
                         ? "Ejecutando ataque de Batalla Molestosa #"
                         : pesky ? "Ejecutando ataque molesto #"
                         : "Ejecutando canje #") + entry.Id + " de " +
-                        entry.Donor + ".");
+                        entry.Donor + " (" + entry.Item + ").");
                 return true;
             }
 
@@ -1437,6 +1537,8 @@ namespace Gilomx.CupheadBossRoulette
                 return peskyBattle.Active;
             if (!InteractionsEnabled || queuePaused)
                 return false;
+            if (IsTimedChallenge(entry.Item))
+                return entry.Source != CreatorToolsInteractionSource.Stream || peskyBattle.StreamAttacksAllowed;
             // Never reject an earned redemption for pacing. It remains queued,
             // and eligible siblings (including Battle) may still advance.
             if (!interactionPacing.CanDispatchInteraction(interactionPacingSettings.Enabled,
@@ -1644,6 +1746,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(CreatorToolsPeskyModeSettings.DefaultMaximumCompanionsDuringMiniBoss);
             peskySettings.AppendSpawnSettingsJson(builder);
             peskySettings.AppendSpawnSettingsJson(builder, true);
+            builder.Append(",\"challengeDurationSeconds\":").Append(peskySettings.ChallengeDurationSeconds);
+            builder.Append(",\"challengeCountdownSeconds\":").Append(peskySettings.ChallengeCountdownSeconds);
+            builder.Append(",\"challengeWaitSeconds\":").Append(peskySettings.ChallengeWaitSeconds);
             builder.Append(",\"names\":[");
             for (var i = 0; i < peskySettings.Names.Count; i++)
             {

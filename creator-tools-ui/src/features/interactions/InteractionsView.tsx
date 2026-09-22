@@ -17,6 +17,8 @@ export function InteractionsView() {
   const [donors, setDonors] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [delays, setDelays] = useState<Record<string, number>>({});
+  const [durations, setDurations] = useState<Record<string, number>>({});
+  const [countdowns, setCountdowns] = useState<Record<string, number>>({});
   const [testingItem, setTestingItem] = useState<string | null>(null);
   const [category, setCategory] = useState<InteractionCategoryFilter>("all");
   const visibleItems = interactionItems.filter((item) =>
@@ -102,9 +104,12 @@ export function InteractionsView() {
                   const donor = donors[item.id] ?? "";
                   const quantity = quantities[item.id] ?? 1;
                   const delay = delays[item.id] ?? 0;
+                  const duration = durations[item.id] ?? 15;
+                  const countdown = countdowns[item.id] ?? 3;
                   const canQueue = (interaction?.ready ?? false) &&
                     (interaction?.interactionsEnabled ?? false) &&
-                    donor.trim().length > 0;
+                    donor.trim().length > 0 && Number.isInteger(duration) && duration >= 1 && duration <= 120 &&
+                    Number.isInteger(countdown) && countdown >= 0 && countdown <= 30;
                   return (
                     <tr key={item.id}>
                       <td>
@@ -115,6 +120,20 @@ export function InteractionsView() {
                       </td>
                       <td>
                         <div className="interaction-test-fields">
+                          {item.group === "challenge" ? (
+                            <>
+                            <label>
+                              <span>{t("interactions.challenges.countdown")}</span>
+                              <input type="number" min={0} max={30} step={1} value={countdown}
+                                onChange={(event) => setCountdowns((current) => ({ ...current, [item.id]: Number(event.target.value) }))} />
+                            </label>
+                            <label>
+                              <span>{t("interactions.challenges.duration")}</span>
+                              <input type="number" min={1} max={120} step={1} value={duration}
+                                onChange={(event) => setDurations((current) => ({ ...current, [item.id]: Number(event.target.value) }))} />
+                            </label>
+                            </>
+                          ) : null}
                           <label>
                             <span>{t("interactions.test.donorLabel")}</span>
                             <input
@@ -167,7 +186,7 @@ export function InteractionsView() {
                               disabled={!canQueue}
                               onClick={() => {
                                 setTestingItem(item.id);
-                                testInteraction(item.id, donor, quantity, delay);
+                                testInteraction(item.id, donor, quantity, delay, duration, countdown);
                               }}
                             >
                               {interactionTesting && testingItem === item.id

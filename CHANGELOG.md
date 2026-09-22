@@ -2,6 +2,50 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El remitente del reto temporal se muestra en mayúsculas y al mismo tamaño
+  que su título. **Reto en camino** y la cuenta regresiva pasan a la parte
+  superior central; cada número reproduce el clic nativo del selector de
+  equipo. Al perder se conserva el HUD con el tiempo congelado, dentro de la
+  capa de derrota; reintentar o salir limpia la presentación.
+- Modo Molestoso incorpora **Espera entre retos**, 5 segundos por defecto,
+  configurable de 0 a 300. Los retos tienen su propio reloj: espera → cuenta
+  previa → reto → nueva espera. Ya no compiten en el sorteo de ataques ni
+  consumen cupos de actores o acompañantes del minijefe. El HUD temporal
+  reutiliza el canvas del reto de la ruleta y puede prepararse al entrar
+  directamente a un nivel, sin depender de la plantilla del menú del mapa.
+- El HUD de retos temporales usa la misma plantilla nativa, tipografía y tamaño
+  que el HUD del reto. Antes de activarse muestra **Reto en camino** arriba y centrado
+  y una cuenta grande animada; después aparece el reto con su tiempo restante
+  en la parte superior central y el remitente debajo, al mismo tamaño. El aviso
+  previo dura 3 segundos por defecto, configurable de 0 a 30 por regla, prueba
+  manual o Modo Molestoso. Es independiente del descanso y no consume duración
+  del efecto. En Modo Molestoso usa el nombre aleatorio elegido, u omite esa
+  línea cuando no hay nombres. Tanto el aviso como el reto tienen entrada y
+  salida animadas; la pausa detiene toda la secuencia.
+- Primer reto temporal: **Daño a la mitad**, disponible en pruebas manuales,
+  reglas de stream y el grupo **Retos temporales** del Modo Molestoso. Duración
+  recomendada de 15 segundos, ajustable de 1 a 120; el modo automático y cada
+  regla guardan sus duraciones por separado. Empieza desmarcado, también al
+  actualizar ajustes antiguos. Sólo hay un reto temporal activo; el contador
+  se pausa con el juego, sobrevive a transiciones protegidas entre fases y se
+  cancela al terminar o abandonar el intento. Incluye aviso en juego y segundos
+  restantes en el panel. Conserva el reto de la partida y no vuelve a reducir
+  el daño si ya estaba equipado Daño a la mitad. Pendiente de balance en juego.
+- El despliegue Dev comprueba el destino físico del ZIP y evita la copia
+  privada de AppData que Windows puede usar para procesos iniciados desde
+  Codex/MSIX. Si detecta esa redirección, compila y publica mediante un proceso
+  independiente del mismo usuario, para que el launcher normal vea la entrega.
+- La Reliquia Maldita muestra su propio icono en el overlay y en el panel de
+  configuración. El selector de ruleta forzada y el overlay usan sus respectivas
+  imágenes proporcionadas por el usuario. La Reliquia Divina conserva
+  su imagen existente. Antes ambas entradas apuntaban a la Divina.
+- Estado de la actualización en desarrollo, confirmado el 2026-09-22: todos
+  los retos implementados y Creator Tools están habilitados. RGB, pantalla
+  invertida, HP.1, Lluvia de tinta y Daño -50% participan normalmente en el
+  catálogo. Las notas de desactivación de entradas históricas corresponden a
+  publicaciones anteriores que excluyeron esos cambios; no son pendientes de
+  reactivación de esta rama. Los selectores para forzar pruebas permanecen
+  apagados. Esta aclaración documental no modifica el comportamiento del mod.
 - Las entradas y salidas de la Baronesa y Fósforo Sombrío avanzan ahora con más
   calma: ambos usan 20 frames para cada recorrido. El dragón queda además 27%
   fuera del borde derecho para mostrar menos cuerpo. Los instantes de

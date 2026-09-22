@@ -11,6 +11,11 @@ terminar el giro, el mod equipa el resultado y carga directamente el combate.
 
 Consulta [CHANGELOG.md](CHANGELOG.md) para ver el historial de cambios.
 
+Este checkout corresponde a una **nueva actualización en desarrollo**. Todos
+los retos implementados del catálogo y Creator Tools están habilitados. Las
+notas antiguas que dejaban RGB, pantalla invertida, HP.1 o Daño -50% desactivados
+corresponden a una publicación anterior que salió sin esos cambios.
+
 Para extender los indicadores durante una pelea, consulta
 [HUD_INTEGRATION.md](HUD_INTEGRATION.md) antes de modificar las capas o el layout.
 

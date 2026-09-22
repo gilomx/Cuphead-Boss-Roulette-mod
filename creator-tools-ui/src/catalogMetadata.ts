@@ -71,7 +71,7 @@ const charmMeta: OptionMeta[] = [
   ["charm_health_up_2", "charms/corazondoble.png"],
   ["charm_parry_attack", "charms/afiladora.png"],
   ["charm_chalice", "charms/galletitaastral.png"],
-  ["charm_curse_0", "charms/reliquiadivina.png"],
+  ["charm_curse_0", "creator-tools/charms/reliquiamaldita-panel.png"],
   ["charm_curse_4", "charms/reliquiadivina.png"],
   ["charm_healer", "charms/anillocorazon.png"],
   ["None", "creator-tools/empty.png"],

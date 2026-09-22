@@ -5,7 +5,7 @@ import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { PeskyBattleParticipant } from "../../model";
-import { interactionItems } from "../interactions/interactionCatalog";
+import { interactionItems as allInteractionItems } from "../interactions/interactionCatalog";
 
 const BATTLE_CAPACITY = 5;
 
@@ -36,6 +36,8 @@ function participantsBySlot(participants: PeskyBattleParticipant[]) {
   }
   return slots;
 }
+
+const interactionItems = allInteractionItems.filter((item) => item.group !== "challenge");
 
 export function PeskyBattlePanel() {
   const {

@@ -189,7 +189,7 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
             <tbody>
               {queue.map((entry, index) => {
                 const item = interactionItemFor(entry.item);
-                const displayStatus = entry.status === "queued" && !available
+                const displayStatus = entry.countingDown ? "countdown" : entry.status === "queued" && !available
                   ? "waiting_game"
                   : entry.status;
                 return (
@@ -205,6 +205,7 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
                     <td>
                       <span className="queue-status" data-status={displayStatus}>
                         {t(`interactions.queue.${displayStatus}`)}
+                        {entry.countingDown ? ` · ${entry.countdownRemaining ?? 0} s` : entry.remainingSeconds !== undefined ? ` · ${entry.remainingSeconds} s` : ""}
                       </span>
                     </td>
                   </tr>

@@ -230,6 +230,7 @@ namespace Gilomx.CupheadBossRoulette
         private ModifierId activeChallenge = ModifierId.None;
         private int activeChallengeBoss = -1;
         private bool loggedHalfDamageSample;
+        private TimedChallengeInteractionExecutor timedChallengeInteractions;
         private float blackAndWhiteBlend;
         private float blackAndWhiteTransitionStartedAt = -1f;
         private float blackAndWhiteTransitionFrom;
@@ -341,6 +342,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OnModLanguageChanged()
         {
+            DestroyTimedChallengeHud();
             // Every visible string is resolved while drawing. Reset the one
             // cached native layout so its measured width is rebuilt too.
             nativeRoulettePromptLayoutToken = null;
@@ -2490,6 +2492,7 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin != null)
             {
+                plugin.ResetTimedChallengeHudForAttempt(true);
                 plugin.RestoreOriginalLoadouts(false);
                 plugin.EndBattleResultHudSession();
             }
@@ -3118,8 +3121,8 @@ namespace Gilomx.CupheadBossRoulette
             __state = ___damageMultiplier;
             var plugin = activeInstance;
             if (plugin == null ||
-                plugin.activeChallenge != ModifierId.HalfDamage ||
-                !plugin.ShouldShowActiveChallenge() ||
+                !((plugin.activeChallenge == ModifierId.HalfDamage && plugin.ShouldShowActiveChallenge()) ||
+                  (plugin.timedChallengeInteractions != null && plugin.timedChallengeInteractions.Active)) ||
                 (int)___playerId == int.MaxValue ||
                 !IsPlayerOffensiveDamageTarget(hit))
                 return;
@@ -3650,6 +3653,7 @@ namespace Gilomx.CupheadBossRoulette
             DestroyNativeChallengePrompt();
             DisposeManualChallengeEquipment();
             DestroyBattleResultHud();
+            DestroyTimedChallengeHud();
             CloseCreatorToolsMenu(false);
             ShutdownCreatorTools();
             ClearChallengeVisualRetryGate();

@@ -16,8 +16,8 @@ const view = readFileSync(
 const mockServer = readFileSync(resolve(uiRoot, "scripts", "mock-server.mjs"), "utf8");
 const groupsSource = readFileSync(resolve(repositoryRoot, "Interactions", "CreatorToolsInteractionGroups.cs"), "utf8");
 const runtimeGroups = new Map();
-for (const match of groupsSource.matchAll(/((?:\s*case "[^"]+":)+)\s*return (Light|Strong|MiniBoss);/g)) {
-  const group = { Light: "light", Strong: "strong", MiniBoss: "mini_boss" }[match[2]];
+for (const match of groupsSource.matchAll(/((?:\s*case "[^"]+":)+)\s*return (Light|Strong|MiniBoss|Challenge);/g)) {
+  const group = { Light: "light", Strong: "strong", MiniBoss: "mini_boss", Challenge: "challenge" }[match[2]];
   for (const item of match[1].matchAll(/case "([^"]+)":/g)) runtimeGroups.set(item[1], group);
 }
 const locales = ["es", "en"].map((locale) => ({
@@ -72,7 +72,7 @@ function validateTranslation(key) {
 for (const match of view.matchAll(/\{\s*id:\s*"([^"]+)"([\s\S]*?)\}/g)) {
   const [, id, fields] = match;
   const category = fields.match(/\bcategory:\s*"([^"]+)"/)?.[1];
-  if (category !== "attack" && category !== "mini_boss") {
+  if (category !== "attack" && category !== "mini_boss" && category !== "challenge") {
     throw new Error(`Unknown or missing category for ${id}: ${category}.`);
   }
   validateTranslation(`interactions.categories.${category}`);
@@ -87,7 +87,7 @@ for (const match of view.matchAll(/\{\s*id:\s*"([^"]+)"([\s\S]*?)\}/g)) {
     validateTranslation(key);
   }
   const image = fields.match(/\bimage:\s*"([^"]+)"/)?.[1];
-  if (!image || !/^\/assets\/creator-tools\/interactions\/[a-z0-9-]+\.png$/.test(image)) {
+  if (!image || !/^\/assets\/creator-tools\/(?:interactions|modifiers)\/[a-z0-9_-]+\.png$/.test(image)) {
     throw new Error(`Invalid local interaction preview for ${id}: ${image}.`);
   }
   const png = readFileSync(resolve(repositoryRoot, image.slice(1)));

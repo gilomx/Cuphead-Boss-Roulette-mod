@@ -2,22 +2,19 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal static class ExperimentalFeatures
     {
-        // Completed public-candidate challenge. Enabled for the combined
-        // five-challenge acceptance pass.
+        // Completed challenge, enabled normally in the new development update.
         internal static readonly bool EnableRgbShiftChallenge = true;
 
         // Development switch: while true, every challenge-enabled spin uses
         // RGB and keeps the compatible boss selection random.
         internal static readonly bool ForceRgbShiftChallengeForTesting = false;
 
-        // Completed flat 180-degree screen rotation challenge. Enabled for the
-        // combined five-challenge acceptance pass.
+        // Completed flat 180-degree rotation, enabled in the current update.
         internal static readonly bool EnableUpsideDownChallenge = true;
         internal static readonly bool ForceUpsideDownChallengeForTesting =
             false;
 
-        // HP.1 and its final animated art are complete. Enabled for the
-        // combined five-challenge acceptance pass.
+        // HP.1 and its final animated art are complete and enabled normally.
         internal static readonly bool EnableHpOneChallenge = true;
         internal static readonly bool ForceHpOneChallengeForTesting = false;
 
@@ -26,12 +23,11 @@ namespace Gilomx.CupheadBossRoulette
         internal static readonly bool EnableInkRainChallenge = true;
         internal static readonly bool ForceInkRainChallengeForTesting = false;
 
-        // Validated implementation with final animated art. Enabled for the
-        // combined five-challenge acceptance pass.
+        // Validated implementation with final animated art, enabled normally.
         internal static readonly bool EnableHalfDamageChallenge = true;
         internal static readonly bool ForceHalfDamageChallengeForTesting = false;
 
-        // Creator Tools development master switch.
+        // Creator Tools is enabled in the current development update.
         internal static readonly bool EnableCreatorTools = true;
 
         internal static bool IsChallengeEnabled(ModifierId id)

@@ -8,7 +8,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'LauncherDevPackage.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'LauncherDevEnvironment.psm1') -Force
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (Get-LauncherDeploymentPackageIdentity) {
+    Invoke-LauncherDeploymentOutsidePackage $repoRoot $CupheadDir $BootstrapZip
+    return
+}
 $cacheRoot = Join-Path $repoRoot '.deployment-cache'
 $null = [IO.Directory]::CreateDirectory($cacheRoot)
 
@@ -91,6 +96,16 @@ try {
     # Serialize builds/publications without interacting with Cuphead or the launcher.
     $lock = [IO.File]::Open((Join-Path $packageDirectory '.publish.lock'),
         [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try { $null = Assert-LauncherPhysicalPath $lock (Join-Path $packageDirectory '.publish.lock') }
+    catch {
+        # Child shells can inherit redirection without exposing a package name.
+        # The actual file handle is authoritative in that case.
+        if ($env:PICHI_LAUNCHER_UNPACKAGED_WORKER -eq '1') { throw }
+        $lock.Dispose()
+        $lock = $null
+        Invoke-LauncherDeploymentOutsidePackage $repoRoot $CupheadDir $BootstrapZip
+        return
+    }
     $null = [IO.Directory]::CreateDirectory($stage)
     if ($BootstrapZip) { $BootstrapZip = Resolve-LocalPath $BootstrapZip }
     else {
@@ -179,7 +194,11 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $temporaryZip, [IO.Compression.CompressionLevel]::Optimal, $false)
     $hash = (Get-FileHash -LiteralPath $temporaryZip -Algorithm SHA256).Hash
     Publish-DevPackage $temporaryZip $packagePath $manifest
+    $published = [IO.File]::OpenRead($packagePath)
+    try { $physicalPackage = Assert-LauncherPhysicalPath $published $packagePath }
+    finally { $published.Dispose() }
     [pscustomobject]@{ Package = $packagePath; Files = $manifest.Count; Sha256 = $hash;
+        PhysicalPackage = $physicalPackage;
         LauncherIntegration = 'Pending; package prepared for the next supported launch.' } | ConvertTo-Json
 }
 finally {

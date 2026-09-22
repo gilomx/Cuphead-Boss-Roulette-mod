@@ -1,6 +1,274 @@
 # La Pichi Ruleta - Project Handoff
 
-Current release: **La Pichi Ruleta 0.6.0**.
+Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
+
+## HUD temporal: tamaño, derrota y clic de cuenta previa (2026-09-22)
+
+El remitente usa la misma fuente y tamaño que el título, ahora en mayúsculas.
+El aviso **Reto en camino** también usa ese tamaño y se ancla arriba y centrado,
+en la misma posición del reto activo. La cifra conserva su tamaño grande (3×)
+debajo del aviso y su pulso animado. La espera independiente de 5 s no cambia.
+
+`CreatorToolsTimedChallengeHudState` conserva una copia de presentación en
+el prefijo de `_OnLose`, antes de que `_OnLevelEnd` libere las interacciones.
+Se verificó ese orden leyendo el IL de Cuphead, sin iniciar el juego. La copia
+retiene fase, segundos y remitente; no se avanza ni se usa para aplicar daño.
+Se muestra en el canvas persistente durante la transición de muerte y dentro
+del mismo `Background` de `LevelGameOverGUI` que usa la ruleta al aparecer el
+menú. Morir durante el aviso conserva la cifra silenciosamente; morir durante
+el descanso no recupera retos antiguos. Retry, reinicio desde pausa, salida al
+mapa, carga/destrucción del nivel y registro de un nuevo intento limpian el
+estado. El bloqueo de nuevo intento evita avisos durante el fundido de reinicio.
+
+La cuenta previa reproduce `menu_equipment_move`, el evento nativo usado por
+las tarjetas del selector de equipo (referencias comprobadas en la DLL local).
+Usa la función de sonido nativo existente, con `selection.wav` (0.209 s) a 0.45
+como respaldo. Sólo se emite una vez por número visible y revisión del reto;
+no suena durante pausa, derrota, salida del aviso ni con cuenta previa 0. Un
+frame lento no reproduce una ráfaga de números omitidos. No se añaden assets.
+
+Pruebas automatizadas: copia independiente tras liberar el efecto, aviso en
+derrota, limpieza y bloqueo de reinicio, ausencia de texto viejo en descanso,
+una señal por cifra, pausa/reanudación, siguiente reto y salto de frames. Todas
+pasan. Apariencia y volumen exactos quedan para prueba dentro de Cuphead.
+
+Build Release sin advertencias ni errores. Paquete Dev físico publicado con
+535 archivos; SHA256
+`2EB6AE7A97788DB24246DAE65879469CF74D7FE3B462F18E65712396B0A7DA3C`.
+Comprobante: `.deployment-cache/unpackaged-d667bb438dc1479fb2580b929593f0bf/`.
+
+## Espera propia y corrección de preparación del HUD (2026-09-22)
+
+El usuario reportó que dejó de ver el HUD tras el cambio de diseño. El registro
+real consultado no muestra excepciones ni despachos del reto; sus ajustes sí
+tienen Daño a la mitad seleccionado. Había dos dependencias problemáticas:
+el reto participaba en el sorteo común y su admisión exigía encontrar de nuevo
+la jerarquía exacta del menú de pausa del mapa, incluso existiendo un HUD válido.
+
+`TimedChallengeHud` ahora reutiliza el canvas y la fuente de `BattleResultHud`,
+con raíz independiente de la fila de ruleta. La preparación compartida puede
+usar `LevelHUD.Current.Canvas` si falta la jerarquía del menú. Los textos copian
+apariencia y contornos, sin clonar controladores de menú, animaciones ni estado
+oculto. Se restablecen rotación, profundidad y escala. Usa la capa persistente
+en juego, la capa nativa para retos de cámara y la capa interior en pausa.
+
+`CreatorToolsChallengePacing` introduce espera independiente, 5 s por defecto
+y 0–300 enteros. Campo **Espera entre retos (segundos)**, `challengeWaitSeconds`,
+esquema Molestoso 11; migración conserva selección, nombres y otros tiempos.
+Sólo avanza durante juego disponible; aviso, efecto y salida no gastan espera.
+Al terminar cualquier reto temporal se espera de nuevo antes del automático.
+Reiniciar/desactivar reinicia la espera. Los retos quedan fuera del sorteo,
+cupos y pausas de actores/minijefes; siguen siendo exclusivos entre fuentes.
+Los canjes listos tienen la primera oportunidad antes del reto gratuito.
+
+Pruebas de reloj, pausa, límites y persistencia pasan. Panel comprobado en
+navegador a 1440 y 390 px: valor inicial 5, guardado/recarga de los tres tiempos,
+validación y pruebas manuales/reglas de stream. Falta comprobación visual dentro
+de Cuphead: no se inicia el juego como parte del despliegue.
+
+Compilación final Release sin errores ni advertencias; paquete Dev de 535
+archivos publicado y ruta física verificada. SHA256
+`545F394102DA2BC19B0A3CF015894B2353002DD9598FA2F0411F190D61A35892`.
+Comprobante: `.deployment-cache/unpackaged-1e70ebb429724fec976582c1885a18e4/`.
+La DLL consultada antes de esta entrega sí coincidía con el paquete anterior
+del HUD nativo; se descarta que aquella prueba estuviera usando el HUD IMGUI.
+
+## HUD y aviso previo de retos temporales (2026-09-22)
+
+El usuario pidió diseñar esta presentación antes de incorporar más retos. Se
+retira el recuadro IMGUI provisional. `TimedChallengeHud.cs` crea textos UI a
+partir de la misma plantilla nativa que `BattleResultHud`, conservando fuente,
+material y efectos de contorno; el reto activo usa su tamaño base y opacidad.
+Se mantiene arriba y centrado, ahora con la etiqueta del reto, segundos activos
+y remitente al mismo tamaño debajo, en mayúsculas. Nombres sin rich text; la línea se oculta
+si está vacía. Modo Molestoso ya elige el nombre al encolar, y ese mismo valor se
+conserva durante el aviso y el efecto. No se inventa un donador para esa fuente.
+
+Secuencia: espera propia (5 s por defecto) → cuenta previa → salida del aviso (0.25 s)
+→ reto activo (entrada 0.28 s) → salida del reto (0.25 s). El aviso tiene
+**Reto en camino** al tamaño del título y el número a triple tamaño, arriba y centrados;
+cada cifra pulsa suavemente. El título activo entra con desplazamiento, escala
+y opacidad, sin recuadro. Los 15 segundos del efecto empiezan después de la
+salida del aviso; el efecto acaba antes de su propia salida visual.
+
+`CreatorToolsTimedChallenge` distingue reserva/presentación (`Busy`) de efecto
+(`Active`), para no aplicar daño durante la cuenta previa y no solapar avisos.
+Pausa, transiciones protegidas y falta de foco congelan también las animaciones.
+La cancelación borra todas las fases; una limpieza tardía no afecta al siguiente
+reto. El HUD debe poder prepararse antes de admitir el aviso y no escanea cada
+frame si temporalmente falta una plantilla nativa. Se destruye con el plugin y
+se reconstruye al cambiar el idioma.
+
+Cuenta previa de 3 segundos, entera de 0 a 30; 0 omite el aviso. Campo separado en
+Modo Molestoso, pruebas manuales y editor de reglas. Se conserva en backlog y
+cola, sin modificar el descanso ni la duración activa. Modo Molestoso esquema
+11 (`challengeCountdownSeconds`, `challengeWaitSeconds`), reglas esquema 4 (`countdownSeconds`); archivos
+anteriores reciben 3 segundos sin perder su duración ni su selección. La cola
+conserva el estado activo para su gestión e informa `countingDown` y
+`countdownRemaining` para mostrar **Reto en camino** en el panel.
+
+Pruebas automatizadas cubren reserva, ausencia de efecto durante aviso/salida,
+duración completa, pausa, cancelación, saltos de tiempo, omisión, validación y
+persistencia/transporte de ambos tiempos. Falta validar la apariencia exacta y
+el movimiento dentro de Cuphead; no se inicia el juego desde el despliegue.
+
+Panel comprobado en navegador (1440 y 390 px), incluidos guardado y recarga de
+ambos tiempos, límites y envío desde pruebas manuales/editor de reglas. Build
+Release: cero advertencias y errores. Paquete Dev físico publicado, 535 archivos,
+SHA256 `DBC554F02F6F178427201EE3788D4780CE1897F204E94C82B40BBA0AC2886593`.
+Comprobante: `.deployment-cache/unpackaged-6674877dda73455d922fad431783b6a0/`.
+
+## Retos temporales: primera entrega para probar (2026-09-22)
+
+El usuario eligió convertir los retos en interacciones y probarlos agregándolos
+progresivamente al Modo Molestoso. Primer reto: `challenge_half_damage`, dentro
+del grupo propio `challenge` / **Retos temporales**. Reutiliza la reducción de
+daño existente sin cambiar el reto base de la ruleta o equip card. Si el reto
+base ya es HalfDamage, los canjes esperan y el modo automático no lo selecciona.
+Otros retos base siguen funcionando; esta primera entrega no sustituye esos
+retos ni acumula dos multiplicadores de HalfDamage.
+
+- Duración inicial 15 segundos, entera entre 1 y 120. Es una propuesta para
+  balancear jugando, no un valor ya aprobado por pruebas de combate.
+- Modo Molestoso: casilla inicialmente apagada, incluso en ajustes migrados;
+  duración propia en `challengeDurationSeconds`, esquema 9. Participa en el
+  intervalo común y siempre sale uno. No cambia las cantidades leves/intensas.
+- Pruebas manuales y reglas de stream: duración por solicitud/regla, conservada
+  al pasar por backlog y cola. Reglas esquema 3; versiones 1/2 siguen leyendo
+  con 15 segundos como valor por omisión. Batalla Molestosa no incorpora retos.
+- Cuenta atrás en juego y colas del panel. Un temporizador compartido impide
+  solapamientos entre canjes y molestias automáticas. Pausa/falta de foco y
+  transiciones protegidas detienen el tiempo. Limpieza de actores durante una
+  transición preserva el reto; fin de intento, salida y descarte de su cola lo
+  cancelan. No necesita cargar actores ni texturas nativas nuevas.
+- Pruebas automatizadas: reloj, exclusión, limpieza tardía de otro intento,
+  validación, migración, persistencia y duración al canjear reglas. Panel probado
+  en navegador a 1440 y 390 px. Falta prueba real de daño y sensaciones en tierra,
+  avión, cooperativo, pausa, derrota/reintento y cambios de fase.
+
+Siguientes pasos tras la prueba del usuario: ajustar duración de HalfDamage e
+incorporar cada reto con sus propias reglas de compatibilidad y retirada. HP.1
+necesita definir cómo recuperar la vida. El reto Aleatorio y el rediseño completo
+de overlays siguen pendientes; no se implementaron en esta entrega.
+
+Entrega Dev de esta versión comprobada por el publicador independiente:
+535 archivos, Release sin advertencias ni errores, destino físico canónico.
+SHA256 `178B759D227AC016D903CA8A97FD60163EF9A0B36A37F88F06602739A7A33901`.
+Comprobante local: `.deployment-cache/unpackaged-0b7b4115d8874837a33256b9912b7fa0/`.
+No se inició ni interrumpió una partida para verificar esta entrega.
+
+## Icono exclusivo para el selector de ruleta forzada (2026-09-22)
+
+El usuario proporcionó una segunda imagen para la Reliquia Maldita, destinada
+específicamente al panel de control. Se conserva sin modificar en
+`assets/creator-tools/charms/reliquiamaldita-panel.png`; sólo la referencia
+`charm_curse_0` de `creator-tools-ui/src/catalogMetadata.ts` usa esa imagen.
+Se comprueban tanto la opción del desplegable como el icono al seleccionarla.
+
+El overlay mantiene el icono con marco en
+`assets/creator-tools/charms/reliquiamaldita.png`. El juego mantiene el sprite
+nativo y su PNG de respaldo en `assets/charms/reliquiamaldita.png`.
+El extractor de sprites no sobrescribe ninguna de las dos imágenes del usuario.
+
+Comprobado en navegador: el desplegable y la selección cargan la nueva imagen;
+el overlay conserva la anterior. Panel compilado y paquete Dev publicado en
+la ruta física real mediante el proceso independiente de MSIX: 535 archivos,
+Release sin advertencias ni errores. SHA256 del ZIP:
+`CABE06CF65B32DB942CAA7F2F6D52CE9D171DA58FAFD09FBE41A27478DAA4174`.
+El PNG del panel conserva el hash del archivo entregado por el usuario:
+`0F8DD5C1557F5517FAF97EE0B65AC01CD283347A698245917365910C5D4C9A80`.
+Comprobante local en
+`.deployment-cache/unpackaged-d5ebc429e34945cd8048f80442ba3f84/`.
+
+## Entrega Dev real: corrección de AppData virtualizado por MSIX (2026-09-22)
+
+El usuario no veía Dev y el Explorador no encontraba su carpeta. Las lecturas
+desde Codex y un launcher iniciado como hijo de Codex sí la detectaban, pero
+consultaban una copia privada bajo `Packages/<paquete de Codex>/LocalCache/Local`.
+Se confirmó con `GetFinalPathNameByHandle`; ni permisos ni cambiar de PC eran
+la causa. Los comprobantes anteriores hechos dentro de ese contexto no
+demostraban una entrega visible para el launcher abierto normalmente.
+
+`tools/deploy-launcher-dev.ps1` conserva el destino y procedimiento canónicos.
+Detecta la identidad MSIX y también la ruta física del bloqueo: los procesos
+hijos pueden heredar la redirección sin exponer nombre de paquete. En ese caso
+`LauncherDevEnvironment.psm1` y `run-launcher-dev-unpackaged.ps1` ejecutan el
+mismo despliegue mediante WMI en un proceso oculto, independiente y con el
+mismo SID. Los parámetros y resultados son JSON; se verifica la ruta física
+antes de publicar y al abrir el ZIP final. Los archivos privados de ajustes y
+catálogo no se copian sobre los del launcher normal.
+
+Entrega real: 534 archivos; SHA256
+`E91597D9ED1ED947B9519A702D3D78E9505D700ADDFBABFDC4535C6C00160CE2`.
+Compilación Release sin advertencias/errores, panel y companion compilados,
+17 pruebas del publicador aprobadas. El Explorador abrió el destino real y
+mostró `current.zip`. Se cerró únicamente el launcher de prueba iniciado desde
+Codex y se abrió el instalado desde el Explorador: Dev apareció en la segunda
+fila, a la derecha. Cuphead permaneció cerrado; no se comprobó el arranque del
+juego ni se modificó su instalación, runtime o catálogo manualmente.
+
+Log y respuesta de entrega, excluidos de Git:
+`.deployment-cache/unpackaged-84226d6ca4634ad194f3ffaec4ec4d26/`.
+El diagnóstico C# temporal se conserva bajo `.deployment-cache/`, excluido
+también de la compilación del mod; no poner proyectos C# en
+`installation-backups/`, donde el glob del proyecto principal los recogería.
+
+## Iconos separados de las reliquias (2026-09-22)
+
+La Reliquia Maldita y la Divina ya tenían grados y sprites nativos distintos
+en el juego, pero ambas apuntaban a `charms/reliquiadivina.png` en el overlay
+web y en los metadatos del panel. No había un PNG separado para la Maldita.
+
+Se exportó directamente `equip_icon_charm_curse_1_0001` del bundle local
+`atlas_equip_icons_dlc`, sin redibujarlo ni cambiar sus colores o tamaño.
+`tools/extract_native_cursed_relic_icon.py` permite repetir la extracción con
+UnityPy y Pillow, pasando `--bundle` o la variable `CUPHEAD_DIR`.
+El PNG nativo de 80 × 80 con transparencia está en
+`assets/charms/reliquiamaldita.png`, para el panel y el reemplazo del juego.
+Después, el usuario entregó un icono de 82 × 82 con el marco del resto del
+overlay: se conservó exactamente en
+`assets/creator-tools/charms/reliquiamaldita.png`. El extractor ya no escribe
+en esa carpeta para evitar sobrescribir el arte del usuario.
+
+`RouletteData.cs` y `creator-tools-ui/src/catalogMetadata.ts` apuntan ahora a
+la imagen de la Maldita. La Divina conserva sus dos imágenes existentes, sin
+modificación. El mock incluye ambas reliquias para poder comprobarlas juntas.
+No se cambió la selección ni el grado de la reliquia equipada.
+
+Validación: panel compilado y comprobación en navegador de ambas opciones,
+de la imagen seleccionada y de los dos estados del overlay, usando las rutas
+del catálogo real. Evidencia local, excluida de Git, en
+`installation-backups/relic-icons-20260922/`.
+
+Paquete Dev actualizado con el icono del usuario mediante
+`tools/deploy-launcher-dev.ps1`: 534 archivos,
+panel y companion compilados, DLL Release sin advertencias ni errores.
+SHA256: `14AFF09B53E088174B09208F6A16D0B501339B872EE1FDFBF163A01733433BCE`.
+Se verificaron los cuatro PNG dentro del ZIP; el icono del overlay coincide
+exactamente con el archivo entregado por el usuario
+(`3C917D3DD15CA85166A094B0EF2D864F0DC9CF7AEBE4D9B683974417B131B91C`).
+La comprobación en navegador volvió a pasar con la nueva imagen. No se inició
+Cuphead ni se modificó su instalación original. La publicación del ZIP no
+verifica la integración pendiente del launcher.
+
+## Estado vigente: nueva actualización con las funciones implementadas activas (2026-09-22)
+
+El usuario confirmó que la desactivación de los nuevos retos correspondía a
+una versión anterior que se publicó sin esos cambios. Esta rama ya desarrolla
+la siguiente actualización con todo lo implementado activo: RGB, pantalla
+invertida, HP.1, Lluvia de tinta y Daño -50%, además de Creator Tools. Los seis
+interruptores `Enable...` de `ExperimentalFeatures.cs` están en `true`.
+Modo tieso también forma parte del catálogo normal.
+
+Los selectores `Force...ForTesting` siguen en `false`; esto evita resultados
+forzados de prueba y no desactiva ninguna de esas funciones. No registrar su
+reactivación como trabajo pendiente. Las regresiones y comprobaciones visuales
+son verificaciones separadas; estar activo no implica cerrar pruebas sin evidencia.
+
+Las secciones antiguas de este historial que dicen `dormant`, `disabled` o
+`Enable...Challenge = false` describen el estado de aquella versión o sesión
+de desarrollo. Se conservan como antecedentes y no prevalecen sobre este
+estado vigente. Las propuestas aún no implementadas siguen en `FUTURE_IDEAS.md`.
 
 ## Despliegue Dev mediante el launcher (2026-09-12)
 

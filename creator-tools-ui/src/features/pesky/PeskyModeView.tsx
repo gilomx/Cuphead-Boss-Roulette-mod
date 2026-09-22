@@ -3,6 +3,7 @@ import { useConfig } from "../../config/ConfigContext";
 import { interactionItemFor, interactionItems } from "../interactions/interactionCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { PeskyIntervalPanel } from "./PeskyIntervalPanel";
+import { PeskyChallengesPanel } from "./PeskyChallengesPanel";
 
 function validNames(value: string) {
   const seen = new Set<string>();
@@ -56,7 +57,7 @@ export function PeskyModeView() {
   const normalizedNames = useMemo(() => validNames(namesDraft), [namesDraft]);
   const disabledItems = new Set(pesky?.disabledItems ?? []);
   const enabledItemCount = interactionItems.filter(
-    (item) => !disabledItems.has(item.id),
+    (item) => (pesky?.items ?? []).includes(item.id) && !disabledItems.has(item.id),
   ).length;
   const blockedByPeskyBattle = pesky?.blockedByPeskyBattle ?? false;
   const canEnable = (pesky?.ready ?? false) &&
@@ -211,7 +212,7 @@ export function PeskyModeView() {
                 <tbody>
                   {queue.map((entry, index) => {
                     const item = interactionItemFor(entry.item);
-                    const displayStatus = entry.status === "queued" && !pesky?.available
+                    const displayStatus = entry.countingDown ? "countdown" : entry.status === "queued" && !pesky?.available
                       ? "waiting_game"
                       : entry.status;
                     return (
@@ -227,6 +228,7 @@ export function PeskyModeView() {
                         <td>
                           <span className="queue-status" data-status={displayStatus}>
                             {t(`pesky.queue.${displayStatus}`)}
+                            {entry.countingDown ? ` · ${entry.countdownRemaining ?? 0} s` : entry.remainingSeconds !== undefined ? ` · ${entry.remainingSeconds} s` : ""}
                           </span>
                         </td>
                       </tr>
@@ -240,6 +242,7 @@ export function PeskyModeView() {
 
         <div className="interaction-workspace__tools">
         <PeskyIntervalPanel />
+        <PeskyChallengesPanel />
         <section className="interaction-panel pesky-names" aria-labelledby="pesky-names-title">
           <div className="interaction-panel__heading">
             <div>
@@ -294,10 +297,11 @@ export function PeskyModeView() {
               <h2 id="pesky-attacks-title">{t("pesky.attacks.title")}</h2>
               <p>{t("pesky.attacks.description")}</p>
             </div>
-            <span className="interaction-count">{enabledItemCount}</span>
+            <span className="interaction-count">{interactionItems.filter((item) =>
+              item.group !== "challenge" && !disabledItems.has(item.id)).length}</span>
           </div>
           <div className="pesky-attack-list">
-            {interactionItems.map((item) => {
+            {interactionItems.filter((item) => item.group !== "challenge").map((item) => {
               const enabled = !disabledItems.has(item.id);
               return (
                 <label className="pesky-attack" data-enabled={enabled} key={item.id}>

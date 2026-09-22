@@ -22,6 +22,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string BaronessWaffle = "baroness_waffle";
         internal const string BaronessCandyCorn = "baroness_candy_corn";
         internal const string BaronessJawbreaker = "baroness_jawbreaker";
+        internal const string HalfDamageChallenge = "challenge_half_damage";
 
         internal static readonly string[] All =
         {
@@ -41,7 +42,8 @@ namespace Gilomx.CupheadBossRoulette
             BaronessGumball,
             BaronessWaffle,
             BaronessCandyCorn,
-            BaronessJawbreaker
+            BaronessJawbreaker,
+            HalfDamageChallenge
         };
     }
 
@@ -67,6 +69,19 @@ namespace Gilomx.CupheadBossRoulette
     internal interface ICreatorToolsExclusiveInteractionExecutor
     {
         bool BlocksConcurrentSpawn(string item);
+    }
+
+    internal interface ICreatorToolsTimedInteractionExecutor
+    {
+        bool TrySpawn(string item, string donor, string giftImagePath, int duration, int countdown,
+            out ICreatorToolsInteractionHandle handle, out string feedbackCode, out string error);
+    }
+
+    internal interface ICreatorToolsTimedInteractionHandle
+    {
+        int SecondsRemaining { get; }
+        bool CountingDown { get; }
+        int CountdownSecondsRemaining { get; }
     }
 
     internal interface ICreatorToolsLevelRestrictedInteractionExecutor

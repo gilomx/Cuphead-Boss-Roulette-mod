@@ -17,6 +17,9 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin != null)
             {
+                // _OnLose calls _OnLevelEnd next, which releases gameplay
+                // leases. Preserve only presentation before that cleanup.
+                plugin.HoldTimedChallengeHudAfterDefeat(__instance);
                 if (plugin.creatorToolsInteractions != null)
                     plugin.creatorToolsInteractions
                         .PeskyBattleLevelDefeated(__instance);
@@ -143,6 +146,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PrepareChallengeVisualsForPauseExit()
         {
+            ResetTimedChallengeHudForAttempt(true);
             if (activeChallenge != ModifierId.UpsideDown)
                 return;
 
@@ -154,6 +158,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PrepareChallengeVisualsForDefeatExit()
         {
+            ResetTimedChallengeHudForAttempt(true);
             if (activeChallenge != ModifierId.UpsideDown)
                 return;
 

@@ -1,10 +1,19 @@
-export const interactionCategories = ["attack", "mini_boss"] as const;
+export const interactionCategories = ["attack", "mini_boss", "challenge"] as const;
 export type InteractionCategory = typeof interactionCategories[number];
-export const interactionGroups = ["light", "strong", "mini_boss"] as const;
+export const interactionGroups = ["light", "strong", "mini_boss", "challenge"] as const;
 export type InteractionGroup = typeof interactionGroups[number];
 export type InteractionCategoryFilter = "all" | InteractionGroup;
 
 export const interactionItems = [
+  {
+    id: "challenge_half_damage",
+    category: "challenge",
+    group: "challenge",
+    titleKey: "interactions.challenges.halfDamage",
+    imageAltKey: "interactions.challenges.halfDamage",
+    typeKey: "interactions.groups.challenge",
+    image: "/assets/creator-tools/modifiers/halfdamage_01.png",
+  },
   {
     id: "hilda_green_zeppelin",
     category: "attack",

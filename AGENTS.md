@@ -6,6 +6,12 @@ deben conservarse: [docs/launcher-dev-deployment.md](docs/launcher-dev-deploymen
 - Usa `pwsh -NoProfile -File ./tools/deploy-launcher-dev.ps1` para compilar y
   publicar el paquete completo. Versiona el script, sus pruebas y estas
   instrucciones; excluye ZIP, cachés y configuración específica de cada PC.
+- Desde aplicaciones MSIX, el script deriva la compilación y entrega a un
+  proceso independiente del mismo usuario para evitar AppData virtualizado.
+  Conserva esa detección y la comprobación de rutas físicas. Una lectura desde
+  Codex o abrir el launcher como hijo de Codex no demuestra por sí solo que
+  la entrega sea visible fuera de su contexto. No copiar catálogos ni ajustes
+  de la copia privada sobre los datos reales del usuario.
 - El único destino Dev es `%LOCALAPPDATA%\CupheadModLauncher\dev\pichi-ruleta\current.zip`.
   Calcúlalo exactamente así en PowerShell:
 

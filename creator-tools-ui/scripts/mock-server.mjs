@@ -163,7 +163,10 @@ function pacingCandidate(params, current, prefix = "") {
   return candidate;
 }
 let peskyNames = [];
-let peskyDisabledItems = [];
+let peskyDisabledItems = ["challenge_half_damage"];
+let peskyChallengeDurationSeconds = 15;
+let peskyChallengeCountdownSeconds = 3;
+let peskyChallengeWaitSeconds = 5;
 let peskyBattleRevision = 0;
 let peskyBattlePhase = "off";
 let peskyBattleSessionId = 0;
@@ -378,6 +381,7 @@ const interactionItems = [
   "baroness_waffle",
   "baroness_candy_corn",
   "baroness_jawbreaker",
+  "challenge_half_damage",
 ];
 const miniBossItems = new Set([
   "baroness_cupcake",
@@ -505,6 +509,8 @@ const charms = [
   { id: 0, name: "Corazón" },
   { id: 2, name: "Bomba de humo" },
   { id: 6, name: "Galletita Astral" },
+  { id: 7, name: "Reliquia Maldita" },
+  { id: 8, name: "Reliquia Divina" },
   { id: 10, name: "Nada" },
 ];
 const modifiers = [
@@ -1439,6 +1445,8 @@ createServer((req, res) => {
           every: eventType === "follow" ? 1 : every,
           interaction,
           quantity,
+          durationSeconds: Number(url.searchParams.get("durationSeconds") ?? 15),
+          countdownSeconds: Number(url.searchParams.get("countdownSeconds") ?? 3),
         };
         if (action === "create") {
           streamRules.push(rule);
@@ -1759,6 +1767,9 @@ createServer((req, res) => {
       names: peskyNames,
       items: interactionItems,
       disabledItems: peskyDisabledItems,
+      challengeDurationSeconds: peskyChallengeDurationSeconds,
+      challengeCountdownSeconds: peskyChallengeCountdownSeconds,
+      challengeWaitSeconds: peskyChallengeWaitSeconds,
       queueCount: 0,
       activeCount: 0,
       maxActive: interactionMaxActive,
@@ -1774,7 +1785,14 @@ createServer((req, res) => {
     const minimumIntervalValue = url.searchParams.get("minimumInterval");
     const maximumIntervalValue = url.searchParams.get("maximumInterval");
     peskyError = false;
-    if (minimumIntervalValue !== null || maximumIntervalValue !== null) {
+    if (url.searchParams.has("challengeDurationSeconds") || url.searchParams.has("challengeCountdownSeconds") || url.searchParams.has("challengeWaitSeconds")) {
+      const seconds = Number(url.searchParams.get("challengeDurationSeconds") ?? peskyChallengeDurationSeconds);
+      const countdown = Number(url.searchParams.get("challengeCountdownSeconds") ?? peskyChallengeCountdownSeconds);
+      const wait = Number(url.searchParams.get("challengeWaitSeconds") ?? peskyChallengeWaitSeconds);
+      if (!Number.isInteger(seconds) || seconds < 1 || seconds > 120 || !Number.isInteger(countdown) || countdown < 0 || countdown > 30 || !Number.isInteger(wait) || wait < 0 || wait > 300) {
+        peskyError = true; peskyFeedback = "invalid_setting";
+      } else { peskyChallengeDurationSeconds = seconds; peskyChallengeCountdownSeconds = countdown; peskyChallengeWaitSeconds = wait; peskyFeedback = "items_saved"; }
+    } else if (minimumIntervalValue !== null || maximumIntervalValue !== null) {
       const candidate = pacingCandidate(url.searchParams, peskyIntervals);
       const strongToken = url.searchParams.get("allowConcurrentStrongInteractions");
       const strong = strongToken === null ? peskyAllowConcurrentStrongInteractions
