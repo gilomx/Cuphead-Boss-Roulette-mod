@@ -14,9 +14,17 @@ namespace Gilomx.CupheadBossRoulette
         private Text timedWarningNumber;
         private Text timedActiveTitle;
         private Text timedActiveDonor;
+        private Color timedActiveTitleBaseColor;
         private float timedHudRetryAt;
         private readonly CreatorToolsTimedChallengeHudState timedHudState = new CreatorToolsTimedChallengeHudState();
         private const float TimedHudTopMargin = 35f;
+        private const float TimedHudCountdownCueVolume = 0.70f;
+        private const float TimedHudUrgencySeconds = 3f;
+        private const float TimedHudUrgencySlowHz = 1.25f;
+        private const float TimedHudUrgencyFastHz = 4f;
+        private static readonly Color TimedHudUrgencyColor = new Color32(229, 48, 43, 255);
+        private static readonly Color TimedHudShadowColor = new Color(0f, 0f, 0f, 0.32f);
+        private static readonly Vector2 TimedHudShadowDistance = new Vector2(2f, -2f);
 
         private bool PrepareTimedChallengeHud()
         {
@@ -37,6 +45,7 @@ namespace Gilomx.CupheadBossRoulette
             timedWarningNumber = CreateTimedHudText(template, timedWarningRoot, "Countdown", size * 3, -size * 2.2f);
             timedActiveTitle = CreateTimedHudText(template, timedActiveRoot, "Challenge and remaining time", size, 0f);
             timedActiveDonor = CreateTimedHudText(template, timedActiveRoot, "Sender", size, -size * 1.45f);
+            timedActiveTitleBaseColor = timedActiveTitle.color;
             timedChallengeRoot.gameObject.SetActive(false);
             Logger.LogInfo("HUD de reto temporal preparado en la capa de la ruleta.");
             return true;
@@ -129,14 +138,13 @@ namespace Gilomx.CupheadBossRoulette
             // A current camera challenge can tint the battle HUD material.
             // Start with its native text material, not a temporary effect.
             text.material = battleHudChallengeBaseMaterial;
-            foreach (var source in template.GetComponents<Shadow>())
-            {
-                var shadow = source is Outline ? text.gameObject.AddComponent<Outline>() : text.gameObject.AddComponent<Shadow>();
-                shadow.effectColor = source.effectColor;
-                shadow.effectDistance = source.effectDistance;
-                shadow.useGraphicAlpha = source.useGraphicAlpha;
-                shadow.enabled = source.enabled;
-            }
+            // Use one explicit outer drop shadow instead of stacking the
+            // template's effects. This keeps the dark copy behind and offset
+            // from the glyph rather than darkening its interior edges.
+            var readabilityShadow = text.gameObject.AddComponent<Shadow>();
+            readabilityShadow.effectColor = TimedHudShadowColor;
+            readabilityShadow.effectDistance = TimedHudShadowDistance;
+            readabilityShadow.useGraphicAlpha = true;
             var rect = text.rectTransform;
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition3D = new Vector3(0f, y, 0f);
@@ -144,6 +152,27 @@ namespace Gilomx.CupheadBossRoulette
             rect.sizeDelta = new Vector2(900f, size * 1.8f);
             rect.localScale = Vector3.one;
             return text;
+        }
+
+        private void UpdateTimedActiveTitleUrgency(CreatorToolsTimedChallenge timer, bool frozen)
+        {
+            timedActiveTitle.color = timedActiveTitleBaseColor;
+            if (frozen || timer.Phase != TimedChallengePhase.Active ||
+                timer.Remaining <= 0f || timer.Remaining > TimedHudUrgencySeconds)
+                return;
+
+            var elapsed = TimedHudUrgencySeconds - timer.Remaining;
+            var progress = Mathf.Clamp01(elapsed / TimedHudUrgencySeconds);
+            // Integrate a linearly increasing frequency so the pulse remains
+            // continuous while accelerating from the 3-second mark to zero.
+            var cycles = TimedHudUrgencySlowHz * elapsed +
+                0.5f * (TimedHudUrgencyFastHz - TimedHudUrgencySlowHz) *
+                elapsed * progress;
+            var pulse = 0.5f + 0.5f * Mathf.Sin(cycles * Mathf.PI * 2f - Mathf.PI * 0.5f);
+            var urgent = TimedHudUrgencyColor;
+            urgent.a = timedActiveTitleBaseColor.a;
+            timedActiveTitle.color = Color.Lerp(
+                timedActiveTitleBaseColor, urgent, Mathf.SmoothStep(0f, 1f, pulse));
         }
 
         private void UpdateTimedChallengeHud()
@@ -180,12 +209,20 @@ namespace Gilomx.CupheadBossRoulette
                 var beat = Mathf.Clamp01((timer.PhaseElapsed % 1f) / 0.22f);
                 timedWarningNumber.rectTransform.localScale = Vector3.one * (exiting || frozen ? 1f : 1f + 0.14f * (1f - beat) * (1f - beat));
                 if (timedHudState.TakeCountdownCue(timer, timedChallengeInteractions.GameplayAvailable))
-                    PlayNativeMenuSound("menu_equipment_move", selectionClip, 0.45f);
+                {
+                    // Prefer the packaged clip so a native sound lookup that
+                    // fails silently cannot swallow the countdown cue.
+                    if (selectionClip != null)
+                        PlayOneShot(selectionClip, TimedHudCountdownCueVolume);
+                    else
+                        PlayNativeMenuSound("menu_equipment_move", null, TimedHudCountdownCueVolume);
+                }
             }
             else
             {
                 timedActiveTitle.text = LocalizedChallengeLabel(ModifierId.HalfDamage).ToUpperInvariant() +
                     "  ·  " + Mathf.CeilToInt(timer.Remaining) + " S";
+                UpdateTimedActiveTitleUrgency(timer, frozen);
                 timedActiveDonor.text = ((frozen ? timedHudState.DefeatDonor : timedChallengeInteractions.Donor) ?? string.Empty).ToUpperInvariant();
                 timedActiveDonor.gameObject.SetActive(!string.IsNullOrEmpty(timedActiveDonor.text));
                 var exiting = !frozen && timer.Phase == TimedChallengePhase.Exit;
