@@ -2,6 +2,547 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Pendientes actuales (2026-09-23)
+
+Esta lista resume el trabajo restante y sustituye los recuentos históricos de
+retos pendientes que aparecen más abajo. Hay nueve retos temporales implementados.
+
+- Validar en juego desde un arranque nuevo: lluvia temporal sin pulpo, reto
+  de ruleta/equipado con pulpo, fluidez al entrar al mapa y al primer nivel,
+  y aviso de preparación alineado con el borde inferior del reloj.
+- **Volteada de cabeza — dificultad alta:** conservar las transiciones del
+  reto y restaurar cámara, controles y HUD al terminar, pausar, perder o reintentar.
+- **Solo balas de miniavión — dificultad alta:** exclusivo de avión; acordar
+  la penalización temporal al incumplirlo, porque el reto base puede reiniciar
+  el nivel. Resolver restauración e incompatibilidades.
+- **Una vida y te callas / HP.1 — dificultad muy alta:** definir cómo devolver
+  la vida sin curar daño recibido ni revivir, incluyendo cooperativo.
+- Después de completar los temporales, desarrollar el reto que cambia
+  aleatoriamente por tiempo, respetando compatibilidad y duraciones probadas.
+- Continuar los diseños de overlays, incluido el de interacciones y sus canjes,
+  con contenido adecuado al nivel que se está jugando.
+
+La preparación selectiva de todo el catálogo según casillas habilitadas sigue
+siendo una propuesta, no una tarea acordada. Actualmente se prepara el catálogo
+durante la carga de niveles y se reutiliza; sólo la introducción del pulpo se
+prepara cuando hace falta. El trabajo nativo que no haya comenzado al agotar el
+presupuesto de carga puede continuar en otra carga. Los recursos marcados como
+fallidos no se reintentan automáticamente durante la misma sesión.
+
+## Temporal de tinta sin pulpo y preparación separada (2026-09-23)
+
+Petición aceptada: quitar el pulpo sólo del reto temporal. `StartTemporary`
+inicia `StartAttempt` sin introducción y programa la primera ola en el primer
+tick activo, después de «Reto en camino», sin gastar 1.25 s en la espera base.
+No activa actor, animación ni sonidos del pulpo; se elimina la antigua
+aceleración del 25 %. Conserva lluvia por dificultad, impactos, manchas,
+pausas y cierre natural por tiempo o derrota. La ruleta/Equip Card conserva
+su pulpo, cadencia nativa, introducción inocua y gracia tras Wallop.
+
+Se separan los recursos: 136 PNG de lluvia frente a 59 de pulpo, con estados,
+propiedad y limpieza independientes. Un fallo parcial del pulpo no invalida
+la lluvia; un fallo de lluvia tampoco deja esperando al cargador del pulpo.
+Todo se prepara por partes bajo carga. Antes del nivel se consulta el reto
+de ruleta, o la selección guardada de Equip Card (ésta se activa después, en
+LevelInit); la ruleta tiene precedencia incluso si su opción RETO está apagada.
+Sólo ese reto completo solicita el pulpo. Si se elige más tarde, carga sólo
+las imágenes faltantes. Lo ya preparado se conserva hasta cerrar el mod.
+El resto del catálogo sigue usando la preparación existente, sin implementar
+todavía la propuesta general de cargar sólo interacciones habilitadas.
+
+Pruebas actualizadas de temporal directo en tierra/avión, tres dificultades,
+conteo previo, pausa, final corto, reserva, derrota y reintento; harness de
+assets verifica 136/59, cambio posterior a ruleta, reutilización, fallos de
+cada grupo y liberación exacta. Textos ES/EN, README y reglas actualizados.
+Pendiente prueba en juego de ambos modos desde un arranque nuevo.
+
+Release sin advertencias ni errores; contrato nativo de carga/Mono y build
+del panel correctos. Paquete Dev publicado, 535 archivos, ruta física
+verificada por proceso independiente. SHA256:
+`A0E8A5E96D8100C53DA7560B6F4A4468D9769DA365714A955A950BEA212F7546`.
+Comprobante: `.deployment-cache/unpackaged-b7f3f5b470c549edbf011d41db4f7428/`.
+
+## Aviso de carga alineado abajo (2026-09-23)
+
+El usuario vio el aviso demasiado alto y pidió alinearlo donde termina la
+imagen del reloj. `AssetLoadingNotice.cs` ahora ancla su rectángulo a la
+esquina inferior izquierda del reloj, con pivote inferior derecho y texto
+`LowerRight`. Mantiene el espacio lateral de 18, tamaño 22, fuente y opacidad.
+El borde inferior queda ligado al reloj, sin desplazamientos por resolución.
+Pendiente confirmar el ajuste visual en juego.
+
+Compilación correcta, sin advertencias ni errores. Paquete Dev publicado por
+el proceso independiente, 535 archivos y ruta física verificada. SHA256:
+`65B9C119780B5DF04C7E5A91804374267A34A60A49D08F7192F25D9907F5372B`.
+Comprobante: `.deployment-cache/unpackaged-51102a928ad04622b125d37497be43cd/`.
+
+## Lluvia de tinta descartada por incompatibilidad de Mono (2026-09-23)
+
+El usuario dejó sólo Lluvia de tinta habilitada en retos temporales y nunca
+aparecía tras los cambios de carga. Confirmado en el registro físico de su
+sesión (lector independiente, sin identidad MSIX): la preparación fallaba con
+`Could not load type 'System.IO.InvalidDataException'`. Los archivos de tinta
+estaban instalados. No era el sorteo ni la configuración.
+
+`InkRainChallenge.Assets.cs` introdujo dos referencias a `InvalidDataException`,
+tipo permitido al compilar contra net35 pero ausente del `System.dll` reducido
+de Cuphead. La compilación JIT puede fallar al entrar al método o al iterador,
+aunque no se llegue a ejecutar el throw. El cargador lo atrapaba, liberaba
+recursos parciales y quedaba Failed; la elegibilidad de tinta permanecía falsa.
+Se sustituyeron ambas referencias por `InvalidOperationException` de mscorlib,
+como ya hacía `CreatorToolsGiftImageCache` por la misma restricción del motor.
+Se conserva la preparación incremental bajo carga y el aviso junto al reloj.
+
+`verify_native_loading_contract.ps1` verifica ahora constructores de excepción
+del runtime de tinta y sus iteradores/closures generados contra las DLL reales
+del juego. Reprodujo el fallo con la DLL anterior y pasa con la corrección.
+El harness InkAssets pasa con las 195 imágenes, reutilización, liberación y
+fallos de decodificación; Release sin advertencias ni errores. La prueba net10
+por sí sola no detecta tipos que Unity/Mono ha eliminado. Pendiente validar
+en juego tras volver a abrir Cuphead con el paquete actualizado; la sesión
+actual ya tiene marcada la preparación como fallida y no puede recargar DLL.
+
+Paquete Dev corregido publicado, 535 archivos, ruta física verificada por
+proceso independiente. SHA256:
+`C5BE40E2E6505EF99D88946E54E4D1E6C800DA12743140FCC484E6E6C042046B`.
+Comprobante: `.deployment-cache/unpackaged-dfcc03bff4eb4b5197bf5e608ac8a1bc/`.
+
+## Aviso junto al reloj de carga (2026-09-23)
+
+Petición: indicar cuándo la pantalla de carga prepara recursos del mod.
+`AssetLoadingNotice.cs` añade «Preparando interacciones…» (ES) / «Preparing
+interactions…» (EN) a la izquierda de `SceneLoader.icon`, usando `theme.BodyFont`
+ya disponible, tamaño 22, color blanco y alineación derecha. Es un `Text` hijo
+del reloj nativo: conserva su canvas, cámara, capa y escalado; copia la opacidad
+del reloj en LateUpdate, no recibe clics y no crea otra pantalla superpuesta.
+Se reutiliza entre cargas y se destruye al desmontar el mod.
+
+La visibilidad sigue las dos preparaciones reales: catálogo nativo (incluido
+el drenaje de operaciones/texturas pendientes tras el límite) y recursos de
+tinta/hooks visuales. Se apaga antes de avanzar el iterador de carga de Cuphead
+y también al cancelar. Reintentos con recursos ya listos no anuncian trabajo.
+La prueba de barrera verifica esos casos; el contrato IL comprueba el campo
+nativo y la inyección de la imagen del reloj. Build Release sin advertencias
+ni errores, suite runtime y contrato nativo correctos. Pendiente ver posición
+y tamaño en el juego; no se ha arrancado ni interrumpido Cuphead.
+
+Alcance: se habló de cargar sólo lo habilitado y prepararlo al reintentar si
+el usuario lo cambia desde el panel. Sigue siendo una propuesta; este cambio
+añade el aviso al mecanismo actual, que prepara el catálogo completo.
+
+Paquete Dev publicado mediante el script canónico, 535 archivos y ruta física
+verificada. SHA256:
+`F3BE7256889DA920A07F65CBC04A7C25E200376876AFF9CB9BC3A8FC8E939792`.
+Comprobante: `.deployment-cache/unpackaged-027439fb951f428a8457b31b166ab1e5/`.
+
+## Carga inicial y tinta temporal después de perder (2026-09-23)
+
+El usuario reportó tirón al entrar al mapa y congelamiento justo antes del
+primer «Reto en camino» de cada proceso. Se localizaron dos rutas costosas:
+`PrepareTemporary` consultaba `EnsureInkAssets`, que decodificaba de golpe
+195 PNG; el catálogo nativo permitía activar/descargar escenas en el mapa.
+Son causas identificadas en el código, todavía sin medición de frames en juego.
+
+`EnsureInkAssets` ahora sólo lee disponibilidad. `InkRainChallenge.Assets.cs`
+prepara el catálogo mediante `IncrementalAssetPreparation`: máximo cuatro
+imágenes o 2 ms por vuelta, sin partir la decodificación individual de Unity.
+Sólo publica disponibilidad al terminar; error o cancelación libera sprites
+y texturas parciales, sin reintentos continuos. `InkRainChallenge.Loading.cs`
+envuelve el iterador nativo `SceneLoader.load_cr` después del fundido, antes de
+iniciar la carga de escena; reinicia `doneLoadingSceneAsync` antes del primer
+yield. Los hooks opcionales de RGB también se instalan en esa primera carga.
+El registro guarda duración de arranque, preparación y decodificación máxima.
+
+`CanPreloadNativeInteractionAssets` exige pantalla de carga **y** ventana del
+coordinador. Ya no se permite precargar en el mapa; esto sustituye las notas
+históricas que lo permitían. Se conserva espera de atlas, descarga segura,
+límite de preparación y recuperación en cargas posteriores. La primera carga
+puede durar más; no se traslada trabajo pendiente al combate.
+
+En derrota temporal, `HoldTimedChallengeHudAfterDefeat` preserva la presentación
+antes de liberar la reserva. `TimedInkRainChallenge` deja de emitir/entintar y
+termina pulpo, gotas, impactos y manchas con tiempo sin escalar (salvo pérdida
+de foco), aunque el juego congele su reloj. No depende del HUD ni mantiene la
+reserva del reto. Reintentar, cambiar de escena o salir cancela inmediatamente.
+La tinta nativa del pirata conserva su propio ciclo. El reto de ruleta mantiene
+su comportamiento anterior. Esta nota sustituye el cierre inmediato por derrota
+descrito más abajo para la primera implementación temporal.
+
+Verificado: suites de runtime, tinta, armas de avión y RGB; nuevo harness
+`InkAssets` con las 195 imágenes reales, pausas de preparación, reutilización,
+geometría, fallos y liberación. `Directory.Build.props` separa obj/bin por
+proyecto: compartirlos podía reutilizar el apphost de otro harness y ejecutar
+la suite equivocada. `verify_native_loading_contract.ps1` comprueba también
+la DLL recién compilada: consulta de tinta sin carga, bloqueo del mapa,
+reinicio del flag nativo y preparación antes de avanzar el iterador del juego.
+Release compila sin advertencias ni errores. Pendiente prueba visual y de
+fluidez reiniciando Cuphead; no se ha reiniciado ni interrumpido la partida.
+
+Paquete Dev completo publicado con el procedimiento canónico; ruta física
+verificada por proceso independiente, 535 archivos, build de panel y companion
+correctos. SHA256:
+`E39FD5FB3522B19184DB6F1C169000B706B3F06EAED44AD67716A62A06C12E2D`.
+Comprobante: `.deployment-cache/unpackaged-d8c5562522b440238579aacbd2506e4f/`.
+
+## Ajuste de la introducción de tinta temporal (2026-09-23)
+
+A petición del usuario, sólo el pulpo inicial de la interacción temporal
+lanza más bolitas y éstas entintan durante su animación. `SquidIntroDelay`
+reduce a 80 % el intervalo: 0.168 s en Fácil y 0.096 s en Normal/Experto,
+equivalente a 25 % más lanzamientos por segundo, manteniendo el límite de
+20 gotas de la introducción. La cantidad final depende de la duración del
+ataque, el límite y las colisiones. No cambia `NextSpawnDelay`, las trayectorias
+ni el ritmo de lluvia posterior.
+
+El temporal habilita impactos al empezar la sesión activa; `CanInkPlayers`
+permite golpear durante la intro sólo cuando `temporarySession` está activo.
+La ruleta conserva 0.21/0.12 s, intro inocua y gracia original. El aviso previo
+no inicia el efecto, y la salida natural sigue dejando impactar las gotas ya
+existentes. Textos ES/EN y documentación actualizados. El harness de tinta
+comprueba la separación entre temporal/ruleta en las tres dificultades,
+entrada, aviso, salida natural, cancelación y restauración de las reglas base.
+
+Harness de tinta y build UI correctos (26 artículos, 43 regalos). Release sin
+advertencias ni errores. Paquete Dev publicado y ruta física verificada,
+535 archivos. SHA256:
+`5CE9B132B8AED0C710F87EF49DCDFA9193D55DC409A4768653CE74655BA61E10`.
+Comprobante: `.deployment-cache/unpackaged-7c03e51ea4db48b5995211f3bd3368a6/`.
+Pendiente valorar en juego si la cantidad inicial resulta adecuada.
+
+## Lluvia de tinta temporal con salida natural (2026-09-23)
+
+Noveno reto temporal: `challenge_ink_rain`, tierra y avión, con el icono
+existente de LLUVIA DE TINTA, catálogo, pruebas, reglas ES/EN y HUD. Esquema
+Molestoso 18: empieza desmarcado y conserva todos los ajustes anteriores.
+Quedan tres: Volteada de cabeza, Solo balas de miniavión y HP.1. Se mantienen
+pendientes las decisiones sobre penalización de Solo mini y restauración HP.1.
+
+Petición del usuario: activación igual al reto base; al terminar el contador,
+dejar caer todas las gotas existentes sin cortarlas. Se reutiliza el mismo
+`InkRainChallengeRuntime`, sus PNG ya cargados, intro del pulpo, velocidades,
+grupos, límites por dificultad, impactos, colisiones y desvanecimiento de tinta.
+La intro empieza al entrar en Active, después de «Reto en camino»; forma parte
+del tiempo activo. A cero se bloquean ambas fuentes de gotas (pulpo/lluvia),
+sin llamar a la salida de derrota que borra gotas. Las que quedan aún pueden
+entintar. Pulpo, impactos, manchas y oscuridad terminan con su lógica existente.
+En Capitán Brineybeard se conserva el overlay nativo: se espera su renderer
+sólo si recibió un impacto temporal, sin alterar sus corutinas o borrar tinta.
+
+`TimedInkRainChallenge` posee la sesión temporal y mantiene el temporizador en
+Exit hasta que no queden efectos. La salida del HUD conserva 0.25 s: no muestra
+un cero permanente. La reserva bloquea sucesores y el descanso de Modo Molestoso
+empieza después de ese cierre. La cuenta sigue siendo la duración de emisión,
+no una promesa de duración total de la tinta recibida. Retos mínimos de 1 s
+también dejan acabar la intro, pero no emiten después de cero.
+
+`InkRainChallenge.Temporary.cs` usa un reloj de juego propio para intro, gotas,
+impactos y manchas; el ejecutor lo avanza una sola vez, excluyendo aviso/pausa,
+pérdida de foco, transiciones protegidas y falta de cámara. El runtime base
+sigue usando `Time.time`. Su Update autónomo se omite mientras lo dirige el
+ejecutor y la limpieza de retos equipados no interrumpe una sesión temporal.
+Al morir, cancelar, reiniciar o salir del nivel se libera la sesión temporal;
+el HUD conserva la copia de derrota habitual. Un reto de tinta ya equipado
+impide duplicarlo. `ResetState` también desactiva el runtime para que no siga
+simulando después de una limpieza definitiva.
+
+Validado: suite runtime con migración 17→18, nueve IDs en reglas, reservas,
+pausa y HUD; harness `CreatorToolsRuntimeTests/InkChallenges/InkChallenges.csproj`
+enlaza ejecutor, temporizador, puente y adaptador temporal reales, con dobles
+de física/render para comprobar cierre sin Clear, tres dificultades, tierra/
+avión, pausa, cámara ausente, gotas/impactos/manchas, overlay nativo, descanso,
+repetición, cancelación y no interferencia con el reto base. Suites de armas
+y RGB pasan tras el cambio del ejecutor. Contrato nativo
+`tools/verify_native_ink_overlay_contract.ps1` comprueba que Hit habilita el
+renderer de tinta y el fade lo apaga al acabar. UI: 26 artículos y 43 regalos;
+navegador 1440/390 px, nueve iconos, selección, guardado, límites y parámetros
+manuales/stream; capturas inspeccionadas. Falta comprobar el combate en Cuphead,
+especialmente las últimas gotas y manchas al llegar a cero.
+
+Release compilado sin advertencias ni errores. Paquete Dev completo publicado
+por el proceso independiente y ruta física verificada, 535 archivos. SHA256:
+`5CA9D3DF10216E658D02622082162374515D0F8F80BA9DE51832855EE684BD26`.
+Comprobante: `.deployment-cache/unpackaged-8895617fb8374fc788f390cf584169a0/`.
+
+## RGB temporal y equivalencias sin duplicar el sorteo (2026-09-23)
+
+Octavo reto temporal: `challenge_rgb_shift` (**MAMÁ ESCUCHO BORROSO — RGB**),
+disponible en tierra y avión con el icono existente. Catálogo, pruebas manuales,
+reglas ES/EN y HUD integrados. Esquema Molestoso 17: RGB empieza desmarcado y
+conserva selecciones, tiempos y nombres anteriores. Quedan cuatro por convertir:
+Lluvia de tinta, Volteada de cabeza, Solo balas de miniavión y HP.1. La
+penalización temporal de Solo mini y la restauración de vida de HP.1 siguen
+pendientes de definición; el overlay de canjes continúa fuera de este alcance.
+
+Se conservan las equivalencias aceptadas. `ChooseAutomatic` agrupa NO DASH y
+MODO TIESO como una sola opción elegible en avión (ambos usan NO MINIAVIÓN),
+sin duplicar su probabilidad si ambos están marcados. En tierra son distintos;
+si sólo uno está habilitado, sigue participando. Únicamente cambia el sorteo
+gratuito: los canjes manuales/stream mantienen solicitudes y tiempos separados.
+
+RGB comparte la receta visual con el reto equipado mediante
+`CreatorToolsRgbShiftVisuals`: desplazamientos originales y pulso de desenfoque
+nativo al 70 %. El reloj temporal mueve la animación y la curva suave: entrada
+completa de 1.25 s al empezar el contador activo, salida de 0.9 s después de cero,
+descanso posterior. El aviso no aplica el efecto. Pausa, pérdida de foco y
+ausencia de una cámara válida congelan la secuencia. La derrota conserva el
+HUD, pero libera el efecto; el reto equipado y sus relojes siguen independientes.
+
+`TimedRgbShiftChallenge` instala prefix/finalizer en los dos `OnRenderImage`
+nativos. `TimedRgbShiftRenderFrame` modifica los campos sólo durante el render y
+recupera sus valores exactos incluso ante excepciones; así un efecto de polen
+que ya estuviera decayendo no acumula desenfoque ni queda congelado al acabar
+la interacción. Mientras RGB temporal está activo se omiten nuevas llamadas
+visuales TouchFuzzy de Cagney, como en el reto base, conservando el daño.
+Los canjes RGB esperan si el reto base ya posee ese efecto, incluida su salida;
+el modo automático lo omite. Los HUD de ruleta y temporal usan la cámara nativa
+durante RGB para recibir el mismo efecto. No se crean materiales por fotograma.
+
+Validado: suite runtime (ocho IDs, migración 16→17, sorteo, curvas, pausa,
+duraciones extremas y derrota), harness de armas/cola con canjes separados,
+`CreatorToolsRuntimeTests/RgbChallenges/RgbChallenges.csproj` con restauración
+por fotograma, polen previo, renders anidados y excepciones. Contrato nativo
+`tools/verify_native_rgb_render_contract.ps1` comprueba que los renders sólo
+leen los campos que se sustituyen y que TouchFuzzy usa ambos efectos. Build UI:
+25 artículos y 43 regalos. Navegador a 1440 y 390 px: iconos, selección,
+guardado, rangos y parámetros manuales/stream; capturas inspeccionadas.
+Falta la comprobación visual en Cuphead, especialmente transiciones y Cagney.
+
+Release compilado sin advertencias ni errores. Paquete Dev completo publicado
+por el proceso independiente y ruta física verificada, 535 archivos. SHA256:
+`179A523889C5B7889C8BAD2425082328B5F9962BB7EA3B1BCD0B7004627FEE73`.
+Comprobante: `.deployment-cache/unpackaged-cd16d4e873294a628259f795c1203e23/`.
+
+## NO DISPARO BOMBAS y SIN PEASHOOTER temporales (2026-09-23)
+
+Sexto y séptimo retos: `challenge_no_bombs` y `challenge_no_peashooter`.
+Decisión del usuario: exclusivos de avión, sin equivalentes terrestres. Modo
+Molestoso sólo los sortea en avión; los canjes manuales/stream en tierra o mapa
+esperan durante la sesión, conservando nombre, duración y cuenta previa. El
+panel indica «Esperando un nivel de avión». El ejecutor implementa la restricción
+de nivel que la cola ya consulta para dejar avanzar las solicitudes compatibles.
+No se crea todavía el futuro overlay de interacciones y sus canjes.
+
+El catálogo, pruebas manuales, reglas ES/EN y HUD usan sus iconos existentes.
+Esquema Molestoso 16: ambos empiezan desmarcados, preservando las cinco
+selecciones anteriores, nombres y tiempos. Se mantiene un solo reto temporal.
+Si la ruleta ya exige una de estas armas o SOLO MINI, los canjes esperan y el
+modo automático los omite para evitar restricciones duplicadas o contradictorias.
+
+`TimedPlaneWeaponChallenge` captura el arma de tamaño normal de cada jugador
+al empezar el efecto (no durante el aviso), contemplando `unshrunkWeapon`.
+Usa el cambio nativo de arma y las variantes de Ms. Chalice; conserva el
+miniavión y sus disparos, EX y súperes. El bloqueo existente de cambios manuales
+y la selección aleatoria de la reliquia también respetan el reto temporal.
+Al expirar/cancelar recupera la selección previa por jugador, sin escribir
+equipamiento guardado. Un EX/súper en curso termina antes del cambio; si retrasa
+la restauración, el siguiente reto espera. La muerte/carga descarta referencias
+sin reiniciar disparos en jugadores muertos. No busca objetos por toda la escena.
+
+Validado: suite runtime, migración desde 15, reglas para los siete IDs, harness
+`CreatorToolsRuntimeTests/PlaneChallenges/PlaneChallenges.csproj` enlazado al
+ejecutor/cola/puente de armas reales con dobles del juego, y contrato IL nativo
+`tools/verify_native_plane_weapon_contract.ps1 -CupheadDir <referencias locales>`.
+Incluye miniavión al empezar y acabar, restauración por jugador, pausa, EX/súper,
+cancelación, sucesores, muerte y canjes pendientes entre niveles. El build UI
+valida 24 artículos y 43 regalos. Ambos pasan pruebas de navegador con iconos,
+selección, guardado, parámetros manuales/stream y estado de espera en Dashboard.
+Falta comprobar el combate visualmente en Cuphead.
+
+Release sin advertencias ni errores. Paquete Dev completo publicado, ruta física
+verificada, 535 archivos. SHA256:
+`BBC2A2665852B5348C070C9C966787876CB9D08B06D2122B4895B8C06E71BAF6`.
+Comprobante: `.deployment-cache/unpackaged-b61e01ac4303487e8e81dbc10f828e89/`.
+
+Quedan cinco por convertir: RGB, Lluvia de tinta, Volteada de cabeza,
+Solo balas de miniavión y HP.1. Solo mini también será exclusivo de avión;
+su penalización temporal y la restauración de vida de HP.1 siguen por definir.
+
+## Blanco y negro temporal (2026-09-23)
+
+El usuario confirmó Modo Tieso y el espaciado del HUD. Se incorpora el quinto
+reto temporal: `challenge_black_and_white`, con imagen existente, descripción
+ES/EN, pruebas manuales, reglas y Modo Molestoso. Esquema Molestoso 15: empieza
+desmarcado, sin cambiar las cuatro selecciones anteriores ni los tiempos.
+
+`CreatorToolsTimedChallenge.BlackAndWhiteBlend` calcula una curva suave con
+el mismo reloj del reto. A petición del usuario, el aviso no aplica color;
+al entrar en la fase activa arrancan juntos el contador y la entrada de
+1.25 s. La salida de 0.9 s sólo empieza al llegar a cero. Ambas duraciones
+se comparten con el reto base y no se acortan para retos breves: si dura 1 s,
+la salida parte suavemente de la intensidad alcanzada. La reserva continúa
+hasta terminar la salida y después empieza el descanso. Pausa, falta de foco
+y transiciones protegidas congelan también la curva. Al cancelar, perder o
+reiniciar, la fuente temporal devuelve cero; la copia del HUD conserva icono,
+título, tiempo y remitente, sin mantener vivo el filtro. El HUD conserva su
+salida de 0.25 s; perder durante la restauración restante no resucita su texto.
+
+El render reutiliza `BlackAndWhiteSaturationEffect` y los recursos ya cargados.
+Combina el máximo del blend base y temporal, sin modificar `activeChallenge`
+ni `SettingsData.filter`. El puente nativo BW sólo actúa a saturación completa;
+al terminar vuelve el valor real del filtro del jugador. Un BW equipado sigue
+excluyendo el BW automático y deja sus canjes pendientes. No se cambian los
+relojes ni transiciones del reto de ruleta. La actualización del render ahora
+se ejecuta también cuando el reto base mantiene una imagen durante derrota o
+retry, para no dejar un material temporal antiguo en esa cámara.
+
+El ejecutor comprueba disponibilidad del shader y soporte de GPU. Durante la
+fase activa y su salida no consumen tiempo hasta tener un renderizador válido; la búsqueda
+de cámaras sigue limitada al intervalo existente de 0.2 s y sólo se realiza
+mientras hace falta el efecto. No se añaden assets ni cargas de bundles en
+combate. Los HUD persistentes de ruleta y retos temporales usan el material de
+saturación existente, manteniendo posición, tamaños, negrita y remitente.
+
+Suite runtime y build UI (22 artículos) pasan. Se probaron pausa, curva de
+entrada/salida completas, duración mínima/máxima, composición/restauración del
+blend base, reserva y descanso después de la salida, frames largos, cancelación,
+copia de derrota, ausencia de filtro en otros retos, migración
+desde 14 y reglas de los cinco IDs. Panel comprobado a 1440 y 390 px con selección,
+imagen, guardado y parámetros manuales/stream. Falta confirmación visual en
+Cuphead, incluyendo un filtro previo distinto y convivencia con retos de cámara.
+No se inicia ni se cierra el juego durante la entrega.
+
+Release compilado sin advertencias ni errores. Paquete Dev publicado y ruta
+física verificada, 535 archivos. SHA256:
+`542B84A12B5D632691BC2D10001C8D9070E0E1B0A7ED0606F4A216AA139F4837`.
+Comprobante: `.deployment-cache/unpackaged-9f92412fa05f4f24ac0670e1cfef038d/`.
+
+Pendientes, en orden propuesto: No disparo bombas, Sin Peashooter, RGB,
+Lluvia de tinta, Volteada de cabeza, Solo balas de miniavión y HP.1.
+Para armas/miniavión sigue pendiente decidir alcance o equivalencias terrestres;
+Solo mini necesita definir penalización temporal y HP.1 cómo devolver la vida.
+
+## MODO TIESO temporal y remitente más cerca (2026-09-23)
+
+El usuario confirmó NO DASH tanto en tierra como en avión y pidió continuar.
+Cuarto reto: `challenge_stiff_mode`, visible en pruebas manuales, reglas de
+stream y Modo Molestoso. En tierra reutiliza `HandleLocked` + bloqueo de dash:
+el personaje no camina mientras toca suelo, pero puede saltar y dirigir el
+salto. Se leyó el IL nativo: `HandleLocked` recalcula `Locked` en cada llamada,
+por lo que al expirar el temporizador vuelven los controles normales sin
+restaurar estados antiguos. El dash ya iniciado termina normalmente.
+
+En avión reutiliza la restricción NO MINIAVIÓN ya probada; la presentación
+captura esa variante e icono. El reto equipado permanece. En tierra, Tieso
+puede añadir el bloqueo de caminar sobre NO DASH, pero NO DASH no se programa
+sobre Tieso. En avión se omiten equivalentes y SOLO MINI, evitando efectos
+duplicados o contradictorios; los canjes esperan. Exclusividad de un reto
+temporal, tiempos y limpieza al perder/reintentar siguen iguales.
+
+Esquema Molestoso 14: Modo Tieso se añade desmarcado; conserva todos los valores
+y selecciones anteriores. El remitente pasa de 1.8× a 1.45× del tamaño base
+por debajo del título (aproximadamente 20 % más cerca). El contador sigue a
+2× y en negrita; también se conserva el espaciado nuevo en la copia de derrota.
+
+Pasan la suite runtime, el build UI (21 interacciones) y la prueba del panel
+a 1440 y 390 px. Incluyen migración desde 13, identidad/variante en derrota,
+fin del efecto y envío por reglas con los cuatro IDs y sus tiempos. Verificación
+de combate y separación exacta pendiente de prueba del usuario en Cuphead.
+
+Compilación Release sin advertencias ni errores. ZIP Dev publicado y ruta física
+verificada, con 535 archivos. SHA256:
+`54EA7316368880C826DC5DB467AE4C8D395793ADDBFD199CB29D403C2BEB273F`.
+Comprobante: `.deployment-cache/unpackaged-ea95a657addd43829b8e513dcfeebd33/`.
+
+Quedan ocho retos por convertir. Orden propuesto por complejidad aproximada:
+
+1. Blanco y negro: entrada/salida temporal del filtro y restauración del filtro previo.
+2. No disparo bombas: cambiar al arma permitida y recuperar la anterior; decidir alcance terrestre.
+3. Sin Peashooter: reutilizar lo anterior para bombas; decidir alcance terrestre.
+4. Mamá escucho borroso (RGB): separar efecto temporal de la cámara del reto base.
+5. Lluvia de tinta: detener nuevas gotas y limpiar/finalizar las existentes al expirar.
+6. Volteada de cabeza (180°): transiciones, controles y restauración de cámara/HUD.
+7. Solo balas de miniavión: definir la penalización temporal; hoy puede reiniciar el nivel.
+8. Una vida y te callas (HP.1): definir cómo devolver la vida sin curar daño recibido ni revivir.
+
+Los tres retos de arma/miniavión siguen siendo exclusivos de avión en el
+catálogo de Equip Card; no existe aún una equivalencia terrestre que reutilizar.
+NO MINIAVIÓN ya está cubierto por NO DASH y Tieso; no se cuenta como pendiente separado.
+
+## NO DASH temporal y contador grande (2026-09-23)
+
+El usuario confirmó en juego la entrega anterior de NO EX y pidió continuar
+con el siguiente reto y probar el contador activo al doble y en negrita.
+Se incorpora `challenge_no_dash` en pruebas, reglas y Modo Molestoso. En tierra
+bloquea el dash; en avión usa NO MINIAVIÓN, como la equivalencia de Equip Card.
+Los tiempos compartidos y la exclusividad no cambian. Esquema Molestoso 13:
+el nuevo reto empieza desmarcado, conservando NO EX, Daño a la mitad y los tiempos.
+
+Se verificó el IL local de `LevelPlayerMotor.HandleDash`: también avanza y
+finaliza el dash. El prefijo permite ejecutar estados distintos de `Ready`
+para no congelar un dash ya iniciado al entrar la interacción.
+En avión se sustituye el antiguo salto completo de `HandleShrunk` por un
+transpiler que filtra únicamente sus dos `GetButtonDown(int)` y dos
+`GetButton(int)`. Se conserva la máquina nativa de expansión, cooldown y
+protecciones de parry/arma/piedra. Con la restricción activa equivale a soltar
+los botones, incluso si el avión estaba pequeño; no se reescribe su estado ni
+se recrean animaciones. El transpiler valida la firma y cantidad de llamadas.
+Este ajuste también conserva el comportamiento de los retos equipados que
+bloquean miniavión. NO DASH espera si el reto base ya bloquea dash/mini, y en
+avión también si está equipado SOLO MINI para evitar la contradicción.
+
+La presentación captura `PlaneControls` al iniciar la cuenta previa; el HUD
+elige NO DASH o NO MINIAVIÓN y su icono, y la copia de derrota retiene esa
+variante aunque el jugador ya no exista. El tiempo restante es un `Text`
+separado, misma fuente a 2× y `FontStyle.Bold`. Icono, título y contador se
+centran como una sola fila; el remitente conserva tamaño y centrado, con más
+separación. Título y tiempo comparten el pulso rojo final y las animaciones.
+
+Pasan toda la suite runtime y el build UI (20 interacciones). Pruebas nuevas
+cubren la variante en derrota, limpieza al cambiar de intento, activación y
+expiración, migración desde esquema 12 y persistencia. La prueba de reglas
+recorre los tres retos y verifica ID, cuenta previa y duración al despachar.
+Panel probado a 1440 y 390 px, incluyendo selección, imagen y pruebas/reglas
+NO DASH. Falta comprobar en juego el tamaño/negrita y el inicio del efecto
+durante dash o miniavión; no se inicia ni se cierra Cuphead desde el despliegue.
+
+Release compilado sin advertencias ni errores. Paquete Dev completo publicado
+y ruta física verificada: 535 archivos, SHA256
+`37A20D40C4FB4BCA1CC5623D5677C559FBFEFF1EEFA4CBFB0B98B024A7903330`.
+Comprobante: `.deployment-cache/unpackaged-22f5bb0e5a7b45ab8c07ee38526ab20a/`.
+
+## NO EX temporal e iconos del HUD (2026-09-23)
+
+Segundo reto temporal: `challenge_no_ex`, disponible en pruebas manuales,
+reglas de stream y Modo Molestoso. Comparte la espera, cuenta previa, duración
+y exclusividad de Daño a la mitad. El temporizador conserva el ID del efecto;
+cada parche consulta ese ID para evitar que NO EX reduzca también el daño.
+La copia de derrota retiene el ID, además del tiempo y el remitente, para
+mostrar el icono y título correctos incluso tras liberar el efecto de juego.
+
+El bloqueo reutiliza `CanUseEx` en tierra y `PlanePlayerWeaponManager.StartEx`
+en avión. Se comprobó en la DLL de Cuphead que `PlanePlayerWeaponManager.CheckEx`
+consulta `CanUseEx` antes de decidir entre EX y súper; por eso ese getter debe
+seguir intacto en avión. La detección ahora usa los jugadores reales de
+`PlayerManager`, sin depender de que haya un resultado de ruleta equipado.
+No se cambian `StartSuper` ni el consumo de cartas. El efecto sólo se aplica
+durante la fase activa, se pausa con el juego y se libera al finalizar el intento.
+
+Modo Molestoso elige uniformemente entre los retos marcados y disponibles,
+sin crear una lista por frame ni acumular retos automáticos pendientes. Puede
+repetir el mismo reto en turnos consecutivos. Un reto igual al de la ruleta
+queda excluido del sorteo; sus canjes esperan. Esquema de ajustes 12: NO EX
+se añade desmarcado al migrar, conservando Daño a la mitad, tiempos y nombres.
+
+El HUD pone el icono estático existente delante del título y centra el conjunto
+icono + nombre + segundos. El remitente permanece centrado debajo. Se conserva
+el pulso rojo acelerado de los últimos tres segundos y se comparte con
+**RETO EN CAMINO** durante toda la cuenta previa. Se mantienen la sombra exterior
+y el clic `selection.wav` a volumen 0.70, con evento nativo de respaldo,
+del ajuste anterior de HUD (`bb7a496`). Sin nuevos assets.
+
+Pruebas: toda la suite de runtime pasa, incluidas identidad/exclusión de NO EX,
+pausa, expiración, derrota, migración y canjes con tiempos propios. Panel
+comprobado a 1440 y 390 px: selección persistente, iconos, límites y parámetros
+NO EX en pruebas manuales y reglas. Build UI pasa (19 interacciones).
+La apariencia exacta del HUD y el comportamiento en combate requieren prueba
+en Cuphead; no se inicia ni se cierra el juego durante este trabajo.
+
+Compilación Release sin advertencias ni errores. Paquete Dev completo publicado
+y ruta física verificada: 535 archivos, SHA256
+`5C396F498C628B88BF8F6179A9A2A505716829DA0CD1C3160142C0A0BACB682E`.
+Comprobante: `.deployment-cache/unpackaged-1b4db0de8f704384b94548fac3b3e0c4/`.
+Esta entrega actualiza el ZIP Dev; no aplica archivos a una sesión de juego.
+
 ## HUD temporal: tamaño, derrota y clic de cuenta previa (2026-09-22)
 
 El remitente usa la misma fuente y tamaño que el título, ahora en mayúsculas.

@@ -19,7 +19,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const int DefaultLightMaximumBatch = 3;
         internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
         internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
-        private const int CurrentVersion = 11;
+        private const int CurrentVersion = 18;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -251,6 +251,14 @@ namespace Gilomx.CupheadBossRoulette
             MaximumCompanionsDuringMiniBoss = DefaultMaximumCompanionsDuringMiniBoss;
             DisabledItems.Clear();
             DisabledItems.Add(CreatorToolsTimedChallenge.HalfDamage);
+            DisabledItems.Add(CreatorToolsTimedChallenge.NoEx);
+            DisabledItems.Add(CreatorToolsTimedChallenge.NoDash);
+            DisabledItems.Add(CreatorToolsTimedChallenge.StiffMode);
+            DisabledItems.Add(CreatorToolsTimedChallenge.BlackAndWhite);
+            DisabledItems.Add(CreatorToolsTimedChallenge.NoBombs);
+            DisabledItems.Add(CreatorToolsTimedChallenge.NoPeashooter);
+            DisabledItems.Add(CreatorToolsTimedChallenge.RgbShift);
+            DisabledItems.Add(CreatorToolsTimedChallenge.InkRain);
             ChallengeDurationSeconds = CreatorToolsTimedChallenge.DefaultDuration;
             ChallengeCountdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown;
             ChallengeWaitSeconds = CreatorToolsChallengePacing.DefaultWait;
@@ -298,6 +306,22 @@ namespace Gilomx.CupheadBossRoulette
                     Warn("Los intervalos de Modo Molestoso no eran validos; " +
                         "se usaran los intervalos predeterminados.");
                 needsMigration = false;
+                int version;
+                int.TryParse(ReadNumberToken(json, FindPropertyValue(json, "version")),
+                    NumberStyles.Integer, CultureInfo.InvariantCulture, out version);
+                // Adding an interaction never silently enables it in an
+                // existing player's automatic selection.
+                if (version < 12) DisabledItems.Add(CreatorToolsTimedChallenge.NoEx);
+                if (version < 13) DisabledItems.Add(CreatorToolsTimedChallenge.NoDash);
+                if (version < 14) DisabledItems.Add(CreatorToolsTimedChallenge.StiffMode);
+                if (version < 15) DisabledItems.Add(CreatorToolsTimedChallenge.BlackAndWhite);
+                if (version < 16)
+                {
+                    DisabledItems.Add(CreatorToolsTimedChallenge.NoBombs);
+                    DisabledItems.Add(CreatorToolsTimedChallenge.NoPeashooter);
+                }
+                if (version < 17) DisabledItems.Add(CreatorToolsTimedChallenge.RgbShift);
+                if (version < 18) DisabledItems.Add(CreatorToolsTimedChallenge.InkRain);
                 var durationPosition = FindPropertyValue(json, "challengeDurationSeconds");
                 int duration;
                 ChallengeDurationSeconds = CreatorToolsTimedChallenge.TryDuration(
@@ -329,7 +353,7 @@ namespace Gilomx.CupheadBossRoulette
                     spawnValues["miniBossCooldownSeconds"] = ReadNumberToken(json, cooldownPosition);
                 spawnGroups = CreatorToolsSpawnGroupSettings.Load(
                     spawnValues, Warn, out needsMigration, CreateDefaultSpawnGroups());
-                needsMigration |= durationPosition < 0 || countdownPosition < 0 || waitPosition < 0;
+                needsMigration |= version < CurrentVersion || durationPosition < 0 || countdownPosition < 0 || waitPosition < 0;
                 bool allowStrong;
                 if (!TryReadBoolean(json, "allowConcurrentStrongInteractions", out allowStrong))
                     needsMigration = true;

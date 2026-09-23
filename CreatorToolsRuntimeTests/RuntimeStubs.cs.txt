@@ -17,6 +17,7 @@ namespace Gilomx.CupheadBossRoulette
         internal int EnqueuedCount { get; private set; }
         internal int LastDurationSeconds { get; private set; }
         internal int LastCountdownSeconds { get; private set; }
+        internal string LastItem { get; private set; }
 
         internal int StreamQueueAvailableCapacity
         {
@@ -33,6 +34,7 @@ namespace Gilomx.CupheadBossRoulette
             EnqueueCallCount++;
             LastDurationSeconds = durationSeconds;
             LastCountdownSeconds = countdownSeconds;
+            LastItem = item;
             var accepted = Math.Max(
                 0, Math.Min(Math.Max(0, quantity), availableCapacity));
             availableCapacity -= accepted;
@@ -56,7 +58,7 @@ namespace Gilomx.CupheadBossRoulette
             "robot_homing_bomb", "baroness_head_toss", "dragon_fireballs",
             "train_bone_ring", "devil_fire_circle", "beppi_balloon_dog",
             "beppi_pink_balloon_dog", "baroness_cupcake", "baroness_gumball",
-            "baroness_waffle", "baroness_candy_corn", "baroness_jawbreaker", "challenge_half_damage"
+            "baroness_waffle", "baroness_candy_corn", "baroness_jawbreaker", "challenge_half_damage", "challenge_no_ex", "challenge_no_dash", "challenge_stiff_mode", "challenge_black_and_white", "challenge_no_bombs", "challenge_no_peashooter", "challenge_rgb_shift", "challenge_ink_rain"
         };
     }
 

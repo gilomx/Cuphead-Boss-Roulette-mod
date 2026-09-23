@@ -81,6 +81,11 @@ for (const match of view.matchAll(/\{\s*id:\s*"([^"]+)"([\s\S]*?)\}/g)) {
     throw new Error(`Spawn group differs between runtime and panel for ${id}: ${runtimeGroups.get(id)} / ${group}.`);
   }
   validateTranslation(`interactions.groups.${group}`);
+  if (group === "challenge") {
+    const description = fields.match(/\bdescriptionKey:\s*"([^"]+)"/)?.[1];
+    if (!description) throw new Error(`Missing challenge description for ${id}.`);
+    validateTranslation(description);
+  }
   for (const field of ["titleKey", "imageAltKey", "typeKey"]) {
     const key = fields.match(new RegExp(`\\b${field}:\\s*"([^"]+)"`))?.[1];
     if (!key) throw new Error(`Missing ${field} for ${id}.`);
@@ -101,6 +106,8 @@ for (const key of [
   "interactions.miniBoss.description",
   "interactions.miniBoss.compatibility",
   "interactions.feedback.requires_ground_level",
+  "interactions.feedback.requires_plane_level",
+  "interactions.queue.waiting_plane",
 ]) validateTranslation(key);
 
 console.log(`Interaction catalog validated (${runtimeIds.length} items).`);

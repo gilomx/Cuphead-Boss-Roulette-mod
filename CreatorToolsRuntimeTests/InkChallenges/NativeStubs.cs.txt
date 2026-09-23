@@ -1,0 +1,80 @@
+using System;
+using System.Collections.Generic;
+
+namespace UnityEngine
+{
+    public class Object { public static void Destroy(Object value) { } }
+    public class GameObject : Object
+    {
+        public bool activeInHierarchy = true;
+        public void SetActive(bool value) { activeInHierarchy = value; }
+    }
+    public class Component : Object { public GameObject gameObject = new GameObject(); }
+    public class SpriteRenderer : Component { public bool enabled = true; }
+    public class Camera { }
+    public static class Time { public static float deltaTime, time; }
+    public static class Mathf
+    {
+        public static int CeilToInt(float value) { return (int)Math.Ceiling(value); }
+        public static int Max(int a, int b) { return Math.Max(a, b); }
+    }
+}
+internal enum Levels { Other, Pirate }
+internal class Level
+{
+    internal enum Mode { Easy, Normal, Hard }
+    internal static Level Current = new Level();
+    internal Mode mode = Mode.Normal;
+    internal Levels CurrentLevel;
+}
+internal static class SceneLoader { internal static bool CurrentlyLoading; }
+
+namespace Gilomx.CupheadBossRoulette
+{
+    // The production temporary adapter is linked above. These stand in for
+    // the existing rain physics/rendering, so this suite exercises ownership,
+    // clocks, emission shutdown and natural completion rather than Unity.
+    internal sealed partial class InkRainChallengeRuntime
+    {
+        internal readonly List<int> drops = new List<int>();
+        internal readonly List<int> groundImpacts = new List<int>();
+        internal readonly List<int> splats = new List<int>();
+        internal bool squidIntroActive;
+        internal float inkAlpha, targetInkAlpha;
+        internal float nextSpawnAt;
+        internal float inkEffectsEnabledAt = float.PositiveInfinity;
+        internal bool AssetsReady = true;
+        internal bool CameraReady = true;
+        private UnityEngine.Camera gameplayCamera;
+        internal int Starts, Cancels, Ticks, Emissions;
+        internal bool NativePirate, ShowSquid;
+        internal Level.Mode LastMode;
+        internal bool AudioActive;
+        internal float Elapsed;
+        internal float Clock { get { return EffectTime; } }
+        internal bool Draining { get { return temporaryDraining; } }
+        internal bool CanInk { get { return CanInkPlayers; } }
+        private bool EnsureInkAssets() { return AssetsReady; }
+        private UnityEngine.Camera FindGameplayCamera() { return CameraReady ? new UnityEngine.Camera() : null; }
+        private void StartAttempt(Level.Mode mode, bool intro, bool pirate)
+        {
+            Clear(); Starts++; LastMode = mode; NativePirate = pirate; ShowSquid = intro;
+        }
+        private void StopSquidAttackAudio() { AudioActive = false; }
+        private void TickRain(float seconds)
+        {
+            Ticks++; Elapsed += seconds;
+            if (!temporaryDraining && !float.IsPositiveInfinity(nextSpawnAt)) Emissions++;
+        }
+        private void EndImmediately() { Cancels++; Clear(); }
+        internal void TrackNative(UnityEngine.SpriteRenderer renderer) { temporaryNativeInkRenderer = renderer; }
+        private void Clear()
+        {
+            temporarySession = false; temporaryDraining = false; temporaryDefeat = false; temporaryTime = 0f;
+            temporaryNativeInkRenderer = null;
+            drops.Clear(); groundImpacts.Clear(); splats.Clear(); squidIntroActive = false;
+            inkAlpha = targetInkAlpha = 0f; nextSpawnAt = 0f; AudioActive = false; Elapsed = 0f;
+            inkEffectsEnabledAt = float.PositiveInfinity;
+        }
+    }
+}

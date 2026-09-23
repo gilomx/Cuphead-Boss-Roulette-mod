@@ -23,6 +23,14 @@ namespace Gilomx.CupheadBossRoulette
         internal const string BaronessCandyCorn = "baroness_candy_corn";
         internal const string BaronessJawbreaker = "baroness_jawbreaker";
         internal const string HalfDamageChallenge = "challenge_half_damage";
+        internal const string NoExChallenge = "challenge_no_ex";
+        internal const string NoDashChallenge = "challenge_no_dash";
+        internal const string StiffModeChallenge = "challenge_stiff_mode";
+        internal const string BlackAndWhiteChallenge = "challenge_black_and_white";
+        internal const string NoBombsChallenge = "challenge_no_bombs";
+        internal const string NoPeashooterChallenge = "challenge_no_peashooter";
+        internal const string RgbShiftChallenge = "challenge_rgb_shift";
+        internal const string InkRainChallenge = "challenge_ink_rain";
 
         internal static readonly string[] All =
         {
@@ -43,7 +51,15 @@ namespace Gilomx.CupheadBossRoulette
             BaronessWaffle,
             BaronessCandyCorn,
             BaronessJawbreaker,
-            HalfDamageChallenge
+            HalfDamageChallenge,
+            NoExChallenge,
+            NoDashChallenge,
+            StiffModeChallenge,
+            BlackAndWhiteChallenge,
+            NoBombsChallenge,
+            NoPeashooterChallenge,
+            RgbShiftChallenge,
+            InkRainChallenge
         };
     }
 

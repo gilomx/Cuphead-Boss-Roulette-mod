@@ -24,6 +24,14 @@ namespace Gilomx.CupheadBossRoulette
             switch (item)
             {
                 case "challenge_half_damage":
+                case "challenge_no_ex":
+                case "challenge_no_dash":
+                case "challenge_stiff_mode":
+                case "challenge_black_and_white":
+                case "challenge_no_bombs":
+                case "challenge_no_peashooter":
+                case "challenge_rgb_shift":
+                case "challenge_ink_rain":
                     return Challenge;
                 case "hilda_purple_zeppelin":
                 case "rootpack_homing_carrot":

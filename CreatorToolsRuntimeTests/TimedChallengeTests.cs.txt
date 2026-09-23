@@ -8,6 +8,411 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static void RunTimedChallengeTests()
         {
+            Run("Ink migration keeps existing choices and adds only an opt-in", delegate
+            {
+                using (var scope = new TestScope("ink-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":17,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_no_ex\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.InkRain), "new ink starts disabled");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.RgbShift), "RGB opt-in survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "previous exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    Equal("Viewer", settings.Names[0], "donor names survive");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.InkRain);
+                    settings.Save();
+                    True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.InkRain), "ink opt-in persists");
+                }
+            });
+            Run("Ink countdown releases emission but reserves its slot until the visuals drain", delegate
+            {
+                foreach (var plane in new[] { false, true })
+                foreach (var duration in new[] { 1, 15, 120 })
+                {
+                    var timer = new CreatorToolsTimedChallenge();
+                    True(timer.Start(CreatorToolsTimedChallenge.InkRain, duration, 3, plane), "ground and airplane support");
+                    timer.Advance(3.25f, true);
+                    Equal(0f, timer.EffectElapsed, "intro waits for warning exit");
+                    timer.Advance(duration, true);
+                    False(timer.Active, "stop emission at zero");
+                    timer.CompleteInkRainDrain();
+                    True(timer.Busy, "HUD exit cannot be cut short");
+                    timer.Advance(0.25f, true);
+                    False(timer.HudVisible, "no stuck zero timer during drain");
+                    True(timer.Busy, "existing drops keep the slot");
+                    var elapsed = timer.EffectElapsed;
+                    timer.Advance(100f, false);
+                    Equal(elapsed, timer.EffectElapsed, "pause freezes exit time");
+                    timer.Advance(30f, true);
+                    True(timer.Busy, "no arbitrary timeout removes drops");
+                    timer.CompleteInkRainDrain();
+                    False(timer.Busy, "actual completion releases the slot");
+                }
+            });
+            Run("Automatic challenges count equivalent airplane effects only once", delegate
+            {
+                var enabled = new System.Collections.Generic.HashSet<string>(new[] {
+                    CreatorToolsTimedChallenge.NoDash, CreatorToolsTimedChallenge.StiffMode,
+                    CreatorToolsTimedChallenge.NoEx, CreatorToolsTimedChallenge.HalfDamage });
+                foreach (var plane in new[] { false, true })
+                {
+                    var slots = plane ? 3 : 4;
+                    var results = new System.Collections.Generic.HashSet<string>();
+                    for (var selectedSlot = 1; selectedSlot <= slots; selectedSlot++)
+                    {
+                        var draws = 0;
+                        var selected = CreatorToolsTimedChallenge.ChooseAutomatic(plane, enabled.Contains,
+                            delegate(int count) { Equal(++draws, count, "one lottery ticket per eligible effect"); return count == 1 || count == selectedSlot ? 0 : 1; });
+                        Equal(slots, draws, "number of unique candidates");
+                        results.Add(selected);
+                    }
+                    Equal(slots, results.Count, "each distinct effect has one selectable slot");
+                    Equal(!plane, results.Contains(CreatorToolsTimedChallenge.StiffMode), "ground keeps both mobility effects");
+                }
+                enabled.Remove(CreatorToolsTimedChallenge.NoDash);
+                Equal(CreatorToolsTimedChallenge.StiffMode,
+                    CreatorToolsTimedChallenge.ChooseAutomatic(true, enabled.Contains, count => 0), "Stiff Mode alone still supplies NO MINI");
+                Equal(CreatorToolsTimedChallenge.StiffMode,
+                    CreatorToolsTimedChallenge.ChooseAutomatic(true, item => item == CreatorToolsTimedChallenge.StiffMode, count => 0), "unavailable NO DASH cannot swallow eligible equivalent");
+                True(CreatorToolsTimedChallenge.ChooseAutomatic(true, item => false, count => 0) == null, "empty selection creates no backlog");
+            });
+            Run("RGB migration preserves existing choices and enables no new automatic effect", delegate
+            {
+                using (var scope = new TestScope("rgb-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":16,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_no_ex\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.RgbShift), "new RGB starts disabled");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoBombs), "airplane choice survives");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoPeashooter), "other airplane choice survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "previous exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.RgbShift);
+                    settings.Save();
+                    True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.RgbShift), "explicit RGB opt-in persists");
+                }
+            });
+            Run("RGB starts after warning, pauses its movement and restores after zero", delegate
+            {
+                foreach (var duration in new[] { 1, 2, 15, 120 })
+                {
+                    var timer = new CreatorToolsTimedChallenge();
+                    timer.Start(CreatorToolsTimedChallenge.RgbShift, duration, 3);
+                    timer.Advance(3.25f, true);
+                    Equal(0f, timer.EffectElapsed, "warning spends no visual time");
+                    Equal(0f, timer.RgbShiftBlend, "RGB starts from normal");
+                    timer.Advance(0.625f, true);
+                    Equal(0.5f, timer.RgbShiftBlend, "same full entry as BW");
+                    timer.Advance(100f, false);
+                    Equal(0.625f, timer.EffectElapsed, "pause/focus/camera absence freezes oscillation");
+                    Equal(0.5f, timer.RgbShiftBlend, "pause freezes transition too");
+                    Equal(0f, timer.BlackAndWhiteBlend, "RGB does not desaturate");
+                    timer.Advance(duration - 0.625f, true);
+                    var peak = timer.RgbShiftBlend;
+                    True(peak > 0.89f && timer.Busy, "return begins only after active countdown");
+                    timer.Advance(0.45f, true);
+                    True(Math.Abs(timer.RgbShiftBlend - peak / 2f) < 0.0001f, "half of full 0.9 second exit");
+                    True(Math.Abs(timer.EffectElapsed - duration - 0.45f) < 0.0001f, "oscillation continues smoothly across exit boundary");
+                    timer.Advance(0.45f, true);
+                    Equal(0f, timer.RgbShiftBlend, "no lingering contribution");
+                    False(timer.Busy, "reservation releases after return");
+                    timer.Start(CreatorToolsTimedChallenge.RgbShift, duration, 0);
+                    Equal(0f, timer.EffectElapsed, "repeat starts from a new phase");
+                    timer.Advance(0.5f, true);
+                    var hud = new CreatorToolsTimedChallengeHudState();
+                    hud.HoldAfterDefeat(timer, "Viewer");
+                    timer.End();
+                    Equal(0f, timer.RgbShiftBlend, "death/cancellation clears rendering");
+                    Equal(CreatorToolsTimedChallenge.RgbShift, hud.DefeatSnapshot.Item, "death preserves title/icon identity only");
+                }
+            });
+            Run("Airplane weapon challenges migrate disabled without changing previous choices or times", delegate
+            {
+                using (var scope = new TestScope("plane-weapon-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":15,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_no_ex\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoBombs), "NO BOMBS starts disabled");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoPeashooter), "NO PEASHOOTER starts disabled");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "old exclusion survives");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.BlackAndWhite), "old selection survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    Equal("Viewer", settings.Names[0], "names survive");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.NoBombs);
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.NoPeashooter);
+                    settings.Save();
+                    settings = LoadPeskySettings(scope);
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoBombs), "NO BOMBS opt-in persists");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoPeashooter), "NO PEASHOOTER opt-in persists");
+                }
+            });
+            Run("Black and white fades on gameplay time and releases only its own filter", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                timer.Start(CreatorToolsTimedChallenge.BlackAndWhite, 15, 3);
+                Equal(0f, timer.BlackAndWhiteBlend, "warning stays in original colors");
+                timer.Advance(3f, true);
+                Equal(0f, timer.BlackAndWhiteBlend, "warning exit stays in original colors");
+                timer.Advance(0.25f, true);
+                Equal(0f, timer.BlackAndWhiteBlend, "active effect starts without a visual cut");
+                timer.Advance(0.625f, true);
+                Equal(0.5f, timer.BlackAndWhiteBlend, "halfway through the fade in");
+                timer.Advance(100f, false);
+                Equal(0.5f, timer.BlackAndWhiteBlend, "pause or unavailable camera freezes fade");
+                Equal(0.8f, timer.ComposeBlackAndWhiteBlend(0.8f), "weaker temporary source preserves base filter");
+                timer.Advance(0.625f, true);
+                Equal(1f, timer.BlackAndWhiteBlend, "full monochrome reached");
+                False(timer.IsActive(CreatorToolsTimedChallenge.HalfDamage), "monochrome does not reduce damage");
+                timer.Advance(13.5f, true);
+                Equal(1f, timer.BlackAndWhiteBlend, "full monochrome throughout the final second");
+                timer.Advance(0.25f, true);
+                Equal(0f, timer.Remaining, "active countdown reaches zero");
+                Equal(TimedChallengePhase.Exit, timer.Phase, "restoration begins only at zero");
+                Equal(1f, timer.BlackAndWhiteBlend, "restoration starts without a cut");
+                True(timer.RendersBlackAndWhite, "renderer remains available during restoration");
+                True(timer.Busy, "restoration keeps the challenge slot");
+                False(timer.Start(CreatorToolsTimedChallenge.NoEx, 15, 0), "next challenge waits for restoration");
+                timer.Advance(0.45f, true);
+                True(Math.Abs(timer.BlackAndWhiteBlend - 0.5f) < 0.0001f, "full 0.9 second fade out");
+                timer.Advance(100f, false);
+                True(Math.Abs(timer.BlackAndWhiteBlend - 0.5f) < 0.0001f, "pause freezes restoration too");
+                Equal(0.8f, timer.ComposeBlackAndWhiteBlend(0.8f), "restoration preserves the base filter");
+                timer.Advance(0.45f, true);
+                False(timer.Busy, "slot released after restoration");
+                False(timer.RendersBlackAndWhite, "render bridge may clean up after restoration");
+                Equal(0f, timer.BlackAndWhiteBlend, "expiration leaves no filter behind");
+                Equal(0.3f, timer.ComposeBlackAndWhiteBlend(0.3f), "base filter is unchanged after expiration");
+                timer.Start(CreatorToolsTimedChallenge.BlackAndWhite, 15, 0);
+                timer.Advance(2f, true);
+                var hud = new CreatorToolsTimedChallengeHudState();
+                hud.HoldAfterDefeat(timer, "Viewer");
+                timer.End();
+                Equal(0f, timer.BlackAndWhiteBlend, "death/cancellation immediately releases the live effect");
+                Equal(CreatorToolsTimedChallenge.BlackAndWhite, hud.DefeatSnapshot.Item, "death keeps the correct title and icon");
+                Equal(13f, hud.DefeatSnapshot.Remaining, "frozen HUD is independent of render cleanup");
+                timer.Start(CreatorToolsTimedChallenge.NoEx, 15, 0);
+                timer.Advance(2f, true);
+                Equal(0f, timer.BlackAndWhiteBlend, "another challenge cannot inherit the filter");
+            });
+            Run("Monochrome keeps full transition lengths even with a one second countdown", delegate
+            {
+                foreach (var duration in new[] { 1, 2, 3, 15, 120 })
+                {
+                    var timer = new CreatorToolsTimedChallenge();
+                    timer.Start(CreatorToolsTimedChallenge.BlackAndWhite, duration, 0);
+                    timer.Advance(0.625f, true);
+                    Equal(0.5f, timer.BlackAndWhiteBlend, "entry is never accelerated at " + duration + " seconds");
+                    timer.Advance(duration - 0.625f, true);
+                    var strength = duration == 1 ? 0.896f : 1f;
+                    True(Math.Abs(strength - timer.BlackAndWhiteBlend) < 0.0001f, "exit starts from actual strength at " + duration + " seconds");
+                    timer.Advance(0.45f, true);
+                    True(Math.Abs(strength * 0.5f - timer.BlackAndWhiteBlend) < 0.0001f, "exit is never accelerated at " + duration + " seconds");
+                    timer.Advance(0.45f, true);
+                    Equal(0f, timer.BlackAndWhiteBlend, "full restoration at " + duration + " seconds");
+                    False(timer.Busy, "complete lifecycle at " + duration + " seconds");
+                }
+            });
+            Run("Monochrome restoration precedes rest and cannot resurrect an expired HUD on defeat", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var pacing = new CreatorToolsChallengePacing();
+                var hud = new CreatorToolsTimedChallengeHudState();
+                timer.Start(CreatorToolsTimedChallenge.BlackAndWhite, 15, 0);
+                pacing.Reset(5);
+                timer.Advance(15f, true);
+                True(timer.HudVisible, "HUD begins its normal exit at zero");
+                timer.Advance(0.25f, true);
+                False(timer.HudVisible, "HUD finishes its own exit before the color restoration");
+                True(timer.Busy, "color restoration continues after the HUD exits");
+                pacing.Advance(0.25f, true, timer.Busy, 5);
+                Equal(5f, pacing.Remaining, "rest does not run during restoration");
+                hud.HoldAfterDefeat(timer, "Viewer");
+                True(hud.DefeatSnapshot == null, "expired title cannot reappear on defeat");
+                timer.Advance(1f, true);
+                pacing.Advance(1f, true, timer.Busy, 5);
+                Equal(5f, pacing.Remaining, "full rest follows restoration");
+                pacing.Advance(5f, true, timer.Busy, 5);
+                True(pacing.Ready, "next warning may start after the rest");
+            });
+            Run("Monochrome carries slow frames through restoration and resets between requests", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                timer.Start(CreatorToolsTimedChallenge.BlackAndWhite, 1, 3);
+                timer.Advance(4.7f, true);
+                Equal(TimedChallengePhase.Exit, timer.Phase, "overshoot reaches restoration");
+                True(Math.Abs(timer.BlackAndWhiteBlend - 0.448f) < 0.0001f, "overshoot preserves entry and exit curves");
+                timer.End();
+                Equal(0f, timer.BlackAndWhiteBlend, "cancellation during restoration clears its source");
+                timer.Start(CreatorToolsTimedChallenge.BlackAndWhite, 15, 0);
+                Equal(0f, timer.BlackAndWhiteBlend, "new entry starts cleanly");
+                timer.Advance(15f, true);
+                Equal(1f, timer.BlackAndWhiteBlend, "new exit cannot retain prior partial strength");
+                timer.Advance(100f, true);
+                False(timer.Busy, "overshoot beyond restoration releases the slot");
+                foreach (var item in CreatorToolsTimedChallenge.Items)
+                {
+                    if (CreatorToolsTimedChallenge.HasVisualTransition(item) || item == CreatorToolsTimedChallenge.InkRain) continue;
+                    timer.Start(item, 1, 0, true);
+                    timer.Advance(1.25f, true);
+                    False(timer.Busy, "other challenge exit remains 0.25 seconds: " + item);
+                }
+            });
+            Run("Monochrome migration preserves the previous timed catalog and opts out only the new effect", delegate
+            {
+                using (var scope = new TestScope("black-white-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":14,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_half_damage\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.BlackAndWhite), "new effect requires selection");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.StiffMode), "Stiff Mode selection survives");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "NO EX selection survives");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoDash), "NO DASH selection survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "existing exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.BlackAndWhite);
+                    settings.Save();
+                    settings = LoadPeskySettings(scope);
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.BlackAndWhite), "monochrome opt-in persists");
+                }
+            });
+            foreach (var mobilityItem in new[] { CreatorToolsTimedChallenge.NoDash, CreatorToolsTimedChallenge.StiffMode })
+            Run(mobilityItem + " preserves its airplane presentation after defeat and resets on the next effect", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var hud = new CreatorToolsTimedChallengeHudState();
+                timer.Start(mobilityItem, 15, 3, true);
+                False(timer.IsActive(mobilityItem), "movement remains free during warning");
+                timer.Advance(3.25f, true);
+                True(timer.IsActive(mobilityItem), "movement restriction starts after warning");
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "EX remains free");
+                False(timer.IsActive(CreatorToolsTimedChallenge.HalfDamage), "damage remains normal");
+                timer.Advance(5f, true);
+                hud.HoldAfterDefeat(timer, "Viewer");
+                timer.End();
+                False(timer.IsActive(mobilityItem), "death releases movement restriction");
+                timer.Start(mobilityItem, 15, 0, false);
+                False(timer.PlaneControls, "new ground attempt does not retain the airplane equivalent");
+                True(hud.DefeatSnapshot.PlaneControls, "held title and icon keep NO MINI-PLANE");
+                Equal(mobilityItem, hud.DefeatSnapshot.Item, "held effect identity survives");
+                Equal(10f, hud.DefeatSnapshot.Remaining, "held timer survives");
+                timer.Advance(15f, true);
+                False(timer.IsActive(mobilityItem), "expiration releases movement immediately");
+            });
+            Run("Stiff Mode migration preserves all previous challenge selections and times", delegate
+            {
+                using (var scope = new TestScope("stiff-mode-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":13,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_half_damage\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.StiffMode), "new challenge requires selection");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoDash), "NO DASH selection survives");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "NO EX selection survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "existing exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    Equal("Viewer", settings.Names[0], "sender list survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.StiffMode);
+                    settings.Save();
+                    settings = LoadPeskySettings(scope);
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.StiffMode), "Stiff Mode opt-in persists");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoDash), "NO DASH stays selected");
+                }
+            });
+            Run("NO DASH migration preserves NO EX opt-in and all configured times", delegate
+            {
+                using (var scope = new TestScope("no-dash-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":12,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_half_damage\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoDash), "new challenge requires selection");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "existing NO EX selection survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "existing exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "active duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "countdown survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.NoDash);
+                    settings.Save();
+                    settings = LoadPeskySettings(scope);
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoDash), "NO DASH opt-in persists");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "NO EX still selected");
+                }
+            });
+            Run("NO EX uses its own effect and keeps the shared challenge slot exclusive", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                False(timer.Start("unknown", 15), "unsupported effects cannot reserve a slot");
+                True(timer.Start(CreatorToolsTimedChallenge.NoEx, 15, 3), "NO EX warning starts");
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "EX remains available during warning");
+                False(timer.Start(CreatorToolsTimedChallenge.HalfDamage, 20), "another effect cannot replace its warning");
+                timer.Advance(3f, true);
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "warning exit still allows EX");
+                timer.Advance(CreatorToolsTimedChallenge.ExitSeconds, true);
+                True(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "NO EX now applies");
+                False(timer.IsActive(CreatorToolsTimedChallenge.HalfDamage), "NO EX never reduces damage");
+                False(timer.Start(CreatorToolsTimedChallenge.HalfDamage, 20), "effects cannot overlap");
+                timer.Advance(100f, false);
+                Equal(15f, timer.Remaining, "pause preserves NO EX duration");
+                timer.Advance(15f, true);
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "EX returns before the HUD exits");
+                timer.Advance(CreatorToolsTimedChallenge.ExitSeconds, true);
+                True(timer.Start(CreatorToolsTimedChallenge.HalfDamage, 20, 0), "a different effect may follow");
+                True(timer.IsActive(CreatorToolsTimedChallenge.HalfDamage), "next effect applies independently");
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "NO EX does not leak into its successor");
+                timer.End();
+                timer.Start(CreatorToolsTimedChallenge.NoEx, 15, 0);
+                timer.End();
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "level end restores EX immediately");
+            });
+            Run("Defeat keeps NO EX identity after the live effect is cleared or replaced", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var hud = new CreatorToolsTimedChallengeHudState();
+                timer.Start(CreatorToolsTimedChallenge.NoEx, 15, 0);
+                timer.Advance(4.5f, true);
+                hud.HoldAfterDefeat(timer, "Viewer");
+                timer.End();
+                False(timer.IsActive(CreatorToolsTimedChallenge.NoEx), "death clears the gameplay restriction");
+                timer.Start(CreatorToolsTimedChallenge.HalfDamage, 30, 0);
+                Equal(CreatorToolsTimedChallenge.NoEx, hud.DefeatSnapshot.Item, "frozen title and icon remain NO EX");
+                Equal(10.5f, hud.DefeatSnapshot.Remaining, "replacement cannot change the frozen duration");
+            });
+            Run("NO EX migration preserves existing selections and only opts out the new challenge", delegate
+            {
+                using (var scope = new TestScope("no-ex-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":11,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"hilda_green_zeppelin\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "new challenge requires selection");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "existing challenge stays selected");
+                    False(settings.IsItemEnabled("hilda_green_zeppelin"), "existing attack exclusion survives");
+                    True(settings.Enabled, "mode stays enabled");
+                    Equal("Viewer", settings.Names[0], "names survive");
+                    Equal(24, settings.ChallengeDurationSeconds, "active duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "countdown survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.NoEx);
+                    settings.Save();
+                    settings = LoadPeskySettings(scope);
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "explicit NO EX selection survives reload");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "both challenges can stay selected");
+                }
+            });
             Run("Defeat holds the timed HUD without retaining the gameplay effect", delegate
             {
                 var timer = new CreatorToolsTimedChallenge();
@@ -239,13 +644,17 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(10, first.DurationSeconds, "first redemption duration");
                 Equal(25, second.DurationSeconds, "second redemption duration");
                 Equal(5L, backlog.PendingCount, "all redemptions retained");
+                var noEx = backlog.Add(1, "connection", CreatorToolsTimedChallenge.NoEx, "", "A", 1, 10);
+                False(object.ReferenceEquals(first, noEx), "different effects with equal durations stay separate");
+                Equal(6L, backlog.PendingCount, "NO EX redemption also retained");
             });
             Run("Stream rules validate and serialize challenge duration", delegate
             {
-                using (var scope = new TestScope("timed-challenge-rules"))
+                foreach (var item in CreatorToolsTimedChallenge.Items)
+                using (var scope = new TestScope("timed-rules-" + item))
                 {
                     var rules = scope.CreateRules(1);
-                    var query = "action=create&name=Timed&eventType=gift&giftId=1&every=1&interaction=challenge_half_damage&quantity=1&enabled=true&countdownSeconds=6&durationSeconds=";
+                    var query = "action=create&name=Timed&eventType=gift&giftId=1&every=1&interaction=" + item + "&quantity=1&enabled=true&countdownSeconds=6&durationSeconds=";
                     using (var json = JsonDocument.Parse(rules.ProcessServerCommand(query + "24")))
                     {
                         Equal("created", json.RootElement.GetProperty("feedback").GetString(), "rule created");
@@ -263,6 +672,7 @@ namespace Gilomx.CupheadBossRoulette
                     rules.Evaluate(NewGiftEvent(2, 1), true);
                     var gameplay = new CreatorToolsInteractionController(200);
                     rules.Update(null, gameplay, true);
+                    Equal(item, gameplay.LastItem, "saved challenge identity reaches gameplay queue");
                     Equal(24, gameplay.LastDurationSeconds, "custom duration reaches gameplay queue");
                     Equal(6, gameplay.LastCountdownSeconds, "custom warning reaches gameplay queue");
                     foreach (var file in Directory.GetFiles(scope.ConfigDirectory, "*.stream-rules.json", SearchOption.AllDirectories))

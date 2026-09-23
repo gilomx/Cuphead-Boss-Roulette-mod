@@ -268,7 +268,7 @@ export interface InteractionQueueEntry {
   item: string;
   donor: string;
   delaySeconds: number;
-  status: "active" | "queued" | "scheduled" | "waiting_game";
+  status: "active" | "queued" | "scheduled" | "waiting_game" | "waiting_plane";
 }
 
 export interface TikTokGift {

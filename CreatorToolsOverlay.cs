@@ -168,7 +168,11 @@ namespace Gilomx.CupheadBossRoulette
                 delegate(string message) { Logger.LogWarning(message); });
             timedChallengeInteractions = new TimedChallengeInteractionExecutor(
                 delegate { return !timedHudState.WaitingForAttempt && creatorToolsApplicationFocused && CanSpawnCreatorToolsInteraction() && PrepareTimedChallengeHud(); },
-                delegate { return activeChallenge == ModifierId.HalfDamage && ShouldShowActiveChallenge(); });
+                BaseChallengeBlocksTimedChallenge,
+                CreatorToolsInteractionPresentation.HasAircraftPlayer,
+                IsTimedChallengeEffectAvailable,
+                SyncTimedChallengeEffects,
+                AdvanceTimedChallengeEffects);
             creatorToolsInteractions = new CreatorToolsInteractionController(
                 this,
                 Config.ConfigFilePath,
@@ -255,12 +259,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool CanPreloadNativeInteractionAssets()
         {
-            if (SceneLoader.CurrentlyLoading)
-                return creatorToolsNativePreloadWindow;
-
-            // Finish pending work behind the native loading screen. Additive
-            // activation/unloading can stall Unity even in a stable fight.
-            return CanUseRouletteOnMap();
+            // Additive scene activation/unloading also stalls an otherwise
+            // idle map. Admit it only after the native fade covers the screen.
+            return SceneLoader.CurrentlyLoading && creatorToolsNativePreloadWindow;
         }
 
         private bool CanSpawnCreatorToolsInteraction()
@@ -733,9 +734,10 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     plugin.Logger.LogWarning(
                         "Catalog preparation exceeded 30 seconds. Finishing the " +
-                        "current preload; remaining assets will wait for the map " +
-                        "or a later loading screen, never load during combat.");
-                });
+                        "current preload; remaining assets will wait for a later " +
+                        "loading screen, never load on the map or during combat.");
+                },
+                delegate(bool preparing) { plugin.preparingInteractionAssets = preparing; });
         }
 
         private static void CreatorToolsGameplayLevelLoadPrefix()

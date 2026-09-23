@@ -1,0 +1,122 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+
+internal static class Program
+{
+    private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    private static void Step(TimedChallengeInteractionExecutor executor, float seconds)
+    {
+        Time.time += seconds; Time.deltaTime = seconds; executor.Update();
+    }
+    private static void Main()
+    {
+        foreach (var plane in new[] { false, true })
+        foreach (var mode in new[] { Level.Mode.Easy, Level.Mode.Normal, Level.Mode.Hard })
+        {
+            Level.Current = new Level { mode = mode, CurrentLevel = plane ? Levels.Other : Levels.Pirate };
+            var rain = new InkRainChallengeRuntime();
+            var bridge = new TimedInkRainChallenge(rain);
+            var playing = true;
+            var baseInk = false;
+            var executor = new TimedChallengeInteractionExecutor(() => playing, _ => baseInk, () => plane,
+                _ => rain.PrepareTemporary(), bridge.Sync, bridge.Advance);
+            ICreatorToolsInteractionHandle handle;
+            string feedback, error;
+            baseInk = true;
+            Check(!executor.TrySpawn(CreatorToolsTimedChallenge.InkRain, "Viewer", "", 5, 3, out handle, out feedback, out error), "equipped effect blocks duplication");
+            Check(rain.Starts == 0 && rain.Cancels == 0, "does not touch equipped rain");
+            baseInk = false;
+            Check(executor.TrySpawn(CreatorToolsTimedChallenge.InkRain, "Viewer", "", 5, 3, out handle, out feedback, out error), "ground/plane request starts");
+            Check(!rain.CanInk, "warning cannot ink players");
+            Step(executor, 3.25f);
+            Check(rain.Starts == 1 && rain.Ticks == 0, "rain starts exactly at active countdown, not during warning");
+            Check(!rain.ShowSquid && rain.LastMode == mode && rain.NativePirate == !plane, "no squid intro, same difficulty and pirate overlay policy");
+            Check(rain.nextSpawnAt == rain.Clock && rain.inkEffectsEnabledAt == rain.Clock, "first ordinary rain wave is due immediately, without an intro delay");
+            Check(!rain.squidIntroActive && !rain.AudioActive && rain.CanInk, "active rain can ink players without a squid actor or intro sound");
+            Step(executor, 4);
+            var clock = rain.Clock;
+            playing = false; Step(executor, 80);
+            Check(rain.Clock == clock && executor.SecondsRemaining == 1, "pause freezes timer, animation and rain");
+            playing = true;
+            rain.CameraReady = false; Step(executor, 5);
+            Check(rain.Clock == clock && executor.SecondsRemaining == 1, "missing camera does not spend duration");
+            rain.CameraReady = true;
+            rain.drops.Add(1); rain.groundImpacts.Add(1); rain.splats.Add(1);
+            rain.inkAlpha = rain.targetInkAlpha = 0.4f;
+            var emissions = rain.Emissions;
+            Step(executor, 1);
+            Check(executor.SecondsRemaining == 0 && rain.Draining, "expiration stops emission immediately");
+            Check(rain.Emissions == emissions && !rain.AudioActive, "no new droplets or loop while draining");
+            Check(rain.drops.Count == 1 && rain.groundImpacts.Count == 1 && rain.splats.Count == 1, "expiry preserves all existing actors");
+            Check(rain.inkAlpha == .4f && rain.targetInkAlpha == .4f && !rain.squidIntroActive, "expiry preserves ink without starting a squid animation");
+            Check(rain.Cancels == 0 && !handle.IsComplete, "expiry never calls immediate cleanup");
+            Check(rain.CanInk, "existing rain drops keep their hit effect during natural drain");
+            Step(executor, .3f);
+            Check(!executor.Presentation.HudVisible && executor.Busy, "HUD exits while slot stays reserved");
+            var pacing = new CreatorToolsChallengePacing();
+            pacing.Advance(100, true, executor.Busy, 5);
+            Check(!pacing.Ready, "rest cannot elapse under draining rain");
+            ICreatorToolsInteractionHandle blocked;
+            Check(!executor.TrySpawn(CreatorToolsTimedChallenge.NoEx, "Second", "", 5, 0, out blocked, out feedback, out error), "next challenge waits for natural exit");
+            clock = rain.Clock; playing = false; Step(executor, 80);
+            Check(rain.Clock == clock && rain.drops.Count == 1, "pause freezes drain too");
+            playing = true;
+            rain.drops.Clear();
+            Step(executor, .1f); Check(executor.Busy, "impact and stains remain after last drop");
+            rain.groundImpacts.Clear(); rain.splats.Clear();
+            Step(executor, .1f); Check(executor.Busy, "existing full-screen ink fades naturally");
+            var native = new SpriteRenderer(); rain.TrackNative(native);
+            rain.inkAlpha = rain.targetInkAlpha = 0;
+            Step(executor, .1f); Check(executor.Busy, "native pirate ink also owns its full exit");
+            native.enabled = false; Step(executor, .1f);
+            Check(handle.IsComplete && !executor.Busy && !bridge.OwnsRuntime, "last visual releases lease");
+            pacing.Advance(0, true, executor.Busy, 5);
+            pacing.Advance(4, true, executor.Busy, 5); Check(!pacing.Ready, "rest begins after drain");
+            pacing.Advance(1, true, executor.Busy, 5); Check(pacing.Ready, "full configured rest after drain");
+            Check(executor.TrySpawn(CreatorToolsTimedChallenge.InkRain, "Second", "", 1, 0, out blocked, out feedback, out error), "repeat starts cleanly");
+            handle.Dispose(); Check(executor.Busy && bridge.OwnsRuntime, "old lease cannot erase successor");
+            rain.drops.Add(1);
+            Step(executor, 2);
+            Check(executor.Busy && !rain.squidIntroActive && rain.Draining, "short challenge drains its existing rain without emitting again");
+            executor.EndGameplayLevel();
+            Check(!executor.Busy && !bridge.OwnsRuntime && rain.drops.Count == 0, "unpreserved level cancellation releases temporary session immediately");
+            Check(!rain.CanInk, "temporary hit policy cannot leak into the next roulette attempt");
+
+            Check(executor.TrySpawn(CreatorToolsTimedChallenge.InkRain, "Defeat", "", 15, 0, out blocked, out feedback, out error), "start the defeat scenario");
+            rain.drops.Add(1); rain.groundImpacts.Add(1); rain.inkAlpha = .4f;
+            bridge.PreserveAfterDefeat();
+            executor.EndGameplayLevel(); blocked.Dispose();
+            Check(bridge.FinishingAfterDefeat && bridge.OwnsRuntime && !rain.squidIntroActive && rain.drops.Count == 1, "death and gameplay lease disposal preserve existing rain without a squid");
+            Check(!rain.CanInk && rain.Draining, "defeat visuals cannot emit or ink players");
+            var deathClock = rain.Clock;
+            bridge.AdvanceDefeat(.5f);
+            Check(rain.Clock > deathClock && !executor.Busy, "visual exit advances independently of the ended gameplay timer");
+            rain.drops.Clear(); rain.groundImpacts.Clear(); rain.inkAlpha = 0;
+            rain.TrackNative(new SpriteRenderer());
+            bridge.AdvanceDefeat(.5f);
+            Check(!bridge.OwnsRuntime && !bridge.FinishingAfterDefeat, "last custom visual releases death presentation without owning native pirate effects");
+            Check(executor.TrySpawn(CreatorToolsTimedChallenge.InkRain, "Retry", "", 15, 0, out blocked, out feedback, out error), "start retry scenario");
+            rain.drops.Add(1); bridge.PreserveAfterDefeat(); executor.EndGameplayLevel();
+            bridge.CancelVisuals();
+            Check(rain.drops.Count == 0 && !bridge.OwnsRuntime && !bridge.FinishingAfterDefeat, "explicit retry or exit clears lingering defeat visuals");
+        }
+        var untouched = new InkRainChallengeRuntime();
+        var idle = new TimedInkRainChallenge(untouched);
+        idle.Sync(new CreatorToolsTimedChallenge());
+        Check(untouched.Starts == 0 && untouched.Cancels == 0, "inactive adapter never resets the roulette runtime");
+        untouched.inkEffectsEnabledAt = Time.time - 1f;
+        untouched.squidIntroActive = true;
+        Check(!untouched.CanInk, "roulette squid intro remains harmless");
+        untouched.squidIntroActive = false;
+        untouched.inkEffectsEnabledAt = Time.time + 1f;
+        Check(!untouched.CanInk, "roulette grace period is preserved after intro");
+        Time.time += 1f;
+        Check(untouched.CanInk, "roulette rain still inks after intro and grace period");
+        var unavailable = new InkRainChallengeRuntime { AssetsReady = false };
+        Check(!unavailable.PrepareTemporary(), "missing resources stay unavailable");
+        SceneLoader.CurrentlyLoading = true;
+        Check(!untouched.PrepareTemporary(), "loading scene stays unavailable");
+        Console.WriteLine("PASS Direct rain without squid, ground/plane difficulty, expiry without clearing, emission shutdown, pause/camera loss, natural/native fade, reservation/rest, short duration, repeat, defeat visuals, retry cancellation and base ownership.");
+    }
+}

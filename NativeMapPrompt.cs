@@ -30,6 +30,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void LateUpdate()
         {
+            UpdateAssetLoadingNotice();
             UpdateBattleResultHud();
             UpdateTimedChallengeHud();
             UpdateNativeRoulettePrompt();

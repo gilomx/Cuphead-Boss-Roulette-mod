@@ -72,7 +72,6 @@ namespace Gilomx.CupheadBossRoulette
             AdvanceUpsideDownTransition();
             UpdateUpsideDownRenderEffects();
             AdvanceBlackAndWhiteTransition();
-            UpdateBlackAndWhiteRenderEffects();
         }
 
         private static void PrepareChallengeVisualsForRetryPrefix()

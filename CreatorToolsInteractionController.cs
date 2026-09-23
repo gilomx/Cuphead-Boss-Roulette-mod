@@ -996,15 +996,21 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdatePeskyChallenges(bool gameplayDispatchAllowed)
         {
-            var enabled = peskySettings.Enabled && peskySettings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage);
+            var enabled = false;
+            foreach (var item in CreatorToolsTimedChallenge.Items)
+                enabled |= peskySettings.Enabled && peskySettings.IsItemEnabled(item);
             var playing = enabled && gameplayDispatchAllowed && timedChallenges.GameplayAvailable;
             peskyChallengePacing.Advance(Time.deltaTime, playing, timedChallenges.Busy,
                 peskySettings.ChallengeWaitSeconds);
-            if (!playing || !peskyChallengePacing.Ready ||
-                !timedChallenges.IsAvailable(CreatorToolsTimedChallenge.HalfDamage)) return;
+            if (!playing || !peskyChallengePacing.Ready || timedChallenges.Busy) return;
+            var selected = CreatorToolsTimedChallenge.ChooseAutomatic(
+                CreatorToolsInteractionPresentation.HasAircraftPlayer(),
+                delegate(string item) { return peskySettings.IsItemEnabled(item) && timedChallenges.IsAvailable(item); },
+                delegate(int count) { return UnityEngine.Random.Range(0, count); });
+            if (selected == null) return;
             // Never build a free backlog. Queue and activate a single entry in
             // this update so actor reservations cannot discard its warning.
-            EnqueuePeskyItem(CreatorToolsTimedChallenge.HalfDamage);
+            EnqueuePeskyItem(selected);
             var entry = peskyQueue.Peek(delegate(CreatorToolsInteractionQueue.Entry candidate)
                 { return IsTimedChallenge(candidate.Item); });
             if (entry == null) return;
@@ -1498,6 +1504,7 @@ namespace Gilomx.CupheadBossRoulette
             if (feedbackCode == "native_assets_loading" ||
                 feedbackCode == "requires_gameplay_level" ||
                 feedbackCode == "requires_ground_level" ||
+                feedbackCode == "requires_plane_level" ||
                 feedbackCode == "interaction_type_active")
                 return false;
 
@@ -1682,7 +1689,7 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"maxDelay\":")
                 .Append(CreatorToolsInteractionQueue.MaximumDelaySeconds)
                 .Append(",\"queue\":");
-            interactionQueue.AppendJson(builder);
+            interactionQueue.AppendJson(builder, PendingInteractionStatus);
             builder.Append(",\"pacing\":");
             interactionPacingSettings.AppendJson(builder);
             builder.Append(",\"defaultPacing\":");
@@ -1818,6 +1825,12 @@ namespace Gilomx.CupheadBossRoulette
         {
             var executor = FindExecutor(item);
             return executor != null && executor.IsAvailable(item);
+        }
+
+        private string PendingInteractionStatus(string item)
+        {
+            return CreatorToolsTimedChallenge.RequiresPlane(item) && !timedChallenges.SupportsCurrentLevel(item)
+                ? "waiting_plane" : "queued";
         }
 
         private static int ParseQuantity(

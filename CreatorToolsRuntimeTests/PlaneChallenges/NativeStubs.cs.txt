@@ -1,0 +1,73 @@
+using System;
+using System.Collections.Generic;
+
+// Native mini-plane transitions below follow the IL checked by
+// tools/verify_native_plane_weapon_contract.ps1. These are not render tests.
+namespace UnityEngine
+{
+    public class Object { public static void Destroy(Object value) { } }
+    public class GameObject : Object
+    {
+        public bool activeInHierarchy = true;
+        public void SetActive(bool value) { activeInHierarchy = value; }
+    }
+    public class Component : Object { public GameObject gameObject = new GameObject(); }
+    public static class Time { public static float deltaTime; public static float realtimeSinceStartup; }
+    public static class Mathf
+    {
+        public static int CeilToInt(float value) { return (int)Math.Ceiling(value); }
+        public static int Max(int a, int b) { return Math.Max(a, b); }
+    }
+}
+public enum Weapon { None, plane_weapon_peashot, plane_weapon_bomb, plane_chalice_weapon_3way, plane_chalice_weapon_bomb }
+public class PlayerStatsManager { public bool isChalice; }
+public class PlanePlayerController : UnityEngine.Component
+{
+    public bool IsDead;
+    public bool WeaponBusy;
+    public bool Shrunk;
+    public PlayerStatsManager stats = new PlayerStatsManager();
+    public PlanePlayerWeaponManager weaponManager;
+    public PlanePlayerController(Weapon initial, bool chalice = false)
+    {
+        stats.isChalice = chalice;
+        weaponManager = new PlanePlayerWeaponManager(this, initial);
+    }
+}
+public class PlanePlayerWeaponManager : UnityEngine.Component
+{
+    private Weapon currentWeapon;
+    private Weapon unshrunkWeapon = Weapon.None;
+    public PlanePlayerController player;
+    public int SwitchCount;
+    public bool Shooting = true;
+    public Weapon FullSizeWeapon { get { return unshrunkWeapon == Weapon.None ? currentWeapon : unshrunkWeapon; } }
+    public Weapon Shot { get { return currentWeapon; } }
+    public PlanePlayerWeaponManager(PlanePlayerController player, Weapon initial) { this.player = player; currentWeapon = initial; }
+    private void SwitchWeapon(Weapon weapon)
+    {
+        if (player.WeaponBusy) throw new Exception("An EX/super was interrupted");
+        EndBasic();
+        currentWeapon = weapon;
+        SwitchCount++;
+        if (Shooting) StartBasic();
+    }
+    public void StartBasic()
+    {
+        if (player.Shrunk && currentWeapon != Weapon.plane_weapon_peashot)
+        {
+            unshrunkWeapon = currentWeapon;
+            currentWeapon = Weapon.plane_weapon_peashot;
+        }
+    }
+    public void EndBasic()
+    {
+        if (unshrunkWeapon != Weapon.None) { currentWeapon = unshrunkWeapon; unshrunkWeapon = Weapon.None; }
+    }
+}
+public static class PlayerManager
+{
+    public static readonly List<PlanePlayerController> Players = new List<PlanePlayerController>();
+    public static IEnumerable<PlanePlayerController> GetAllPlayers() { return Players; }
+}
+public static class SceneLoader { public static bool CurrentlyLoading; }

@@ -789,14 +789,14 @@ namespace Gilomx.CupheadBossRoulette
             // black-and-white transition, avoiding an unnecessary custom
             // shared-material path during ordinary combat.
             var useSaturationMaterial = !battleHudOnNativeCanvas &&
-                battleHudChallengeSnapshot == ModifierId.BlackAndWhite;
+                (battleHudChallengeSnapshot == ModifierId.BlackAndWhite || IsTimedBlackAndWhiteRendering);
             if (useSaturationMaterial)
             {
                 EnsureBattleHudSaturationMaterial();
                 if (battleHudSaturationMaterial != null)
                     battleHudSaturationMaterial.SetFloat(
                         "_Saturation",
-                        1f - Mathf.Clamp01(blackAndWhiteBlend));
+                        1f - Mathf.Clamp01(EffectiveBlackAndWhiteBlend));
                 else
                     useSaturationMaterial = false;
             }
@@ -1230,7 +1230,7 @@ namespace Gilomx.CupheadBossRoulette
             // independent overlay that isolates them from the native parry
             // flash.
             if (battleHudChallengeSnapshot == ModifierId.RgbShift ||
-                battleHudChallengeSnapshot == ModifierId.UpsideDown)
+                battleHudChallengeSnapshot == ModifierId.UpsideDown || IsTimedRgbRendering)
                 return PlaceBattleHudOnNativeGameplayLayer(nativeCanvas);
 
             // The camera that renders LevelHUD also receives Cuphead's parry

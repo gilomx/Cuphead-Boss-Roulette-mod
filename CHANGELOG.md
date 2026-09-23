@@ -2,6 +2,87 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- **LLUVIA DE TINTA temporal** empieza directamente con lluvia, sin pulpo ni
+  ráfaga inicial. Separa sus 136 imágenes de las 59 de la introducción, que se
+  preparan sólo cuando se necesita el reto de ruleta/equipado. Conserva la
+  cuenta previa, gotas, manchas y cierre gradual. El pulpo de ruleta mantiene
+  su introducción y ritmo originales.
+
+- Corregida la regresión que impedía aparecer a **LLUVIA DE TINTA** tras
+  trasladar sus imágenes a la pantalla de carga. La preparación usaba un tipo
+  de excepción ausente en el motor de Cuphead y quedaba descartada durante
+  toda la sesión. Se comprueba ahora esa compatibilidad contra las librerías
+  reales del juego, además de las pruebas de preparación de imágenes.
+
+- Aviso **«Preparando interacciones…»** junto al reloj nativo durante la
+  preparación de recursos del mod, alineado con su borde inferior. Usa la
+  tipografía del juego, acompaña la opacidad del reloj y desaparece cuando
+  termina el trabajo pendiente.
+  Los reintentos con recursos listos no muestran el aviso.
+
+- Se elimina la carga de imágenes de tinta al elegir el primer reto temporal:
+  se preparan por partes bajo la pantalla de carga y se reutilizan durante la
+  sesión. El catálogo de ataques y minijefes también se prepara sólo durante
+  la carga de niveles; deja de cargar escenas mientras se muestra el mapa.
+- Al perder durante **LLUVIA DE TINTA temporal**, las gotas ya visibles
+  terminan su animación sin emitir ni entintar más. Reintentar o
+  salir sigue limpiando la pantalla inmediatamente.
+
+- **LLUVIA DE TINTA** se añade como reto temporal en tierra y avión. Empieza
+  directamente con lluvia y conserva las gotas e impactos del reto de ruleta.
+  Al llegar el contador a cero deja de emitir: las gotas existentes terminan
+  su recorrido y la tinta se disipa normalmente, sin desaparecer de golpe.
+  El siguiente reto y su descanso esperan a que termine ese cierre; el HUD
+  sale al terminar el contador. Pausa también la lluvia y empieza desmarcado
+  en Modo Molestoso, sin cambiar los ajustes guardados.
+
+- **MAMÁ ESCUCHO BORROSO — RGB** se incorpora a los retos temporales, en tierra
+  y avión. Conserva los colores y desenfoque del reto de ruleta: entrada de
+  1.25 s junto al contador activo y vuelta a la normalidad de 0.9 s después de
+  llegar a cero. La pausa congela también su movimiento. Incluye icono, pruebas,
+  reglas de stream y Modo Molestoso, donde empieza desmarcado. Respeta los
+  efectos nativos y no se duplica si RGB ya está equipado.
+- En el sorteo de retos del Modo Molestoso, **NO DASH** y **MODO TIESO** cuentan
+  como una sola opción al volar, porque ambos equivalen a **NO MINIAVIÓN**.
+  En tierra siguen separados. Los canjes manuales y de stream conservan cada
+  solicitud, remitente y duración.
+
+- **NO DISPARO BOMBAS** y **SIN PEASHOOTER** se añaden a los retos temporales,
+  exclusivos de avión. Recuperan el arma anterior de cada jugador al terminar,
+  conservando miniavión y súperes. Los canjes en tierra esperan un nivel de avión
+  sin detener las demás interacciones; el panel muestra esa espera. En Modo
+  Molestoso sólo se sortean en avión y empiezan desmarcados al actualizar.
+
+- **BLANCO Y NEGRO** se añade como reto temporal en tierra y avión, para
+  pruebas, reglas de stream y Modo Molestoso. Reutiliza el filtro y shader
+  existentes: la entrada de 1.25 s empieza con el contador activo y la salida
+  de 0.9 s empieza cuando llega a cero, antes del descanso. La pausa congela
+  también la transición. Al terminar recupera el filtro del
+  jugador sin modificar sus ajustes. El HUD acompaña la saturación conservando
+  su diseño. Empieza desmarcado al actualizar y respeta el reto equipado.
+- **MODO TIESO** se incorpora a las interacciones temporales: en tierra fija
+  el movimiento al tocar suelo y bloquea el dash, permitiendo saltar y dirigir
+  el salto. En avión usa NO MINIAVIÓN, como en Equip Card. Comparte los tiempos
+  y la exclusividad de los demás retos y empieza desmarcado al actualizar.
+  El remitente del HUD temporal queda aproximadamente un 20 % más cerca del
+  título, conservando el contador a 2× y en negrita.
+- Nuevo reto temporal **NO DASH / NO MINIAVIÓN**: bloquea nuevos dashes en
+  tierra y el encogimiento en avión. Un dash ya iniciado termina normalmente;
+  si el avión ya estaba pequeño, vuelve a tamaño normal mediante su transición
+  nativa. Se evitan combinaciones con NO MINI o SOLO MINI equipados en avión.
+  Disponible en pruebas, reglas y Modo Molestoso, inicialmente desmarcado.
+- El contador restante del HUD temporal usa el doble de tamaño y negrita,
+  conservando la fuente, el pulso rojo final y la fila centrada con icono y
+  título. El remitente mantiene su tamaño, con más separación debajo.
+- **NO EX** se incorpora a los retos temporales de Interacciones y Modo
+  Molestoso: bloquea EX durante el tiempo configurado, manteniendo los súperes
+  tanto en tierra como en avión. Empieza desmarcado al actualizar, sin cambiar
+  las selecciones ni los tiempos guardados. Si se marcan varios retos, el modo
+  elige uno compatible al azar por turno; sigue habiendo un solo reto temporal.
+- El HUD temporal muestra el icono del reto antes de su nombre y centra la
+  fila completa. **RETO EN CAMINO** usa desde el inicio de la cuenta previa
+  el mismo pulso de color rojo, cada vez más rápido, del aviso de finalización.
+  La pantalla de derrota conserva el icono y nombre del reto que estaba activo.
 - El remitente del reto temporal se muestra en mayúsculas y al mismo tamaño
   que su título. **Reto en camino** y la cuenta regresiva pasan a la parte
   superior central; cada número reproduce el clic nativo del selector de

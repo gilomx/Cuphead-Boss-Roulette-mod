@@ -154,6 +154,63 @@ donaciones. Al apagarlo se eliminan únicamente sus molestias pendientes y las
 que sigan activas en pantalla. La lista de nombres aleatorios es opcional; si se
 deja vacía, los ataques aparecen sin nombre.
 
+**Retos temporales** permite seleccionar **Daño a la mitad**, **NO EX**,
+**NO DASH / NO MINIAVIÓN**, **MODO TIESO**, **BLANCO Y NEGRO**,
+**NO DISPARO BOMBAS**, **SIN PEASHOOTER**, **MAMÁ ESCUCHO BORROSO — RGB**
+y **LLUVIA DE TINTA**.
+NO EX bloquea los ataques EX, pero deja disponibles los súperes en tierra y
+avión. NO DASH bloquea nuevos dashes en tierra; al volar impide encogerse y
+devuelve un avión pequeño a su tamaño normal. Un dash que ya había empezado
+termina normalmente. MODO TIESO impide caminar y hacer dash en tierra, pero
+permite moverse al saltar; en avión también equivale a NO MINIAVIÓN. Si marcas
+ambos, en avión cuentan como una sola opción del sorteo automático para no
+duplicar su probabilidad. En tierra siguen separados. Los canjes manuales y de
+stream se conservan individualmente, con sus propios nombres y tiempos.
+BLANCO Y NEGRO y RGB funcionan en tierra y avión. RGB separa los colores y
+añade el mismo desenfoque que su reto de ruleta. Al terminar «Reto en camino»,
+el contador activo y la transición de entrada (1.25 s) arrancan juntos.
+Cuando llega a cero, comienza la vuelta a la imagen anterior (0.9 s); después
+empieza el descanso. Ambas transiciones conservan su duración. La pausa
+congela también la transición y el movimiento del efecto RGB.
+LLUVIA DE TINTA temporal funciona en tierra y avión. Empieza directamente con
+lluvia al terminar «Reto en camino», sin aparición del pulpo ni ráfaga inicial.
+Conserva las gotas, impactos, manchas y ritmo de lluvia del reto de ruleta.
+Al llegar a cero deja de crear gotas; las que quedan siguen cayendo y
+pueden entintar al jugador. Los impactos y manchas terminan normalmente antes
+del descanso. El HUD se retira al acabar el contador, sin quedarse mostrando
+cero mientras se despeja la pantalla. La pausa detiene también la lluvia.
+Si pierdes, las gotas que ya estaban en pantalla terminan su
+animación, sin generar gotas ni entintar más. Reintentar o salir limpia todo.
+Las imágenes de lluvia se preparan por partes durante la primera pantalla de
+carga y se reutilizan después. El reto de ruleta/equipado conserva el pulpo;
+sus imágenes sólo se preparan si se necesita esa introducción, durante la carga
+del nivel, y después también se reutilizan.
+Mientras se preparan recursos del mod aparece «Preparando interacciones…»
+a la izquierda del reloj de carga, alineado con su borde inferior. El aviso
+desaparece al terminar esa preparación y no aparece en los reintentos que ya
+tienen todo listo.
+Los nueve empiezan desmarcados en Modo Molestoso. Si marcas varios, se
+elige uno compatible al azar cada turno; sólo puede haber un reto temporal a
+la vez. También puedes enviarlos desde las pruebas manuales y reglas de stream.
+
+NO DISPARO BOMBAS y SIN PEASHOOTER son exclusivos de avión. Cambian al arma
+permitida y recuperan la selección anterior al terminar; el miniavión y sus
+disparos, EX y súperes siguen disponibles. Un EX o súper ya iniciado termina
+antes de cambiar de arma. Los canjes recibidos en tierra esperan durante la
+sesión, sin gastar su duración ni detener las demás interacciones. El panel
+muestra «Esperando un nivel de avión». Modo Molestoso sólo los sortea en avión.
+
+El ciclo es espera entre retos (5 s por defecto) → cuenta previa (3 s) → reto
+activo (15 s). Los tres tiempos se pueden configurar. El aviso **RETO EN CAMINO**
+pulsa en rojo durante la cuenta previa; después aparece el icono junto al nombre,
+el tiempo restante al doble de tamaño y en negrita, y el remitente debajo, si lo hay.
+En avión, NO DASH y MODO TIESO muestran el nombre e icono de NO MINIAVIÓN.
+La pausa congela la cuenta.
+Al perder se conserva la presentación; reintentar la limpia. El reto de la ruleta
+permanece: un canje del mismo efecto espera, y el modo automático lo omite.
+NO MINIAVIÓN también espera si está equipado SOLO MINI, para evitar efectos
+contradictorios.
+
 Los controles separan **Ataques normales** y **Minijefes**, con un resumen
 que muestra las esperas resultantes. Modo Molestoso e Interacciones conservan
 sus propios ajustes. En Interacciones hay que activar **Espaciar los ataques

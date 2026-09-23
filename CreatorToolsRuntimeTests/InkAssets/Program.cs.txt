@@ -1,0 +1,103 @@
+using System;
+using System.IO;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+
+internal static class Program
+{
+    private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    private static void Finish(InkRainChallengeRuntime rain, bool includeSquid = false)
+    {
+        SceneLoader.CurrentlyLoading = true;
+        for (var frame = 0; frame < 1000 && rain.NeedsAssetPreparation(includeSquid); frame++)
+        {
+            var count = Texture2D.Loaded;
+            rain.PrepareAssetsDuringLoading(includeSquid);
+            Check(Texture2D.Loaded - count <= 4, "at most four image decodes per slice");
+        }
+        Check(!rain.NeedsAssetPreparation(includeSquid), "finite preparation completes even if a resource group failed");
+        SceneLoader.CurrentlyLoading = false;
+    }
+    private static void Main(string[] args)
+    {
+        var root = Path.GetFullPath(args.Length > 0 ? args[0] : "assets");
+        var rain = new InkRainChallengeRuntime(root);
+        for (var i = 0; i < 100; i++)
+        {
+            Check(!rain.Ready, "cold eligibility does not load assets");
+            rain.PrepareAssetsDuringLoading();
+        }
+        Check(Texture2D.Created == 0 && !rain.AssetsSettled, "startup and gameplay perform no image work");
+        SceneLoader.CurrentlyLoading = true;
+        rain.PrepareAssetsDuringLoading();
+        Check(!rain.Ready, "partial projectile frames do not publish a ready catalog");
+        var partial = Texture2D.Loaded;
+        SceneLoader.CurrentlyLoading = false;
+        for (var i = 0; i < 100; i++) rain.PrepareAssetsDuringLoading();
+        Check(Texture2D.Loaded == partial, "leaving the loading screen suspends preparation");
+        Finish(rain);
+        Check(rain.Ready && rain.log.Warnings == 0, "shared rain catalog becomes ready without squid");
+        Check(Texture2D.Loaded == 136 && !rain.SquidReady && !rain.SquidAssetsSettled && rain.squidEntranceFrames == null,
+            "temporal preparation decodes only 136 rain images and never opens squid frames");
+        Check(rain.inkDropFrames.Length == Directory.GetFiles(Path.Combine(root, "inkrain/projectiles"), "pirate_squid_inkblob_*.png").Length, "all projectile frames preserved");
+        Check(rain.groundImpactAnimations.Count == 4 && rain.inkScreenAnimations.Count == 5, "all impact/splat groups preserved");
+        Check(rain.inkDropFrames[0].pixelsPerUnit == 100 && rain.inkScreenAnimations[0][0].pixelsPerUnit == 1, "rain sprite geometry remains correct");
+        var loaded = Texture2D.Loaded;
+        for (var i = 0; i < 100; i++) { Check(rain.Ready, "cache remains ready"); rain.PrepareAssetsDuringLoading(); }
+        Check(Texture2D.Loaded == loaded, "repeat fights only read readiness");
+        var rainFrames = rain.inkDropFrames;
+        Check(rain.NeedsAssetPreparation(true), "a later roulette ink selection requests just the missing intro");
+        rain.PrepareAssetsDuringLoading(true);
+        Check(Texture2D.Loaded == loaded, "even an explicit squid request cannot load outside the loading screen");
+        Finish(rain, true);
+        Check(rain.SquidReady && Texture2D.Loaded - loaded == 59 && ReferenceEquals(rainFrames, rain.inkDropFrames),
+            "roulette upgrade adds only 59 squid images without reloading shared rain");
+        Check(rain.squidAttackFrames.Length == 3 && rain.squidAttackLoopFrames.Length == 16 && rain.squidExitFrames.Length == 7 + rain.squidLeaveFrames.Length,
+            "roulette squid frame slices retain their original animation");
+        Check(rain.squidEntranceFrames[0].pivot.y == 0, "squid geometry remains correct");
+        loaded = Texture2D.Loaded;
+        Finish(rain); Finish(rain, true);
+        Check(Texture2D.Loaded == loaded, "switching between temporary and equipped effects reuses both catalogs");
+        rain.Shutdown();
+        Check(UnityEngine.Object.DestroyCount == Texture2D.Created + Sprite.Created, "shutdown releases every texture and sprite once");
+        Console.WriteLine("PASS Loading-only slices, temporal 136-image rain, optional 59-image squid, later roulette upgrade, geometry and cached repeat fights.");
+
+        Texture2D.FailAt = Texture2D.Loaded + 2;
+        var broken = new InkRainChallengeRuntime(root);
+        Finish(broken);
+        Check(!broken.Ready && broken.log.Warnings == 1 && broken.ownedInkTextures.Count == 0, "decode failure settles without publishing or leaking partial textures");
+        Check(!broken.NeedsAssetPreparation(true), "rain failure does not wait forever for a squid intro that cannot prepare");
+        loaded = Texture2D.Loaded;
+        SceneLoader.CurrentlyLoading = true;
+        for (var i = 0; i < 100; i++) broken.PrepareAssetsDuringLoading();
+        Check(Texture2D.Loaded == loaded, "failed assets do not retry on each gameplay check");
+        broken.Shutdown();
+        Check(UnityEngine.Object.DestroyCount == Texture2D.Created + Sprite.Created, "failure and shutdown do not double destroy");
+        Texture2D.FailAt = 0;
+        var brokenSquid = new InkRainChallengeRuntime(root);
+        Finish(brokenSquid);
+        rainFrames = brokenSquid.inkDropFrames;
+        Texture2D.FailAt = Texture2D.Loaded + 2;
+        Finish(brokenSquid, true);
+        Check(brokenSquid.Ready && !brokenSquid.SquidReady && brokenSquid.log.Warnings == 1 &&
+            ReferenceEquals(rainFrames, brokenSquid.inkDropFrames) && !rainFrames[0].Destroyed,
+            "a squid failure preserves the loaded rain and keeps the temporal effect available");
+        loaded = Texture2D.Loaded;
+        Finish(brokenSquid, true);
+        Check(Texture2D.Loaded == loaded, "squid failure also avoids retry storms");
+        brokenSquid.Shutdown();
+        Check(UnityEngine.Object.DestroyCount == Texture2D.Created + Sprite.Created, "failed squid releases its own partial resources exactly once");
+        Texture2D.FailAt = 0;
+        var cancelled = new InkRainChallengeRuntime(root);
+        SceneLoader.CurrentlyLoading = true;
+        cancelled.PrepareAssetsDuringLoading(); cancelled.Shutdown();
+        Check(!cancelled.Ready && UnityEngine.Object.DestroyCount == Texture2D.Created + Sprite.Created, "interrupted preparation releases partial resources");
+        var cancelledSquid = new InkRainChallengeRuntime(root);
+        Finish(cancelledSquid);
+        SceneLoader.CurrentlyLoading = true;
+        cancelledSquid.PrepareAssetsDuringLoading(true); cancelledSquid.Shutdown();
+        Check(!cancelledSquid.Ready && !cancelledSquid.SquidReady && UnityEngine.Object.DestroyCount == Texture2D.Created + Sprite.Created,
+            "cancelling a partial squid upgrade also releases both catalogs exactly once");
+        Console.WriteLine("PASS Isolated rain/squid decode failures, no retry storms or loading deadlock, partial-load cancellation and exact disposal.");
+    }
+}

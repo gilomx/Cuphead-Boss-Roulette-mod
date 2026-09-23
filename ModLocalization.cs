@@ -46,6 +46,7 @@ namespace Gilomx.CupheadBossRoulette
         ActionSelectSave,
         ChallengePrefix,
         ChallengeIncoming,
+        LoadingInteractions,
         ControlsLegacy,
         StatusReady,
         StatusSpinning,
@@ -311,6 +312,7 @@ namespace Gilomx.CupheadBossRoulette
             spanish[ModText.ActionSelectSave] = "SELECCIONA UNA PARTIDA";
             spanish[ModText.ChallengePrefix] = "RETO:";
             spanish[ModText.ChallengeIncoming] = "Reto en camino";
+            spanish[ModText.LoadingInteractions] = "Preparando interacciones…";
             spanish[ModText.ControlsLegacy] =
                 "F6  ABRIR/CERRAR     ·     F7  GIRAR     ·     CTRL+I  SELECCIÓN FORZADA";
             spanish[ModText.StatusReady] = "PULSA ENTER PARA GIRAR";
@@ -376,6 +378,7 @@ namespace Gilomx.CupheadBossRoulette
             english[ModText.ActionSpinning] = "SPINNING...";
             english[ModText.ChallengePrefix] = "CHALLENGE:";
             english[ModText.ChallengeIncoming] = "Challenge incoming";
+            english[ModText.LoadingInteractions] = "Preparing interactions…";
             english[ModText.ChallengeNoDash] = "NO DASH";
             english[ModText.ChallengeNoMiniPlane] = "NO MINI-PLANE";
             english[ModText.ChallengeMiniPlaneOnly] = "MINI-PLANE ONLY";

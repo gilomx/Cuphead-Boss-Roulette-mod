@@ -16,12 +16,14 @@ namespace Gilomx.CupheadBossRoulette
             Func<bool> busy,
             Action<bool> setPreloadWindow,
             Func<float> realtime,
-            Action onTimeout)
+            Action onTimeout,
+            Action<bool> setPreparing = null)
         {
             try
             {
                 if (prepareCatalog && !settled())
                 {
+                    if (setPreparing != null) setPreparing(true);
                     var startedAt = realtime();
                     setPreloadWindow(true);
                     while (!settled() &&
@@ -32,19 +34,24 @@ namespace Gilomx.CupheadBossRoulette
                         onTimeout();
                 }
 
-                // Also drain map preloads when returning to a menu or map.
+                // Drain any in-flight work when returning to a menu or map.
                 // On timeout stop admitting new work, then let the current
                 // Unity operation unload safely; Unity cannot cancel it.
                 // Busy also includes native atlas requests, even if the
                 // template is ready and the source preload has released.
                 while (busy())
+                {
+                    if (setPreparing != null) setPreparing(true);
                     yield return null;
+                }
 
+                if (setPreparing != null) setPreparing(false);
                 while (nativeLoad.MoveNext())
                     yield return nativeLoad.Current;
             }
             finally
             {
+                if (setPreparing != null) setPreparing(false);
                 setPreloadWindow(false);
                 var disposable = nativeLoad as IDisposable;
                 if (disposable != null)

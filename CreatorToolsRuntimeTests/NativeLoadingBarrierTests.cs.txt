@@ -11,6 +11,8 @@ namespace Gilomx.CupheadBossRoulette
             internal bool Busy;
             internal int NativeAssetRequests;
             internal bool Window;
+            internal bool Notice;
+            internal int NoticeStarts;
             internal float Now;
             internal int Timeouts;
             internal int NativeStarts;
@@ -22,13 +24,19 @@ namespace Gilomx.CupheadBossRoulette
                 return NativeInteractionLoadingBarrier.BeforeSceneLoad(
                     NativeLoad(), prepare, () => Settled,
                     () => Busy || NativeAssetRequests > 0,
-                    allowed => Window = allowed, () => Now, () => Timeouts++);
+                    allowed => Window = allowed, () => Now, () => Timeouts++,
+                    preparing =>
+                    {
+                        if (preparing && !Notice) NoticeStarts++;
+                        Notice = preparing;
+                    });
             }
 
             private IEnumerator NativeLoad()
             {
                 True(!Busy && !Window && NativeAssetRequests == 0,
                     "native load starts after capture, unload and native asset completion");
+                False(Notice, "preparation notice is hidden before native scene loading starts");
                 NativeStarts++;
                 try { yield return NativeYield; }
                 finally { NativeDisposals++; }
@@ -42,6 +50,7 @@ namespace Gilomx.CupheadBossRoulette
                 var p = new LoadingProbe { Settled = true, NativeAssetRequests = 2 };
                 var load = p.Wrap();
                 True(load.MoveNext(), "completed scene still has two pending atlas requests");
+                True(p.Notice, "notice remains visible while atlas requests finish");
                 False(p.Window, "draining textures never starts new catalog work");
                 Equal(0, p.NativeStarts, "native loader cannot close the pending atlas bundles");
                 p.NativeAssetRequests = 1;
@@ -59,6 +68,7 @@ namespace Gilomx.CupheadBossRoulette
                 True(load.MoveNext(), "preparing");
                 p.Now = NativeInteractionLoadingBarrier.PreparationBudgetSeconds;
                 True(load.MoveNext(), "timeout still drains native I/O");
+                True(p.Notice, "timeout does not hide the notice while work is still pending");
                 Equal(1, p.Timeouts, "preparation timeout reported");
                 Equal(0, p.NativeStarts, "pending textures survive the preparation timeout");
                 False(p.Window, "no new catalog loads");
@@ -72,10 +82,12 @@ namespace Gilomx.CupheadBossRoulette
                 var load = p.Wrap();
                 True(load.MoveNext(), "pending preparation yields a frame");
                 True(p.Window, "preload window opens behind fade");
+                True(p.Notice, "notice follows actual preparation");
                 Equal(0, p.NativeStarts, "native async queue remains untouched");
                 p.Settled = true;
                 p.Busy = true;
                 True(load.MoveNext(), "ready templates still wait for source unload");
+                True(p.Notice, "notice persists until source unload completes");
                 False(p.Window, "no new preloads during drain");
                 Equal(0, p.NativeStarts, "target cannot race source unload");
                 p.Busy = false;
@@ -91,10 +103,11 @@ namespace Gilomx.CupheadBossRoulette
                 True(load.MoveNext(), "native first yield occurs immediately");
                 True(ReferenceEquals(p.NativeYield, load.Current), "no extra preparation frame");
                 Equal(1, p.NativeStarts, "retry starts immediately");
+                Equal(0, p.NoticeStarts, "cached retries never flash a preparation notice");
                 ((IDisposable)load).Dispose();
                 Equal(1, p.NativeDisposals, "cancellation reaches native iterator");
             });
-            Run("Menu transitions drain a map preload without starting a catalog", () =>
+            Run("Menu transitions drain in-flight work without starting a catalog", () =>
             {
                 var p = new LoadingProbe { Busy = true };
                 var load = p.Wrap(false);
@@ -127,6 +140,7 @@ namespace Gilomx.CupheadBossRoulette
                 True(load.MoveNext(), "preparing");
                 ((IDisposable)load).Dispose();
                 False(p.Window, "aborted loading cannot enable gameplay preloads");
+                False(p.Notice, "cancellation cannot leave a stale preparation notice");
                 Equal(0, p.NativeStarts, "aborted transition did not enqueue a target");
             });
             Run("Later loading screens can finish assets left by a timeout", () =>

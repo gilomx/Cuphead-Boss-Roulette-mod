@@ -4,18 +4,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     public sealed partial class Plugin
     {
-        private const float RgbShiftAmount = 32f;
-        private const float RgbShiftSpeed = 10f;
-        private const float RgbShiftHorizontalSpeedRatio = 0.73f;
-        private const float RgbShiftHorizontalScale = 0.7f;
-        private const float RgbShiftRedScale = 1.2f;
-        private const float RgbShiftGreenScale = 0.6f;
-        private const float RgbShiftBlueScale = 0.9f;
-        private const float RgbBlurStrength = 0.7f;
-        private const float RgbBlurInitialOffset = 1f;
-        private const float RgbBlurRiseDuration = 0.6f;
-        private const float RgbBlurPeakOffset = 1.6f;
-        private const float RgbBlurPulseDuration = 2.2f;
+        private const float RgbBlurPulseDuration = CreatorToolsRgbShiftVisuals.BlurPulseDuration;
 
         private ChromaticAberrationFilmGrain rgbShiftEffect;
         private BlurGamma rgbShiftBlur;
@@ -122,18 +111,10 @@ namespace Gilomx.CupheadBossRoulette
             rgbShiftBlurPulseTime = Mathf.Repeat(
                 rgbShiftBlurPulseTime + Time.deltaTime,
                 RgbBlurPulseDuration);
-            var verticalPhase = Mathf.Sin(
-                rgbShiftPhaseTime * RgbShiftSpeed);
-            var horizontalPhase = Mathf.Sin(
-                rgbShiftPhaseTime * RgbShiftSpeed *
-                RgbShiftHorizontalSpeedRatio + Mathf.PI * 0.5f);
-            var baseOffset = new Vector2(
-                horizontalPhase * RgbShiftAmount *
-                RgbShiftHorizontalScale,
-                verticalPhase * RgbShiftAmount);
-            var red = baseOffset * RgbShiftRedScale;
-            var green = baseOffset * RgbShiftGreenScale;
-            var blue = -baseOffset * RgbShiftBlueScale;
+            var sample = CreatorToolsRgbShiftVisuals.At(rgbShiftPhaseTime, rgbShiftBlurPulseTime);
+            var red = new Vector2(sample.RedX, sample.RedY);
+            var green = new Vector2(sample.GreenX, sample.GreenY);
+            var blue = new Vector2(sample.BlueX, sample.BlueY);
             var blend = Mathf.Clamp01(rgbShiftBlend);
 
             // LateUpdate runs after Cuphead's pollen coroutine, so Cagney's
@@ -144,25 +125,11 @@ namespace Gilomx.CupheadBossRoulette
 
             if (rgbShiftBlur != null && rgbShiftBlurOriginalCaptured)
             {
-                var blurOffset = NativeCagneyBlurOffset(
-                    rgbShiftBlurPulseTime);
                 rgbShiftBlur.blurSize = Mathf.Lerp(
                     rgbShiftOriginalBlurSize,
-                    rgbShiftOriginalBlurSize +
-                    blurOffset * RgbBlurStrength,
+                    rgbShiftOriginalBlurSize + sample.Blur,
                     blend);
             }
-        }
-
-        private static float NativeCagneyBlurOffset(float pulseTime)
-        {
-            // TouchFuzzy immediately adds 1, rises at one unit per second for
-            // 0.6 seconds, then falls at the same rate back to the baseline.
-            if (pulseTime < RgbBlurRiseDuration)
-                return RgbBlurInitialOffset + pulseTime;
-
-            return Mathf.Max(0f, RgbBlurPeakOffset -
-                (pulseTime - RgbBlurRiseDuration));
         }
 
         private static bool SuppressCagneyFuzzyDuringRgbPrefix()
@@ -174,6 +141,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldSuppressCagneyFuzzyDuringRgb()
         {
+            if (IsTimedRgbRendering && Level.Current != null && Level.Current.CurrentLevel == Levels.Flower)
+                return true;
             if (activeChallenge != ModifierId.RgbShift ||
                 !activeChallengeTargetAssigned ||
                 activeChallengeTargetLevel != Levels.Flower)

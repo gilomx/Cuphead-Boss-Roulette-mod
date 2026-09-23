@@ -37,7 +37,7 @@ namespace Gilomx.CupheadBossRoulette
                     "maximum supported seconds");
                 False(settings.Enabled, "new settings remain disabled");
                 Equal(6, settings.Names.Count, "existing default names");
-                Equal(1, settings.DisabledItems.Count, "timed challenges start disabled");
+                Equal(9, settings.DisabledItems.Count, "all nine timed challenges start disabled");
             }
         }
 
@@ -154,7 +154,7 @@ namespace Gilomx.CupheadBossRoulette
                 settings.Save();
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(11, json.RootElement.GetProperty("version").GetInt32(),
+                    Equal(18, json.RootElement.GetProperty("version").GetInt32(),
                         "saved file uses the interval schema");
                     Equal(3f, json.RootElement.GetProperty("minimumInterval")
                         .GetSingle(), "new minimum is serialized");

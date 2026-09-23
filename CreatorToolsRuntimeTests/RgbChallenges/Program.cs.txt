@@ -1,0 +1,70 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+
+internal static class Program
+{
+    private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    private static void Near(float expected, float actual, string message) { Check(Math.Abs(expected - actual) < 0.0001f, message); }
+    private static void Main()
+    {
+        var sample = CreatorToolsRgbShiftVisuals.At(0f, 0f);
+        Near(26.88f, sample.RedX, "original red horizontal offset");
+        Near(13.44f, sample.GreenX, "original green horizontal offset");
+        Near(-20.16f, sample.BlueX, "original blue horizontal offset");
+        Near(0f, sample.RedY, "entry phase");
+        Near(0.7f, sample.Blur, "original 70 percent blur start");
+        Near(1.12f, CreatorToolsRgbShiftVisuals.At(0, 0.6f).Blur, "native blur peak");
+        Near(0.07f, CreatorToolsRgbShiftVisuals.At(0, 2.1f).Blur, "native blur decay");
+        Near(0.7f, CreatorToolsRgbShiftVisuals.At(0, 2.2f).Blur, "native blur pulse restarts");
+        Console.WriteLine("PASS Shared RGB visual parameters retain the equipped challenge's motion and blur");
+
+        var color = new ChromaticAberrationFilmGrain();
+        var blur = new BlurGamma();
+        var timer = new CreatorToolsTimedChallenge();
+        timer.Start(CreatorToolsTimedChallenge.RgbShift, 2, 0);
+        for (var frame = 0; frame < 240; frame++)
+        {
+            // Native pollen was already running before the interaction. It
+            // continues to finish normally, independently of our rendered frame.
+            var native = Math.Max(0, 1f - frame / 60f);
+            color.r = new Vector2(0, native * 15);
+            color.g = new Vector2(0, native * 7.5f);
+            color.b = new Vector2(0, -native * 15);
+            blur.blurSize = 0.2f + native;
+            timer.Advance(1f / 60, true);
+            var colorState = TimedRgbShiftRenderFrame.Apply(color, timer.RgbShiftBlend, timer.EffectElapsed);
+            var blurState = TimedRgbShiftRenderFrame.Apply(blur, timer.RgbShiftBlend, timer.EffectElapsed);
+            if (timer.RgbShiftBlend > 0)
+                Check(colorState.Applied && blurState.Applied, "effect is drawn while active/returning");
+            TimedRgbShiftRenderFrame.Restore(color, colorState);
+            TimedRgbShiftRenderFrame.Restore(blur, blurState);
+            Near(native * 15, color.r.y, "native red continues independently");
+            Near(native * 7.5f, color.g.y, "native green continues independently");
+            Near(-native * 15, color.b.y, "native blue continues independently");
+            Near(0.2f + native, blur.blurSize, "blur never compounds between frames");
+        }
+        Check(!timer.Busy, "RGB lifecycle completes");
+        Near(0f, color.r.y, "no stale pollen color restored at expiration");
+        Near(0.2f, blur.blurSize, "no stale pollen blur restored at expiration");
+        Console.WriteLine("PASS Mid-pollen entry, native decay, post-zero return and no residual filter");
+
+        var state = TimedRgbShiftRenderFrame.Apply(blur, 1, 1);
+        try { throw new InvalidOperationException("simulated render failure"); }
+        catch (InvalidOperationException) { }
+        finally { TimedRgbShiftRenderFrame.Restore(blur, state); }
+        Near(0.2f, blur.blurSize, "finalizer restores native value on render exception");
+        color.r = new Vector2(3, 4);
+        var outer = TimedRgbShiftRenderFrame.Apply(color, 0.5f, 1);
+        var outerRed = color.r;
+        var inner = TimedRgbShiftRenderFrame.Apply(color, 1, 2);
+        TimedRgbShiftRenderFrame.Restore(color, inner);
+        Near(outerRed.x, color.r.x, "nested render restores its caller");
+        TimedRgbShiftRenderFrame.Restore(color, outer);
+        Near(3, color.r.x, "outer render restores native values");
+        Near(4, color.r.y, "native offsets survive nested rendering");
+        Check(!TimedRgbShiftRenderFrame.Apply(blur, 0, 1).Applied, "zero blend leaves native effect untouched");
+        TimedRgbShiftRenderFrame.Restore((BlurGamma)null, state);
+        Console.WriteLine("PASS Render failure cleanup, nested calls, absent camera and zero contribution");
+    }
+}

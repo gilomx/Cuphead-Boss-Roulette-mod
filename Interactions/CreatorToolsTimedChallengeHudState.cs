@@ -12,7 +12,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void HoldAfterDefeat(CreatorToolsTimedChallenge timer, string donor)
         {
-            if (WaitingForAttempt || DefeatSnapshot != null || timer == null || !timer.Busy) return;
+            if (WaitingForAttempt || DefeatSnapshot != null || timer == null || !timer.HudVisible) return;
             DefeatSnapshot = timer.Snapshot();
             DefeatDonor = donor ?? string.Empty;
         }

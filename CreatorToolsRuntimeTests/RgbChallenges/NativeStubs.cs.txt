@@ -1,0 +1,16 @@
+namespace UnityEngine
+{
+    public struct Vector2
+    {
+        public float x, y;
+        public Vector2(float x, float y) { this.x = x; this.y = y; }
+        public static Vector2 Lerp(Vector2 a, Vector2 b, float t)
+        {
+            t = Mathf.Clamp01(t);
+            return new Vector2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+        }
+    }
+    public static class Mathf { public static float Clamp01(float v) { return System.Math.Max(0, System.Math.Min(1, v)); } }
+}
+public class ChromaticAberrationFilmGrain { public UnityEngine.Vector2 r, g, b; }
+public class BlurGamma { public float blurSize; }

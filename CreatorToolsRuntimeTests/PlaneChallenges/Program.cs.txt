@@ -1,0 +1,128 @@
+using System;
+using System.Text;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+
+internal static class Program
+{
+    private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    private static void Step(TimedChallengeInteractionExecutor executor, float seconds) { Time.deltaTime = seconds; executor.Update(); }
+    private static void Main()
+    {
+        Check(TimedPlaneWeaponChallenge.Supported, "native reflection contract");
+        foreach (var item in new[] { CreatorToolsTimedChallenge.NoBombs, CreatorToolsTimedChallenge.NoPeashooter })
+        foreach (var chalice in new[] { false, true })
+        foreach (var shrunk in new[] { false, true })
+        {
+            PlayerManager.Players.Clear();
+            var gun = chalice ? Weapon.plane_chalice_weapon_3way : Weapon.plane_weapon_peashot;
+            var bomb = chalice ? Weapon.plane_chalice_weapon_bomb : Weapon.plane_weapon_bomb;
+            var initial = item == CreatorToolsTimedChallenge.NoBombs ? bomb : gun;
+            var desired = item == CreatorToolsTimedChallenge.NoBombs ? gun : bomb;
+            var player = new PlanePlayerController(initial, chalice) { Shrunk = shrunk };
+            player.weaponManager.StartBasic();
+            PlayerManager.Players.Add(player);
+            var weapons = new TimedPlaneWeaponChallenge();
+            var playing = true;
+            var executor = new TimedChallengeInteractionExecutor(() => playing, _ => false, () => true,
+                _ => !weapons.IsRestoring, weapons.Update);
+            ICreatorToolsInteractionHandle handle;
+            string feedback, error;
+            Check(executor.TrySpawn(item, " Viewer ", "", 5, 3, out handle, out feedback, out error), "enqueue plane effect");
+            Check(player.weaponManager.FullSizeWeapon == initial, "warning must not change weapons");
+            Step(executor, 3.25f);
+            Check(player.weaponManager.FullSizeWeapon == desired, "active full-size weapon");
+            Check(!shrunk || player.weaponManager.Shot == Weapon.plane_weapon_peashot, "small-plane shot remains native");
+            Check(player.Shrunk == shrunk, "no forced size change");
+            Check(executor.Donor == "Viewer", "sender retained");
+            var changes = player.weaponManager.SwitchCount;
+            playing = false;
+            Step(executor, 10f);
+            Check(executor.SecondsRemaining == 5, "pause does not spend duration");
+            Check(changes == player.weaponManager.SwitchCount, "no repeated weapon switches");
+            playing = true;
+            Step(executor, 5f);
+            Check(player.weaponManager.FullSizeWeapon == initial, "restore the pre-challenge selection");
+            Check(!shrunk || player.weaponManager.Shot == Weapon.plane_weapon_peashot, "restoration keeps mini shots");
+            player.Shrunk = false;
+            player.weaponManager.EndBasic();
+            Check(player.weaponManager.Shot == initial, "expansion cannot revive restricted selection");
+            Step(executor, 0.25f);
+            Check(handle.IsComplete, "normal lifecycle completes");
+        }
+        Console.WriteLine("PASS Both weapons, Cuphead/Mugman/Chalice variants, shrinking, warning, pause and restoration");
+
+        PlayerManager.Players.Clear();
+        var first = new PlanePlayerController(Weapon.plane_weapon_bomb);
+        var second = new PlanePlayerController(Weapon.plane_weapon_peashot);
+        PlayerManager.Players.Add(first);
+        PlayerManager.Players.Add(second);
+        var bridge = new TimedPlaneWeaponChallenge();
+        var timed = new TimedChallengeInteractionExecutor(() => true, _ => false, () => true, _ => !bridge.IsRestoring, bridge.Update);
+        ICreatorToolsInteractionHandle lease;
+        string code, failure;
+        first.WeaponBusy = true;
+        timed.TrySpawn(CreatorToolsTimedChallenge.NoBombs, "A", "", 2, 0, out lease, out code, out failure);
+        Check(first.weaponManager.SwitchCount == 0, "ongoing EX is not interrupted on entry");
+        first.WeaponBusy = false;
+        Step(timed, 0.1f);
+        Check(first.weaponManager.Shot == Weapon.plane_weapon_peashot, "entry finishes after EX");
+        first.WeaponBusy = true;
+        Step(timed, 2f);
+        Check(bridge.IsRestoring, "restore waits for ongoing super");
+        Check(!timed.IsAvailable(CreatorToolsTimedChallenge.NoPeashooter), "successor cannot overwrite pending restore");
+        first.WeaponBusy = false;
+        Step(timed, 1f);
+        Check(first.weaponManager.FullSizeWeapon == Weapon.plane_weapon_bomb, "player one restores bombs");
+        Check(second.weaponManager.FullSizeWeapon == Weapon.plane_weapon_peashot, "player two keeps own selection");
+        Check(!bridge.IsRestoring, "restore drains when ready");
+        timed.TrySpawn(CreatorToolsTimedChallenge.NoPeashooter, "B", "", 5, 0, out var next, out code, out failure);
+        lease.Dispose();
+        Check(timed.IsActive(CreatorToolsTimedChallenge.NoPeashooter), "old handle cannot end successor");
+        next.Dispose();
+        Check(second.weaponManager.FullSizeWeapon == Weapon.plane_weapon_peashot, "cancellation restores immediately");
+        timed.TrySpawn(CreatorToolsTimedChallenge.NoBombs, "C", "", 5, 0, out lease, out code, out failure);
+        first.IsDead = true;
+        var previousChanges = first.weaponManager.SwitchCount;
+        timed.EndGameplayLevel();
+        Check(first.weaponManager.SwitchCount == previousChanges && !bridge.IsRestoring, "death clears state without restarting fire");
+        Console.WriteLine("PASS Co-op, in-flight EX/super, consecutive effects, cancellation and death");
+
+        PlayerManager.Players.Clear();
+        var plane = false;
+        var queue = new CreatorToolsInteractionQueue();
+        var executorQueue = new TimedChallengeInteractionExecutor(() => true, _ => false, () => plane, _ => true, _ => { });
+        foreach (var item in new[] { CreatorToolsTimedChallenge.NoBombs, CreatorToolsTimedChallenge.NoPeashooter })
+        {
+            Check(!executorQueue.IsAvailable(item), "automatic generation excludes ground");
+            Check(!executorQueue.TrySpawn(item, "A", "", out lease, out code, out failure) && code == "requires_plane_level", "manual race remains retryable");
+            queue.Enqueue(item, "Air viewer", "gift", 1, 0, CreatorToolsInteractionSource.Stream, 24, 6);
+        }
+        queue.Enqueue(CreatorToolsTimedChallenge.NoEx, "Ground viewer", "", 1, 0, CreatorToolsInteractionSource.Stream);
+        var compatible = queue.Peek(e => executorQueue.SupportsCurrentLevel(e.Item));
+        Check(compatible.Item == CreatorToolsTimedChallenge.NoEx, "incompatible earlier requests do not block compatible siblings");
+        var json = new StringBuilder();
+        queue.AppendJson(json, item => executorQueue.SupportsCurrentLevel(item) ? "queued" : "waiting_plane");
+        Check(json.ToString().Contains("waiting_plane"), "pending status names the required level");
+        queue.ClearActive(); // Native level-end semantics preserve earned pending requests.
+        Check(queue.PendingCount == 3, "level changes retain requests");
+        plane = true;
+        compatible = queue.Peek(e => executorQueue.SupportsCurrentLevel(e.Item));
+        Check(compatible.Item == CreatorToolsTimedChallenge.NoBombs && compatible.DurationSeconds == 24 && compatible.CountdownSeconds == 6 && compatible.Donor == "Air viewer", "next plane consumes oldest compatible redemption intact");
+        executorQueue.TrySpawn(compatible.Item, compatible.Donor, compatible.GiftImagePath, compatible.DurationSeconds, compatible.CountdownSeconds, out lease, out code, out failure);
+        queue.Activate(compatible, lease);
+        Check(executorQueue.Presentation.CountingDown && executorQueue.SecondsRemaining == 24, "waiting never spends warning or active time");
+        Check(!executorQueue.IsAvailable(CreatorToolsTimedChallenge.NoPeashooter), "queued plane challenges stay exclusive");
+        Console.WriteLine("PASS Ground exclusion, queue bypass, waiting status, level changes and preserved redemption parameters");
+        var separate = new CreatorToolsInteractionQueue();
+        separate.Enqueue(CreatorToolsTimedChallenge.NoDash, "First viewer", "gift-a", 1, 0, CreatorToolsInteractionSource.Stream, 10, 2);
+        separate.Enqueue(CreatorToolsTimedChallenge.StiffMode, "Second viewer", "gift-b", 1, 0, CreatorToolsInteractionSource.Stream, 20, 4);
+        Check(separate.PendingCount == 2, "automatic deduplication never merges earned equivalents");
+        var firstPaid = separate.Peek();
+        Check(firstPaid.Donor == "First viewer" && firstPaid.DurationSeconds == 10, "first paid variant retained");
+        separate.Reject(firstPaid);
+        var secondPaid = separate.Peek();
+        Check(secondPaid.Item == CreatorToolsTimedChallenge.StiffMode && secondPaid.Donor == "Second viewer" && secondPaid.DurationSeconds == 20 && secondPaid.CountdownSeconds == 4, "second paid variant retains all parameters");
+        Console.WriteLine("PASS Earned equivalent challenges remain separate requests");
+    }
+}

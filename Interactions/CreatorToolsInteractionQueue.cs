@@ -293,7 +293,7 @@ namespace Gilomx.CupheadBossRoulette
             entry.Handle = null;
         }
 
-        internal void AppendJson(StringBuilder builder)
+        internal void AppendJson(StringBuilder builder, Func<string, string> pendingStatus = null)
         {
             builder.Append('[');
             var first = true;
@@ -307,7 +307,7 @@ namespace Gilomx.CupheadBossRoulette
                 AppendEntry(
                     builder,
                     pending[i],
-                    pending[i].IsReady ? "queued" : "scheduled", first);
+                    pending[i].IsReady ? (pendingStatus == null ? "queued" : pendingStatus(pending[i].Item)) : "scheduled", first);
                 first = false;
             }
             builder.Append(']');

@@ -2,8 +2,10 @@
   <PropertyGroup>
     <!-- This file is imported before Microsoft.Common.props, early enough for
          NuGet and MSBuild to agree on the same repository-external paths. -->
-    <BaseIntermediateOutputPath>$(TEMP)\LaPichiRuleta-CreatorToolsRuntimeTests\obj\</BaseIntermediateOutputPath>
+    <!-- Each harness needs its own obj/apphost; sharing these can launch a
+         different harness after another project builds, even with distinct DLLs. -->
+    <BaseIntermediateOutputPath>$(TEMP)\LaPichiRuleta-CreatorToolsRuntimeTests\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
     <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
-    <BaseOutputPath>$(TEMP)\LaPichiRuleta-CreatorToolsRuntimeTests\bin\</BaseOutputPath>
+    <BaseOutputPath>$(TEMP)\LaPichiRuleta-CreatorToolsRuntimeTests\$(MSBuildProjectName)\bin\</BaseOutputPath>
   </PropertyGroup>
 </Project>

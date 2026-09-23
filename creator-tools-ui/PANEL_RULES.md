@@ -45,8 +45,11 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   `hilda_green_zeppelin`, `rootpack_homing_carrot` y
   `cagney_homing_plant` y `frogs_firefly` están disponibles en cualquier
   batalla o nivel de plataformas, entre por la ruleta o por una puerta normal.
-  El mapa es la ventana preferida para preparar los prefabs originales y el
-  gameplay estable puede terminar los que sigan pendientes. La zanahoria aparece como `Proyectil`; los dos
+  Los prefabs originales se preparan sólo durante la pantalla de carga de
+  niveles y se reutilizan durante la sesión. El trabajo que aún no haya
+  comenzado al agotarse el presupuesto espera otra pantalla de carga;
+  no se preparan escenas en el mapa ni durante la partida.
+  La zanahoria aparece como `Proyectil`; los dos
   zepelines, la semilla y la luciérnaga aparecen como `Enemigo`. Las tarjetas son un resumen
   vertical
   pequeño con el primer frame nativo arriba y la información debajo; no
@@ -84,6 +87,41 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   manual como al catálogo configurable de Modo Molestoso. La sección de
   Interacciones no contiene un generador aleatorio automático: ese uso pertenece
   exclusivamente a Modo Molestoso.
+- Los **Retos temporales** son Daño a la mitad, NO EX, NO DASH / NO MINIAVIÓN,
+  MODO TIESO, BLANCO Y NEGRO, NO DISPARO BOMBAS, SIN PEASHOOTER, RGB y LLUVIA
+  DE TINTA. Sus tarjetas, pruebas
+  manuales y reglas comparten el catálogo; cada uno tiene su propia explicación
+  en Modo Molestoso. NO EX conserva los súperes, en tierra y avión. NO DASH
+  bloquea nuevos dashes en tierra. MODO TIESO también fija el movimiento al
+  tocar suelo, pero permite saltar y moverse en el aire. Ambos usan NO MINIAVIÓN al volar;
+  el HUD elige el nombre e icono de esa variante al iniciarse el aviso. Si ambos
+  están habilitados, en avión cuentan como una sola opción del sorteo automático;
+  en tierra siguen separados y los canjes manuales/stream nunca se fusionan.
+  BLANCO Y NEGRO y RGB funcionan en tierra y avión. Su entrada de 1.25 s empieza con
+  el contador activo, después del aviso; al llegar a cero comienza la vuelta
+  al filtro previo durante 0.9 s, antes del descanso y sin cambiar ajustes.
+  Ambas transiciones conservan su duración completa. RGB conserva los colores y
+  desenfoque del reto de ruleta; la pausa congela su movimiento y transiciones.
+  LLUVIA DE TINTA temporal arranca directamente con lluvia al comenzar el
+  contador activo, sin pulpo ni ráfaga inicial. Conserva el ritmo de la lluvia
+  del reto base; las gotas pueden entintar desde que se activa.
+  A cero detiene la emisión, dejando caer las gotas
+  existentes y terminar impactos/manchas antes de iniciar el descanso. Su HUD
+  sale normalmente, aunque la reserva siga ocupada durante ese cierre natural.
+  El esquema Molestoso 18 añade tinta desmarcada y conserva los ajustes anteriores. Los retos
+  nuevos se incorporan desmarcados, sin alterar selecciones anteriores. El modo
+  sortea un reto habilitado y compatible por turno, con una espera independiente
+  de los ataques y un máximo de un reto temporal entre todas las fuentes.
+  NO DISPARO BOMBAS y SIN PEASHOOTER sólo se ejecutan en avión; recuperan el
+  arma anterior por jugador y conservan miniavión, EX y súperes. El automático
+  los omite en tierra. Los canjes manuales/stream quedan pendientes durante la
+  sesión con estado `waiting_plane` («Esperando un nivel de avión»), sin gastar
+  duración ni impedir que pasen otras solicitudes compatibles. Las cuentas
+  empiezan cuando el reto realmente obtiene su turno en avión.
+  Los tiempos comunes de Modo Molestoso son espera 5 s (0–300), cuenta previa
+  3 s (0–30) y duración 15 s (1–120). Las pruebas y reglas guardan cuenta previa
+  y duración por separado. La compatibilidad, exclusión mutua y ejecución
+  pertenecen a C#; el panel no aplica los efectos.
 - Modo Molestoso tiene una cola operativa separada. El interruptor general,
   Pausar y Vaciar de Interacciones no la controlan; su propio interruptor basta
   porque al desactivarlo puede borrar pendientes y actores activos sin perder

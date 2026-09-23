@@ -163,7 +163,7 @@ function pacingCandidate(params, current, prefix = "") {
   return candidate;
 }
 let peskyNames = [];
-let peskyDisabledItems = ["challenge_half_damage"];
+let peskyDisabledItems = ["challenge_half_damage", "challenge_no_ex", "challenge_no_dash", "challenge_stiff_mode", "challenge_black_and_white", "challenge_no_bombs", "challenge_no_peashooter", "challenge_rgb_shift", "challenge_ink_rain"];
 let peskyChallengeDurationSeconds = 15;
 let peskyChallengeCountdownSeconds = 3;
 let peskyChallengeWaitSeconds = 5;
@@ -382,6 +382,14 @@ const interactionItems = [
   "baroness_candy_corn",
   "baroness_jawbreaker",
   "challenge_half_damage",
+  "challenge_no_ex",
+  "challenge_no_dash",
+  "challenge_stiff_mode",
+  "challenge_black_and_white",
+  "challenge_no_bombs",
+  "challenge_no_peashooter",
+  "challenge_rgb_shift",
+  "challenge_ink_rain",
 ];
 const miniBossItems = new Set([
   "baroness_cupcake",
@@ -551,6 +559,8 @@ function refreshInteractionQueue() {
   for (const entry of interactionQueue) {
     if (active >= interactionMaxActive) break;
     if (entry.status === "queued") {
+      if (process.env.MOCK_PLANE_LEVEL === "0" &&
+          ["challenge_no_bombs", "challenge_no_peashooter"].includes(entry.item)) continue;
       if (miniBossItems.has(entry.item)) {
         if (activeMiniBosses.has(entry.item) || activeMiniBosses.size >= interactionMaxMiniBosses) continue;
         activeMiniBosses.add(entry.item);
@@ -562,7 +572,12 @@ function refreshInteractionQueue() {
 }
 
 function publicInteractionQueue() {
-  return interactionQueue.map(({ readyAt: _readyAt, ...entry }) => entry);
+  return interactionQueue.map(({ readyAt: _readyAt, ...entry }) => ({
+    ...entry,
+    status: entry.status === "queued" && process.env.MOCK_PLANE_LEVEL === "0" &&
+      ["challenge_no_bombs", "challenge_no_peashooter"].includes(entry.item)
+      ? "waiting_plane" : entry.status,
+  }));
 }
 
 function parseDashboardSimulation(searchParams) {
@@ -982,7 +997,7 @@ function serveCreatorToolFile(fileName, contentType, res) {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
-  if (url.pathname === "/config" || url.pathname.startsWith("/config/")) {
+  if (url.pathname === "/dashboard" || url.pathname === "/config" || url.pathname.startsWith("/config/")) {
     serveCreatorToolFile(
       "config.html",
       "text/html; charset=utf-8",

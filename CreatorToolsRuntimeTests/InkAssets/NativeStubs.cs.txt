@@ -1,0 +1,83 @@
+using System;
+using System.Collections.Generic;
+namespace UnityEngine
+{
+    public class Object
+    {
+        public string name;
+        public bool Destroyed;
+        public static int DestroyCount;
+        public static void Destroy(Object item)
+        {
+            if (item.Destroyed) throw new Exception("Double asset destruction");
+            item.Destroyed = true; DestroyCount++;
+        }
+    }
+    public struct Vector2 { public float x, y; public Vector2(float x, float y) { this.x = x; this.y = y; } }
+    public struct Rect { public float width, height; public Rect(float x, float y, float width, float height) { this.width = width; this.height = height; } }
+    public enum TextureFormat { ARGB32 }
+    public enum FilterMode { Bilinear }
+    public enum TextureWrapMode { Clamp }
+    public class Texture2D : Object
+    {
+        public static int Loaded, Created, FailAt;
+        public int width, height;
+        public FilterMode filterMode;
+        public TextureWrapMode wrapMode;
+        public Texture2D(int w, int h, TextureFormat f, bool mipmaps) { Created++; }
+        public bool LoadImage(byte[] bytes)
+        {
+            Loaded++;
+            if (Loaded == FailAt) return false;
+            if (bytes.Length < 24 || bytes[0] != 137 || bytes[1] != 80) throw new Exception("Invalid PNG asset");
+            width = ReadInt(bytes, 16); height = ReadInt(bytes, 20); return true;
+        }
+        private static int ReadInt(byte[] b, int i) { return (b[i] << 24) | (b[i+1] << 16) | (b[i+2] << 8) | b[i+3]; }
+    }
+    public class Sprite : Object
+    {
+        public Rect rect;
+        public Vector2 pivot;
+        public float pixelsPerUnit;
+        public Texture2D texture;
+        public static int Created;
+        public static Sprite Create(Texture2D texture, Rect rect, Vector2 pivot, float ppu)
+        {
+            Created++; return new Sprite { texture = texture, rect = rect, pivot = pivot, pixelsPerUnit = ppu };
+        }
+    }
+}
+internal static class SceneLoader { internal static bool CurrentlyLoading; }
+internal class TestLogger
+{
+    internal int Warnings;
+    internal void LogWarning(string value) { Warnings++; }
+    internal void LogInfo(string value) { }
+}
+namespace Gilomx.CupheadBossRoulette
+{
+    internal sealed partial class InkRainChallengeRuntime : UnityEngine.Object
+    {
+        private readonly string assetsDirectory;
+        internal readonly TestLogger log = new TestLogger();
+        internal UnityEngine.Sprite[] inkDropFrames, squidEntranceFrames, squidAttackFrames, squidAttackLoopFrames, squidLeaveFrames, squidExitFrames;
+        internal UnityEngine.Sprite inkScreenOverlay;
+        internal readonly List<UnityEngine.Texture2D> ownedInkTextures = new List<UnityEngine.Texture2D>();
+        internal readonly List<UnityEngine.Sprite[]> groundImpactAnimations = new List<UnityEngine.Sprite[]>();
+        internal readonly List<UnityEngine.Sprite[]> inkScreenAnimations = new List<UnityEngine.Sprite[]>();
+        internal readonly List<UnityEngine.Vector2[]> inkScreenPivotPixels = new List<UnityEngine.Vector2[]>();
+        internal InkRainChallengeRuntime(string root) { assetsDirectory = root; }
+        internal bool Ready { get { return EnsureInkAssets(); } }
+        internal bool SquidReady { get { return squidAssetsReady; } }
+        internal void Shutdown() { DisposeInkAssetPreparation(); }
+        private static UnityEngine.Sprite[] SpriteRange(UnityEngine.Sprite[] source, int start, int count)
+        {
+            if (source == null || start >= source.Length) return new UnityEngine.Sprite[0];
+            count = Math.Min(count, source.Length-start); var result = new UnityEngine.Sprite[count]; Array.Copy(source,start,result,0,count); return result;
+        }
+        private static UnityEngine.Sprite[] JoinSpriteRanges(UnityEngine.Sprite[] a, UnityEngine.Sprite[] b)
+        {
+            var result = new UnityEngine.Sprite[a.Length+b.Length]; a.CopyTo(result,0); b.CopyTo(result,a.Length); return result;
+        }
+    }
+}

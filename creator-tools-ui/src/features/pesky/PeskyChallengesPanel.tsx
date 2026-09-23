@@ -36,7 +36,7 @@ export function PeskyChallengesPanel() {
           return (
             <label className="pesky-attack" data-enabled={enabled} key={item.id}>
               <img src={item.image} alt="" />
-              <span><strong>{t(item.titleKey)}</strong><small>{t("interactions.challenges.effect")}</small></span>
+              <span><strong>{t(item.titleKey)}</strong><small>{t(item.descriptionKey)}</small></span>
               <input type="checkbox" checked={enabled} disabled={!pesky?.ready || !pesky.items.includes(item.id)}
                 onChange={(event) => applyPeskyItem(item.id, event.target.checked)} />
             </label>

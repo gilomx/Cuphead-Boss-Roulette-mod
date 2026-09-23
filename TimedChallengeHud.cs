@@ -13,10 +13,19 @@ namespace Gilomx.CupheadBossRoulette
         private Text timedWarningTitle;
         private Text timedWarningNumber;
         private Text timedActiveTitle;
+        private Text timedActiveRemaining;
         private Text timedActiveDonor;
+        private RawImage timedActiveIcon;
+        private string timedHudIconItem;
+        private string timedHudLayoutText;
+        private string timedHudLayoutRemaining;
+        private ModifierId timedHudIconModifier;
+        private bool timedHudUsingSaturationMaterial;
         private Color timedActiveTitleBaseColor;
+        private Color timedWarningTitleBaseColor;
         private float timedHudRetryAt;
         private readonly CreatorToolsTimedChallengeHudState timedHudState = new CreatorToolsTimedChallengeHudState();
+        private readonly TimedPlaneWeaponChallenge timedPlaneWeapons = new TimedPlaneWeaponChallenge();
         private const float TimedHudTopMargin = 35f;
         private const float TimedHudCountdownCueVolume = 0.70f;
         private const float TimedHudUrgencySeconds = 3f;
@@ -43,9 +52,21 @@ namespace Gilomx.CupheadBossRoulette
             timedActiveRoot = CreateTimedHudGroup("Active challenge", new Vector2(0.5f, 1f), out timedActiveGroup);
             timedWarningTitle = CreateTimedHudText(template, timedWarningRoot, "Incoming label", size, 0f);
             timedWarningNumber = CreateTimedHudText(template, timedWarningRoot, "Countdown", size * 3, -size * 2.2f);
-            timedActiveTitle = CreateTimedHudText(template, timedActiveRoot, "Challenge and remaining time", size, 0f);
+            timedActiveTitle = CreateTimedHudText(template, timedActiveRoot, "Challenge title", size, 0f);
+            timedActiveRemaining = CreateTimedHudText(template, timedActiveRoot, "Remaining time", size * 2, 0f);
+            timedActiveRemaining.fontStyle = FontStyle.Bold;
             timedActiveDonor = CreateTimedHudText(template, timedActiveRoot, "Sender", size, -size * 1.45f);
+            timedActiveIcon = new GameObject("Challenge icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage)).GetComponent<RawImage>();
+            timedActiveIcon.transform.SetParent(timedActiveRoot, false);
+            timedActiveIcon.gameObject.layer = timedActiveRoot.gameObject.layer;
+            timedActiveIcon.raycastTarget = false;
+            timedActiveIcon.color = Color.white;
+            timedActiveIcon.rectTransform.anchorMin = timedActiveIcon.rectTransform.anchorMax =
+                timedActiveIcon.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            timedHudIconItem = timedHudLayoutText = timedHudLayoutRemaining = null;
+            timedHudUsingSaturationMaterial = false;
             timedActiveTitleBaseColor = timedActiveTitle.color;
+            timedWarningTitleBaseColor = timedWarningTitle.color;
             timedChallengeRoot.gameObject.SetActive(false);
             Logger.LogInfo("HUD de reto temporal preparado en la capa de la ruleta.");
             return true;
@@ -92,8 +113,8 @@ namespace Gilomx.CupheadBossRoulette
             }
             Canvas nativeCanvas;
             if (!TryGetNativeBattleHudCanvas(out nativeCanvas)) return false;
-            var cameraEffect = ShouldShowActiveChallenge() &&
-                (activeChallenge == ModifierId.RgbShift || activeChallenge == ModifierId.UpsideDown);
+            var cameraEffect = IsTimedRgbRendering || (ShouldShowActiveChallenge() &&
+                (activeChallenge == ModifierId.RgbShift || activeChallenge == ModifierId.UpsideDown));
             PlaceTimedChallengeRoot(cameraEffect ? nativeCanvas.transform : battleHudCanvas.transform, false);
             return true;
         }
@@ -161,24 +182,73 @@ namespace Gilomx.CupheadBossRoulette
                 timer.Remaining <= 0f || timer.Remaining > TimedHudUrgencySeconds)
                 return;
 
-            var elapsed = TimedHudUrgencySeconds - timer.Remaining;
-            var progress = Mathf.Clamp01(elapsed / TimedHudUrgencySeconds);
+            timedActiveTitle.color = TimedHudUrgencyTint(timedActiveTitleBaseColor,
+                TimedHudUrgencySeconds - timer.Remaining, TimedHudUrgencySeconds);
+        }
+
+        private static Color TimedHudUrgencyTint(Color baseColor, float elapsed, float duration)
+        {
+            var progress = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, duration));
             // Integrate a linearly increasing frequency so the pulse remains
-            // continuous while accelerating from the 3-second mark to zero.
+            // continuous while accelerating toward the end of either warning.
             var cycles = TimedHudUrgencySlowHz * elapsed +
                 0.5f * (TimedHudUrgencyFastHz - TimedHudUrgencySlowHz) *
                 elapsed * progress;
             var pulse = 0.5f + 0.5f * Mathf.Sin(cycles * Mathf.PI * 2f - Mathf.PI * 0.5f);
             var urgent = TimedHudUrgencyColor;
-            urgent.a = timedActiveTitleBaseColor.a;
-            timedActiveTitle.color = Color.Lerp(
-                timedActiveTitleBaseColor, urgent, Mathf.SmoothStep(0f, 1f, pulse));
+            urgent.a = baseColor.a;
+            return Color.Lerp(baseColor, urgent, Mathf.SmoothStep(0f, 1f, pulse));
+        }
+
+        private static ModifierId TimedChallengeModifier(string item, bool planeControls = false)
+        {
+            if (item == CreatorToolsTimedChallenge.RgbShift) return ModifierId.RgbShift;
+            if (item == CreatorToolsTimedChallenge.InkRain) return ModifierId.InkRain;
+            if (item == CreatorToolsTimedChallenge.NoBombs) return ModifierId.NoBombs;
+            if (item == CreatorToolsTimedChallenge.NoPeashooter) return ModifierId.NoPeashooter;
+            if (item == CreatorToolsTimedChallenge.BlackAndWhite) return ModifierId.BlackAndWhite;
+            if (item == CreatorToolsTimedChallenge.StiffMode) return planeControls ? ModifierId.NoMiniPlane : ModifierId.StiffMode;
+            if (item == CreatorToolsTimedChallenge.NoDash) return planeControls ? ModifierId.NoMiniPlane : ModifierId.NoDash;
+            if (item == CreatorToolsTimedChallenge.NoEx) return ModifierId.NoEx;
+            if (item == CreatorToolsTimedChallenge.HalfDamage) return ModifierId.HalfDamage;
+            return ModifierId.None;
+        }
+
+        private void UpdateTimedChallengeTitleLayout(CreatorToolsTimedChallenge timer)
+        {
+            var modifierId = TimedChallengeModifier(timer.Item, timer.PlaneControls);
+            if (timedHudIconItem != timer.Item || timedHudIconModifier != modifierId)
+            {
+                timedHudIconItem = timer.Item;
+                timedHudIconModifier = modifierId;
+                timedHudLayoutText = null;
+                var modifier = FindModifierEntry(modifierId);
+                ApplyTextureToBattleHudIcon(timedActiveIcon, modifier == null ? null : GetTexture(modifier.Image));
+            }
+            if (timedHudLayoutText == timedActiveTitle.text && timedHudLayoutRemaining == timedActiveRemaining.text) return;
+            timedHudLayoutText = timedActiveTitle.text;
+            timedHudLayoutRemaining = timedActiveRemaining.text;
+            var size = timedActiveTitle.fontSize * 1.5f;
+            var gap = timedActiveIcon.enabled ? timedActiveTitle.fontSize * 0.3f : 0f;
+            var iconWidth = timedActiveIcon.enabled ? size : 0f;
+            var textWidth = Mathf.Ceil(timedActiveTitle.preferredWidth);
+            var remainingWidth = Mathf.Ceil(timedActiveRemaining.preferredWidth);
+            var remainingGap = timedActiveTitle.fontSize * 0.4f;
+            var left = -(iconWidth + gap + textWidth + remainingGap + remainingWidth) * 0.5f;
+            // Center the whole icon/title/timer row; the sender remains
+            // centered beneath it. Reflow only when the text actually changes.
+            timedActiveTitle.rectTransform.anchoredPosition = new Vector2(left + iconWidth + gap + textWidth * 0.5f, 0f);
+            timedActiveTitle.rectTransform.sizeDelta = new Vector2(textWidth, timedActiveTitle.fontSize * 1.8f);
+            timedActiveIcon.rectTransform.sizeDelta = new Vector2(size, size);
+            timedActiveIcon.rectTransform.anchoredPosition = new Vector2(left + iconWidth * 0.5f, 0f);
+            timedActiveRemaining.rectTransform.sizeDelta = new Vector2(remainingWidth, timedActiveRemaining.fontSize * 1.8f);
+            timedActiveRemaining.rectTransform.anchoredPosition = new Vector2(-left - remainingWidth * 0.5f, 0f);
         }
 
         private void UpdateTimedChallengeHud()
         {
             if (timedChallengeInteractions == null || timedHudState.WaitingForAttempt ||
-                (!timedChallengeInteractions.Busy && timedHudState.DefeatSnapshot == null) || SceneLoader.CurrentlyLoading)
+                (!timedChallengeInteractions.Presentation.HudVisible && timedHudState.DefeatSnapshot == null) || SceneLoader.CurrentlyLoading)
             {
                 HideTimedChallengeHud();
                 return;
@@ -190,6 +260,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             }
             timedChallengeRoot.gameObject.SetActive(true);
+            UpdateTimedChallengeHudSaturation();
             var frozen = timedHudState.DefeatSnapshot != null;
             var timer = timedHudState.DefeatSnapshot ?? timedChallengeInteractions.Presentation;
             var warning = timer.CountingDown;
@@ -199,6 +270,10 @@ namespace Gilomx.CupheadBossRoulette
             if (warning)
             {
                 timedWarningTitle.text = L(ModText.ChallengeIncoming).ToUpperInvariant();
+                timedWarningTitle.color = !frozen && timer.Phase == TimedChallengePhase.Countdown
+                    ? TimedHudUrgencyTint(timedWarningTitleBaseColor, timer.PhaseElapsed,
+                        timer.PhaseElapsed + timer.CountdownRemaining)
+                    : timedWarningTitleBaseColor;
                 timedWarningNumber.text = Mathf.Max(1, Mathf.CeilToInt(timer.CountdownRemaining)).ToString();
                 var exiting = !frozen && timer.Phase == TimedChallengePhase.CountdownExit;
                 var t = Mathf.Clamp01(timer.PhaseElapsed / (exiting ? CreatorToolsTimedChallenge.ExitSeconds : 0.25f));
@@ -220,9 +295,11 @@ namespace Gilomx.CupheadBossRoulette
             }
             else
             {
-                timedActiveTitle.text = LocalizedChallengeLabel(ModifierId.HalfDamage).ToUpperInvariant() +
-                    "  ·  " + Mathf.CeilToInt(timer.Remaining) + " S";
+                timedActiveTitle.text = LocalizedChallengeLabel(TimedChallengeModifier(timer.Item, timer.PlaneControls)).ToUpperInvariant() + "  ·";
+                timedActiveRemaining.text = Mathf.CeilToInt(timer.Remaining) + " S";
+                UpdateTimedChallengeTitleLayout(timer);
                 UpdateTimedActiveTitleUrgency(timer, frozen);
+                timedActiveRemaining.color = timedActiveTitle.color;
                 timedActiveDonor.text = ((frozen ? timedHudState.DefeatDonor : timedChallengeInteractions.Donor) ?? string.Empty).ToUpperInvariant();
                 timedActiveDonor.gameObject.SetActive(!string.IsNullOrEmpty(timedActiveDonor.text));
                 var exiting = !frozen && timer.Phase == TimedChallengePhase.Exit;
@@ -234,16 +311,39 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private void UpdateTimedChallengeHudSaturation()
+        {
+            // The persistent overlay is outside the gameplay post-process.
+            // Match the existing roulette HUD without changing its layout.
+            var useSaturation = timedChallengeRoot.parent == battleHudCanvas.transform &&
+                EffectiveBlackAndWhiteBlend > 0.001f;
+            if (useSaturation)
+            {
+                EnsureBattleHudSaturationMaterial();
+                useSaturation = battleHudSaturationMaterial != null;
+                if (useSaturation)
+                    battleHudSaturationMaterial.SetFloat("_Saturation", 1f - Mathf.Clamp01(EffectiveBlackAndWhiteBlend));
+            }
+            if (timedHudUsingSaturationMaterial == useSaturation) return;
+            timedHudUsingSaturationMaterial = useSaturation;
+            var textMaterial = useSaturation ? battleHudSaturationMaterial : battleHudChallengeBaseMaterial;
+            timedWarningTitle.material = timedWarningNumber.material = timedActiveTitle.material =
+                timedActiveRemaining.material = timedActiveDonor.material = textMaterial;
+            timedActiveIcon.material = useSaturation ? battleHudSaturationMaterial : null;
+        }
+
         private void HoldTimedChallengeHudAfterDefeat(Level level)
         {
             if (level == null || timedChallengeInteractions == null ||
                 level.GetInstanceID() != creatorToolsInteractionLevelInstanceId) return;
             timedHudState.HoldAfterDefeat(timedChallengeInteractions.Presentation, timedChallengeInteractions.Donor);
+            if (timedInkRain != null) timedInkRain.PreserveAfterDefeat();
         }
 
         private void ResetTimedChallengeHudForAttempt(bool waitingForAttempt)
         {
             timedHudState.Reset(waitingForAttempt);
+            if (timedInkRain != null) timedInkRain.CancelVisuals();
             if (timedChallengeInteractions != null) timedChallengeInteractions.EndGameplayLevel();
             HideTimedChallengeHud();
         }

@@ -21,6 +21,10 @@ function Calls($method, [string]$typeName, [string]$methodName) {
         $_.Operand.Name -eq $methodName
     })
 }
+function SelfAndNestedTypes($type) {
+    $type
+    foreach ($nested in $type.NestedTypes) { SelfAndNestedTypes $nested }
+}
 try {
     $loader = $module.Types | Where-Object Name -eq 'SceneLoader'
     $factory = $loader.Methods | Where-Object Name -eq 'load_cr'
@@ -28,6 +32,8 @@ try {
     Require (@(Calls $factory 'UnityEngine.SceneManagement.SceneManager' 'LoadSceneAsync').Count -eq 0) 'Iterator factory now starts native I/O eagerly'
     $done = $loader.Fields | Where-Object Name -eq 'doneLoadingSceneAsync'
     Require ($null -ne $done -and -not $done.IsStatic -and $done.FieldType.FullName -eq 'System.Boolean') 'Native completion flag changed'
+    $icon = $loader.Fields | Where-Object Name -eq 'icon'
+    Require ($null -ne $icon -and -not $icon.IsStatic -and $icon.FieldType.FullName -eq 'UnityEngine.UI.Image') 'Native clock image changed; the preparation notice must attach to the real loading icon'
 
     $loop = ($loader.NestedTypes | Where-Object Name -like '<loop_cr>*').Methods | Where-Object Name -eq 'MoveNext'
     $fade = @(Calls $loop 'SceneLoader' 'in_cr')
@@ -96,6 +102,70 @@ try {
     }
     Require ($cacheCount -eq 10) 'Expected all ten native source scene caches'
     Write-Output 'Compiled catalog contract passed: all ten caches await native resources before unloading; the final loading barrier also drains asset requests.'
+
+    $plugin = $mod.Types | Where-Object Name -eq 'Plugin'
+    $preload = $plugin.Methods | Where-Object Name -eq 'CanPreloadNativeInteractionAssets'
+    Require (@(Calls $preload 'SceneLoader' 'get_CurrentlyLoading').Count -eq 1) 'Native catalog must require a loading screen'
+    Require (@($preload.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'creatorToolsNativePreloadWindow'
+    }).Count -eq 1) 'Native catalog must require the covered preload window'
+    Require (@($preload.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference]
+    }).Count -eq 1) 'Map or gameplay eligibility must not permit native preloading'
+
+    $ink = $mod.Types | Where-Object Name -eq 'InkRainChallengeRuntime'
+    # Compiling for net35 can still introduce framework types stripped from
+    # Cuphead's legacy Mono. Even an unexecuted throw can break JIT entry into
+    # an otherwise valid preparation iterator. Check its exception constructors
+    # against the actual game libraries, including generated iterator/closure IL.
+    $inkTypes = @(SelfAndNestedTypes $ink) + @($mod.Types | Where-Object Name -eq 'IncrementalAssetPreparation')
+    $runtimeModules = @{}
+    try {
+        foreach ($type in $inkTypes) {
+            foreach ($method in $type.Methods | Where-Object HasBody) {
+                foreach ($instruction in $method.Body.Instructions) {
+                    $constructor = $instruction.Operand
+                    if ($instruction.OpCode.Code -ne 'Newobj' -or $constructor -isnot [Mono.Cecil.MethodReference] -or
+                        $constructor.DeclaringType.FullName -notlike 'System.*Exception') { continue }
+                    $scope = $constructor.DeclaringType.Scope.Name
+                    if (!$runtimeModules.ContainsKey($scope)) {
+                        $runtimeModules[$scope] = [Mono.Cecil.ModuleDefinition]::ReadModule(
+                            (Join-Path $CupheadDir "Cuphead_Data/Managed/$scope.dll"))
+                    }
+                    $nativeType = $runtimeModules[$scope].GetType($constructor.DeclaringType.FullName)
+                    Require ($null -ne $nativeType) "Ink preparation references unavailable Cuphead runtime type $($constructor.DeclaringType.FullName) in $($method.FullName)"
+                    Require (@($nativeType.Methods | Where-Object FullName -eq $constructor.FullName).Count -eq 1) "Ink preparation references an unavailable native constructor: $($constructor.FullName)"
+                }
+            }
+        }
+    }
+    finally { foreach ($runtimeModule in $runtimeModules.Values) { $runtimeModule.Dispose() } }
+    Write-Output 'Compiled ink compatibility contract passed: exception constructors, including iterator bodies, exist in Cuphead legacy Mono.'
+    $ready = $ink.Methods | Where-Object Name -eq 'EnsureInkAssets'
+    Require (@($ready.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference]
+    }).Count -eq 0) 'Ink readiness must not perform any loading or allocation'
+    Require (@($ready.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'inkAssetsReady'
+    }).Count -eq 1) 'Ink readiness must read the prepared asset flag'
+
+    $awake = $plugin.Methods | Where-Object Name -eq 'Awake'
+    Require (@(Calls $awake $plugin.FullName 'InstallTimedVisualPreparationPatch').Count -eq 1) 'Startup must install the covered visual preparation hook'
+    Require (@(Calls $awake $plugin.FullName 'InstallTimedRgbShiftPatches').Count -eq 0) 'Optional render patching must not run synchronously at startup'
+    $postfix = $plugin.Methods | Where-Object Name -eq 'TimedVisualPreparationPostfix'
+    Require (@($postfix.Parameters | Where-Object {
+        $_.Name -eq '___icon' -and $_.ParameterType.FullName -eq 'UnityEngine.UI.Image'
+    }).Count -eq 1) 'Visual preparation must receive the native clock image'
+    $wrap = @(Calls $postfix $plugin.FullName 'PrepareTimedVisualsBeforeLevel')
+    $reset = @($postfix.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Stind_I1' -and $_.Previous.OpCode.Code -eq 'Ldc_I4_0'
+    })
+    Require ($wrap.Count -eq 1 -and $reset.Count -eq 1 -and $reset[0].Offset -lt $wrap[0].Offset) 'Visual preparation must clear the reused native completion flag before yielding'
+    $visualMove = ($plugin.NestedTypes | Where-Object Name -like '<PrepareTimedVisualsBeforeLevel>*').Methods | Where-Object Name -eq 'MoveNext'
+    $prepare = @(Calls $visualMove $ink.FullName 'PrepareAssetsDuringLoading')
+    $next = @(Calls $visualMove 'System.Collections.IEnumerator' 'MoveNext')
+    Require ($prepare.Count -eq 1 -and $next.Count -eq 1 -and $prepare[0].Offset -lt $next[0].Offset) 'Visual assets must finish before starting native scene loading'
+    Write-Output 'Compiled cold-start contract passed: no map preloads or lazy ink decoding; visual preparation stays behind the native loading fade.'
 }
 finally {
     $mod.Dispose()

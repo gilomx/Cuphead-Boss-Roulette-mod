@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection.Emit;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -87,8 +88,8 @@ namespace Gilomx.CupheadBossRoulette
             new KeyboardShortcut(KeyCode.F8, KeyCode.RightControl);
 
         private const float BlackAndWhiteEntryDelay = 1.5f;
-        private const float BlackAndWhiteFadeInDuration = 1.25f;
-        private const float BlackAndWhiteFadeOutDuration = 0.9f;
+        private const float BlackAndWhiteFadeInDuration = CreatorToolsTimedChallenge.BlackAndWhiteFadeInSeconds;
+        private const float BlackAndWhiteFadeOutDuration = CreatorToolsTimedChallenge.BlackAndWhiteFadeOutSeconds;
         private const float SpinAudioVolume = 0.45f;
         private const float SelectionStopAudioVolume = 0.45f;
         private static readonly Color Ink = new Color(0.075f, 0.065f, 0.055f);
@@ -425,6 +426,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void Awake()
         {
+            var startupClock = System.Diagnostics.Stopwatch.StartNew();
             modLocalization = new ModLocalization();
             modLocalization.LanguageChanged += OnModLanguageChanged;
             InitializeManualChallengeEquipment();
@@ -751,11 +753,11 @@ namespace Gilomx.CupheadBossRoulette
 
             var handleShrunk = AccessTools.Method(
                 typeof(PlanePlayerAnimationController), "HandleShrunk");
-            var blockMiniPlanePrefix = AccessTools.Method(
-                typeof(Plugin), "BlockMiniPlanePrefix");
-            if (handleShrunk != null && blockMiniPlanePrefix != null)
+            var miniPlaneInputTranspiler = AccessTools.Method(
+                typeof(Plugin), "MiniPlaneInputTranspiler");
+            if (handleShrunk != null && miniPlaneInputTranspiler != null)
                 harmony.Patch(handleShrunk,
-                    prefix: new HarmonyMethod(blockMiniPlanePrefix));
+                    transpiler: new HarmonyMethod(miniPlaneInputTranspiler));
             else
                 Logger.LogWarning("Could not install the No mini airplane guard.");
 
@@ -835,6 +837,7 @@ namespace Gilomx.CupheadBossRoulette
                     "Could not install the cursed relic airplane weapon guard.");
 
             InstallCurseRelicLevelOverridePatches();
+            InstallTimedVisualPreparationPatch();
             InstallHpOneChallengePatches();
             InstallRouletteDjimmiGuardPatch();
             InstallInkRainChallengePatches();
@@ -844,6 +847,7 @@ namespace Gilomx.CupheadBossRoulette
             Logger.LogInfo(PluginName + " " + PluginVersion +
                            " listo. F6 o gatillo izquierdo + Equip abre/cierra; " +
                            "F7 o gatillo derecho gira.");
+            Logger.LogInfo("Synchronous mod startup: " + startupClock.ElapsedMilliseconds + " ms.");
         }
 
         private static void ForceFiveSuperCardsForHudTestPrefix(
@@ -1304,6 +1308,7 @@ namespace Gilomx.CupheadBossRoulette
         private void Update()
         {
             UpdateCreatorTools();
+            UpdateTimedInkRainDefeat();
             UpdateManualChallengeSelectors();
             SafeUpdateInkRainChallenge();
             UpdateLanguageTestShortcut();
@@ -1317,8 +1322,11 @@ namespace Gilomx.CupheadBossRoulette
                 UpdateUpsideDownTransition();
                 UpdateUpsideDownRenderEffects();
                 UpdateBlackAndWhiteTransition();
-                UpdateBlackAndWhiteRenderEffects();
             }
+            // Keep the render bridge current even while a base camera
+            // challenge holds its frame for retry or defeat. A released timed
+            // effect must not leave its last saturation on that held frame.
+            UpdateBlackAndWhiteRenderEffects();
             var controllerRerollPressed = PollControllerRerollPressed();
             var onMap = CanUseRouletteOnMap();
             if (!onMap)
@@ -2773,9 +2781,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateBlackAndWhiteRenderEffects()
         {
+            var blend = EffectiveBlackAndWhiteBlend;
             var shouldRun = blackAndWhiteLevelInstanceId >= 0 ||
                             blackAndWhiteNativeBaseActive ||
-                            blackAndWhiteBlend > 0.001f ||
+                            IsTimedBlackAndWhiteRendering ||
+                            blend > 0.001f ||
                             blackAndWhiteTransitionStartedAt >= 0f;
 
             for (var i = blackAndWhiteEffects.Count - 1; i >= 0; i--)
@@ -2788,7 +2798,7 @@ namespace Gilomx.CupheadBossRoulette
                     continue;
                 }
 
-                effect.SetBlend(blackAndWhiteBlend);
+                effect.SetBlend(blend);
             }
 
             // Switch to Cuphead's exact native filter only after saturation
@@ -2832,7 +2842,7 @@ namespace Gilomx.CupheadBossRoulette
                     continue;
                 }
 
-                effect.SetBlend(blackAndWhiteBlend);
+                effect.SetBlend(blend);
                 blackAndWhiteEffects.Add(effect);
                 blackAndWhiteRenderFailureLogged = false;
                 Logger.LogInfo(
@@ -2843,15 +2853,48 @@ namespace Gilomx.CupheadBossRoulette
             blackAndWhiteNativeBaseActive =
                 ShouldUseNativeBlackAndWhiteFilter();
             for (var i = 0; i < blackAndWhiteEffects.Count; i++)
-                blackAndWhiteEffects[i].SetBlend(blackAndWhiteBlend);
+                blackAndWhiteEffects[i].SetBlend(blend);
+        }
+
+        private bool IsTimedBlackAndWhiteRendering
+        {
+            get { return timedChallengeInteractions != null && timedChallengeInteractions.Presentation.RendersBlackAndWhite; }
+        }
+
+        private bool IsTimedChallengeEffectAvailable(string item)
+        {
+            if (timedPlaneWeapons.IsRestoring) return false;
+            if (item == CreatorToolsTimedChallenge.InkRain) return IsTimedInkRainAvailable();
+            if (item == CreatorToolsTimedChallenge.RgbShift) return IsTimedRgbAvailable();
+            if (CreatorToolsTimedChallenge.RequiresPlane(item)) return TimedPlaneWeaponChallenge.Supported;
+            if (item != CreatorToolsTimedChallenge.BlackAndWhite) return true;
+            if (blackAndWhiteTransitionShader == null || !blackAndWhiteTransitionShader.isSupported)
+                return false;
+            if (!IsTimedBlackAndWhiteRendering) return true;
+            // The render bridge attaches in this Update. Do not spend the
+            // effect time while a replacement gameplay camera is unavailable.
+            for (var i = 0; i < blackAndWhiteEffects.Count; i++)
+                if (blackAndWhiteEffects[i].IsValid) return true;
+            return false;
+        }
+
+        private float EffectiveBlackAndWhiteBlend
+        {
+            get
+            {
+                return timedChallengeInteractions == null ? blackAndWhiteBlend :
+                    timedChallengeInteractions.Presentation.ComposeBlackAndWhiteBlend(blackAndWhiteBlend);
+            }
         }
 
         private bool ShouldUseNativeBlackAndWhiteFilter()
         {
             var fadingOut = blackAndWhiteTransitionStartedAt >= 0f &&
                             blackAndWhiteTransitionTo < 0.001f;
-            return blackAndWhiteEffects.Count > 0 && !fadingOut &&
-                   blackAndWhiteBlend >= 0.999f;
+            var timedFullBlend = timedChallengeInteractions != null &&
+                timedChallengeInteractions.Presentation.BlackAndWhiteBlend >= 0.999f;
+            return blackAndWhiteEffects.Count > 0 &&
+                   (timedFullBlend || (!fadingOut && blackAndWhiteBlend >= 0.999f));
         }
 
         private bool HasBlackAndWhiteEffect(BlurGamma blurEffect)
@@ -3059,22 +3102,27 @@ namespace Gilomx.CupheadBossRoulette
             return level.CurrentLevel == Levels.DicePalaceMain;
         }
 
-        private static bool BlockDashPrefix(ref bool __result)
+        private static bool BlockDashPrefix(LevelPlayerMotor __instance, ref bool __result)
         {
             var plugin = activeInstance;
             if (plugin == null || !plugin.ShouldBlockDash())
                 return true;
 
+            // HandleDash also advances/finishes an existing dash. A timed
+            // restriction must never freeze its motion or invulnerability.
+            if (__instance.DashState != LevelPlayerMotor.DashManager.State.Ready)
+                return true;
             __result = false;
             return false;
         }
 
         private bool ShouldBlockDash()
         {
-            return (activeChallenge == ModifierId.NoDash ||
+            return ((activeChallenge == ModifierId.NoDash ||
                     activeChallenge == ModifierId.StiffMode) &&
                    !ActiveChallengeUsesPlaneControls() &&
-                   ShouldShowActiveChallenge();
+                   ShouldShowActiveChallenge()) ||
+                TimedChallengeBlocksMobility();
         }
 
         private static void ForceLockedPostfix(LevelPlayerMotor __instance)
@@ -3092,24 +3140,88 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldForceLocked()
         {
-            return activeChallenge == ModifierId.StiffMode &&
+            return (activeChallenge == ModifierId.StiffMode &&
                    !ActiveChallengeUsesPlaneControls() &&
-                   ShouldShowActiveChallenge();
+                   ShouldShowActiveChallenge()) ||
+                (timedChallengeInteractions != null && timedChallengeInteractions.IsActive(CreatorToolsTimedChallenge.StiffMode));
         }
 
-        private static bool BlockMiniPlanePrefix()
+        private bool TimedChallengeBlocksMobility()
         {
-            var plugin = activeInstance;
-            return plugin == null || !plugin.ShouldBlockMiniPlane();
+            return timedChallengeInteractions != null &&
+                (timedChallengeInteractions.IsActive(CreatorToolsTimedChallenge.NoDash) ||
+                 timedChallengeInteractions.IsActive(CreatorToolsTimedChallenge.StiffMode));
+        }
+
+        private static IEnumerable<CodeInstruction> MiniPlaneInputTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var down = AccessTools.Method(typeof(Rewired.Player), "GetButtonDown", new[] { typeof(int) });
+            var held = AccessTools.Method(typeof(Rewired.Player), "GetButton", new[] { typeof(int) });
+            var guardedDown = AccessTools.Method(typeof(Plugin), "MiniPlaneButtonDown");
+            var guardedHeld = AccessTools.Method(typeof(Plugin), "MiniPlaneButtonHeld");
+            if (down == null || held == null || guardedDown == null || guardedHeld == null)
+                throw new InvalidOperationException("Could not find the airplane shrink input guards.");
+            // Only filter inputs inside HandleShrunk. Its native expansion,
+            // cooldown, parry and weapon guards still run when the effect starts
+            // with the player already small (even with the button held).
+            var downCount = 0;
+            var heldCount = 0;
+            foreach (var instruction in instructions)
+            {
+                if (Equals(instruction.operand, down) || Equals(instruction.operand, held))
+                {
+                    if (Equals(instruction.operand, down)) downCount++;
+                    else heldCount++;
+                    instruction.opcode = OpCodes.Call;
+                    instruction.operand = Equals(instruction.operand, down) ? guardedDown : guardedHeld;
+                }
+                yield return instruction;
+            }
+            if (downCount != 2 || heldCount != 2)
+                throw new InvalidOperationException("Unexpected airplane shrink input layout; guard was not installed.");
+        }
+
+        private static bool MiniPlaneButtonDown(Rewired.Player player, int action)
+        {
+            return (activeInstance == null || !activeInstance.ShouldBlockMiniPlane()) && player.GetButtonDown(action);
+        }
+
+        private static bool MiniPlaneButtonHeld(Rewired.Player player, int action)
+        {
+            return (activeInstance == null || !activeInstance.ShouldBlockMiniPlane()) && player.GetButton(action);
         }
 
         private bool ShouldBlockMiniPlane()
         {
-            return (activeChallenge == ModifierId.NoMiniPlane ||
+            return ((activeChallenge == ModifierId.NoMiniPlane ||
                     activeChallenge == ModifierId.NoDash ||
                     activeChallenge == ModifierId.StiffMode) &&
                    ActiveChallengeUsesPlaneControls() &&
-                   ShouldShowActiveChallenge();
+                   ShouldShowActiveChallenge()) ||
+                TimedChallengeBlocksMobility();
+        }
+
+        private bool BaseChallengeBlocksTimedChallenge(string item)
+        {
+            if (item == CreatorToolsTimedChallenge.RgbShift && OwnsBaseRgbEffect) return true;
+            if (!ShouldShowActiveChallenge()) return false;
+            if (CreatorToolsTimedChallenge.RequiresPlane(item))
+                return activeChallenge == ModifierId.NoBombs || activeChallenge == ModifierId.NoPeashooter || activeChallenge == ModifierId.MiniPlaneOnly;
+            if (item == CreatorToolsTimedChallenge.NoDash || item == CreatorToolsTimedChallenge.StiffMode)
+            {
+                if (activeChallenge == ModifierId.StiffMode)
+                    return true;
+                var planeControls = CreatorToolsInteractionPresentation.HasAircraftPlayer();
+                // On ground, Stiff Mode adds a grounded movement lock even
+                // when NO DASH is equipped. In air their effect is identical.
+                if (activeChallenge == ModifierId.NoDash)
+                    return item == CreatorToolsTimedChallenge.NoDash || planeControls;
+                // NO MINI and SOLO MINI would duplicate or contradict this
+                // airplane equivalent. Keep earned requests pending.
+                return planeControls &&
+                    (activeChallenge == ModifierId.NoMiniPlane || activeChallenge == ModifierId.MiniPlaneOnly);
+            }
+            return activeChallenge == TimedChallengeModifier(item);
         }
 
         private static void ReducePlayerDamagePrefix(
@@ -3122,7 +3234,7 @@ namespace Gilomx.CupheadBossRoulette
             var plugin = activeInstance;
             if (plugin == null ||
                 !((plugin.activeChallenge == ModifierId.HalfDamage && plugin.ShouldShowActiveChallenge()) ||
-                  (plugin.timedChallengeInteractions != null && plugin.timedChallengeInteractions.Active)) ||
+                  (plugin.timedChallengeInteractions != null && plugin.timedChallengeInteractions.IsActive(CreatorToolsTimedChallenge.HalfDamage))) ||
                 (int)___playerId == int.MaxValue ||
                 !IsPlayerOffensiveDamageTarget(hit))
                 return;
@@ -3271,14 +3383,18 @@ namespace Gilomx.CupheadBossRoulette
                     isChalice = RouletteData.Charms[result.Charm].Value ==
                                 Charm.charm_chalice;
             }
-            if (activeChallenge == ModifierId.NoBombs)
+            var requiredChallenge = activeChallenge;
+            if (timedChallengeInteractions != null && timedChallengeInteractions.Presentation.Active &&
+                CreatorToolsTimedChallenge.RequiresPlane(timedChallengeInteractions.Presentation.Item))
+                requiredChallenge = TimedChallengeModifier(timedChallengeInteractions.Presentation.Item);
+            if (requiredChallenge == ModifierId.NoBombs)
             {
                 weapon = isChalice
                     ? Weapon.plane_chalice_weapon_3way
                     : Weapon.plane_weapon_peashot;
                 return true;
             }
-            if (activeChallenge == ModifierId.NoPeashooter)
+            if (requiredChallenge == ModifierId.NoPeashooter)
             {
                 weapon = isChalice
                     ? Weapon.plane_chalice_weapon_bomb
@@ -3297,9 +3413,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldLockPlaneWeapon()
         {
-            return (activeChallenge == ModifierId.NoBombs ||
+            return ((activeChallenge == ModifierId.NoBombs ||
                     activeChallenge == ModifierId.NoPeashooter) &&
-                   ShouldShowActiveChallenge();
+                   ShouldShowActiveChallenge()) ||
+                (timedChallengeInteractions != null && timedChallengeInteractions.Presentation.Active &&
+                 CreatorToolsTimedChallenge.RequiresPlane(timedChallengeInteractions.Presentation.Item));
         }
 
         private static void CanUseExPostfix(ref bool __result)
@@ -3317,13 +3435,16 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldBlockGroundEx()
         {
-            return ShouldBlockEx() && !ActiveChallengeUsesPlaneControls();
+            // Plane CheckEx gates both EX and Super on CanUseEx. Keep that
+            // capability intact in air and block only StartEx there. The real
+            // players determine control type even with no roulette challenge.
+            return ShouldBlockEx() && !CreatorToolsInteractionPresentation.HasAircraftPlayer();
         }
 
         private bool ShouldBlockEx()
         {
-            return activeChallenge == ModifierId.NoEx &&
-                   ShouldShowActiveChallenge();
+            return (activeChallenge == ModifierId.NoEx && ShouldShowActiveChallenge()) ||
+                (timedChallengeInteractions != null && timedChallengeInteractions.IsActive(CreatorToolsTimedChallenge.NoEx));
         }
 
         private bool ActiveChallengeUsesPlaneControls()
@@ -3654,6 +3775,7 @@ namespace Gilomx.CupheadBossRoulette
             DisposeManualChallengeEquipment();
             DestroyBattleResultHud();
             DestroyTimedChallengeHud();
+            DestroyAssetLoadingNotice();
             CloseCreatorToolsMenu(false);
             ShutdownCreatorTools();
             ClearChallengeVisualRetryGate();
