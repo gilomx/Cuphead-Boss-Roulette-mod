@@ -56,6 +56,12 @@ export function PeskyModeView() {
 
   const normalizedNames = useMemo(() => validNames(namesDraft), [namesDraft]);
   const disabledItems = new Set(pesky?.disabledItems ?? []);
+  const nuisanceItems = interactionItems.filter((item) => item.group !== "challenge");
+  const enabledNuisanceItems = nuisanceItems.filter(
+    (item) => !disabledItems.has(item.id),
+  );
+  const allNuisancesEnabled = nuisanceItems.length > 0 &&
+    enabledNuisanceItems.length === nuisanceItems.length;
   const enabledItemCount = interactionItems.filter(
     (item) => (pesky?.items ?? []).includes(item.id) && !disabledItems.has(item.id),
   ).length;
@@ -72,6 +78,14 @@ export function PeskyModeView() {
       : "disabled";
   const showInteractionsNotice = (pesky?.enabled ?? false) &&
     (interaction?.interactionsEnabled ?? false);
+
+  const toggleAllNuisances = () => {
+    const enable = !allNuisancesEnabled;
+    nuisanceItems.forEach((item) => {
+      const enabled = !disabledItems.has(item.id);
+      if (enabled !== enable) applyPeskyItem(item.id, enable);
+    });
+  };
 
   return (
     <div className="page page--pesky">
@@ -242,7 +256,6 @@ export function PeskyModeView() {
 
         <div className="interaction-workspace__tools">
         <PeskyIntervalPanel />
-        <PeskyChallengesPanel />
         <section className="interaction-panel pesky-names" aria-labelledby="pesky-names-title">
           <div className="interaction-panel__heading">
             <div>
@@ -291,17 +304,28 @@ export function PeskyModeView() {
           </div>
         </section>
 
+        <PeskyChallengesPanel />
+
         <section className="interaction-panel pesky-attacks" aria-labelledby="pesky-attacks-title">
           <div className="interaction-panel__heading">
             <div>
               <h2 id="pesky-attacks-title">{t("pesky.attacks.title")}</h2>
               <p>{t("pesky.attacks.description")}</p>
             </div>
-            <span className="interaction-count">{interactionItems.filter((item) =>
-              item.group !== "challenge" && !disabledItems.has(item.id)).length}</span>
+            <div className="pesky-attacks__heading-actions">
+              <span className="interaction-count">{enabledNuisanceItems.length}</span>
+              <button
+                className="pesky-bulk-toggle"
+                type="button"
+                disabled={!pesky?.ready || nuisanceItems.length === 0}
+                onClick={toggleAllNuisances}
+              >
+                {t(`pesky.items.${allNuisancesEnabled ? "disableAll" : "enableAll"}`)}
+              </button>
+            </div>
           </div>
           <div className="pesky-attack-list">
-            {interactionItems.filter((item) => item.group !== "challenge").map((item) => {
+            {nuisanceItems.map((item) => {
               const enabled = !disabledItems.has(item.id);
               return (
                 <label className="pesky-attack" data-enabled={enabled} key={item.id}>

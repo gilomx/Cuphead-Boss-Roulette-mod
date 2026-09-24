@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,7 @@ namespace Gilomx.CupheadBossRoulette
         private CanvasGroup timedWarningGroup;
         private CanvasGroup timedActiveGroup;
         private Text timedWarningTitle;
+        private Text timedWarningChallenge;
         private Text timedWarningNumber;
         private Text timedActiveTitle;
         private Text timedActiveRemaining;
@@ -24,10 +26,18 @@ namespace Gilomx.CupheadBossRoulette
         private Color timedActiveTitleBaseColor;
         private Color timedWarningTitleBaseColor;
         private float timedHudRetryAt;
+        private AudioClip timedWarningClip;
+        private AudioSource timedWarningAudioSource;
+        private Coroutine timedWarningAudioFade;
+        private bool timedWarningAudioPaused;
+        private int timedWarningAudioRevision = -1;
+        private int timedWarningAudioFadeRevision = -1;
         private readonly CreatorToolsTimedChallengeHudState timedHudState = new CreatorToolsTimedChallengeHudState();
         private readonly TimedPlaneWeaponChallenge timedPlaneWeapons = new TimedPlaneWeaponChallenge();
         private const float TimedHudTopMargin = 35f;
-        private const float TimedHudCountdownCueVolume = 0.70f;
+        private const float TimedHudWarningAudioFadeSeconds = 0.35f;
+        private const float TimedHudWarningAudioVolume = 1f;
+        private const float TimedHudWarningFallbackVolume = 0.70f;
         private const float TimedHudUrgencySeconds = 3f;
         private const float TimedHudUrgencySlowHz = 1.25f;
         private const float TimedHudUrgencyFastHz = 4f;
@@ -51,7 +61,16 @@ namespace Gilomx.CupheadBossRoulette
             timedWarningRoot = CreateTimedHudGroup("Challenge incoming", new Vector2(0.5f, 1f), out timedWarningGroup);
             timedActiveRoot = CreateTimedHudGroup("Active challenge", new Vector2(0.5f, 1f), out timedActiveGroup);
             timedWarningTitle = CreateTimedHudText(template, timedWarningRoot, "Incoming label", size, 0f);
-            timedWarningNumber = CreateTimedHudText(template, timedWarningRoot, "Countdown", size * 3, -size * 2.2f);
+            timedWarningChallenge = CreateTimedHudText(
+                template, timedWarningRoot, "Incoming challenge", size,
+                -size * 1.35f);
+            timedWarningChallenge.resizeTextForBestFit = true;
+            timedWarningChallenge.resizeTextMinSize =
+                Mathf.Max(12, size / 2);
+            timedWarningChallenge.resizeTextMaxSize = size;
+            timedWarningNumber = CreateTimedHudText(
+                template, timedWarningRoot, "Countdown", size * 3,
+                -size * 3.35f);
             timedActiveTitle = CreateTimedHudText(template, timedActiveRoot, "Challenge title", size, 0f);
             timedActiveRemaining = CreateTimedHudText(template, timedActiveRoot, "Remaining time", size * 2, 0f);
             timedActiveRemaining.fontStyle = FontStyle.Bold;
@@ -70,6 +89,18 @@ namespace Gilomx.CupheadBossRoulette
             timedChallengeRoot.gameObject.SetActive(false);
             Logger.LogInfo("HUD de reto temporal preparado en la capa de la ruleta.");
             return true;
+        }
+
+        private void InitializeTimedChallengeWarningAudio()
+        {
+            if (timedWarningAudioSource != null)
+                return;
+            timedWarningAudioSource = gameObject.AddComponent<AudioSource>();
+            timedWarningAudioSource.playOnAwake = false;
+            timedWarningAudioSource.volume = TimedHudWarningAudioVolume;
+            timedWarningAudioSource.spatialBlend = 0f;
+            timedWarningAudioSource.priority = 48;
+            timedWarningAudioSource.ignoreListenerPause = true;
         }
 
         private void PlaceTimedChallengeRoot(Transform parent, bool behindMenu)
@@ -258,6 +289,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!PrepareTimedChallengeHud()) return;
             if (!UpdateTimedChallengeHudLayer())
             {
+                FadeTimedChallengeWarningAudio();
                 timedChallengeRoot.gameObject.SetActive(false);
                 return;
             }
@@ -271,7 +303,12 @@ namespace Gilomx.CupheadBossRoulette
             var pauseAlpha = !frozen && IsCreatorToolsInteractionPaused() ? BattleHudPauseAlphaMultiplier : 1f;
             if (warning)
             {
+                UpdateTimedChallengeWarningAudioPause(
+                    !frozen && IsCreatorToolsInteractionPaused());
                 timedWarningTitle.text = L(ModText.ChallengeIncoming).ToUpperInvariant();
+                timedWarningChallenge.text = LocalizedChallengeLabel(
+                    TimedChallengeModifier(timer.Item,
+                        timer.PlaneControls)).ToUpperInvariant();
                 timedWarningTitle.color = !frozen && timer.Phase == TimedChallengePhase.Countdown
                     ? TimedHudUrgencyTint(timedWarningTitleBaseColor, timer.PhaseElapsed,
                         timer.PhaseElapsed + timer.CountdownRemaining)
@@ -285,18 +322,30 @@ namespace Gilomx.CupheadBossRoulette
                 timedWarningRoot.localScale = Vector3.one * (exiting ? 1f + eased * 0.12f : 0.90f + eased * 0.10f);
                 var beat = Mathf.Clamp01((timer.PhaseElapsed % 1f) / 0.22f);
                 timedWarningNumber.rectTransform.localScale = Vector3.one * (exiting || frozen ? 1f : 1f + 0.14f * (1f - beat) * (1f - beat));
-                if (timedHudState.TakeCountdownCue(timer, timedChallengeInteractions.GameplayAvailable))
+                if (timedHudState.TakeWarningCue(
+                    timer, timedChallengeInteractions.GameplayAvailable))
                 {
-                    // Prefer the packaged clip so a native sound lookup that
-                    // fails silently cannot swallow the countdown cue.
-                    if (selectionClip != null)
-                        PlayOneShot(selectionClip, TimedHudCountdownCueVolume);
-                    else
-                        PlayNativeMenuSound("menu_equipment_move", null, TimedHudCountdownCueVolume);
+                    timedWarningAudioRevision = timer.Revision;
+                    timedWarningAudioFadeRevision = -1;
+                    PlayTimedChallengeWarningAudio();
                 }
+                if (timedHudState.TakeCountdownCue(
+                    timer, timedChallengeInteractions.GameplayAvailable))
+                {
+                    if (selectionClip != null)
+                        PlayOneShot(selectionClip,
+                            TimedHudWarningFallbackVolume);
+                    else
+                        PlayNativeMenuSound(
+                            "menu_equipment_move", null,
+                            TimedHudWarningFallbackVolume);
+                }
+                if (!frozen && timer.Phase != TimedChallengePhase.Countdown)
+                    FadeTimedChallengeWarningAudio();
             }
             else
             {
+                FadeTimedChallengeWarningAudio();
                 timedActiveTitle.text = LocalizedChallengeLabel(TimedChallengeModifier(timer.Item, timer.PlaneControls)).ToUpperInvariant() + "  ·";
                 timedActiveRemaining.text = Mathf.CeilToInt(timer.Remaining) + " S";
                 UpdateTimedChallengeTitleLayout(timer);
@@ -329,7 +378,8 @@ namespace Gilomx.CupheadBossRoulette
             if (timedHudUsingSaturationMaterial == useSaturation) return;
             timedHudUsingSaturationMaterial = useSaturation;
             var textMaterial = useSaturation ? battleHudSaturationMaterial : battleHudChallengeBaseMaterial;
-            timedWarningTitle.material = timedWarningNumber.material = timedActiveTitle.material =
+            timedWarningTitle.material = timedWarningChallenge.material =
+                timedWarningNumber.material = timedActiveTitle.material =
                 timedActiveRemaining.material = timedActiveDonor.material = textMaterial;
             timedActiveIcon.material = useSaturation ? battleHudSaturationMaterial : null;
         }
@@ -338,6 +388,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (level == null || timedChallengeInteractions == null ||
                 level.GetInstanceID() != creatorToolsInteractionLevelInstanceId) return;
+            FadeTimedChallengeWarningAudio();
             HoldTimedUpsideDownFrame();
             timedHudState.HoldAfterDefeat(timedChallengeInteractions.Presentation, timedChallengeInteractions.Donor);
             if (timedInkRain != null) timedInkRain.PreserveAfterDefeat();
@@ -354,6 +405,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void HideTimedChallengeHud()
         {
+            FadeTimedChallengeWarningAudio();
             if (timedChallengeRoot == null) return;
             // Keep our root alive when the native scene/menu unloads.
             if (battleHudCanvas != null && timedChallengeRoot.parent != battleHudCanvas.transform)
@@ -363,9 +415,86 @@ namespace Gilomx.CupheadBossRoulette
 
         private void DestroyTimedChallengeHud()
         {
+            FadeTimedChallengeWarningAudio();
             if (timedChallengeRoot != null) Destroy(timedChallengeRoot.gameObject);
             timedChallengeRoot = null;
             timedHudRetryAt = 0f;
+        }
+
+        private void FadeTimedChallengeWarningAudio()
+        {
+            if (timedWarningAudioRevision < 0 ||
+                timedWarningAudioFadeRevision == timedWarningAudioRevision)
+                return;
+            timedWarningAudioFadeRevision = timedWarningAudioRevision;
+            if (timedWarningAudioSource == null ||
+                timedWarningAudioSource.clip == null)
+                return;
+            if (timedWarningAudioFade != null)
+                StopCoroutine(timedWarningAudioFade);
+            timedWarningAudioFade = StartCoroutine(
+                FadeTimedChallengeWarningAudioCoroutine());
+        }
+
+        private void PlayTimedChallengeWarningAudio()
+        {
+            if (timedWarningClip == null ||
+                timedWarningAudioSource == null)
+                return;
+            if (timedWarningAudioFade != null)
+            {
+                StopCoroutine(timedWarningAudioFade);
+                timedWarningAudioFade = null;
+            }
+            timedWarningAudioPaused = false;
+            timedWarningAudioSource.Stop();
+            timedWarningAudioSource.clip = timedWarningClip;
+            timedWarningAudioSource.volume = TimedHudWarningAudioVolume;
+            timedWarningAudioSource.Play();
+        }
+
+        private void UpdateTimedChallengeWarningAudioPause(bool paused)
+        {
+            if (timedWarningAudioSource == null ||
+                timedWarningAudioSource.clip == null ||
+                timedWarningAudioFade != null)
+                return;
+            if (paused && !timedWarningAudioPaused &&
+                timedWarningAudioSource.isPlaying)
+            {
+                timedWarningAudioSource.Pause();
+                timedWarningAudioPaused = true;
+            }
+            else if (!paused && timedWarningAudioPaused)
+            {
+                timedWarningAudioSource.UnPause();
+                timedWarningAudioPaused = false;
+            }
+        }
+
+        private IEnumerator FadeTimedChallengeWarningAudioCoroutine()
+        {
+            var source = timedWarningAudioSource;
+            var startVolume = source == null ? 0f : source.volume;
+            var elapsed = 0f;
+            while (source != null &&
+                   elapsed < TimedHudWarningAudioFadeSeconds)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                source.volume = Mathf.Lerp(
+                    startVolume, 0f,
+                    Mathf.Clamp01(elapsed /
+                        TimedHudWarningAudioFadeSeconds));
+                yield return null;
+            }
+            if (source != null)
+            {
+                source.volume = 0f;
+                source.Stop();
+                source.clip = null;
+            }
+            timedWarningAudioPaused = false;
+            timedWarningAudioFade = null;
         }
     }
 }

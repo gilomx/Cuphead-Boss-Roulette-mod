@@ -2,6 +2,33 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Nombre y audio de la cuenta previa (2026-09-24)
+
+El HUD temporal presenta tres filas: **RETO EN CAMINO**, nombre localizado del
+reto y cifra. La fila del nombre usa ajuste automático para traducciones largas
+y respeta la variante de avión de NO DASH/MODO TIESO. La cuenta reproduce una
+sola vez `level_pirate_shark_warning` y conserva `selection.wav` una vez por
+cifra visible. Al salir de la cuenta, perder, reiniciar o desaparecer el HUD, se solicita un fade lineal
+de 0.35 s hasta volumen cero y nunca un corte directo. El estado de presentación
+garantiza una sola reproducción por revisión, incluso tras pausa o frames lentos.
+La llamada original a `AudioManager` era silenciosa fuera del nivel Pirata porque
+su banco no estaba cargado. `assets/sounds/pirate_shark_warning.wav` contiene el
+clip nativo `sfx_level_pirate_shark_warning`, extraíble de `sharedassets9.assets`
+con `tools/extract_native_pirate_shark_warning.py`; una fuente dedicada permite
+pausarlo y desvanecerlo sin afectar los clics ni otros efectos del mod.
+
+## Recuperación del puerto del panel (2026-09-24)
+
+El servidor interno conserva el puerto fijo `18081`, pero ahora reintenta la
+conexión cada cinco segundos si otra aplicación lo ocupaba al iniciar Cuphead.
+El simulador local cambió su valor predeterminado a `18091` y dispone de
+`npm run mock`; las pruebas manuales del panel no deben usar el puerto del juego.
+Esto evita que el navegador escriba en el estado simulado mientras el runtime
+queda sin panel durante el resto de la sesión. Además, el bucle de juego ya no
+depende de que el servidor HTTP esté activo: Modo Molestoso, Batalla Molestosa
+y Tap Farming siguen actualizándose con su estado guardado durante una colisión
+de puerto; únicamente los comandos y publicaciones web esperan al servidor.
+
 ## Pendientes actuales (2026-09-23)
 
 Esta lista resume el trabajo restante y sustituye los recuentos históricos de
@@ -10,8 +37,9 @@ retos pendientes que aparecen más abajo. Hay once retos temporales implementado
 - Validar en juego desde un arranque nuevo: lluvia temporal sin pulpo, reto
   de ruleta/equipado con pulpo, fluidez al entrar al mapa y al primer nivel,
   aviso de preparación en mayúsculas alineado con el borde inferior del reloj,
-  Volteada de cabeza temporal en tierra/avión, pausa y derrota/reintento, y la
-  penalización de Solo balas de miniavión con P1/P2 y Ms. Chalice.
+  Volteada de cabeza temporal en tierra/avión, pausa, K.O. y
+  derrota/reintento, y la penalización de Solo balas de miniavión con P1/P2 y
+  Ms. Chalice.
 - **Una vida y te callas / HP.1 — dificultad muy alta:** definir cómo devolver
   la vida sin curar daño recibido ni revivir, incluyendo cooperativo.
 - Después de completar los temporales, desarrollar el reto que cambia
@@ -25,6 +53,40 @@ durante la carga de niveles y se reutiliza; sólo la introducción del pulpo se
 prepara cuando hace falta. El trabajo nativo que no haya comenzado al agotar el
 presupuesto de carga puede continuar en otra carga. Los recursos marcados como
 fallidos no se reintentan automáticamente durante la misma sesión.
+
+## Modo Molestoso: orden y selección masiva (2026-09-24)
+
+El panel ordena ahora sus herramientas como Configuración, Nombres aleatorios,
+Retos temporales y Molestias. Las dos listas de selección quedan al final y cada
+una muestra el total activo junto a un botón `Activar todo` / `Desactivar todo`.
+El control sólo escribe los elementos cuyo estado cambia; Retos temporales
+omite entradas no disponibles para el runtime. El diseño móvil expande el
+botón dentro del encabezado.
+
+Verificado con TypeScript, catálogos de 28 interacciones y 43 regalos, build
+Vite y mock local. En el navegador se comprobó el orden y la alternancia
+completa de ambas listas; el estado del mock se restauró después de la prueba.
+Paquete Dev publicado por el proceso independiente, 535 archivos y ruta física
+verificada. SHA256:
+`56CDD39B6DD66A1F5E8E26156EE8467C775430A6019C19B3A761A8B608D29146`.
+
+## Volteada de cabeza temporal: regreso tras K.O. (2026-09-24)
+
+Corregido el enderezado abrupto al ganar mientras el reto temporal estaba
+activo. Cuphead llama `_OnLevelEnd` antes de `_OnPreWin`; Creator Tools cerraba
+el temporizador en el primer evento y perdía su ángulo antes de que pudiera
+iniciarse la salida. El prefijo de fin de nivel captura ahora el último frame
+visible antes de liberar la interacción y lo transfiere al renderer compartido.
+La vista conserva la pausa de K.O. de 1 s y vuelve durante 0.45 s, igual que
+Volteada de cabeza de ruleta/equipada.
+
+La ruta de ruleta/equipada fue revisada: ya inicia su regreso en `_OnPreWin`,
+marca la salida como propia antes de limpiar el reto y evita que el ciclo
+normal sobrescriba la animación. No requirió cambios. Suite runtime completa
+aprobada. Paquete Dev publicado por el proceso independiente, 535 archivos y
+ruta física verificada. SHA256:
+`92888BD63EB6D4BFBE40056C768D5E65840020B065A326F70543054C0E923413`.
+Pendiente confirmación visual en Cuphead desde un arranque nuevo.
 
 ## Solo balas de miniavión temporal (2026-09-23)
 

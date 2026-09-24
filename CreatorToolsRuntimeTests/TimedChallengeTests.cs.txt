@@ -118,14 +118,14 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(CreatorToolsTimedChallenge.UpsideDown, hud.DefeatSnapshot.Item, "defeat keeps only the frozen HUD identity");
                 }
             });
-            Run("Upside-down defeat transfers its exact frame into the animated return", delegate
+            Run("Upside-down defeat or knockout transfers its exact frame into the animated return", delegate
             {
                 var timer = new CreatorToolsTimedChallenge();
                 var hold = new TimedUpsideDownFrameHold();
                 timer.Start(CreatorToolsTimedChallenge.UpsideDown, 15, 0);
                 timer.Advance(0.475f, true);
                 Equal(0.5f, timer.UpsideDownBlend, "defeat occurs halfway through the turn");
-                True(hold.Capture(timer), "defeat captures the visible angle");
+                True(hold.Capture(timer), "level end captures the visible angle before gameplay cleanup");
                 timer.End();
                 Equal(0f, timer.UpsideDownBlend, "gameplay lease is released");
                 Equal(0.5f, hold.Blend, "captured frame survives lease cleanup");
@@ -542,9 +542,9 @@ namespace Gilomx.CupheadBossRoulette
                 timer.Start(20, 3);
                 hud.HoldAfterDefeat(timer, "Late cleanup");
                 True(hud.DefeatSnapshot == null, "restart cannot capture the old attempt again");
-                False(hud.TakeCountdownCue(timer, true), "no cues during reload");
+                False(hud.TakeWarningCue(timer, true), "no cues during reload");
                 hud.Reset(false);
-                True(hud.TakeCountdownCue(timer, true), "new attempt can count normally");
+                True(hud.TakeWarningCue(timer, true), "new attempt can warn normally");
             });
             Run("Defeat during the warning preserves its number silently", delegate
             {
@@ -556,37 +556,48 @@ namespace Gilomx.CupheadBossRoulette
                 timer.End();
                 True(hud.DefeatSnapshot.CountingDown, "warning does not become a challenge on death");
                 Equal(2f, hud.DefeatSnapshot.CountdownRemaining, "warning stays on its visible number");
-                False(hud.TakeCountdownCue(hud.DefeatSnapshot, true), "frozen warning stays silent");
+                False(hud.TakeWarningCue(hud.DefeatSnapshot, true), "frozen warning stays silent");
                 hud.Reset(false);
                 hud.HoldAfterDefeat(timer, "Nobody");
                 True(hud.DefeatSnapshot == null, "death during rest has no stale challenge");
             });
-            Run("Countdown cues play once per number and never replay after pause", delegate
+            Run("Warning plays once while countdown clicks follow each number", delegate
             {
                 var timer = new CreatorToolsTimedChallenge();
                 var hud = new CreatorToolsTimedChallengeHudState();
                 timer.Start(15, 3);
-                False(hud.TakeCountdownCue(timer, false), "paused first frame is silent");
-                True(hud.TakeCountdownCue(timer, true), "first number plays once");
-                False(hud.TakeCountdownCue(timer, true), "second rendering of same number is silent");
+                False(hud.TakeWarningCue(timer, false), "paused first frame is silent");
+                False(hud.TakeCountdownCue(timer, false), "paused first click is silent");
+                True(hud.TakeWarningCue(timer, true), "warning plays once");
+                True(hud.TakeCountdownCue(timer, true), "first number clicks once");
+                False(hud.TakeWarningCue(timer, true), "second rendering is silent");
+                False(hud.TakeCountdownCue(timer, true), "first number does not click twice");
                 timer.Advance(1f, true);
-                True(hud.TakeCountdownCue(timer, true), "second number plays");
+                False(hud.TakeWarningCue(timer, true), "second number does not replay the warning");
+                True(hud.TakeCountdownCue(timer, true), "second number clicks");
                 timer.Advance(20f, false);
-                False(hud.TakeCountdownCue(timer, false), "pause does not tick");
-                False(hud.TakeCountdownCue(timer, true), "resume does not replay previous tick");
+                False(hud.TakeWarningCue(timer, false), "pause is silent");
+                False(hud.TakeCountdownCue(timer, false), "pause has no click");
+                False(hud.TakeWarningCue(timer, true), "resume does not replay the warning");
+                False(hud.TakeCountdownCue(timer, true), "resume does not replay the same click");
                 timer.Advance(1f, true);
-                True(hud.TakeCountdownCue(timer, true), "last number plays");
+                False(hud.TakeWarningCue(timer, true), "last number stays silent");
+                True(hud.TakeCountdownCue(timer, true), "last number clicks");
                 timer.Advance(1f, true);
-                False(hud.TakeCountdownCue(timer, true), "warning exit does not add a tick");
+                False(hud.TakeWarningCue(timer, true), "warning exit does not replay");
+                False(hud.TakeCountdownCue(timer, true), "warning exit has no click");
                 timer.End();
                 timer.Start(15, 0);
-                False(hud.TakeCountdownCue(timer, true), "zero warning is silent");
+                False(hud.TakeWarningCue(timer, true), "zero warning is silent");
+                False(hud.TakeCountdownCue(timer, true), "zero warning has no click");
                 timer.End();
                 timer.Start(15, 3);
-                True(hud.TakeCountdownCue(timer, true), "next challenge restarts sound sequence");
+                True(hud.TakeWarningCue(timer, true), "next challenge restarts sound sequence");
+                True(hud.TakeCountdownCue(timer, true), "next challenge restarts clicks");
                 timer.Advance(2.5f, true);
-                True(hud.TakeCountdownCue(timer, true), "slow frame plays only the current number");
-                False(hud.TakeCountdownCue(timer, true), "no catch-up burst");
+                False(hud.TakeWarningCue(timer, true), "slow frame cannot replay the warning");
+                True(hud.TakeCountdownCue(timer, true), "slow frame clicks only the visible number");
+                False(hud.TakeCountdownCue(timer, true), "slow frame does not burst clicks");
             });
             Run("Automatic challenges wait five playable seconds before and between effects", delegate
             {

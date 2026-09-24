@@ -2,6 +2,31 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- La cuenta previa de cada reto temporal muestra ahora el nombre localizado
+  entre **RETO EN CAMINO** y la cifra. El aviso nativo del tiburón pirata suena
+  una sola vez al comenzar y cada cifra conserva su clic; si el aviso supera la
+  duración de la cuenta, se desvanece a volumen cero en lugar de cortarse de
+  golpe. El WAV se carga desde el propio mod para que esté disponible en todos
+  los jefes, sin depender del banco de audio exclusivo del Capitán Barbas.
+
+- El servidor del panel vuelve a intentar automáticamente el puerto `18081`
+  cada cinco segundos si estaba ocupado al arrancar. El simulador de desarrollo
+  usa ahora `18091` por defecto, evitando que una prueba del panel capture las
+  opciones del usuario sin enviarlas al juego. Modo Molestoso continúa
+  funcionando con su configuración guardada aunque el servidor del panel no
+  pueda abrirse.
+
+- Modo Molestoso coloca **Retos temporales** y **Molestias** como sus dos
+  últimas secciones, en ese orden. Ambas listas incorporan un botón que
+  alterna entre activar y desactivar todos sus elementos disponibles, conserva
+  los ajustes individuales y muestra el total activo.
+
+- Al conseguir un K.O. mientras **VOLTEADA DE CABEZA temporal** está
+  activa, se conserva el último ángulo visible antes de cerrar la
+  interacción y la pantalla gira suavemente a su orientación normal. Usa la
+  misma pausa y duración de regreso que el reto de ruleta/equipado, en vez de
+  enderezarse de forma abrupta al finalizar el nivel.
+
 - **SOLO BALAS DE MINIAVIÓN** se incorpora como undécimo reto temporal,
   exclusivo de avión. Conserva el cambio de tamaño y no fuerza el arma: las
   balas del miniavión y los súperes están permitidos. Cuando un disparo normal,

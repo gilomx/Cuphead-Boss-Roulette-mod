@@ -144,6 +144,13 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   controles, con su propio interruptor de espaciado y sus valores independientes.
   Los campos se agrupan en Ataques normales y Minijefes; las ayudas y el resumen
   explican tiempos y cantidades, sin exponer nombres de implementación.
+- En la columna de herramientas, Configuración y Nombres aleatorios aparecen
+  primero. Retos temporales y Molestias son las dos últimas secciones, en ese
+  orden. Cada lista muestra su cantidad activa y un botón que alterna entre
+  activar y desactivar todos sus elementos disponibles. La operación conserva
+  el guardado optimista y no envía cambios para casillas que ya tienen el estado
+  solicitado; los retos ausentes del runtime permanecen bloqueados y no se
+  incluyen en la operación masiva.
 - El intervalo de molestias normales admite 0.35–300 s y el descanso entre
   minijefes 0–300 s, con mínimo <= máximo. El primer mini compatible no consume
   ese descanso: puede entrar tras el margen seguro de inicio de 3 s. Los relojes

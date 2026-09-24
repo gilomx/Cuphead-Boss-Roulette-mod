@@ -31,6 +31,7 @@ namespace Gilomx.CupheadBossRoulette
     public sealed partial class Plugin
     {
         private const int CreatorToolsDefaultPort = 18081;
+        private const float CreatorToolsServerRetrySeconds = 5f;
         private const float CreatorToolsDevilPhaseTransitionBlockDelay = 6f;
         private const float CreatorToolsSaltbakerPhaseOneBlockDelay = 2.5f;
         private const float CreatorToolsInteractionPhaseTransitionTimeout = 30f;
@@ -78,6 +79,7 @@ namespace Gilomx.CupheadBossRoulette
         private int creatorToolsLabelRevision;
         private bool creatorToolsLabelRenderFailureLogged;
         private string creatorToolsServerError;
+        private float creatorToolsServerRetryAt;
         private bool creatorToolsInteractionLevelStartObserved;
         private int creatorToolsInteractionLevelInstanceId = -1;
         private const float CreatorToolsInteractionStartSafetySeconds = 3f;
@@ -1166,8 +1168,11 @@ namespace Gilomx.CupheadBossRoulette
                 // Project the win first so Tap Farming stops accepting taps
                 // at knockout and keeps its completed state for WinScreen.
                 if (Level.Won)
+                {
+                    plugin.BeginTimedUpsideDownVictoryReturn();
                     plugin.creatorToolsInteractions.PeskyBattleLevelPreWin(
                         __instance);
+                }
                 plugin.creatorToolsInteractions.PeskyBattleLevelEnded(
                     __instance);
                 plugin.creatorToolsInteractions.SuspendGameplayLevel();
@@ -1314,13 +1319,17 @@ namespace Gilomx.CupheadBossRoulette
             {
                 creatorToolsServerError =
                     "EL PUERTO 18081 ESTÁ OCUPADO";
+                creatorToolsServerRetryAt = Time.realtimeSinceStartup +
+                    CreatorToolsServerRetrySeconds;
                 Logger.LogWarning(
                     "Creator Tools requires fixed port 18081, but it is " +
-                    "already in use. Close the application using the port " +
-                    "and try again.");
+                    "already in use. It will retry automatically after the " +
+                    "port is released.");
                 return false;
             }
 
+            creatorToolsServerError = null;
+            creatorToolsServerRetryAt = float.PositiveInfinity;
             PublishCreatorToolsState(true);
             PublishCreatorToolsForceConfig(true);
             return true;
@@ -1527,7 +1536,8 @@ namespace Gilomx.CupheadBossRoulette
 
             if ((creatorToolsServer == null ||
                  !creatorToolsServer.IsRunning) &&
-                string.IsNullOrEmpty(creatorToolsServerError))
+                (string.IsNullOrEmpty(creatorToolsServerError) ||
+                 Time.realtimeSinceStartup >= creatorToolsServerRetryAt))
                 StartCreatorToolsServer();
 
             UpdateCreatorToolsChallengeLabel();

@@ -5,7 +5,7 @@ import { extname, resolve, sep } from "node:path";
 const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
 const port = Number.isInteger(configuredPort) && configuredPort > 0
   ? configuredPort
-  : 18081;
+  : 18091;
 const host = process.argv[3] ?? "127.0.0.1";
 const assetsRoot = resolve(process.cwd(), "../assets") + sep;
 const giftCatalog = JSON.parse(readFileSync(

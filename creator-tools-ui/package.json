@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.embedded.config.ts --open /config.html",
+    "mock": "node scripts/mock-server.mjs 18091",
     "validate:gifts": "node scripts/validate-gift-catalog.mjs",
     "validate:interactions": "node scripts/validate-interaction-catalog.mjs",
     "build": "npm run validate:interactions && npm run validate:gifts && tsc -b && vite build --config vite.embedded.config.ts",

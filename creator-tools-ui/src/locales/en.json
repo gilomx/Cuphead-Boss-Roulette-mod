@@ -966,6 +966,10 @@
       "enable": "Enable mode",
       "disable": "Disable mode"
     },
+    "items": {
+      "enableAll": "Enable all",
+      "disableAll": "Disable all"
+    },
     "phaseProtection": {
       "title": "Transition protection",
       "description": "For the Devil, blocking starts 6 seconds after the phase 1 to 2 signal. For a full comparison, change it before the transformation; it turns back on when the game restarts.",

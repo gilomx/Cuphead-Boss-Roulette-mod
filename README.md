@@ -95,7 +95,7 @@ conserva el formato nativo `ETIQUETA: VALOR`.
 El servidor escucha únicamente en `127.0.0.1:18081`: no necesita internet ni
 una cuenta y nunca cambia de puerto. Si otra aplicación ya está usando `18081`,
 `PANEL DE CONTROL` abre una página local con instrucciones; después de liberar
-el puerto, selecciona la misma opción otra vez para reintentar. El servidor
+el puerto, el mod reintenta automáticamente cada cinco segundos. El servidor
 permanece disponible para `/config` aunque `ESTADO` esté desactivado; ese ajuste
 solo oculta o muestra el contenido de la fuente de OBS.
 
@@ -216,8 +216,12 @@ muestra «Esperando un nivel de avión». Modo Molestoso sólo los sortea en avi
 
 El ciclo es espera entre retos (5 s por defecto) → cuenta previa (3 s) → reto
 activo (15 s). Los tres tiempos se pueden configurar. El aviso **RETO EN CAMINO**
-pulsa en rojo durante la cuenta previa; después aparece el icono junto al nombre,
-el tiempo restante al doble de tamaño y en negrita, y el remitente debajo, si lo hay.
+muestra debajo el nombre del reto y luego la cifra de la cuenta previa; el título
+pulsa en rojo. Al comenzar suena una vez el aviso nativo del tiburón pirata y
+cada cifra conserva su clic. Si el aviso sigue reproduciéndose al terminar la
+cuenta, baja suavemente a silencio.
+Después aparece el icono junto al nombre, el tiempo restante al doble de tamaño
+y en negrita, y el remitente debajo, si lo hay.
 En avión, NO DASH y MODO TIESO muestran el nombre e icono de NO MINIAVIÓN.
 La pausa congela la cuenta.
 Al perder se conserva la presentación; reintentar la limpia. El reto de la ruleta

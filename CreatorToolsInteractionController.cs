@@ -177,62 +177,63 @@ namespace Gilomx.CupheadBossRoulette
             var peskyFinished = peskyQueue.RemoveFinished();
             if (interactionsFinished || peskyFinished)
                 InvalidateState();
-            if (server == null || !server.IsRunning)
-                return;
-
-            string query;
-            bool backgroundApplied;
-            bool isTest;
-            int deferredTestQuantity;
-            long commandSequence;
-            long testGeneration;
-            peskyBattle.ProcessCommands(server);
-            var processedCommands = 0;
-            while (processedCommands < MaximumCommandsPerUpdate &&
-                   server.TryTakeInteractionCommand(
-                       interactionQueue.AvailableCapacity > 0,
-                       out query,
-                       out backgroundApplied,
-                       out isTest,
-                       out deferredTestQuantity,
-                       out commandSequence,
-                       out testGeneration))
+            var serverRunning = server != null && server.IsRunning;
+            if (serverRunning)
             {
-                var commandQuery = query;
-                var commandValues = ParseQuery(commandQuery);
-                if (isTest)
+                string query;
+                bool backgroundApplied;
+                bool isTest;
+                int deferredTestQuantity;
+                long commandSequence;
+                long testGeneration;
+                peskyBattle.ProcessCommands(server);
+                var processedCommands = 0;
+                while (processedCommands < MaximumCommandsPerUpdate &&
+                       server.TryTakeInteractionCommand(
+                           interactionQueue.AvailableCapacity > 0,
+                           out query,
+                           out backgroundApplied,
+                           out isTest,
+                           out deferredTestQuantity,
+                           out commandSequence,
+                           out testGeneration))
                 {
-                    var commandQuantity = deferredTestQuantity;
-                    var commandGeneration = testGeneration;
-                    server.ProcessInteractionTestCommand(
-                        commandQuery,
-                        commandQuantity,
-                        commandGeneration,
-                        delegate
-                        {
-                            return ProcessInteractionCommand(
-                                commandValues,
-                                false,
-                                commandQuantity);
-                        });
+                    var commandQuery = query;
+                    var commandValues = ParseQuery(commandQuery);
+                    if (isTest)
+                    {
+                        var commandQuantity = deferredTestQuantity;
+                        var commandGeneration = testGeneration;
+                        server.ProcessInteractionTestCommand(
+                            commandQuery,
+                            commandQuantity,
+                            commandGeneration,
+                            delegate
+                            {
+                                return ProcessInteractionCommand(
+                                    commandValues,
+                                    false,
+                                    commandQuantity);
+                            });
+                    }
+                    else
+                    {
+                        ProcessInteractionCommand(
+                            commandValues, backgroundApplied, 0);
+                    }
+                    if (commandSequence >
+                        lastProcessedInteractionControlSequence)
+                        lastProcessedInteractionControlSequence =
+                            commandSequence;
+                    processedCommands++;
                 }
-                else
+                var processedPeskyCommands = 0;
+                while (processedPeskyCommands < MaximumCommandsPerUpdate &&
+                       server.TryTakePeskyCommand(out query))
                 {
-                    ProcessInteractionCommand(
-                        commandValues, backgroundApplied, 0);
+                    ProcessPeskyCommand(ParseQuery(query));
+                    processedPeskyCommands++;
                 }
-                if (commandSequence >
-                    lastProcessedInteractionControlSequence)
-                    lastProcessedInteractionControlSequence =
-                        commandSequence;
-                processedCommands++;
-            }
-            var processedPeskyCommands = 0;
-            while (processedPeskyCommands < MaximumCommandsPerUpdate &&
-                   server.TryTakePeskyCommand(out query))
-            {
-                ProcessPeskyCommand(ParseQuery(query));
-                processedPeskyCommands++;
             }
 
             var interactionsEnabled = InteractionsEnabled;
@@ -295,7 +296,7 @@ namespace Gilomx.CupheadBossRoulette
 
             PublishInteractionState(server, interactionsAvailable);
             var peskyState = BuildPeskyState(gameplayAvailable);
-            if (peskyState != lastPeskyState)
+            if (serverRunning && peskyState != lastPeskyState)
             {
                 lastPeskyState = peskyState;
                 server.SetPeskyState(peskyState);
@@ -363,6 +364,8 @@ namespace Gilomx.CupheadBossRoulette
         private void PublishInteractionState(
             CreatorToolsServer server, bool interactionsAvailable)
         {
+            if (server == null || !server.IsRunning)
+                return;
             var interactionState = BuildInteractionState(
                 interactionsAvailable);
             if (interactionState == lastInteractionState)

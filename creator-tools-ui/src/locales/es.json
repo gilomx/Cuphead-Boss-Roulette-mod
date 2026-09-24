@@ -966,6 +966,10 @@
       "enable": "Activar modo",
       "disable": "Desactivar modo"
     },
+    "items": {
+      "enableAll": "Activar todo",
+      "disableAll": "Desactivar todo"
+    },
     "phaseProtection": {
       "title": "Protección de transiciones",
       "description": "En el Diablo, el bloqueo comienza 6 s después de la señal del cambio de fase 1 a 2. Para comparar toda la transición, cámbiala antes de la transformación; vuelve a activarse al reiniciar el juego.",

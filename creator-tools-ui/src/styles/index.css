@@ -577,6 +577,40 @@ textarea:focus-visible {
   line-height: 1.5;
 }
 
+.pesky-attacks__heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pesky-bulk-toggle {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  background: var(--color-control);
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.pesky-bulk-toggle:hover:not(:disabled) {
+  border-color: var(--color-focus);
+  background: var(--color-control-hover);
+}
+
+.pesky-bulk-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .pesky-attack-list {
   display: grid;
   gap: 1px;
@@ -5004,6 +5038,8 @@ textarea:focus-visible {
   .pesky-names__save-slot button { width: 100%; }
   .interaction-panel__heading { padding: var(--space-3); }
   .interaction-panel__heading { flex-direction: column; }
+  .pesky-attacks__heading-actions { width: 100%; }
+  .pesky-bulk-toggle { flex: 1; }
   .interaction-queue__heading-actions { width: 100%; }
   .interaction-queue__totals { margin-right: auto; }
   .dashboard-interaction-control { flex-direction: column; }

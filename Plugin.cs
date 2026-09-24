@@ -470,6 +470,7 @@ namespace Gilomx.CupheadBossRoulette
             // Unity ever needs to virtualize one of the sources.
             effectsAudioSource.priority = 64;
             effectsAudioSource.ignoreListenerPause = true;
+            InitializeTimedChallengeWarningAudio();
             RouteModAudioToGameSfxMixer();
             activeInstance = this;
             SceneLoader.OnFadeInEndEvent +=
@@ -3720,6 +3721,9 @@ namespace Gilomx.CupheadBossRoulette
             yield return StartCoroutine(LoadClip(
                 "sounds/hp_one_rejected_parry.wav", AudioType.WAV,
                 clip => hpOneRejectedParryClip = clip));
+            yield return StartCoroutine(LoadClip(
+                "sounds/pirate_shark_warning.wav", AudioType.WAV,
+                clip => timedWarningClip = clip));
         }
 
         private IEnumerator LoadClip(string relativePath, AudioType type, Action<AudioClip> assign)
@@ -3770,6 +3774,8 @@ namespace Gilomx.CupheadBossRoulette
 
                 audioSource.outputAudioMixerGroup = sfxGroup;
                 effectsAudioSource.outputAudioMixerGroup = sfxGroup;
+                if (timedWarningAudioSource != null)
+                    timedWarningAudioSource.outputAudioMixerGroup = sfxGroup;
                 Logger.LogInfo(
                     "Audio del mod conectado a los volumenes Principal y Efectos de Cuphead.");
             }

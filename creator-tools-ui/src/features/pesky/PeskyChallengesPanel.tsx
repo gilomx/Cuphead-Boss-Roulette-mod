@@ -22,6 +22,24 @@ export function PeskyChallengesPanel() {
     Number.isInteger(waitSeconds) && waitSeconds >= 0 && waitSeconds <= 300 &&
     Number.isInteger(seconds) && seconds >= 1 && seconds <= 120 &&
     Number.isInteger(countdownSeconds) && countdownSeconds >= 0 && countdownSeconds <= 30;
+  const challengeItems = interactionItems.filter((item) => item.group === "challenge");
+  const supportedChallengeItems = challengeItems.filter(
+    (item) => pesky?.items.includes(item.id),
+  );
+  const enabledChallengeItems = supportedChallengeItems.filter(
+    (item) => !pesky?.disabledItems.includes(item.id),
+  );
+  const allChallengesEnabled = supportedChallengeItems.length > 0 &&
+    enabledChallengeItems.length === supportedChallengeItems.length;
+
+  const toggleAllChallenges = () => {
+    const enable = !allChallengesEnabled;
+    supportedChallengeItems.forEach((item) => {
+      const enabled = !pesky?.disabledItems.includes(item.id);
+      if (enabled !== enable) applyPeskyItem(item.id, enable);
+    });
+  };
+
   return (
     <section className="interaction-panel pesky-attacks" aria-labelledby="pesky-challenges-title">
       <div className="interaction-panel__heading">
@@ -29,9 +47,20 @@ export function PeskyChallengesPanel() {
           <h2 id="pesky-challenges-title">{t("interactions.groups.challenge")}</h2>
           <p>{t("interactions.challenges.description")}</p>
         </div>
+        <div className="pesky-attacks__heading-actions">
+          <span className="interaction-count">{enabledChallengeItems.length}</span>
+          <button
+            className="pesky-bulk-toggle"
+            type="button"
+            disabled={!pesky?.ready || supportedChallengeItems.length === 0}
+            onClick={toggleAllChallenges}
+          >
+            {t(`pesky.items.${allChallengesEnabled ? "disableAll" : "enableAll"}`)}
+          </button>
+        </div>
       </div>
       <div className="pesky-attack-list">
-        {interactionItems.filter((item) => item.group === "challenge").map((item) => {
+        {challengeItems.map((item) => {
           const enabled = Boolean(pesky?.items.includes(item.id)) && !pesky?.disabledItems.includes(item.id);
           return (
             <label className="pesky-attack" data-enabled={enabled} key={item.id}>

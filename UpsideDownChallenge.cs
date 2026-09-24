@@ -87,6 +87,26 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
+        private bool BeginTimedUpsideDownVictoryReturn()
+        {
+            // Cuphead calls _OnLevelEnd before _OnPreWin on victory. Capture
+            // the timed lease before Creator Tools releases it, then use the
+            // same delayed K.O. return as the roulette/equipped challenge.
+            if (!HoldTimedUpsideDownFrame())
+                return false;
+
+            upsideDownBlend = Mathf.Max(
+                upsideDownBlend,
+                timedUpsideDownFrameHold.Consume());
+            upsideDownFadeOutStarted = true;
+            BeginUpsideDownTransition(
+                0f, UpsideDownVictoryReturnDelay,
+                UpsideDownEntryDuration);
+            Logger.LogInfo(
+                "Timed upside-down view is turning upright after knockout.");
+            return true;
+        }
+
         private bool IsTimedUpsideDownAvailable()
         {
             if (!ExperimentalFeatures.EnableUpsideDownChallenge ||

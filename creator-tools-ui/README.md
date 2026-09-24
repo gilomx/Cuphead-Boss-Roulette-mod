@@ -23,11 +23,17 @@ npm run build
 ```
 
 `npm run dev` usa el servidor del mod en `http://127.0.0.1:18081` para `/api`
-y `/assets`. Para trabajar sin Cuphead, inicia primero el servidor simulado:
+y `/assets`. Para revisar el panel compilado sin Cuphead, inicia el servidor
+simulado en el puerto de desarrollo `18091`, separado del puerto del juego:
 
 ```powershell
-node scripts/mock-server.mjs
+npm run build
+npm run mock
 ```
+
+Abre `http://127.0.0.1:18091/config`. Si necesitas Vite con recarga en vivo,
+define `CREATOR_TOOLS_PROXY_TARGET=http://127.0.0.1:18091` antes de
+`npm run dev`. No ejecutes el simulador en `18081` mientras Cuphead esté abierto.
 
 El servidor simulado habilita los mini zepelines verde y morado, la zanahoria
 teledirigida de La pandilla raíz, la semilla azul de Cagney y la luciérnaga
