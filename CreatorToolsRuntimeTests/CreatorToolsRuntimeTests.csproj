@@ -18,6 +18,8 @@
     <Compile Include="TimedChallengeTests.cs.txt" Link="TimedChallengeTests.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallenge.cs" Link="Product\Interactions\CreatorToolsTimedChallenge.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallengeHudState.cs" Link="Product\Interactions\CreatorToolsTimedChallengeHudState.cs" />
+    <Compile Include="..\Interactions\TimedUpsideDownFrameHold.cs" Link="Product\Interactions\TimedUpsideDownFrameHold.cs" />
+    <Compile Include="..\Interactions\TimedMiniPlanePenaltyPolicy.cs" Link="Product\Interactions\TimedMiniPlanePenaltyPolicy.cs" />
     <Compile Include="..\Interactions\CreatorToolsChallengePacing.cs" Link="Product\Interactions\CreatorToolsChallengePacing.cs" />
     <Compile Include="MiniBossSpawnPolicyTests.cs.txt" Link="MiniBossSpawnPolicyTests.cs" />
     <Compile Include="DonorLabelLifetimeTests.cs.txt" Link="DonorLabelLifetimeTests.cs" />

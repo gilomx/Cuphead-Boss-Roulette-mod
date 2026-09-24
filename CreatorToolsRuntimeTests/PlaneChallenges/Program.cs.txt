@@ -89,10 +89,27 @@ internal static class Program
         Console.WriteLine("PASS Co-op, in-flight EX/super, consecutive effects, cancellation and death");
 
         PlayerManager.Players.Clear();
+        var unrestrictedPlayer = new PlanePlayerController(
+            Weapon.plane_weapon_bomb);
+        PlayerManager.Players.Add(unrestrictedPlayer);
+        var unrestrictedBridge = new TimedPlaneWeaponChallenge();
+        var unrestricted = new TimedChallengeInteractionExecutor(
+            () => true, _ => false, () => true, _ => true,
+            unrestrictedBridge.Update);
+        unrestricted.TrySpawn(CreatorToolsTimedChallenge.MiniPlaneOnly,
+            "Mini", "", 5, 0, out lease, out code, out failure);
+        Step(unrestricted, 0.1f);
+        Check(unrestrictedPlayer.weaponManager.FullSizeWeapon ==
+            Weapon.plane_weapon_bomb &&
+            unrestrictedPlayer.weaponManager.SwitchCount == 0,
+            "mini-plane-only never forces or locks a full-size weapon");
+        lease.Dispose();
+
+        PlayerManager.Players.Clear();
         var plane = false;
         var queue = new CreatorToolsInteractionQueue();
         var executorQueue = new TimedChallengeInteractionExecutor(() => true, _ => false, () => plane, _ => true, _ => { });
-        foreach (var item in new[] { CreatorToolsTimedChallenge.NoBombs, CreatorToolsTimedChallenge.NoPeashooter })
+        foreach (var item in new[] { CreatorToolsTimedChallenge.NoBombs, CreatorToolsTimedChallenge.NoPeashooter, CreatorToolsTimedChallenge.MiniPlaneOnly })
         {
             Check(!executorQueue.IsAvailable(item), "automatic generation excludes ground");
             Check(!executorQueue.TrySpawn(item, "A", "", out lease, out code, out failure) && code == "requires_plane_level", "manual race remains retryable");
@@ -105,7 +122,7 @@ internal static class Program
         queue.AppendJson(json, item => executorQueue.SupportsCurrentLevel(item) ? "queued" : "waiting_plane");
         Check(json.ToString().Contains("waiting_plane"), "pending status names the required level");
         queue.ClearActive(); // Native level-end semantics preserve earned pending requests.
-        Check(queue.PendingCount == 3, "level changes retain requests");
+        Check(queue.PendingCount == 4, "level changes retain requests");
         plane = true;
         compatible = queue.Peek(e => executorQueue.SupportsCurrentLevel(e.Item));
         Check(compatible.Item == CreatorToolsTimedChallenge.NoBombs && compatible.DurationSeconds == 24 && compatible.CountdownSeconds == 6 && compatible.Donor == "Air viewer", "next plane consumes oldest compatible redemption intact");
@@ -114,6 +131,16 @@ internal static class Program
         Check(executorQueue.Presentation.CountingDown && executorQueue.SecondsRemaining == 24, "waiting never spends warning or active time");
         Check(!executorQueue.IsAvailable(CreatorToolsTimedChallenge.NoPeashooter), "queued plane challenges stay exclusive");
         Console.WriteLine("PASS Ground exclusion, queue bypass, waiting status, level changes and preserved redemption parameters");
+        Check(CreatorToolsTimedChallenge.RequiresPlane(CreatorToolsTimedChallenge.MiniPlaneOnly), "mini-plane-only is airplane exclusive");
+        Check(!CreatorToolsTimedChallenge.UsesForcedPlaneWeapon(CreatorToolsTimedChallenge.MiniPlaneOnly), "mini-plane-only preserves weapon switching");
+        Check(TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, true, true, false, false), "full-size damage violates the temporal rule");
+        Check(!TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, true, true, true, false), "mini-plane bullets remain valid");
+        Check(!TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, true, true, false, true), "supers remain valid");
+        var penalties = new TimedMiniPlanePenaltyPolicy();
+        Check(penalties.TryQueue(0) && !penalties.TryQueue(0) && penalties.TryQueue(1), "same-frame hits dedupe per player without merging co-op");
+        penalties.Complete(0);
+        Check(penalties.TryQueue(0), "later native vulnerability windows can admit another penalty");
+        Console.WriteLine("PASS Mini-plane-only keeps weapon choice, allows mini bullets/supers, and deduplicates one-life penalties");
         var separate = new CreatorToolsInteractionQueue();
         separate.Enqueue(CreatorToolsTimedChallenge.NoDash, "First viewer", "gift-a", 1, 0, CreatorToolsInteractionSource.Stream, 10, 2);
         separate.Enqueue(CreatorToolsTimedChallenge.StiffMode, "Second viewer", "gift-b", 1, 0, CreatorToolsInteractionSource.Stream, 20, 4);

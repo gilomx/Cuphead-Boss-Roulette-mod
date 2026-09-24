@@ -15,11 +15,14 @@ namespace Gilomx.CupheadBossRoulette
         internal const string NoBombs = "challenge_no_bombs";
         internal const string NoPeashooter = "challenge_no_peashooter";
         internal const string RgbShift = "challenge_rgb_shift";
+        internal const string UpsideDown = "challenge_upside_down";
         internal const string InkRain = "challenge_ink_rain";
-        internal static readonly string[] Items = { HalfDamage, NoEx, NoDash, StiffMode, BlackAndWhite, NoBombs, NoPeashooter, RgbShift, InkRain };
+        internal const string MiniPlaneOnly = "challenge_mini_plane_only";
+        internal static readonly string[] Items = { HalfDamage, NoEx, NoDash, StiffMode, BlackAndWhite, NoBombs, NoPeashooter, RgbShift, UpsideDown, InkRain, MiniPlaneOnly };
         internal static bool Supports(string item) { return item == HalfDamage || item == NoEx || item == NoDash || item == StiffMode || item == InkRain || HasVisualTransition(item) || RequiresPlane(item); }
-        internal static bool RequiresPlane(string item) { return item == NoBombs || item == NoPeashooter; }
-        internal static bool HasVisualTransition(string item) { return item == BlackAndWhite || item == RgbShift; }
+        internal static bool RequiresPlane(string item) { return UsesForcedPlaneWeapon(item) || item == MiniPlaneOnly; }
+        internal static bool UsesForcedPlaneWeapon(string item) { return item == NoBombs || item == NoPeashooter; }
+        internal static bool HasVisualTransition(string item) { return item == BlackAndWhite || item == RgbShift || item == UpsideDown; }
         internal static bool SupportsLevel(string item, bool plane) { return Supports(item) && (!RequiresPlane(item) || plane); }
         internal static string ChooseAutomatic(bool plane, Func<string, bool> eligible, Func<int, int> draw)
         {
@@ -45,6 +48,9 @@ namespace Gilomx.CupheadBossRoulette
         internal const float ExitSeconds = 0.25f;
         internal const float BlackAndWhiteFadeInSeconds = 1.25f;
         internal const float BlackAndWhiteFadeOutSeconds = 0.9f;
+        internal const float UpsideDownEntryDelaySeconds = 0.25f;
+        internal const float UpsideDownEntrySeconds = 0.45f;
+        internal const float UpsideDownExitSeconds = 0.9f;
         private float visualExitBlend;
         internal float EffectElapsed { get; private set; }
         internal TimedChallengePhase Phase { get; private set; }
@@ -56,6 +62,7 @@ namespace Gilomx.CupheadBossRoulette
         internal bool HudVisible { get { return Busy && (Phase != TimedChallengePhase.Exit || PhaseElapsed < ExitSeconds); } }
         internal bool RendersBlackAndWhite { get { return Item == BlackAndWhite && (Active || Phase == TimedChallengePhase.Exit); } }
         internal bool RendersRgbShift { get { return Item == RgbShift && (Active || Phase == TimedChallengePhase.Exit); } }
+        internal bool RendersUpsideDown { get { return Item == UpsideDown && (Active || Phase == TimedChallengePhase.Exit); } }
         internal bool CountingDown { get { return Phase == TimedChallengePhase.Countdown || Phase == TimedChallengePhase.CountdownExit; } }
         internal int Revision { get; private set; }
 
@@ -69,6 +76,11 @@ namespace Gilomx.CupheadBossRoulette
             get { return RendersRgbShift ? VisualBlend : 0f; }
         }
 
+        internal float UpsideDownBlend
+        {
+            get { return RendersUpsideDown ? VisualBlend : 0f; }
+        }
+
         private float VisualBlend
         {
             get
@@ -78,10 +90,26 @@ namespace Gilomx.CupheadBossRoulette
                 // only at zero, retaining both full transition lengths. A short
                 // challenge fades back from the strength actually reached.
                 var exiting = Phase == TimedChallengePhase.Exit;
-                var progress = Math.Min(1f, PhaseElapsed / (exiting ? BlackAndWhiteFadeOutSeconds : BlackAndWhiteFadeInSeconds));
+                var elapsed = Math.Max(0f, PhaseElapsed - (exiting ? 0f : VisualEntryDelay(Item)));
+                var progress = Math.Min(1f, elapsed / (exiting ? VisualExitDuration(Item) : VisualEntryDuration(Item)));
                 var eased = progress * progress * (3f - 2f * progress);
                 return exiting ? visualExitBlend * (1f - eased) : eased;
             }
+        }
+
+        private static float VisualEntryDelay(string item)
+        {
+            return item == UpsideDown ? UpsideDownEntryDelaySeconds : 0f;
+        }
+
+        private static float VisualEntryDuration(string item)
+        {
+            return item == UpsideDown ? UpsideDownEntrySeconds : BlackAndWhiteFadeInSeconds;
+        }
+
+        private static float VisualExitDuration(string item)
+        {
+            return item == UpsideDown ? UpsideDownExitSeconds : BlackAndWhiteFadeOutSeconds;
         }
 
         internal float ComposeBlackAndWhiteBlend(float baseBlend)
@@ -89,6 +117,13 @@ namespace Gilomx.CupheadBossRoulette
             // The temporary source cannot erase the equipped challenge's
             // blend, nor write to the player's persistent filter setting.
             return Math.Max(baseBlend, BlackAndWhiteBlend);
+        }
+
+        internal float ComposeUpsideDownBlend(float baseBlend)
+        {
+            // A temporary rotation must not weaken an equipped upside-down
+            // challenge that owns the same final-frame render bridge.
+            return Math.Max(baseBlend, UpsideDownBlend);
         }
 
         internal static bool TryDuration(string token, out int duration)
@@ -147,7 +182,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 var left = Phase == TimedChallengePhase.Countdown ? CountdownRemaining
                     : Active ? Remaining
-                    : (Phase == TimedChallengePhase.Exit && HasVisualTransition(Item) ? BlackAndWhiteFadeOutSeconds : ExitSeconds) - PhaseElapsed;
+                    : (Phase == TimedChallengePhase.Exit && HasVisualTransition(Item) ? VisualExitDuration(Item) : ExitSeconds) - PhaseElapsed;
                 var step = Math.Min(seconds, Math.Max(0f, left));
                 PhaseElapsed += step;
                 if (Active || Phase == TimedChallengePhase.Exit) EffectElapsed += step;

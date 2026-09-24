@@ -12,5 +12,6 @@
     <Compile Include="../../Interactions/CreatorToolsInteractionQueue.cs" />
     <Compile Include="../../Interactions/TimedChallengeInteractionExecutor.cs" />
     <Compile Include="../../Interactions/TimedPlaneWeaponChallenge.cs" />
+    <Compile Include="../../Interactions/TimedMiniPlanePenaltyPolicy.cs" />
   </ItemGroup>
 </Project>

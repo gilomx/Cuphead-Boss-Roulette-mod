@@ -19,7 +19,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const int DefaultLightMaximumBatch = 3;
         internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
         internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
-        private const int CurrentVersion = 18;
+        private const int CurrentVersion = 20;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -258,7 +258,9 @@ namespace Gilomx.CupheadBossRoulette
             DisabledItems.Add(CreatorToolsTimedChallenge.NoBombs);
             DisabledItems.Add(CreatorToolsTimedChallenge.NoPeashooter);
             DisabledItems.Add(CreatorToolsTimedChallenge.RgbShift);
+            DisabledItems.Add(CreatorToolsTimedChallenge.UpsideDown);
             DisabledItems.Add(CreatorToolsTimedChallenge.InkRain);
+            DisabledItems.Add(CreatorToolsTimedChallenge.MiniPlaneOnly);
             ChallengeDurationSeconds = CreatorToolsTimedChallenge.DefaultDuration;
             ChallengeCountdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown;
             ChallengeWaitSeconds = CreatorToolsChallengePacing.DefaultWait;
@@ -322,6 +324,8 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 if (version < 17) DisabledItems.Add(CreatorToolsTimedChallenge.RgbShift);
                 if (version < 18) DisabledItems.Add(CreatorToolsTimedChallenge.InkRain);
+                if (version < 19) DisabledItems.Add(CreatorToolsTimedChallenge.UpsideDown);
+                if (version < 20) DisabledItems.Add(CreatorToolsTimedChallenge.MiniPlaneOnly);
                 var durationPosition = FindPropertyValue(json, "challengeDurationSeconds");
                 int duration;
                 ChallengeDurationSeconds = CreatorToolsTimedChallenge.TryDuration(

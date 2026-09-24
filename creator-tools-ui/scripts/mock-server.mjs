@@ -163,7 +163,7 @@ function pacingCandidate(params, current, prefix = "") {
   return candidate;
 }
 let peskyNames = [];
-let peskyDisabledItems = ["challenge_half_damage", "challenge_no_ex", "challenge_no_dash", "challenge_stiff_mode", "challenge_black_and_white", "challenge_no_bombs", "challenge_no_peashooter", "challenge_rgb_shift", "challenge_ink_rain"];
+let peskyDisabledItems = ["challenge_half_damage", "challenge_no_ex", "challenge_no_dash", "challenge_stiff_mode", "challenge_black_and_white", "challenge_no_bombs", "challenge_no_peashooter", "challenge_rgb_shift", "challenge_upside_down", "challenge_ink_rain", "challenge_mini_plane_only"];
 let peskyChallengeDurationSeconds = 15;
 let peskyChallengeCountdownSeconds = 3;
 let peskyChallengeWaitSeconds = 5;
@@ -389,7 +389,9 @@ const interactionItems = [
   "challenge_no_bombs",
   "challenge_no_peashooter",
   "challenge_rgb_shift",
+  "challenge_upside_down",
   "challenge_ink_rain",
+  "challenge_mini_plane_only",
 ];
 const miniBossItems = new Set([
   "baroness_cupcake",

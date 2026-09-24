@@ -86,6 +86,16 @@ export const interactionItems = [
     image: "/assets/creator-tools/modifiers/rgb_01.png",
   },
   {
+    id: "challenge_upside_down",
+    category: "challenge",
+    group: "challenge",
+    titleKey: "interactions.challenges.upsideDown",
+    descriptionKey: "interactions.challenges.upsideDownEffect",
+    imageAltKey: "interactions.challenges.upsideDown",
+    typeKey: "interactions.groups.challenge",
+    image: "/assets/creator-tools/modifiers/upside_down_01.png",
+  },
+  {
     id: "challenge_ink_rain",
     category: "challenge",
     group: "challenge",
@@ -94,6 +104,16 @@ export const interactionItems = [
     imageAltKey: "interactions.challenges.inkRain",
     typeKey: "interactions.groups.challenge",
     image: "/assets/creator-tools/modifiers/inkrain_01.png",
+  },
+  {
+    id: "challenge_mini_plane_only",
+    category: "challenge",
+    group: "challenge",
+    titleKey: "interactions.challenges.miniPlaneOnly",
+    descriptionKey: "interactions.challenges.miniPlaneOnlyEffect",
+    imageAltKey: "interactions.challenges.miniPlaneOnly",
+    typeKey: "interactions.challenges.planeOnly",
+    image: "/assets/creator-tools/modifiers/mini_01.png",
   },
   {
     id: "hilda_green_zeppelin",

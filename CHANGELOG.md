@@ -2,6 +2,23 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- **SOLO BALAS DE MINIAVIÓN** se incorpora como undécimo reto temporal,
+  exclusivo de avión. Conserva el cambio de tamaño y no fuerza el arma: las
+  balas del miniavión y los súperes están permitidos. Cuando un disparo normal,
+  una bomba o un EX daña a un enemigo, el jugador que lo lanzó recibe un punto
+  de daño nativo en vez de reiniciar el nivel. La invulnerabilidad posterior al
+  golpe evita perder varias vidas por colisiones simultáneas. Los canjes en
+  tierra esperan un nivel de avión y el Modo Molestoso lo añade desmarcado.
+
+- **VOLTEADA DE CABEZA** se incorpora como décimo reto temporal en tierra y
+  avión. Reutiliza la rotación plana del reto equipado: espera 0.25 s, gira
+  durante 0.45 s y vuelve a la normalidad en 0.9 s después de llegar a cero.
+  No modifica controles, física ni colisiones. La pausa congela el reloj y la
+  transición. Al perder, tanto éste como el reto equipado giran de regreso
+  durante 0.45 s para dejar derecho el menú de derrota. Si se reintenta o sale
+  antes de terminar, el reset restante se oculta bajo negro total. Incluye
+  catálogo, reglas, pruebas y migración opt-in del Modo Molestoso.
+
 - **LLUVIA DE TINTA temporal** empieza directamente con lluvia, sin pulpo ni
   ráfaga inicial. Separa sus 136 imágenes de las 59 de la introducción, que se
   preparan sólo cuando se necesita el reto de ruleta/equipado. Conserva la
@@ -14,10 +31,10 @@
   toda la sesión. Se comprueba ahora esa compatibilidad contra las librerías
   reales del juego, además de las pruebas de preparación de imágenes.
 
-- Aviso **«Preparando interacciones…»** junto al reloj nativo durante la
+- Aviso **«PREPARANDO INTERACCIONES…»** junto al reloj nativo durante la
   preparación de recursos del mod, alineado con su borde inferior. Usa la
-  tipografía del juego, acompaña la opacidad del reloj y desaparece cuando
-  termina el trabajo pendiente.
+  tipografía del juego, se presenta en mayúsculas, acompaña la opacidad del
+  reloj y desaparece cuando termina el trabajo pendiente.
   Los reintentos con recursos listos no muestran el aviso.
 
 - Se elimina la carga de imágenes de tinta al elegir el primer reto temporal:

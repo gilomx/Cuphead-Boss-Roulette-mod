@@ -88,8 +88,8 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   Interacciones no contiene un generador aleatorio automático: ese uso pertenece
   exclusivamente a Modo Molestoso.
 - Los **Retos temporales** son Daño a la mitad, NO EX, NO DASH / NO MINIAVIÓN,
-  MODO TIESO, BLANCO Y NEGRO, NO DISPARO BOMBAS, SIN PEASHOOTER, RGB y LLUVIA
-  DE TINTA. Sus tarjetas, pruebas
+  MODO TIESO, BLANCO Y NEGRO, NO DISPARO BOMBAS, SIN PEASHOOTER, RGB, VOLTEADA
+  DE CABEZA, LLUVIA DE TINTA y SOLO BALAS DE MINIAVIÓN. Sus tarjetas, pruebas
   manuales y reglas comparten el catálogo; cada uno tiene su propia explicación
   en Modo Molestoso. NO EX conserva los súperes, en tierra y avión. NO DASH
   bloquea nuevos dashes en tierra. MODO TIESO también fija el movimiento al
@@ -102,13 +102,23 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   al filtro previo durante 0.9 s, antes del descanso y sin cambiar ajustes.
   Ambas transiciones conservan su duración completa. RGB conserva los colores y
   desenfoque del reto de ruleta; la pausa congela su movimiento y transiciones.
+  VOLTEADA DE CABEZA comparte la rotación plana del reto equipado: 0.25 s de
+  espera, giro de 0.45 s y regreso de 0.9 s al llegar a cero. No cambia entradas,
+  física ni colisiones; pausa congela su reloj. Al perder, el temporal y el reto
+  equipado regresan animados durante 0.45 s para dejar derecho el menú; un
+  reintento o salida anticipados terminan el reset bajo negro total.
   LLUVIA DE TINTA temporal arranca directamente con lluvia al comenzar el
   contador activo, sin pulpo ni ráfaga inicial. Conserva el ritmo de la lluvia
   del reto base; las gotas pueden entintar desde que se activa.
   A cero detiene la emisión, dejando caer las gotas
   existentes y terminar impactos/manchas antes de iniciar el descanso. Su HUD
   sale normalmente, aunque la reserva siga ocupada durante ese cierre natural.
-  El esquema Molestoso 18 añade tinta desmarcada y conserva los ajustes anteriores. Los retos
+  SOLO BALAS DE MINIAVIÓN sólo se ejecuta en avión y no fuerza tamaño ni arma.
+  Balas pequeñas y súperes están permitidos; un impacto enemigo de disparo
+  normal, bomba o EX aplica un punto de daño nativo al tirador, sin reiniciar el
+  nivel. La invulnerabilidad del golpe evita penalizaciones simultáneas.
+  El esquema Molestoso 20 añade Solo balas de miniavión desmarcado y conserva
+  los ajustes anteriores. Los retos
   nuevos se incorporan desmarcados, sin alterar selecciones anteriores. El modo
   sortea un reto habilitado y compatible por turno, con una espera independiente
   de los ataques y un máximo de un reto temporal entre todas las fuentes.

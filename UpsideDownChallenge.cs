@@ -6,8 +6,10 @@ namespace Gilomx.CupheadBossRoulette
 {
     public sealed partial class Plugin
     {
-        private const float UpsideDownEntryDelay = 0.25f;
-        private const float UpsideDownEntryDuration = 0.45f;
+        private const float UpsideDownEntryDelay =
+            CreatorToolsTimedChallenge.UpsideDownEntryDelaySeconds;
+        private const float UpsideDownEntryDuration =
+            CreatorToolsTimedChallenge.UpsideDownEntrySeconds;
         private const float UpsideDownVictoryReturnDelay = 1f;
         private const float UpsideDownTurnSoundVolume = 1f;
 
@@ -27,6 +29,112 @@ namespace Gilomx.CupheadBossRoulette
         private float nextUpsideDownEffectScanAt;
         private bool upsideDownRenderFailureLogged;
         private bool upsideDownTurnSoundPending;
+        private readonly TimedUpsideDownFrameHold timedUpsideDownFrameHold =
+            new TimedUpsideDownFrameHold();
+        private int timedUpsideDownSoundRevision = -1;
+        private TimedChallengePhase timedUpsideDownSoundPhase =
+            TimedChallengePhase.Idle;
+        private float timedUpsideDownPreviousBlend;
+
+        private bool IsTimedUpsideDownRendering
+        {
+            get
+            {
+                return timedUpsideDownFrameHold.Active ||
+                    (timedChallengeInteractions != null &&
+                     timedChallengeInteractions.Presentation.RendersUpsideDown);
+            }
+        }
+
+        private float EffectiveUpsideDownBlend
+        {
+            get
+            {
+                var liveBlend = timedChallengeInteractions == null
+                    ? upsideDownBlend
+                    : timedChallengeInteractions.Presentation
+                        .ComposeUpsideDownBlend(upsideDownBlend);
+                return Mathf.Max(liveBlend, timedUpsideDownFrameHold.Blend);
+            }
+        }
+
+        private bool HoldTimedUpsideDownFrame()
+        {
+            var wasActive = timedUpsideDownFrameHold.Active;
+            var captured = timedUpsideDownFrameHold.Capture(
+                timedChallengeInteractions == null
+                    ? null
+                    : timedChallengeInteractions.Presentation);
+            if (captured && !wasActive)
+                Logger.LogInfo(
+                    "Holding timed upside-down frame through retry/exit fade.");
+            return captured;
+        }
+
+        private bool BeginTimedUpsideDownDefeatReturn()
+        {
+            if (!timedUpsideDownFrameHold.Active)
+                return false;
+
+            // _OnLevelEnd releases the timed gameplay lease immediately after
+            // _OnLose. Transfer its exact visible angle into the shared
+            // renderer so the defeat menu sees an animated return, not a snap.
+            upsideDownBlend = Mathf.Max(
+                upsideDownBlend,
+                timedUpsideDownFrameHold.Consume());
+            BeginUpsideDownTransition(
+                0f, 0f, UpsideDownEntryDuration);
+            return true;
+        }
+
+        private bool IsTimedUpsideDownAvailable()
+        {
+            if (!ExperimentalFeatures.EnableUpsideDownChallenge ||
+                blackAndWhiteTransitionShader == null ||
+                !blackAndWhiteTransitionShader.isSupported ||
+                SceneLoader.CurrentlyLoading)
+                return false;
+            if (!IsTimedUpsideDownRendering)
+                return true;
+            // Once active, spend no challenge time until the current gameplay
+            // camera owns the same final-frame bridge used by the base effect.
+            for (var i = 0; i < upsideDownRenderEffects.Count; i++)
+                if (upsideDownRenderEffects[i].IsValid)
+                    return true;
+            return false;
+        }
+
+        private void SyncTimedUpsideDownEffect(
+            CreatorToolsTimedChallenge timer)
+        {
+            if (timer == null || !timer.Busy ||
+                timer.Item != CreatorToolsTimedChallenge.UpsideDown)
+            {
+                timedUpsideDownSoundRevision = -1;
+                timedUpsideDownSoundPhase = TimedChallengePhase.Idle;
+                timedUpsideDownPreviousBlend = 0f;
+                return;
+            }
+
+            if (timedUpsideDownSoundRevision != timer.Revision)
+            {
+                timedUpsideDownSoundRevision = timer.Revision;
+                timedUpsideDownSoundPhase = timer.Phase;
+                timedUpsideDownPreviousBlend = timer.UpsideDownBlend;
+            }
+
+            var blend = timer.UpsideDownBlend;
+            var beginsEntry = timer.Phase == TimedChallengePhase.Active &&
+                timedUpsideDownPreviousBlend <= 0.001f && blend > 0.001f;
+            var beginsExit = timer.Phase == TimedChallengePhase.Exit &&
+                timedUpsideDownSoundPhase != TimedChallengePhase.Exit &&
+                blend > 0.001f;
+            if (beginsEntry || beginsExit)
+                PlayOneShot(upsideDownTurnClip, UpsideDownTurnSoundVolume);
+
+            timedUpsideDownSoundPhase = timer.Phase;
+            timedUpsideDownPreviousBlend = blend;
+        }
 
         private void UpdateUpsideDownTransition()
         {
@@ -116,8 +224,10 @@ namespace Gilomx.CupheadBossRoulette
         private void UpdateUpsideDownRenderEffects()
         {
             var shouldRun = upsideDownLevelInstanceId >= 0 ||
+                            IsTimedUpsideDownRendering ||
                             upsideDownBlend > 0.001f ||
                             upsideDownTransitionStartedAt >= 0f;
+            var blend = EffectiveUpsideDownBlend;
 
             for (var i = upsideDownRenderEffects.Count - 1; i >= 0; i--)
             {
@@ -128,7 +238,7 @@ namespace Gilomx.CupheadBossRoulette
                     upsideDownRenderEffects.RemoveAt(i);
                     continue;
                 }
-                effect.SetAngle(upsideDownBlend * 180f);
+                effect.SetAngle(blend * 180f);
             }
 
             if (!shouldRun)
@@ -166,7 +276,7 @@ namespace Gilomx.CupheadBossRoulette
                     continue;
                 }
 
-                effect.SetAngle(upsideDownBlend * 180f);
+                effect.SetAngle(blend * 180f);
                 upsideDownRenderEffects.Add(effect);
                 upsideDownRenderFailureLogged = false;
                 Logger.LogInfo(
@@ -287,6 +397,10 @@ namespace Gilomx.CupheadBossRoulette
             upsideDownFadeOutStarted = false;
             upsideDownRenderFailureLogged = false;
             upsideDownTurnSoundPending = false;
+            timedUpsideDownSoundRevision = -1;
+            timedUpsideDownSoundPhase = TimedChallengePhase.Idle;
+            timedUpsideDownPreviousBlend = 0f;
+            timedUpsideDownFrameHold.Clear();
         }
     }
 }

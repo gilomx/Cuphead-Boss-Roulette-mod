@@ -18,7 +18,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void Update(CreatorToolsTimedChallenge timer)
         {
-            var active = timer.Active && CreatorToolsTimedChallenge.RequiresPlane(timer.Item);
+            var active = timer.Active &&
+                CreatorToolsTimedChallenge.UsesForcedPlaneWeapon(timer.Item);
             if (!active)
             {
                 released.Clear();

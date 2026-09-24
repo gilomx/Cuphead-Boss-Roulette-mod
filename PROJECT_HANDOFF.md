@@ -5,16 +5,13 @@ Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 ## Pendientes actuales (2026-09-23)
 
 Esta lista resume el trabajo restante y sustituye los recuentos históricos de
-retos pendientes que aparecen más abajo. Hay nueve retos temporales implementados.
+retos pendientes que aparecen más abajo. Hay once retos temporales implementados.
 
 - Validar en juego desde un arranque nuevo: lluvia temporal sin pulpo, reto
   de ruleta/equipado con pulpo, fluidez al entrar al mapa y al primer nivel,
-  y aviso de preparación alineado con el borde inferior del reloj.
-- **Volteada de cabeza — dificultad alta:** conservar las transiciones del
-  reto y restaurar cámara, controles y HUD al terminar, pausar, perder o reintentar.
-- **Solo balas de miniavión — dificultad alta:** exclusivo de avión; acordar
-  la penalización temporal al incumplirlo, porque el reto base puede reiniciar
-  el nivel. Resolver restauración e incompatibilidades.
+  aviso de preparación en mayúsculas alineado con el borde inferior del reloj,
+  Volteada de cabeza temporal en tierra/avión, pausa y derrota/reintento, y la
+  penalización de Solo balas de miniavión con P1/P2 y Ms. Chalice.
 - **Una vida y te callas / HP.1 — dificultad muy alta:** definir cómo devolver
   la vida sin curar daño recibido ni revivir, incluyendo cooperativo.
 - Después de completar los temporales, desarrollar el reto que cambia
@@ -28,6 +25,72 @@ durante la carga de niveles y se reutiliza; sólo la introducción del pulpo se
 prepara cuando hace falta. El trabajo nativo que no haya comenzado al agotar el
 presupuesto de carga puede continuar en otra carga. Los recursos marcados como
 fallidos no se reintentan automáticamente durante la misma sesión.
+
+## Solo balas de miniavión temporal (2026-09-23)
+
+Undécimo reto temporal: `challenge_mini_plane_only`, exclusivo de avión, con
+icono, HUD, catálogo, pruebas manuales y reglas ES/EN. Los canjes recibidos en
+tierra conservan remitente, cuenta previa y duración con estado
+`waiting_plane`; Modo Molestoso sólo lo sortea en avión. Esquema Molestoso 20:
+empieza desmarcado y conserva las selecciones y tiempos anteriores.
+
+El temporal no fuerza tamaño ni arma. Igual que el reto equipado, sólo acepta
+daño enemigo procedente de `SmallPlane` o `Super`. Si un disparo normal, bomba
+o EX inflige daño real, se identifica al tirador y se programa un golpe nativo
+de un punto al siguiente frame, dejando terminar los callbacks del proyectil.
+Las colisiones simultáneas se agrupan por jugador y la invulnerabilidad nativa
+del golpe evita vaciar todas las vidas por mantener disparo. En cooperativo cada
+jugador tiene su penalización independiente. El reto equipado conserva su regla
+anterior de reiniciar el intento.
+
+Pruebas automatizadas cubren exclusión en tierra, espera de canjes, libertad de
+arma/tamaño, balas pequeñas y súper permitidos, disparos grandes/bombas/EX
+penalizados, deduplicación y cooperativo. Pendiente validar en juego la pérdida
+de vida y su animación con Cuphead, Mugman y Ms. Chalice.
+
+Verificado: suite runtime completa; harnesses de avión, RGB, tinta y assets;
+catálogo UI con 28 artículos y 43 regalos. Release compila con cero advertencias
+y cero errores. Paquete Dev publicado por el proceso independiente, 535 archivos
+y ruta física verificada. SHA256:
+`B99E0D5290DC92B009F75DF8D822CBFE43B1AC7D5A037CB6CDA10BE47930F9D6`.
+
+## Volteada de cabeza temporal y aviso en mayúsculas (2026-09-23)
+
+Décimo reto temporal: `challenge_upside_down`, disponible en tierra y avión con
+el icono existente, catálogo, pruebas manuales, reglas ES/EN y HUD. Esquema
+Molestoso 19: empieza desmarcado y conserva todas las selecciones y tiempos
+anteriores.
+
+Reutiliza el mismo `FlatRotationRenderEffect` del reto equipado y compone ambas
+fuentes sin debilitar la base. Después de «Reto en camino», el contador activo
+conserva los 0.25 s derechos y el giro suave de 0.45 s hasta 180°. Al llegar a
+cero restaura la imagen durante 0.9 s antes de liberar la reserva y comenzar el
+descanso. No modifica cámara lógica, controles, posiciones, física ni hitboxes.
+El HUD temporal y la fila de ruleta usan la cámara nativa durante el efecto; el
+menú de pausa permanece derecho. Pausa, pérdida de foco o falta de una cámara
+válida congelan reloj y transición. La derrota libera el temporizador pero
+transfiere primero el ángulo exacto de la cámara a una salida animada de 0.45 s.
+Tanto el temporal como el reto equipado giran a la posición normal mientras
+aparece el menú de derrota. Si el usuario reintenta o sale antes de que termine,
+el reset restante se completa bajo el fundido negro; el siguiente intento
+empieza derecho. El sonido existente acompaña la entrada y las salidas animadas.
+
+`AssetLoadingNotice.cs` presenta ahora la traducción vigente con
+`ToUpperInvariant`, por lo que el aviso queda «PREPARANDO INTERACCIONES…» /
+«PREPARING INTERACTIONS…» sin duplicar textos localizados.
+
+Verificado: suite runtime completa; harnesses de RGB, armas de avión, tinta y
+assets; catálogo UI con 27 artículos y 43 regalos. Release compila sin
+advertencias ni errores. Una prueba del usuario detectó el restablecimiento
+abrupto al perder. Primero se añadió una retención idéntica a la conducta del
+reto equipado; después el usuario pidió que ambos regresaran animados para leer
+el menú de derrota. La regresión exige ahora transferir sin saltos el ángulo
+visible a esa salida. Pendiente validar visualmente la corrección, la pausa y el
+aviso en un arranque nuevo.
+
+Paquete Dev publicado por el proceso independiente, 535 archivos y ruta física
+verificada. SHA256:
+`5F2343044FA064D171DD416FF59741A842220614DB770ADBA4B73E7BCC92F95C`.
 
 ## Temporal de tinta sin pulpo y preparación separada (2026-09-23)
 

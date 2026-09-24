@@ -156,8 +156,9 @@ deja vacía, los ataques aparecen sin nombre.
 
 **Retos temporales** permite seleccionar **Daño a la mitad**, **NO EX**,
 **NO DASH / NO MINIAVIÓN**, **MODO TIESO**, **BLANCO Y NEGRO**,
-**NO DISPARO BOMBAS**, **SIN PEASHOOTER**, **MAMÁ ESCUCHO BORROSO — RGB**
-y **LLUVIA DE TINTA**.
+**NO DISPARO BOMBAS**, **SIN PEASHOOTER**, **MAMÁ ESCUCHO BORROSO — RGB**,
+**VOLTEADA DE CABEZA**, **LLUVIA DE TINTA** y
+**SOLO BALAS DE MINIAVIÓN**.
 NO EX bloquea los ataques EX, pero deja disponibles los súperes en tierra y
 avión. NO DASH bloquea nuevos dashes en tierra; al volar impide encogerse y
 devuelve un avión pequeño a su tamaño normal. Un dash que ya había empezado
@@ -181,15 +182,28 @@ del descanso. El HUD se retira al acabar el contador, sin quedarse mostrando
 cero mientras se despeja la pantalla. La pausa detiene también la lluvia.
 Si pierdes, las gotas que ya estaban en pantalla terminan su
 animación, sin generar gotas ni entintar más. Reintentar o salir limpia todo.
+VOLTEADA DE CABEZA funciona en tierra y avión y comparte la rotación plana del
+reto equipado. Al comenzar el contador activo espera 0.25 s y gira durante
+0.45 s; a cero vuelve a la normalidad en 0.9 s antes del descanso. No cambia
+controles, física ni colisiones. La pausa congela el reloj y la transición; al
+perder gira de regreso durante 0.45 s, igual que el reto equipado, para dejar
+derecho el menú de derrota. Si reintentas o sales antes de terminar, el ajuste
+restante se completa oculto bajo negro; el intento siguiente comienza derecho.
+SOLO BALAS DE MINIAVIÓN es exclusivo de avión. Puedes cambiar libremente de
+tamaño y arma; las balas del miniavión y los súperes son válidos. Si un disparo
+normal, una bomba o un EX daña a un enemigo durante el reto, el jugador que lo
+lanzó pierde una vida mediante el daño nativo, sin reiniciar el nivel. La
+invulnerabilidad del golpe evita que varias colisiones simultáneas consuman
+todas las vidas.
 Las imágenes de lluvia se preparan por partes durante la primera pantalla de
 carga y se reutilizan después. El reto de ruleta/equipado conserva el pulpo;
 sus imágenes sólo se preparan si se necesita esa introducción, durante la carga
 del nivel, y después también se reutilizan.
-Mientras se preparan recursos del mod aparece «Preparando interacciones…»
+Mientras se preparan recursos del mod aparece «PREPARANDO INTERACCIONES…»
 a la izquierda del reloj de carga, alineado con su borde inferior. El aviso
 desaparece al terminar esa preparación y no aparece en los reintentos que ya
 tienen todo listo.
-Los nueve empiezan desmarcados en Modo Molestoso. Si marcas varios, se
+Los once empiezan desmarcados en Modo Molestoso. Si marcas varios, se
 elige uno compatible al azar cada turno; sólo puede haber un reto temporal a
 la vez. También puedes enviarlos desde las pruebas manuales y reglas de stream.
 
@@ -209,7 +223,8 @@ La pausa congela la cuenta.
 Al perder se conserva la presentación; reintentar la limpia. El reto de la ruleta
 permanece: un canje del mismo efecto espera, y el modo automático lo omite.
 NO MINIAVIÓN también espera si está equipado SOLO MINI, para evitar efectos
-contradictorios.
+contradictorios. Del mismo modo, SOLO BALAS DE MINIAVIÓN espera si el reto
+equipado impide encogerse.
 
 Los controles separan **Ataques normales** y **Minijefes**, con un resumen
 que muestra las esperas resultantes. Modo Molestoso e Interacciones conservan

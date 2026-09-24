@@ -53,7 +53,7 @@ namespace Gilomx.CupheadBossRoulette
                 rect.sizeDelta = new Vector2(380f, 70f);
             }
 
-            var message = L(ModText.LoadingInteractions);
+            var message = L(ModText.LoadingInteractions).ToUpperInvariant();
             if (assetLoadingNotice.text != message) assetLoadingNotice.text = message;
             // Image alpha does not propagate to children. Match the native
             // clock explicitly so the notice cannot precede its fade-in.

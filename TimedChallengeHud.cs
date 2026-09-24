@@ -113,7 +113,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             Canvas nativeCanvas;
             if (!TryGetNativeBattleHudCanvas(out nativeCanvas)) return false;
-            var cameraEffect = IsTimedRgbRendering || (ShouldShowActiveChallenge() &&
+            var cameraEffect = IsTimedRgbRendering || IsTimedUpsideDownRendering || (ShouldShowActiveChallenge() &&
                 (activeChallenge == ModifierId.RgbShift || activeChallenge == ModifierId.UpsideDown));
             PlaceTimedChallengeRoot(cameraEffect ? nativeCanvas.transform : battleHudCanvas.transform, false);
             return true;
@@ -203,7 +203,9 @@ namespace Gilomx.CupheadBossRoulette
         private static ModifierId TimedChallengeModifier(string item, bool planeControls = false)
         {
             if (item == CreatorToolsTimedChallenge.RgbShift) return ModifierId.RgbShift;
+            if (item == CreatorToolsTimedChallenge.UpsideDown) return ModifierId.UpsideDown;
             if (item == CreatorToolsTimedChallenge.InkRain) return ModifierId.InkRain;
+            if (item == CreatorToolsTimedChallenge.MiniPlaneOnly) return ModifierId.MiniPlaneOnly;
             if (item == CreatorToolsTimedChallenge.NoBombs) return ModifierId.NoBombs;
             if (item == CreatorToolsTimedChallenge.NoPeashooter) return ModifierId.NoPeashooter;
             if (item == CreatorToolsTimedChallenge.BlackAndWhite) return ModifierId.BlackAndWhite;
@@ -336,6 +338,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (level == null || timedChallengeInteractions == null ||
                 level.GetInstanceID() != creatorToolsInteractionLevelInstanceId) return;
+            HoldTimedUpsideDownFrame();
             timedHudState.HoldAfterDefeat(timedChallengeInteractions.Presentation, timedChallengeInteractions.Donor);
             if (timedInkRain != null) timedInkRain.PreserveAfterDefeat();
         }
@@ -343,6 +346,7 @@ namespace Gilomx.CupheadBossRoulette
         private void ResetTimedChallengeHudForAttempt(bool waitingForAttempt)
         {
             timedHudState.Reset(waitingForAttempt);
+            timedMiniPlanePenaltyPolicy.Clear();
             if (timedInkRain != null) timedInkRain.CancelVisuals();
             if (timedChallengeInteractions != null) timedChallengeInteractions.EndGameplayLevel();
             HideTimedChallengeHud();

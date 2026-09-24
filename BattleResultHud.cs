@@ -1230,7 +1230,8 @@ namespace Gilomx.CupheadBossRoulette
             // independent overlay that isolates them from the native parry
             // flash.
             if (battleHudChallengeSnapshot == ModifierId.RgbShift ||
-                battleHudChallengeSnapshot == ModifierId.UpsideDown || IsTimedRgbRendering)
+                battleHudChallengeSnapshot == ModifierId.UpsideDown ||
+                IsTimedRgbRendering || IsTimedUpsideDownRendering)
                 return PlaceBattleHudOnNativeGameplayLayer(nativeCanvas);
 
             // The camera that renders LevelHUD also receives Cuphead's parry

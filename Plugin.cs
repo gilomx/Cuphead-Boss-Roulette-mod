@@ -247,6 +247,9 @@ namespace Gilomx.CupheadBossRoulette
         private float nextBlackAndWhiteEffectScanAt;
         private bool blackAndWhiteRenderFailureLogged;
         private bool soloMiniRestartPending;
+        private readonly TimedMiniPlanePenaltyPolicy
+            timedMiniPlanePenaltyPolicy =
+                new TimedMiniPlanePenaltyPolicy();
         private bool dlcAvailabilityKnown;
         private bool dlcEnabledForRoulette;
         private LoadoutSnapshot originalPlayerOneLoadout;
@@ -2866,6 +2869,8 @@ namespace Gilomx.CupheadBossRoulette
             if (timedPlaneWeapons.IsRestoring) return false;
             if (item == CreatorToolsTimedChallenge.InkRain) return IsTimedInkRainAvailable();
             if (item == CreatorToolsTimedChallenge.RgbShift) return IsTimedRgbAvailable();
+            if (item == CreatorToolsTimedChallenge.UpsideDown) return IsTimedUpsideDownAvailable();
+            if (item == CreatorToolsTimedChallenge.MiniPlaneOnly) return true;
             if (CreatorToolsTimedChallenge.RequiresPlane(item)) return TimedPlaneWeaponChallenge.Supported;
             if (item != CreatorToolsTimedChallenge.BlackAndWhite) return true;
             if (blackAndWhiteTransitionShader == null || !blackAndWhiteTransitionShader.isSupported)
@@ -3205,6 +3210,16 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (item == CreatorToolsTimedChallenge.RgbShift && OwnsBaseRgbEffect) return true;
             if (!ShouldShowActiveChallenge()) return false;
+            if (item == CreatorToolsTimedChallenge.MiniPlaneOnly)
+            {
+                var planeControls =
+                    CreatorToolsInteractionPresentation.HasAircraftPlayer();
+                return activeChallenge == ModifierId.MiniPlaneOnly ||
+                    (planeControls &&
+                     (activeChallenge == ModifierId.NoMiniPlane ||
+                      activeChallenge == ModifierId.NoDash ||
+                      activeChallenge == ModifierId.StiffMode));
+            }
             if (CreatorToolsTimedChallenge.RequiresPlane(item))
                 return activeChallenge == ModifierId.NoBombs || activeChallenge == ModifierId.NoPeashooter || activeChallenge == ModifierId.MiniPlaneOnly;
             if (item == CreatorToolsTimedChallenge.NoDash || item == CreatorToolsTimedChallenge.StiffMode)
@@ -3275,23 +3290,106 @@ namespace Gilomx.CupheadBossRoulette
         private static void RestartSoloMiniOnInvalidDamagePostfix(
             GameObject hit,
             float __result,
-            DamageDealer.DamageSource ___damageSource)
+            DamageDealer.DamageSource ___damageSource,
+            PlayerId ___playerId)
         {
             var plugin = activeInstance;
-            if (plugin == null || __result <= 0f ||
-                !plugin.ShouldRestartOnNonMiniPlaneDamage() ||
-                (___damageSource == DamageDealer.DamageSource.SmallPlane ||
-                 ___damageSource == DamageDealer.DamageSource.Super) ||
-                !IsEnemyDamageTarget(hit))
+            if (plugin == null)
                 return;
 
-            plugin.QueueSoloMiniRestart();
+            var enemyTarget = IsEnemyDamageTarget(hit);
+            var smallPlane =
+                ___damageSource == DamageDealer.DamageSource.SmallPlane;
+            var super = ___damageSource == DamageDealer.DamageSource.Super;
+            var validPlayer = (int)___playerId != int.MaxValue;
+            if (!TimedMiniPlanePenaltyPolicy.IsViolation(
+                    plugin.ShouldRestartOnNonMiniPlaneDamage() ||
+                        plugin.ShouldPenalizeTimedMiniPlaneDamage(),
+                    __result, enemyTarget, validPlayer,
+                    smallPlane, super))
+                return;
+
+            if (plugin.ShouldRestartOnNonMiniPlaneDamage())
+                plugin.QueueSoloMiniRestart();
+            else
+                plugin.QueueTimedMiniPlanePenalty(___playerId);
         }
 
         private bool ShouldRestartOnNonMiniPlaneDamage()
         {
             return activeChallenge == ModifierId.MiniPlaneOnly &&
                    ShouldShowActiveChallenge();
+        }
+
+        private bool ShouldPenalizeTimedMiniPlaneDamage()
+        {
+            return timedChallengeInteractions != null &&
+                timedChallengeInteractions.IsActive(
+                    CreatorToolsTimedChallenge.MiniPlaneOnly);
+        }
+
+        private void QueueTimedMiniPlanePenalty(PlayerId playerId)
+        {
+            var key = (int)playerId;
+            if (!timedMiniPlanePenaltyPolicy.TryQueue(key))
+                return;
+
+            var levelInstanceId = -1;
+            try
+            {
+                var level = Level.Current;
+                if (level != null)
+                    levelInstanceId = level.GetInstanceID();
+            }
+            catch
+            {
+            }
+            StartCoroutine(ApplyTimedMiniPlanePenalty(
+                playerId, key, levelInstanceId));
+        }
+
+        private IEnumerator ApplyTimedMiniPlanePenalty(
+            PlayerId playerId, int key, int levelInstanceId)
+        {
+            // Finish the projectile's valid enemy collision callbacks before
+            // routing one point through Cuphead's native player-damage path.
+            yield return null;
+            timedMiniPlanePenaltyPolicy.Complete(key);
+
+            if (SceneLoader.CurrentlyLoading)
+                yield break;
+            try
+            {
+                var level = Level.Current;
+                if (level == null ||
+                    level.GetInstanceID() != levelInstanceId)
+                    yield break;
+
+                var player = PlayerManager.GetPlayer(playerId)
+                    as PlanePlayerController;
+                if (player == null || player.IsDead ||
+                    !player.gameObject.activeInHierarchy ||
+                    player.damageReceiver == null || player.stats == null)
+                    yield break;
+
+                var previousHealth = player.stats.Health;
+                var damage = new DamageDealer.DamageInfo(
+                    1f,
+                    DamageDealer.Direction.Neutral,
+                    player.transform.position,
+                    DamageDealer.DamageSource.Enemy);
+                player.damageReceiver.TakeDamage(damage);
+                if (player.stats.Health < previousHealth)
+                    Logger.LogInfo(
+                        "Solo mini airplane timed penalty removed one life " +
+                        "from " + playerId + ".");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning(
+                    "Could not apply Solo mini airplane timed penalty: " +
+                    exception.Message);
+            }
         }
 
         private void QueueSoloMiniRestart()
@@ -3385,7 +3483,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             var requiredChallenge = activeChallenge;
             if (timedChallengeInteractions != null && timedChallengeInteractions.Presentation.Active &&
-                CreatorToolsTimedChallenge.RequiresPlane(timedChallengeInteractions.Presentation.Item))
+                CreatorToolsTimedChallenge.UsesForcedPlaneWeapon(timedChallengeInteractions.Presentation.Item))
                 requiredChallenge = TimedChallengeModifier(timedChallengeInteractions.Presentation.Item);
             if (requiredChallenge == ModifierId.NoBombs)
             {
@@ -3417,7 +3515,8 @@ namespace Gilomx.CupheadBossRoulette
                     activeChallenge == ModifierId.NoPeashooter) &&
                    ShouldShowActiveChallenge()) ||
                 (timedChallengeInteractions != null && timedChallengeInteractions.Presentation.Active &&
-                 CreatorToolsTimedChallenge.RequiresPlane(timedChallengeInteractions.Presentation.Item));
+                 CreatorToolsTimedChallenge.UsesForcedPlaneWeapon(
+                     timedChallengeInteractions.Presentation.Item));
         }
 
         private static void CanUseExPostfix(ref bool __result)

@@ -27,6 +27,115 @@ namespace Gilomx.CupheadBossRoulette
                     True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.InkRain), "ink opt-in persists");
                 }
             });
+            Run("Upside-down migration preserves every previous choice and adds one opt-in", delegate
+            {
+                using (var scope = new TestScope("upside-down-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":18,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_no_ex\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.UpsideDown), "new upside-down effect starts disabled");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.InkRain), "ink opt-in survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "previous exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.UpsideDown);
+                    settings.Save();
+                    True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.UpsideDown), "upside-down opt-in persists");
+                }
+            });
+            Run("Mini-plane-only migration preserves prior choices and adds one airplane opt-in", delegate
+            {
+                using (var scope = new TestScope("mini-plane-only-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":19,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_no_ex\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.MiniPlaneOnly), "new airplane challenge starts disabled");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.UpsideDown), "previous upside-down opt-in survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "previous exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.MiniPlaneOnly);
+                    settings.Save();
+                    True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.MiniPlaneOnly), "mini-plane-only opt-in persists");
+                }
+            });
+            Run("Mini-plane-only penalizes only damaging forbidden airplane attacks", delegate
+            {
+                True(CreatorToolsTimedChallenge.RequiresPlane(CreatorToolsTimedChallenge.MiniPlaneOnly), "challenge waits for airplane gameplay");
+                False(CreatorToolsTimedChallenge.UsesForcedPlaneWeapon(CreatorToolsTimedChallenge.MiniPlaneOnly), "challenge never forces the full-size weapon");
+                True(TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, true, true, false, false), "full-size shot or bomb damage costs one life");
+                False(TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, true, true, true, false), "small-plane damage is allowed");
+                False(TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, true, true, false, true), "super damage is allowed");
+                False(TimedMiniPlanePenaltyPolicy.IsViolation(false, 1f, true, true, false, false), "warning and expiry cannot punish");
+                False(TimedMiniPlanePenaltyPolicy.IsViolation(true, 0f, true, true, false, false), "blocked or zero damage cannot punish");
+                False(TimedMiniPlanePenaltyPolicy.IsViolation(true, 1f, false, true, false, false), "non-enemy collisions cannot punish");
+
+                var policy = new TimedMiniPlanePenaltyPolicy();
+                True(policy.TryQueue(0), "first P1 violation queues native damage");
+                False(policy.TryQueue(0), "same-frame duplicate enemy colliders cannot stack P1 damage");
+                True(policy.TryQueue(1), "P2 retains an independent penalty");
+                policy.Complete(0);
+                True(policy.TryQueue(0), "a later violation may cost another life after native recovery");
+                policy.Clear();
+                True(policy.TryQueue(1), "attempt cleanup removes stale pending penalties");
+            });
+            Run("Upside-down keeps its base transition, pauses, and restores after zero", delegate
+            {
+                foreach (var plane in new[] { false, true })
+                {
+                    var timer = new CreatorToolsTimedChallenge();
+                    True(timer.Start(CreatorToolsTimedChallenge.UpsideDown, 15, 3, plane), "ground and airplane support");
+                    Equal(0f, timer.UpsideDownBlend, "warning remains upright");
+                    timer.Advance(3.25f, true);
+                    Equal(0f, timer.EffectElapsed, "warning spends no rotation time");
+                    timer.Advance(0.25f, true);
+                    Equal(0f, timer.UpsideDownBlend, "accepted quarter-second entry delay");
+                    timer.Advance(0.225f, true);
+                    Equal(0.5f, timer.UpsideDownBlend, "halfway through the 0.45 second turn");
+                    timer.Advance(10f, false);
+                    Equal(0.5f, timer.UpsideDownBlend, "pause or missing camera freezes the turn");
+                    Equal(0.8f, timer.ComposeUpsideDownBlend(0.8f), "temporary source cannot weaken the equipped effect");
+                    timer.Advance(14.525f, true);
+                    Equal(TimedChallengePhase.Exit, timer.Phase, "restoration begins at zero");
+                    Equal(1f, timer.UpsideDownBlend, "full turn is held until restoration starts");
+                    True(timer.RendersUpsideDown, "render bridge remains owned during restoration");
+                    timer.Advance(0.45f, true);
+                    Equal(0.5f, timer.UpsideDownBlend, "halfway through the 0.9 second return");
+                    timer.Advance(0.45f, true);
+                    Equal(0f, timer.UpsideDownBlend, "expiration restores the normal frame");
+                    False(timer.Busy, "slot releases after visual restoration");
+
+                    timer.Start(CreatorToolsTimedChallenge.UpsideDown, 15, 0, plane);
+                    timer.Advance(0.475f, true);
+                    var hud = new CreatorToolsTimedChallengeHudState();
+                    hud.HoldAfterDefeat(timer, "Viewer");
+                    timer.End();
+                    Equal(0f, timer.UpsideDownBlend, "defeat or retry clears the live camera effect");
+                    Equal(CreatorToolsTimedChallenge.UpsideDown, hud.DefeatSnapshot.Item, "defeat keeps only the frozen HUD identity");
+                }
+            });
+            Run("Upside-down defeat transfers its exact frame into the animated return", delegate
+            {
+                var timer = new CreatorToolsTimedChallenge();
+                var hold = new TimedUpsideDownFrameHold();
+                timer.Start(CreatorToolsTimedChallenge.UpsideDown, 15, 0);
+                timer.Advance(0.475f, true);
+                Equal(0.5f, timer.UpsideDownBlend, "defeat occurs halfway through the turn");
+                True(hold.Capture(timer), "defeat captures the visible angle");
+                timer.End();
+                Equal(0f, timer.UpsideDownBlend, "gameplay lease is released");
+                Equal(0.5f, hold.Blend, "captured frame survives lease cleanup");
+                Equal(0.5f, hold.Consume(), "animated return begins at the exact visible frame");
+                False(hold.Active, "capture ownership transfers to the return animation");
+                Equal(0f, hold.Blend, "no frozen angle remains behind the defeat menu");
+
+                timer.Start(CreatorToolsTimedChallenge.NoEx, 15, 0);
+                False(hold.Capture(timer), "unrelated timed challenges cannot arm rotation hold");
+            });
             Run("Ink countdown releases emission but reserves its slot until the visuals drain", delegate
             {
                 foreach (var plane in new[] { false, true })
