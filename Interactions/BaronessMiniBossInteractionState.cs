@@ -103,6 +103,12 @@ namespace Gilomx.CupheadBossRoulette
                 float groundOnWater;
                 return TryGetWaterGround(camera, out groundOnWater);
             }
+            // Grim Matchstick has only moving cloud platforms. Its logical
+            // Ground is below the camera, but the catalog actors can use the
+            // lower edge of the visible arena just like an aircraft level.
+            if (CreatorToolsMiniBossArenaPolicy.SupportsScreenEdgeFloor(
+                    Level.Current.CurrentLevel))
+                return true;
             var ground = (float)Level.Current.Ground;
             var halfHeight = camera.orthographicSize;
             // A usable floor is necessary for the original ground patterns.
@@ -261,11 +267,14 @@ namespace Gilomx.CupheadBossRoulette
             bodySizeMultiplier = usesNativeBodyScale ? 1f / cameraScale :
                 (usesAircraftArena || Level.Current.CurrentLevel == Levels.Airplane
                     ? AircraftSizeMultiplier : 1f);
-            usesViewportFloor = !usesWaterFloor && (usesAircraftArena ||
-                Level.Current.CurrentLevel == Levels.Airplane || usesDevilLowerArena);
-            // Freeze this plane arena's reference at spawn: Gumball, Corn and
-            // Waffle store world positions in their native routines. Following
-            // camera shake/player tracking only for Cupcake would split floors.
+            usesViewportFloor = CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                Level.Current.CurrentLevel, usesAircraftArena,
+                usesWaterFloor, usesDevilLowerArena);
+            // Freeze this screen-edge arena's reference at spawn: Gumball,
+            // Corn and Waffle store world positions in their native routines.
+            // Following camera shake/player tracking only for Cupcake would
+            // split floors. This also gives Grim Matchstick a stable floor
+            // below its moving cloud platforms.
             // Howling Aces keeps world-down gravity when its camera rotates.
             // Use the upright viewport's bottom: a floor captured from a side
             // view's wider world-Y span would vanish when the camera turns back.

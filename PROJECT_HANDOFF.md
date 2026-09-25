@@ -2,6 +2,21 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Minijefes en Grim Matchstick (2026-09-24)
+
+Los cinco minijefes de la Baronesa quedaban fuera del sorteo en `Dragon`: el
+nivel usa nubes móviles y su `Level.Ground` lógico está debajo de la cámara, por
+lo que la protección para niveles de plataformas los declaraba incompatibles.
+`CreatorToolsMiniBossArenaPolicy` hace elegible únicamente a `Levels.Dragon`
+sin relajar la validación general y coloca sus actores sobre el borde inferior
+visible, reutilizando el suelo virtual de las arenas de avión. Conservan tamaño
+terrestre normal; Cala María continúa usando su agua visible y el Diablo su
+arena inferior. Pendiente validar en juego los cinco actores durante las fases
+del dragón. Suite runtime completa y contrato nativo de minijefes aprobados.
+Paquete Dev publicado por el proceso independiente, 536 archivos y ruta física
+verificada. SHA256:
+`FEDF90807BAC13725B53FDF53F68CB4E90F003DAB06341AED1B59ABAB33E168C`.
+
 ## Nombre y audio de la cuenta previa (2026-09-24)
 
 El HUD temporal presenta tres filas: **RETO EN CAMINO**, nombre localizado del
@@ -29,19 +44,15 @@ depende de que el servidor HTTP esté activo: Modo Molestoso, Batalla Molestosa
 y Tap Farming siguen actualizándose con su estado guardado durante una colisión
 de puerto; únicamente los comandos y publicaciones web esperan al servidor.
 
-## Pendientes actuales (2026-09-23)
+## Pendientes actuales (2026-09-24)
 
 Esta lista resume el trabajo restante y sustituye los recuentos históricos de
 retos pendientes que aparecen más abajo. Hay once retos temporales implementados.
 
-- Validar en juego desde un arranque nuevo: lluvia temporal sin pulpo, reto
-  de ruleta/equipado con pulpo, fluidez al entrar al mapa y al primer nivel,
-  aviso de preparación en mayúsculas alineado con el borde inferior del reloj,
-  Volteada de cabeza temporal en tierra/avión, pausa, K.O. y
-  derrota/reintento, y la penalización de Solo balas de miniavión con P1/P2 y
-  Ms. Chalice.
-- **Una vida y te callas / HP.1 — dificultad muy alta:** definir cómo devolver
-  la vida sin curar daño recibido ni revivir, incluyendo cooperativo.
+- **Una vida y te callas / HP.1 — en evaluación:** decidir si se desarrolla.
+  La restitución de vida no debe curar daño recibido ni revivir, incluido en
+  cooperativo; una alternativa sería convertirlo en un próximo golpe mortal
+  sin modificar los HP visibles.
 - Después de completar los temporales, desarrollar el reto que cambia
   aleatoriamente por tiempo, respetando compatibilidad y duraciones probadas.
 - Continuar los diseños de overlays, incluido el de interacciones y sus canjes,

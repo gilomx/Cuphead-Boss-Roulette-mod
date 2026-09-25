@@ -1,0 +1,45 @@
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunMiniBossArenaPolicyTests()
+        {
+            Run("Dragon mini-bosses use the bottom edge as their floor",
+                TestDragonMiniBossFloor);
+            Run("Existing aircraft, water and Devil floor rules remain distinct",
+                TestExistingMiniBossFloors);
+        }
+
+        private static void TestDragonMiniBossFloor()
+        {
+            True(CreatorToolsMiniBossArenaPolicy.SupportsScreenEdgeFloor(
+                    Levels.Dragon),
+                "Dragon must be eligible without a visible logical Ground");
+            True(CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                    Levels.Dragon, false, false, false),
+                "Dragon must place native mini-bosses on the screen bottom");
+            False(CreatorToolsMiniBossArenaPolicy.SupportsScreenEdgeFloor(
+                    Levels.Other),
+                "ordinary ground validation must remain active");
+        }
+
+        private static void TestExistingMiniBossFloors()
+        {
+            True(CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                    Levels.Airplane, false, false, false),
+                "airplane levels retain the screen-bottom floor");
+            True(CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                    Levels.Other, true, false, false),
+                "aircraft players retain the screen-bottom floor");
+            True(CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                    Levels.Other, false, false, true),
+                "Devil lower arena retains the screen-bottom floor");
+            False(CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                    Levels.FlyingMermaid, true, true, false),
+                "Cala Maria must keep using her visible water floor");
+            False(CreatorToolsMiniBossArenaPolicy.UsesViewportFloor(
+                    Levels.Other, false, false, false),
+                "ordinary levels must keep their native visible ground");
+        }
+    }
+}

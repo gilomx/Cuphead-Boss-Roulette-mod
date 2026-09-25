@@ -2,6 +2,12 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Los cinco minijefes de la Baronesa ya pueden aparecer contra Grim
+  Matchstick. Como el nivel del dragón sólo ofrece nubes móviles y conserva su
+  suelo lógico fuera de cámara, las interacciones usan el borde inferior
+  visible como suelo estable, igual que en las arenas de avión, pero mantienen
+  el tamaño normal de los niveles terrestres.
+
 - La cuenta previa de cada reto temporal muestra ahora el nombre localizado
   entre **RETO EN CAMINO** y la cifra. El aviso nativo del tiburón pirata suena
   una sola vez al comenzar y cada cifra conserva su clic; si el aviso supera la

@@ -2,6 +2,14 @@ using System;
 
 namespace Gilomx.CupheadBossRoulette
 {
+    internal enum Levels
+    {
+        Other,
+        Airplane,
+        Dragon,
+        FlyingMermaid
+    }
+
     // Unity owns the real implementation. The linked backlog only needs this
     // narrow main-thread dispatch contract, so the harness records every call.
     internal sealed class CreatorToolsInteractionController
