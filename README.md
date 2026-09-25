@@ -158,7 +158,7 @@ deja vacía, los ataques aparecen sin nombre.
 **NO DASH / NO MINIAVIÓN**, **MODO TIESO**, **BLANCO Y NEGRO**,
 **NO DISPARO BOMBAS**, **SIN PEASHOOTER**, **MAMÁ ESCUCHO BORROSO — RGB**,
 **VOLTEADA DE CABEZA**, **LLUVIA DE TINTA** y
-**SOLO BALAS DE MINIAVIÓN**.
+**SOLO BALAS DE MINIAVIÓN**, además de **UNA VIDA Y TE CALLAS / HP.1**.
 NO EX bloquea los ataques EX, pero deja disponibles los súperes en tierra y
 avión. NO DASH bloquea nuevos dashes en tierra; al volar impide encogerse y
 devuelve un avión pequeño a su tamaño normal. Un dash que ya había empezado
@@ -195,6 +195,14 @@ normal, una bomba o un EX daña a un enemigo durante el reto, el jugador que lo
 lanzó pierde una vida mediante el daño nativo, sin reiniciar el nivel. La
 invulnerabilidad del golpe evita que varias colisiones simultáneas consuman
 todas las vidas.
+UNA VIDA Y TE CALLAS funciona en tierra y avión. Al comenzar guarda por
+separado la vida actual y máxima de cada jugador, las fija en 1 e impide toda
+curación mientras corre el contador. Si el jugador sobrevive, al terminar se
+le devuelve exactamente la vida retirada, sin borrar el daño que haya recibido.
+Si muere, una reanimación cooperativa sigue funcionando, pero permanece en
+1 HP durante el reto y ya no recibe esa devolución; nunca se revive a nadie al
+llegar a cero. El corazón del Súper II de Ms. Chalice queda visible, gris e
+inoperante durante el reto y sólo recupera color y función si ella no murió.
 Las imágenes de lluvia se preparan por partes durante la primera pantalla de
 carga y se reutilizan después. El reto de ruleta/equipado conserva el pulpo;
 sus imágenes sólo se preparan si se necesita esa introducción, durante la carga
@@ -203,7 +211,7 @@ Mientras se preparan recursos del mod aparece «PREPARANDO INTERACCIONES…»
 a la izquierda del reloj de carga, alineado con su borde inferior. El aviso
 desaparece al terminar esa preparación y no aparece en los reintentos que ya
 tienen todo listo.
-Los once empiezan desmarcados en Modo Molestoso. Si marcas varios, se
+Los doce empiezan desmarcados en Modo Molestoso. Si marcas varios, se
 elige uno compatible al azar cada turno; sólo puede haber un reto temporal a
 la vez. También puedes enviarlos desde las pruebas manuales y reglas de stream.
 

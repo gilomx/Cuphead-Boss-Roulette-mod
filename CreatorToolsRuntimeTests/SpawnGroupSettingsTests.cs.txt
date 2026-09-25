@@ -119,7 +119,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(6f, pesky.MinimumInterval, "normal cadence remains customized");
                 Equal(legacyPesky, File.ReadAllText(peskyPath + ".bak"), "original Pesky backup");
                 using (var json = JsonDocument.Parse(File.ReadAllText(peskyPath)))
-                    Equal(20, json.RootElement.GetProperty("version").GetInt32(), "new schema version");
+                    Equal(21, json.RootElement.GetProperty("version").GetInt32(), "new schema version");
 
                 var interactionPath = Path.Combine(scope.ConfigDirectory, CreatorToolsInteractionPacingSettings.FileName);
                 const string legacyInteractions = "{\"enabled\":true,\"minimumInterval\":2,\"maximumInterval\":5," +

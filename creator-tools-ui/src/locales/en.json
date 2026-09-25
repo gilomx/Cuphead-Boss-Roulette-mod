@@ -885,6 +885,8 @@
       "inkRainEffect": "Ink starts raining when the warning ends, without a squid entrance. At zero, new drops stop; existing drops finish falling and the ink clears before the rest period. Ground and airplane.",
       "miniPlaneOnly": "MINI-PLANE BULLETS ONLY",
       "miniPlaneOnlyEffect": "Airplane only. Mini-plane bullets and supers are allowed. If a normal shot, bomb, or EX damages an enemy, the player who fired it loses one life; native hit invulnerability prevents chained losses.",
+      "hpOne": "ONE LIFE AND SHUT UP",
+      "hpOneEffect": "Ground and airplane. Temporarily lowers each player's current and maximum health to 1 and blocks all healing. Survivors recover exactly the health removed when the timer reaches zero; a defeated or revived player recovers only their normal maximum.",
       "blackAndWhiteEffect": "The picture gently fades to black and white and restores your filter when it ends. Ground and airplane.",
       "stiffModeEffect": "On the ground you cannot walk or dash, but you can move while jumping. In airplane levels it acts as NO MINI-PLANE.",
       "noDashEffect": "Blocks dashing on the ground. In airplane levels it prevents shrinking and returns an already small plane to normal size.",

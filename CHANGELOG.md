@@ -2,6 +2,24 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Se cerró la ronda de validación en juego de los cambios recientes: minijefes
+  en Grim Matchstick, selección masiva y orden del panel, regreso animado de
+  Volteada de cabeza, Solo balas de miniavión, cuenta previa con nombre y audio,
+  y carga/ejecución de Lluvia de tinta. Ya no figuran como pruebas pendientes.
+
+- **Una vida y te callas / HP.1** ya está disponible como duodécimo reto
+  temporal opcional. Guarda la vida retirada por jugador, bloquea toda curación
+  y la devuelve al llegar a cero sólo si ese jugador no murió. En cooperativo,
+  una reanimación vuelve con 1 HP pero cancela la devolución. El corazón del
+  Súper II de Ms. Chalice permanece gris e inoperante y vuelve únicamente si
+  ella sobrevivió. Mientras está suspendido conserva íntegros el seguimiento y
+  la animación nativos: el efecto sólo sustituye su tono. Mientras existe ese
+  corazón, la comprobación de disparo lo presenta como equipado y bloquea otro
+  Súper II, igual que el juego normal, aunque para el daño siga inoperante. Así
+  no se acumulan protecciones internas ni corazones. La variante de
+  ruleta/equipada conserva su conducta previa. Movimiento, restauración y
+  bloqueo de duplicados quedaron validados en juego.
+
 - Los cinco minijefes de la Baronesa ya pueden aparecer contra Grim
   Matchstick. Como el nivel del dragón sólo ofrece nubes móviles y conserva su
   suelo lógico fuera de cámara, las interacciones usan el borde inferior

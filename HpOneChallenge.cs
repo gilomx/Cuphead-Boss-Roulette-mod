@@ -53,6 +53,28 @@ namespace Gilomx.CupheadBossRoulette
                 Logger.LogWarning(
                     "Could not install the HP.1 cooperative join guards.");
 
+            var handleWeaponFiring = AccessTools.Method(
+                typeof(LevelPlayerWeaponManager), "HandleWeaponFiring");
+            var presentSuspendedShieldPrefix = AccessTools.Method(
+                typeof(Plugin),
+                "PresentSuspendedChaliceShieldWhileFiringPrefix");
+            var restoreSuspendedShieldFinalizer = AccessTools.Method(
+                typeof(Plugin),
+                "RestoreSuspendedChaliceShieldAfterFiringFinalizer");
+            if (handleWeaponFiring != null &&
+                presentSuspendedShieldPrefix != null &&
+                restoreSuspendedShieldFinalizer != null)
+            {
+                harmony.Patch(handleWeaponFiring,
+                    prefix: new HarmonyMethod(
+                        presentSuspendedShieldPrefix),
+                    finalizer: new HarmonyMethod(
+                        restoreSuspendedShieldFinalizer));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the timed HP.1 duplicate shield guard.");
+
             var setChaliceShield = AccessTools.Method(
                 typeof(PlayerStatsManager), "SetChaliceShield",
                 new[] { typeof(bool) });
@@ -167,6 +189,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool ShouldApplyHpOneHealthLock()
         {
+            return ShouldApplyEquippedHpOneHealthLock() ||
+                IsTimedHpOneHealthLockActive();
+        }
+
+        private bool ShouldApplyEquippedHpOneHealthLock()
+        {
             if (!ExperimentalFeatures.EnableHpOneChallenge ||
                 activeChallenge != ModifierId.HpOne ||
                 !activeChallengeTargetAssigned)
@@ -189,16 +217,31 @@ namespace Gilomx.CupheadBossRoulette
                    (battleHudPresentationActive && loanedLoadoutsActive);
         }
 
-        private static void ClampHpOneHealthPrefix(ref int __0)
+        private static void ClampHpOneHealthPrefix(
+            PlayerStatsManager __instance, ref int __0)
         {
-            if (IsHpOneRuntimeActive() && __0 > 1)
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.ShouldApplyHpOneHealthLock())
+                return;
+            if (plugin.IsTimedHpOneHealthLockActive())
+            {
+                plugin.ObserveTimedHpOneHealthWrite(__instance, __0);
+                if (__0 <= 0)
+                    plugin.MarkTimedHpOneDefeated(__instance);
+            }
+            if (__0 > 1)
                 __0 = 1;
         }
 
-        private static void ForceHpOneHealthMaxPrefix(ref int __0)
+        private static void ForceHpOneHealthMaxPrefix(
+            PlayerStatsManager __instance, ref int __0)
         {
-            if (IsHpOneRuntimeActive())
-                __0 = 1;
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.ShouldApplyHpOneHealthLock())
+                return;
+            if (plugin.IsTimedHpOneHealthLockActive())
+                plugin.ObserveTimedHpOneHealthMaxWrite(__instance, __0);
+            __0 = 1;
         }
 
         private static void AllowHpOnePartnerJoinPostfix(ref bool __result)
@@ -212,18 +255,79 @@ namespace Gilomx.CupheadBossRoulette
             return !IsHpOneRuntimeActive();
         }
 
-        private static void RejectHpOneChaliceShieldPrefix(ref bool __0)
+        private static void PresentSuspendedChaliceShieldWhileFiringPrefix(
+            LevelPlayerWeaponManager __instance,
+            out PlayerStatsManager __state)
         {
-            if (IsHpOneRuntimeActive())
-                __0 = false;
+            __state = null;
+            var plugin = activeInstance;
+            if (plugin == null || __instance == null ||
+                !plugin.IsTimedHpOneHealthLockActive())
+                return;
+
+            try
+            {
+                var player = __instance.player;
+                var stats = player == null ? null : player.stats;
+                if (stats == null || stats.ChaliceShieldOn ||
+                    !plugin.HasTimedHpOneSuspendedChaliceShield(stats))
+                    return;
+
+                // HandleWeaponFiring uses this flag only to decide whether a
+                // full meter may start another super. Present the suspended
+                // shield for this synchronous check, exactly like the native
+                // game, without making it available to damage handling.
+                SetNativeChaliceShieldFlag(stats, true);
+                __state = stats;
+            }
+            catch (Exception exception)
+            {
+                plugin.Logger.LogWarning(
+                    "Could not present the suspended Chalice shield: " +
+                    exception.Message);
+            }
+        }
+
+        private static Exception
+            RestoreSuspendedChaliceShieldAfterFiringFinalizer(
+                PlayerStatsManager __state, Exception __exception)
+        {
+            if (__state != null)
+            {
+                try
+                {
+                    SetNativeChaliceShieldFlag(__state, false);
+                }
+                catch
+                {
+                }
+            }
+            return __exception;
+        }
+
+        private static void SetNativeChaliceShieldFlag(
+            PlayerStatsManager stats, bool value)
+        {
+            Traverse.Create(stats).Property("ChaliceShieldOn")
+                .SetValue(value);
+        }
+
+        private static void RejectHpOneChaliceShieldPrefix(
+            PlayerStatsManager __instance, ref bool __0)
+        {
+            var plugin = activeInstance;
+            if (plugin == null || !plugin.ShouldApplyHpOneHealthLock())
+                return;
+            if (__0 && plugin.IsTimedHpOneHealthLockActive())
+                plugin.SuspendTimedHpOneChaliceShield(__instance);
+            __0 = false;
         }
 
         private static void DecorateRejectedChaliceHeartPostfix(
             PlayerSuperChaliceShield __instance)
         {
             var plugin = activeInstance;
-            if (plugin == null || __instance == null ||
-                !plugin.ShouldApplyHpOneHealthLock())
+            if (plugin == null || __instance == null)
                 return;
 
             try
@@ -233,6 +337,16 @@ namespace Gilomx.CupheadBossRoulette
                 var player = Traverse.Create(__instance)
                     .Field("player").GetValue<LevelPlayerController>();
                 if (heart == null)
+                    return;
+
+                if (plugin.IsTimedHpOneHealthLockActive())
+                {
+                    var stats = player == null ? null : player.stats;
+                    plugin.AttachTimedHpOneHeart(
+                        stats, heart, player);
+                    return;
+                }
+                if (!plugin.ShouldApplyEquippedHpOneHealthLock())
                     return;
 
                 var effect = heart.GetComponent<HpOneRejectedHeartEffect>();
@@ -405,6 +519,20 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (!IsHpOneRuntimeActive() || __instance == null)
                 return true;
+
+            var suspended = __instance
+                .GetComponent<TimedHpOneSuspendedHeartEffect>();
+            if (suspended != null)
+            {
+                var suspendedReceiver = suspended.Receiver;
+                if (suspendedReceiver != null)
+                {
+                    rejectedHeartReviveReceiverId =
+                        suspendedReceiver.GetInstanceID();
+                    rejectedHeartReviveFrame = Time.frameCount;
+                }
+                return false;
+            }
 
             var effect = __instance.GetComponent<HpOneRejectedHeartEffect>();
             if (effect == null)

@@ -116,6 +116,16 @@ export const interactionItems = [
     image: "/assets/creator-tools/modifiers/mini_01.png",
   },
   {
+    id: "challenge_hp_one",
+    category: "challenge",
+    group: "challenge",
+    titleKey: "interactions.challenges.hpOne",
+    descriptionKey: "interactions.challenges.hpOneEffect",
+    imageAltKey: "interactions.challenges.hpOne",
+    typeKey: "interactions.groups.challenge",
+    image: "/assets/creator-tools/modifiers/hp1_01.png",
+  },
+  {
     id: "hilda_green_zeppelin",
     category: "attack",
     group: "strong",

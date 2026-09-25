@@ -14,6 +14,7 @@ namespace Gilomx.CupheadBossRoulette
         private void SyncTimedChallengeEffects(CreatorToolsTimedChallenge timer)
         {
             timedPlaneWeapons.Update(timer);
+            SyncTimedHpOneEffect(timer);
             SyncTimedUpsideDownEffect(timer);
             if (timedInkRain != null) timedInkRain.Sync(timer);
         }

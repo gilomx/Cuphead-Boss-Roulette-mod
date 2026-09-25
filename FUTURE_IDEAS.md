@@ -11,6 +11,74 @@ entonces quedaron desactivados. La rama actual prepara una nueva actualización
 y todos los retos implementados están habilitados, junto con Creator Tools.
 No queda pendiente reactivar RGB, pantalla invertida, HP.1 ni Daño -50%.
 
+Esta referencia a HP.1 corresponde al reto de ruleta/equipado ya terminado.
+El 2026-09-25 se añadió además la variante **temporal**, opcional y configurable
+desde Creator Tools. Captura la vida actual/máxima y la cantidad retirada por
+jugador, fija la vida en 1 e impide toda curación. Al terminar devuelve
+exactamente lo retirado sólo a
+quien siga vivo en el mismo intento, sin revivir ni transferir la restauración
+a un reintento o escena nueva. En cooperativo, un jugador revivido durante el
+reto vuelve con 1 HP y sigue limitado; al terminar recupera su máximo normal,
+pero no los HP retirados antes de morir. El escudo del Súper II de Cáliz se
+conserva gris e inoperante durante el temporal y recupera color y función al
+terminar únicamente si Cáliz no murió durante esa activación.
+
+Para la futura ayuda **Vida extra**, cada vida canjeada será un crédito propio
+con el nombre del remitente y un corazón visible; podrá haber varios. No debe
+modelarse con el único estado nativo del Súper II. Durante HP.1 temporal esos
+créditos no protegen ni se consumen. Si el jugador sobrevive hasta el final del
+contador, los corazones suspendidos, incluso los recibidos durante el reto,
+recuperan color y función inmediatamente. Si muere durante HP.1, permanecen
+reservados y reaparecen en el reintento o nivel siguiente; el golpe mortal no
+consume ninguno y una reanimación cooperativa no los reactiva en ese intento.
+Los corazones acumulados se consumen del más antiguo al más reciente.
+
+En cooperativo, **Vida extra y todas las demás funciones futuras de la categoría
+Ayudas se asignan exclusivamente a Player 1**. Player 2 no recibe ni comparte
+sus efectos, aunque participe en la pelea o sea quien reviva a Player 1.
+
+## Ayuda fantasmal
+
+Idea registrada el 2026-09-25 con el nombre **Ayuda fantasmal**. Al canjearla
+aparece durante 10 segundos de tiempo de juego una copia translúcida de Player 1.
+Reproduce sus movimientos y ataques con un pequeño retraso, dispara y aporta un
+segundo daño equivalente; no puede recibir daño. Por la regla común de Ayudas,
+en cooperativo siempre copia y beneficia únicamente a Player 1. Sobre el
+fantasma aparece el nombre de la persona que canjeó la ayuda, con el mismo estilo
+de etiqueta de los demás canjeables y seguimiento continuo del actor visual.
+
+No debe implementarse como otro `LevelPlayerController`: ocupar un jugador real
+duplicaría HUD, cámara, colisiones, parry, cartas, vida y estados cooperativos.
+La ruta segura es un actor visual sin hitbox que reproduce un búfer de posición,
+orientación y animación, acompañado por una ruta de ataques marcada como eco.
+Esa marca evita grabar nuevamente sus propios disparos y crear una recursión.
+
+Reglas propuestas:
+
+- Dura 10 segundos efectivos; pausa, pérdida de foco y detenciones nativas del
+  combate congelan el tiempo.
+- Imita salto, agachado, carrera, dash, tamaño de avión, orientación y animación,
+  pero no hace parry, no revive, no recoge cartas, no mueve la cámara y no activa
+  colisiones ni objetos del escenario.
+- Sus ataques pertenecen a Player 1, heredan los modificadores y restricciones
+  vigentes y sólo pueden dañar objetivos que sigan siendo válidos al reproducirse.
+  No deben generar una segunda penalización en retos que castigan un arma.
+- Copiará disparos normales, cargados, EX y súperes ofensivos. Los EX y súperes
+  necesitan rutas de eco específicas: reproducen con retraso su animación y
+  daño, pero no vuelven a bloquear a Player 1, repetir la cinemática, consumir
+  cartas ni llenar el medidor. Los súperes defensivos o sin daño requieren una
+  regla aparte antes de implementarse.
+- Desaparece al morir Player 1, perder, reiniciar, salir o cambiar de escena; no
+  continúa atacando después de su dueño.
+- Puede coexistir con HP.1 temporal y con las vidas extra porque no posee vida
+  propia ni consume sus créditos.
+- Sólo puede existir una Ayuda fantasmal activa. Los canjes adicionales esperan
+  en orden de llegada y cada uno recibe sus 10 segundos completos con el nombre
+  de su propio remitente; no se acumulan fantasmas ni multiplicadores simultáneos.
+
+Antes de implementarla falta elegir el retraso exacto y definir qué representación
+tendrán los súperes defensivos.
+
 | Función | Estado actual en `ExperimentalFeatures.cs` |
 | --- | --- |
 | RGB / Mamá escucho borroso | `EnableRgbShiftChallenge = true` |

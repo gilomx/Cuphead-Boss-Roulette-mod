@@ -34,6 +34,7 @@ namespace Gilomx.CupheadBossRoulette
                 case "challenge_upside_down":
                 case "challenge_ink_rain":
                 case "challenge_mini_plane_only":
+                case "challenge_hp_one":
                     return Challenge;
                 case "hilda_purple_zeppelin":
                 case "rootpack_homing_carrot":

@@ -2872,6 +2872,8 @@ namespace Gilomx.CupheadBossRoulette
             if (item == CreatorToolsTimedChallenge.RgbShift) return IsTimedRgbAvailable();
             if (item == CreatorToolsTimedChallenge.UpsideDown) return IsTimedUpsideDownAvailable();
             if (item == CreatorToolsTimedChallenge.MiniPlaneOnly) return true;
+            if (item == CreatorToolsTimedChallenge.HpOne)
+                return ExperimentalFeatures.EnableHpOneChallenge;
             if (CreatorToolsTimedChallenge.RequiresPlane(item)) return TimedPlaneWeaponChallenge.Supported;
             if (item != CreatorToolsTimedChallenge.BlackAndWhite) return true;
             if (blackAndWhiteTransitionShader == null || !blackAndWhiteTransitionShader.isSupported)
@@ -3871,6 +3873,8 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsShuttingDown = true;
             SceneLoader.OnFadeInEndEvent -=
                 CompleteChallengeVisualRestartOnFadeInEnd;
+            if (timedHpOneRuntimeActive)
+                EndTimedHpOneRuntime();
             if (harmony != null)
                 harmony.UnpatchSelf();
             if (activeInstance == this)

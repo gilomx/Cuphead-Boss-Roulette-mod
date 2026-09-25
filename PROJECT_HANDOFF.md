@@ -11,8 +11,9 @@ lo que la protección para niveles de plataformas los declaraba incompatibles.
 sin relajar la validación general y coloca sus actores sobre el borde inferior
 visible, reutilizando el suelo virtual de las arenas de avión. Conservan tamaño
 terrestre normal; Cala María continúa usando su agua visible y el Diablo su
-arena inferior. Pendiente validar en juego los cinco actores durante las fases
-del dragón. Suite runtime completa y contrato nativo de minijefes aprobados.
+arena inferior. El usuario validó en juego los cinco actores durante las fases
+del dragón; esta comprobación queda cerrada. Suite runtime completa y contrato
+nativo de minijefes aprobados.
 Paquete Dev publicado por el proceso independiente, 536 archivos y ruta física
 verificada. SHA256:
 `FEDF90807BAC13725B53FDF53F68CB4E90F003DAB06341AED1B59ABAB33E168C`.
@@ -44,17 +45,91 @@ depende de que el servidor HTTP esté activo: Modo Molestoso, Batalla Molestosa
 y Tap Farming siguen actualizándose con su estado guardado durante una colisión
 de puerto; únicamente los comandos y publicaciones web esperan al servidor.
 
-## Pendientes actuales (2026-09-24)
+## Pendientes actuales (2026-09-25)
 
 Esta lista resume el trabajo restante y sustituye los recuentos históricos de
-retos pendientes que aparecen más abajo. Hay once retos temporales implementados.
+retos pendientes que aparecen más abajo. Hay doce retos temporales implementados.
+El usuario completó la ronda de pruebas en juego de los cambios recientes:
+minijefes en Grim Matchstick, controles masivos y orden del panel, regreso de
+Volteada de cabeza, Solo balas de miniavión en sus tres usos, nombre/audio/clics
+de la cuenta previa, los dos modos de Lluvia de tinta y su preparación/aviso de
+carga. Esas validaciones quedan cerradas y ya no forman parte de los pendientes.
 
-- **Una vida y te callas / HP.1 — en evaluación:** decidir si se desarrolla.
-  La restitución de vida no debe curar daño recibido ni revivir, incluido en
-  cooperativo; una alternativa sería convertirlo en un próximo golpe mortal
-  sin modificar los HP visibles.
-- Después de completar los temporales, desarrollar el reto que cambia
-  aleatoriamente por tiempo, respetando compatibilidad y duraciones probadas.
+- **Una vida y te callas / HP.1 temporal — implementado y validado en juego:**
+  la versión de ruleta/equipada conserva su conducta anterior. La
+  variante temporal es una opción configurable, desmarcada por defecto. Al
+  comenzar guarda por separado la vida
+  actual/máxima de cada jugador y la cantidad retirada, y se fijan ambas en 1.
+  Mientras corre el contador ninguna fuente puede aumentar vida. Al llegar a
+  cero, sólo a los jugadores que sigan vivos en el mismo intento se les devuelve
+  exactamente lo retirado y su máximo anterior; nunca se revive ni se escribe
+  sobre un jugador derrotado, un reintento o una escena nueva. P2 incorporado a
+  mitad del reto recibe su propia captura independiente.
+
+  En cooperativo, si un jugador muere durante HP.1 queda marcado como derrotado
+  para esa activación. Puede ser revivido normalmente por su compañero, pero
+  vuelve con 1 HP y continúa limitado mientras siga el contador. Al terminar se
+  restaura su máximo normal, no los HP retirados al inicio; devolverlos después
+  de una muerte sería una curación. Si el contador acaba mientras continúa como
+  fantasma, no se escribe vida sobre él y una reanimación posterior usa la vida
+  nativa. La muerte y restauración se controlan por jugador: la caída de uno no
+  altera lo que recupera el compañero que sobrevivió.
+
+  El escudo del Súper II de Ms. Chalice usa suspensión, no rechazo como en
+  el HP.1 completo. Si ya estaba activo o se obtiene durante el temporal, el
+  corazón queda gris e inoperante hasta que termine el contador; entonces
+  recupera color y función si Cáliz continúa viva en el mismo intento. Se
+  implementó con un efecto reversible y un estado de escudo pendiente en vez
+  del efecto de rechazo que desaparece después de 1.15 s. La primera prueba en
+  juego detectó que reutilizar su vibración fijaba repetidamente la posición
+  local y peleaba contra el seguimiento nativo. El efecto temporal ya no toca
+  posición, color del renderer ni animación: sólo cambia y restaura el material.
+  Una segunda prueba encontró que ejecutar de nuevo el Súper II creaba otro
+  corazón porque el booleano nativo debe permanecer apagado durante la
+  suspensión. Borrar sólo el duplicado visual no bastó: su corrutina seguía
+  esperando el final del escudo y concedía otra protección. El parche presenta
+  el escudo pendiente como activo exclusivamente durante la comprobación
+  síncrona de `LevelPlayerWeaponManager.HandleWeaponFiring`, que es la barrera
+  nativa anterior a `StartSuper`; inmediatamente vuelve a apagarlo para el
+  sistema de daño. La limpieza de un corazón duplicado se conserva como defensa,
+  pero la segunda activación ya no llega a crearlo ni acumular corrutinas. El
+  usuario confirmó en juego el seguimiento y animación normales del corazón,
+  la ausencia de duplicados visuales y la eliminación de la protección doble.
+
+  Verificado con la suite runtime completa, los harnesses de avión, tinta, RGB
+  y assets, catálogo web de 29 interacciones y 43 regalos, y compilación Release
+  contra las DLL reales sin advertencias ni errores. Paquete Dev publicado por
+  el proceso independiente, 536 archivos y ruta física verificada. SHA256:
+  `49ABF934F3C8B1D632F1C85BE2BE665C610530836773B918932C5C10370A5E40`.
+
+  La futura ayuda **Vida extra** debe usar un inventario propio de créditos, no
+  el único booleano nativo del Súper II: cada corazón conserva remitente y dueño,
+  admite varios acumulados y consume sólo uno al proteger. Los créditos no
+  funcionan ni se consumen durante HP.1 temporal. Si el jugador sigue vivo al
+  llegar el contador a cero, todos sus corazones suspendidos —incluidos los
+  recibidos durante el reto— recuperan color y función inmediatamente. Sólo si
+  el jugador muere durante HP.1 quedan reservados para reconstruirse en el
+  reintento o nivel siguiente; el golpe mortal no gasta ningún crédito. Una
+  reanimación cooperativa durante el mismo intento no elimina esa reserva.
+
+  Regla general de la futura categoría **Ayudas**: en cooperativo todos sus
+  canjes y efectos beneficiosos pertenecen exclusivamente a Player 1. Esto
+  incluye Vida extra y cualquier ayuda añadida después; Player 2 no recibe ni
+  comparte esos créditos. Cuando haya varios corazones de Vida extra se consumen
+  del más antiguo al más reciente.
+- **Ayuda fantasmal — concepto pendiente:** durante 10 segundos aparece
+  un eco invulnerable de Player 1 que repite sus movimientos y ataques con
+  retraso y aporta un segundo daño. Debe ser un actor visual sin hitbox ni plaza
+  cooperativa, nunca otro jugador real. No hace parry, no revive, no toca objetos
+  del escenario y desaparece con la muerte de Player 1 o al terminar el intento.
+  Copiará disparos, EX y súperes ofensivos mediante rutas de eco que no repitan
+  cinemáticas ni estados del jugador. Falta definir retraso, súperes defensivos
+  y su representación. Sólo habrá uno activo: los canjes adicionales esperan en
+  orden de llegada, cada uno dura 10 segundos completos y muestra sobre el
+  fantasma el nombre de su remitente con la etiqueta de los demás canjeables.
+  El diseño ampliado está en `FUTURE_IDEAS.md`.
+- El siguiente reto previsto cambia aleatoriamente por tiempo, respetando
+  compatibilidad y duraciones probadas.
 - Continuar los diseños de overlays, incluido el de interacciones y sus canjes,
   con contenido adecuado al nivel que se está jugando.
 
@@ -97,7 +172,7 @@ normal sobrescriba la animación. No requirió cambios. Suite runtime completa
 aprobada. Paquete Dev publicado por el proceso independiente, 535 archivos y
 ruta física verificada. SHA256:
 `92888BD63EB6D4BFBE40056C768D5E65840020B065A326F70543054C0E923413`.
-Pendiente confirmación visual en Cuphead desde un arranque nuevo.
+Validado visualmente por el usuario en Cuphead desde un arranque nuevo.
 
 ## Solo balas de miniavión temporal (2026-09-23)
 
@@ -118,8 +193,9 @@ anterior de reiniciar el intento.
 
 Pruebas automatizadas cubren exclusión en tierra, espera de canjes, libertad de
 arma/tamaño, balas pequeñas y súper permitidos, disparos grandes/bombas/EX
-penalizados, deduplicación y cooperativo. Pendiente validar en juego la pérdida
-de vida y su animación con Cuphead, Mugman y Ms. Chalice.
+penalizados, deduplicación y cooperativo. El usuario validó en juego la pérdida
+de vida y su animación con Cuphead, Mugman y Ms. Chalice en los tres usos del
+reto; esta comprobación queda cerrada.
 
 Verificado: suite runtime completa; harnesses de avión, RGB, tinta y assets;
 catálogo UI con 28 artículos y 43 regalos. Release compila con cero advertencias
@@ -158,8 +234,8 @@ advertencias ni errores. Una prueba del usuario detectó el restablecimiento
 abrupto al perder. Primero se añadió una retención idéntica a la conducta del
 reto equipado; después el usuario pidió que ambos regresaran animados para leer
 el menú de derrota. La regresión exige ahora transferir sin saltos el ángulo
-visible a esa salida. Pendiente validar visualmente la corrección, la pausa y el
-aviso en un arranque nuevo.
+visible a esa salida. El usuario validó visualmente la corrección, la pausa y el
+aviso en un arranque nuevo; esta comprobación queda cerrada.
 
 Paquete Dev publicado por el proceso independiente, 535 archivos y ruta física
 verificada. SHA256:
@@ -190,7 +266,7 @@ Pruebas actualizadas de temporal directo en tierra/avión, tres dificultades,
 conteo previo, pausa, final corto, reserva, derrota y reintento; harness de
 assets verifica 136/59, cambio posterior a ruleta, reutilización, fallos de
 cada grupo y liberación exacta. Textos ES/EN, README y reglas actualizados.
-Pendiente prueba en juego de ambos modos desde un arranque nuevo.
+El usuario validó en juego ambos modos desde un arranque nuevo.
 
 Release sin advertencias ni errores; contrato nativo de carga/Mono y build
 del panel correctos. Paquete Dev publicado, 535 archivos, ruta física
@@ -205,7 +281,7 @@ imagen del reloj. `AssetLoadingNotice.cs` ahora ancla su rectángulo a la
 esquina inferior izquierda del reloj, con pivote inferior derecho y texto
 `LowerRight`. Mantiene el espacio lateral de 18, tamaño 22, fuente y opacidad.
 El borde inferior queda ligado al reloj, sin desplazamientos por resolución.
-Pendiente confirmar el ajuste visual en juego.
+El usuario confirmó el ajuste visual en juego.
 
 Compilación correcta, sin advertencias ni errores. Paquete Dev publicado por
 el proceso independiente, 535 archivos y ruta física verificada. SHA256:
@@ -234,9 +310,9 @@ del runtime de tinta y sus iteradores/closures generados contra las DLL reales
 del juego. Reprodujo el fallo con la DLL anterior y pasa con la corrección.
 El harness InkAssets pasa con las 195 imágenes, reutilización, liberación y
 fallos de decodificación; Release sin advertencias ni errores. La prueba net10
-por sí sola no detecta tipos que Unity/Mono ha eliminado. Pendiente validar
-en juego tras volver a abrir Cuphead con el paquete actualizado; la sesión
-actual ya tiene marcada la preparación como fallida y no puede recargar DLL.
+por sí sola no detecta tipos que Unity/Mono ha eliminado. El usuario validó en
+juego la corrección después de volver a abrir Cuphead con el paquete actualizado;
+la preparación funciona correctamente.
 
 Paquete Dev corregido publicado, 535 archivos, ruta física verificada por
 proceso independiente. SHA256:
@@ -259,8 +335,8 @@ tinta/hooks visuales. Se apaga antes de avanzar el iterador de carga de Cuphead
 y también al cancelar. Reintentos con recursos ya listos no anuncian trabajo.
 La prueba de barrera verifica esos casos; el contrato IL comprueba el campo
 nativo y la inyección de la imagen del reloj. Build Release sin advertencias
-ni errores, suite runtime y contrato nativo correctos. Pendiente ver posición
-y tamaño en el juego; no se ha arrancado ni interrumpido Cuphead.
+ni errores, suite runtime y contrato nativo correctos. El usuario validó la
+posición y el tamaño en el juego.
 
 Alcance: se habló de cargar sólo lo habilitado y prepararlo al reintentar si
 el usuario lo cambia desde el panel. Sigue siendo una propuesta; este cambio
@@ -311,8 +387,8 @@ proyecto: compartirlos podía reutilizar el apphost de otro harness y ejecutar
 la suite equivocada. `verify_native_loading_contract.ps1` comprueba también
 la DLL recién compilada: consulta de tinta sin carga, bloqueo del mapa,
 reinicio del flag nativo y preparación antes de avanzar el iterador del juego.
-Release compila sin advertencias ni errores. Pendiente prueba visual y de
-fluidez reiniciando Cuphead; no se ha reiniciado ni interrumpido la partida.
+Release compila sin advertencias ni errores. El usuario completó la prueba
+visual y de fluidez después de reiniciar Cuphead.
 
 Paquete Dev completo publicado con el procedimiento canónico; ruta física
 verificada por proceso independiente, 535 archivos, build de panel y companion

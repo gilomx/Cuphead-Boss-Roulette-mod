@@ -63,6 +63,71 @@ namespace Gilomx.CupheadBossRoulette
                     True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.MiniPlaneOnly), "mini-plane-only opt-in persists");
                 }
             });
+            Run("HP.1 migration preserves prior choices and adds one opt-in", delegate
+            {
+                using (var scope = new TestScope("hp-one-migration"))
+                {
+                    File.WriteAllText(Path.Combine(scope.ConfigDirectory, PeskySettingsFileName),
+                        "{\"version\":20,\"enabled\":true,\"names\":[\"Viewer\"],\"disabledItems\":[\"challenge_no_ex\"],\"challengeDurationSeconds\":24,\"challengeCountdownSeconds\":7,\"challengeWaitSeconds\":9}");
+                    var settings = LoadPeskySettings(scope);
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.HpOne), "new HP.1 starts disabled");
+                    True(settings.IsItemEnabled(CreatorToolsTimedChallenge.MiniPlaneOnly), "previous airplane opt-in survives");
+                    False(settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "previous exclusion survives");
+                    Equal(24, settings.ChallengeDurationSeconds, "duration survives");
+                    Equal(7, settings.ChallengeCountdownSeconds, "warning survives");
+                    Equal(9, settings.ChallengeWaitSeconds, "rest survives");
+                    settings.DisabledItems.Remove(CreatorToolsTimedChallenge.HpOne);
+                    settings.Save();
+                    True(LoadPeskySettings(scope).IsItemEnabled(CreatorToolsTimedChallenge.HpOne), "HP.1 opt-in persists");
+                }
+            });
+            Run("Temporary HP.1 refunds only a player who never died", delegate
+            {
+                var survivor = new TimedHpOneHealthState();
+                survivor.Capture(4, 4);
+                Equal(3, survivor.RemovedHealth, "three health points are held");
+                True(survivor.ShouldRefundCurrentHealth(true), "living player keeps the refund");
+                Equal(4, survivor.RestoredCurrentHealth(1), "exact held health returns at zero");
+
+                var revived = new TimedHpOneHealthState();
+                revived.Capture(3, 4);
+                revived.MarkDefeated();
+                False(revived.ShouldRefundCurrentHealth(true), "cooperative revive does not restore removed health");
+                Equal(4, revived.OriginalHealthMax, "normal maximum is still restorable");
+
+                var joining = new TimedHpOneHealthState();
+                joining.ObserveProposedHealth(0);
+                joining.ObserveProposedHealthMax(4);
+                joining.ObserveProposedHealth(3);
+                joining.Capture(1, 1);
+                False(joining.Defeated, "an initialization zero is not a cooperative death");
+                Equal(3, joining.OriginalHealth, "pre-clamp join health is captured");
+                Equal(4, joining.OriginalHealthMax, "pre-clamp join maximum is captured");
+                Equal(2, joining.RemovedHealth, "joiner receives an independent refund");
+            });
+            Run("Temporary HP.1 suspends Chalice shield only for survivors", delegate
+            {
+                var survivor = new TimedHpOneHealthState();
+                survivor.Capture(3, 3);
+                survivor.SuspendChaliceShield();
+                survivor.SuspendChaliceShield();
+                True(survivor.PendingChaliceShield, "repeated Super II remains one pending shield state");
+                True(survivor.ShouldRestoreChaliceShield(true), "surviving Chalice regains the shield");
+
+                var defeated = new TimedHpOneHealthState();
+                defeated.Capture(3, 3);
+                defeated.SuspendChaliceShield();
+                defeated.MarkDefeated();
+                True(defeated.PendingChaliceShield, "death keeps Super II blocked for the current attempt");
+                False(defeated.ShouldRestoreChaliceShield(true), "revived Chalice does not regain a pre-death shield");
+                False(defeated.ShouldRestoreChaliceShield(false), "a ghost is never granted a shield");
+            });
+            Run("Temporary HP.1 supports ground and airplane without a plane gate", delegate
+            {
+                True(CreatorToolsTimedChallenge.SupportsLevel(CreatorToolsTimedChallenge.HpOne, false), "ground support");
+                True(CreatorToolsTimedChallenge.SupportsLevel(CreatorToolsTimedChallenge.HpOne, true), "airplane support");
+                False(CreatorToolsTimedChallenge.RequiresPlane(CreatorToolsTimedChallenge.HpOne), "no airplane-only wait");
+            });
             Run("Mini-plane-only penalizes only damaging forbidden airplane attacks", delegate
             {
                 True(CreatorToolsTimedChallenge.RequiresPlane(CreatorToolsTimedChallenge.MiniPlaneOnly), "challenge waits for airplane gameplay");

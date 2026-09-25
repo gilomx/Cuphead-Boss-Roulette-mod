@@ -885,6 +885,8 @@
       "inkRainEffect": "Empieza a llover tinta al terminar el aviso, sin aparición del pulpo. Al llegar a cero dejan de salir gotas; las que quedan terminan de caer y la tinta se disipa antes del descanso. Tierra y avión.",
       "miniPlaneOnly": "SOLO BALAS DE MINIAVIÓN",
       "miniPlaneOnlyEffect": "Sólo avión. Las balas del miniavión y los súperes están permitidos. Si un disparo normal, una bomba o un EX daña a un enemigo, el jugador que lo lanzó pierde una vida; la invulnerabilidad nativa evita pérdidas encadenadas.",
+      "hpOne": "UNA VIDA Y TE CALLAS",
+      "hpOneEffect": "Tierra y avión. Reduce temporalmente a 1 la vida actual y máxima de cada jugador y bloquea toda curación. Quien sobreviva recupera exactamente la vida retirada al llegar a cero; un jugador derrotado o revivido recupera sólo su máximo normal.",
       "blackAndWhiteEffect": "La imagen pasa suavemente a blanco y negro y recupera tu filtro al terminar. Tierra y avión.",
       "stiffModeEffect": "En tierra no puedes caminar ni hacer dash, pero puedes moverte al saltar. En avión equivale a NO MINIAVIÓN.",
       "noDashEffect": "En tierra bloquea el dash. En avión impide encogerse y vuelve al tamaño normal si ya estaba pequeño.",

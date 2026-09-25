@@ -18,8 +18,9 @@ namespace Gilomx.CupheadBossRoulette
         internal const string UpsideDown = "challenge_upside_down";
         internal const string InkRain = "challenge_ink_rain";
         internal const string MiniPlaneOnly = "challenge_mini_plane_only";
-        internal static readonly string[] Items = { HalfDamage, NoEx, NoDash, StiffMode, BlackAndWhite, NoBombs, NoPeashooter, RgbShift, UpsideDown, InkRain, MiniPlaneOnly };
-        internal static bool Supports(string item) { return item == HalfDamage || item == NoEx || item == NoDash || item == StiffMode || item == InkRain || HasVisualTransition(item) || RequiresPlane(item); }
+        internal const string HpOne = "challenge_hp_one";
+        internal static readonly string[] Items = { HalfDamage, NoEx, NoDash, StiffMode, BlackAndWhite, NoBombs, NoPeashooter, RgbShift, UpsideDown, InkRain, MiniPlaneOnly, HpOne };
+        internal static bool Supports(string item) { return item == HalfDamage || item == NoEx || item == NoDash || item == StiffMode || item == InkRain || item == HpOne || HasVisualTransition(item) || RequiresPlane(item); }
         internal static bool RequiresPlane(string item) { return UsesForcedPlaneWeapon(item) || item == MiniPlaneOnly; }
         internal static bool UsesForcedPlaneWeapon(string item) { return item == NoBombs || item == NoPeashooter; }
         internal static bool HasVisualTransition(string item) { return item == BlackAndWhite || item == RgbShift || item == UpsideDown; }

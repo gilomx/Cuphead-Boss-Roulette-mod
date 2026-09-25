@@ -33,6 +33,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string UpsideDownChallenge = "challenge_upside_down";
         internal const string InkRainChallenge = "challenge_ink_rain";
         internal const string MiniPlaneOnlyChallenge = "challenge_mini_plane_only";
+        internal const string HpOneChallenge = "challenge_hp_one";
 
         internal static readonly string[] All =
         {
@@ -63,7 +64,8 @@ namespace Gilomx.CupheadBossRoulette
             RgbShiftChallenge,
             UpsideDownChallenge,
             InkRainChallenge,
-            MiniPlaneOnlyChallenge
+            MiniPlaneOnlyChallenge,
+            HpOneChallenge
         };
     }
 

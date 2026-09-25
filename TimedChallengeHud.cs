@@ -237,6 +237,7 @@ namespace Gilomx.CupheadBossRoulette
             if (item == CreatorToolsTimedChallenge.UpsideDown) return ModifierId.UpsideDown;
             if (item == CreatorToolsTimedChallenge.InkRain) return ModifierId.InkRain;
             if (item == CreatorToolsTimedChallenge.MiniPlaneOnly) return ModifierId.MiniPlaneOnly;
+            if (item == CreatorToolsTimedChallenge.HpOne) return ModifierId.HpOne;
             if (item == CreatorToolsTimedChallenge.NoBombs) return ModifierId.NoBombs;
             if (item == CreatorToolsTimedChallenge.NoPeashooter) return ModifierId.NoPeashooter;
             if (item == CreatorToolsTimedChallenge.BlackAndWhite) return ModifierId.BlackAndWhite;
