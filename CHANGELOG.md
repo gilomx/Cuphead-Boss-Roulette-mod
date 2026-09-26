@@ -2,6 +2,16 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- **Ayuda fantasmal** conserva el último cuadro válido cuando Cáliz oculta por
+  un instante su renderer al saltar y durante las transiciones de bomba en
+  avión. Si la transformación activa otro sprite del jugador, el fantasma lo
+  adopta; ya no hereda la transparencia temporal ni se apaga durante la
+  transformación o la explosión. En tierra no adopta las piezas auxiliares que
+  Cáliz muestra durante su primer salto, evitando un fantasma sin cuerpo. En
+  avión sigue la instancia nativa de `AbstractPlaneSuper` perteneciente a
+  Player 1, por lo que puede reproducir la transformación, la bomba animada y
+  su explosión antes de volver al renderer normal del avión.
+
 - **Máximo de ataques en pantalla** se configura por separado en Interacciones
   y Modo Molestoso. Al actualizar, el modo hereda el límite que ambos usaban y
   después guarda el suyo; **Usar en ambos modos** sincroniza también este valor

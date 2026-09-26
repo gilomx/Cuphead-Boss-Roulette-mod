@@ -1,10 +1,22 @@
 using System;
+using System.Reflection;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsGhostActor : MonoBehaviour
     {
+        private static readonly FieldInfo PlaneSuperPlayer =
+            typeof(AbstractPlaneSuper).GetField(
+                "player",
+                BindingFlags.Instance | BindingFlags.Public |
+                BindingFlags.NonPublic);
+        private static readonly FieldInfo PlaneSuperSpriteRenderer =
+            typeof(AbstractPlaneSuper).GetField(
+                "spriteRenderer",
+                BindingFlags.Instance | BindingFlags.Public |
+                BindingFlags.NonPublic);
+
         internal const float LifetimeSeconds = 10f;
 
         private const float SideSeparation = 140f;
@@ -125,11 +137,10 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (owner == null || ghostRenderer == null)
                 return;
-            if (sourceRenderer == null)
-                sourceRenderer = FindPlayerRenderer(owner);
+            RefreshSourceRenderer();
             if (sourceRenderer == null)
             {
-                ghostRenderer.enabled = false;
+                ApplyCachedFrameVisibility(ResolveOpacity(), false);
                 return;
             }
 
@@ -225,7 +236,11 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (sourceRenderer == null)
                 return;
-            transform.localScale = sourceRenderer.transform.lossyScale;
+            var scale = sourceRenderer.transform.lossyScale;
+            if (Mathf.Abs(scale.x) <= 0.001f ||
+                Mathf.Abs(scale.y) <= 0.001f)
+                return;
+            transform.localScale = scale;
         }
 
         private float ResolveOpacity()
@@ -240,22 +255,155 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (sourceRenderer == null || ghostRenderer == null)
                 return;
-            ghostRenderer.sprite = sourceRenderer.sprite;
-            ghostRenderer.sharedMaterial = sourceRenderer.sharedMaterial;
-            ghostRenderer.flipX = sourceRenderer.flipX;
-            ghostRenderer.flipY = sourceRenderer.flipY;
-            ghostRenderer.sortingLayerID = sourceRenderer.sortingLayerID;
-            ghostRenderer.sortingOrder = sourceRenderer.sortingOrder - 1;
-            ghostRenderer.enabled = sourceRenderer.enabled &&
-                sourceRenderer.gameObject.activeInHierarchy;
+            if (sourceRenderer.sprite != null)
+            {
+                ghostRenderer.sprite = sourceRenderer.sprite;
+                if (sourceRenderer.sharedMaterial != null)
+                    ghostRenderer.sharedMaterial =
+                        sourceRenderer.sharedMaterial;
+                ghostRenderer.flipX = sourceRenderer.flipX;
+                ghostRenderer.flipY = sourceRenderer.flipY;
+                ghostRenderer.sortingLayerID =
+                    sourceRenderer.sortingLayerID;
+                ghostRenderer.sortingOrder =
+                    sourceRenderer.sortingOrder - 1;
+            }
 
             var sourceColor = sourceRenderer.color;
             var tint = Color.Lerp(
                 sourceColor,
                 new Color(0.48f, 0.9f, 1f, sourceColor.a),
                 0.55f);
-            tint.a = sourceColor.a * opacity;
+            tint.a = CreatorToolsGhostFramePolicy.ResolveGhostAlpha(
+                sourceColor.a, opacity);
             ghostRenderer.color = tint;
+            ApplyCachedFrameVisibility(
+                opacity, RendererCanProvideVisibleFrame(sourceRenderer));
+        }
+
+        private void ApplyCachedFrameVisibility(
+            float opacity, bool sourceVisible)
+        {
+            if (ghostRenderer == null)
+                return;
+            ghostRenderer.enabled =
+                CreatorToolsGhostFramePolicy.ShouldDisplayCachedFrame(
+                    ghostRenderer.sprite != null,
+                    sourceVisible,
+                    opacity);
+        }
+
+        private void RefreshSourceRenderer()
+        {
+            if (CreatorToolsGhostFramePolicy.MayUseAlternateRenderer(
+                    groundPresentation))
+            {
+                var superRenderer = FindPlaneSuperRenderer(owner);
+                if (RendererCanProvideVisibleFrame(superRenderer))
+                {
+                    sourceRenderer = superRenderer;
+                    return;
+                }
+            }
+
+            var preferred = FindPlayerRenderer(owner);
+            if (RendererCanProvideVisibleFrame(preferred))
+            {
+                sourceRenderer = preferred;
+                return;
+            }
+            if (RendererCanProvideVisibleFrame(sourceRenderer))
+                return;
+
+            // Chalice's first ground jump exposes auxiliary renderers for
+            // individual body pieces. Mirroring only one would make the ghost
+            // look incomplete, so keep the last complete primary frame until
+            // the normal renderer returns. Aircraft may safely follow their
+            // separate bomb/transformation renderers.
+            if (!CreatorToolsGhostFramePolicy.MayUseAlternateRenderer(
+                    groundPresentation))
+            {
+                if (sourceRenderer == null)
+                    sourceRenderer = preferred;
+                return;
+            }
+
+            var renderers = owner.GetComponentsInChildren<SpriteRenderer>(true);
+            SpriteRenderer best = null;
+            for (var index = 0; index < renderers.Length; index++)
+            {
+                var candidate = renderers[index];
+                if (!RendererCanProvideVisibleFrame(candidate))
+                    continue;
+                if (best == null ||
+                    candidate.sortingOrder > best.sortingOrder)
+                    best = candidate;
+            }
+            if (best != null)
+                sourceRenderer = best;
+            else if (sourceRenderer == null)
+                sourceRenderer = preferred;
+        }
+
+        private static bool RendererCanProvideVisibleFrame(
+            SpriteRenderer renderer)
+        {
+            return renderer != null &&
+                CreatorToolsGhostFramePolicy.CanAdoptSourceFrame(
+                    renderer.gameObject.activeInHierarchy,
+                    renderer.enabled,
+                    renderer.sprite != null,
+                    renderer.color.a);
+        }
+
+        private static SpriteRenderer FindPlaneSuperRenderer(
+            AbstractPlayerController player)
+        {
+            if (player == null || PlaneSuperPlayer == null)
+                return null;
+            try
+            {
+                var supers = UnityEngine.Object
+                    .FindObjectsOfType<AbstractPlaneSuper>();
+                for (var index = 0; index < supers.Length; index++)
+                {
+                    var planeSuper = supers[index];
+                    var superPlayer = planeSuper == null
+                        ? null
+                        : PlaneSuperPlayer.GetValue(planeSuper)
+                            as PlanePlayerController;
+                    if (planeSuper == null || superPlayer != player)
+                        continue;
+
+                    var preferred = PlaneSuperSpriteRenderer == null
+                        ? null
+                        : PlaneSuperSpriteRenderer.GetValue(planeSuper)
+                            as SpriteRenderer;
+                    if (RendererCanProvideVisibleFrame(preferred))
+                        return preferred;
+
+                    var renderers = planeSuper
+                        .GetComponentsInChildren<SpriteRenderer>(true);
+                    SpriteRenderer best = null;
+                    for (var rendererIndex = 0;
+                        rendererIndex < renderers.Length;
+                        rendererIndex++)
+                    {
+                        var candidate = renderers[rendererIndex];
+                        if (!RendererCanProvideVisibleFrame(candidate))
+                            continue;
+                        if (best == null ||
+                            candidate.sortingOrder > best.sortingOrder)
+                            best = candidate;
+                    }
+                    if (best != null)
+                        return best;
+                }
+            }
+            catch
+            {
+            }
+            return null;
         }
 
         private static SpriteRenderer FindPlayerRenderer(

@@ -2,6 +2,33 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Ayuda fantasmal continua en transiciones (2026-09-26)
+
+El doble ya no copia los huecos de visibilidad que usa el personaje real para
+cambiar de animación. Conserva su último sprite válido durante el breve apagado
+del renderer de Cáliz al saltar y durante la transformación o explosión de la
+bomba en avión. También busca un renderer alternativo visible entre los hijos
+del jugador exclusivamente en avión, para reflejar los cuadros de transformación
+cuando Cuphead los presenta por separado. En tierra conserva el renderer
+principal completo: los auxiliares del primer salto de Cáliz son piezas aisladas
+y no deben sustituir el cuerpo del doble. La opacidad del fantasma permanece
+independiente del alpha temporal del personaje; sus fundidos propios de entrada
+y salida siguen funcionando sin cambios.
+
+La transformación de Súper bomba no vive dentro del objeto del jugador:
+`AbstractPlaneSuper.Create` instancia otro actor, oculta el avión y anima allí
+la forma de bomba. Ayuda fantasmal localiza la instancia activa cuyo campo
+`player` corresponde a Player 1 y toma primero su `spriteRenderer`; al explotar,
+puede continuar con el renderer visible de la misma jerarquía. Sólo regresa al
+renderer normal cuando deja de existir una imagen visible del Súper.
+
+La suite runtime completa (incluida una regresión específica para conservar el
+cuadro con el renderer oculto), los catálogos web y la compilación Release
+aprobaron. Paquete Dev publicado por el proceso independiente, 539 archivos.
+SHA256: `BBB29CD41E97B454B75007CFD0BE3EAE2AA4D072CA3926BEBF813351038A08BD`.
+Falta validar en juego saltos repetidos de Cáliz en tierra y transformación,
+explosión y regreso de la bomba en avión.
+
 ## Límites independientes y lotes aleatorios (2026-09-26)
 
 **Interacciones** y **Modo Molestoso** tienen ahora valores independientes de

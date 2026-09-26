@@ -44,6 +44,29 @@ namespace Gilomx.CupheadBossRoulette
                         true, true),
                     "Ghost Help and Half Damage cancel to normal damage");
             });
+
+            Run("Ghost Help keeps a cached frame through player transitions", delegate
+            {
+                False(CreatorToolsGhostFramePolicy.CanAdoptSourceFrame(
+                        true, false, true, 1f),
+                    "a disabled transition renderer is not adopted");
+                False(CreatorToolsGhostFramePolicy.CanAdoptSourceFrame(
+                        true, true, true, 0f),
+                    "a fully transparent transition renderer is not adopted");
+                True(CreatorToolsGhostFramePolicy.ShouldDisplayCachedFrame(
+                        true, false, 0.52f),
+                    "the last valid ghost frame stays visible while the player renderer is hidden");
+                False(CreatorToolsGhostFramePolicy.MayUseAlternateRenderer(true),
+                    "ground jumps cannot replace the full body with one auxiliary Chalice piece");
+                True(CreatorToolsGhostFramePolicy.MayUseAlternateRenderer(false),
+                    "aircraft transformations may provide a complete alternate renderer");
+                Equal(0.52f,
+                    CreatorToolsGhostFramePolicy.ResolveGhostAlpha(0f, 0.52f),
+                    "player transparency does not erase the ghost");
+                False(CreatorToolsGhostFramePolicy.ShouldDisplayCachedFrame(
+                        true, true, 0f),
+                    "the normal ghost entrance and exit fades can still hide it");
+            });
         }
     }
 }
