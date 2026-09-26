@@ -24,6 +24,9 @@
     <Compile Include="..\Interactions\CreatorToolsHelp.cs" Link="Product\Interactions\CreatorToolsHelp.cs" />
     <Compile Include="..\Interactions\CreatorToolsExtraLifeInventory.cs" Link="Product\Interactions\CreatorToolsExtraLifeInventory.cs" />
     <Compile Include="ExtraLifeInventoryTests.cs.txt" Link="ExtraLifeInventoryTests.cs" />
+    <Compile Include="..\Interactions\CreatorToolsGhostQueue.cs" Link="Product\Interactions\CreatorToolsGhostQueue.cs" />
+    <Compile Include="..\Interactions\CreatorToolsGhostDamagePolicy.cs" Link="Product\Interactions\CreatorToolsGhostDamagePolicy.cs" />
+    <Compile Include="GhostHelpTests.cs.txt" Link="GhostHelpTests.cs" />
     <Compile Include="..\Interactions\CreatorToolsChallengePacing.cs" Link="Product\Interactions\CreatorToolsChallengePacing.cs" />
     <Compile Include="MiniBossSpawnPolicyTests.cs.txt" Link="MiniBossSpawnPolicyTests.cs" />
     <Compile Include="MiniBossArenaPolicyTests.cs.txt" Link="MiniBossArenaPolicyTests.cs" />

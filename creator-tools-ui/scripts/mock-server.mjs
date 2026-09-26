@@ -394,6 +394,7 @@ const interactionItems = [
   "challenge_mini_plane_only",
   "challenge_hp_one",
   "help_extra_life",
+  "help_ghost",
 ];
 const automaticInteractionItems = interactionItems.filter(
   (item) => !item.startsWith("help_"),

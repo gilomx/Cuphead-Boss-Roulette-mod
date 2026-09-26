@@ -177,17 +177,22 @@ carga. Esas validaciones quedan cerradas y ya no forman parte de los pendientes.
   incluye Vida extra y cualquier ayuda añadida después; Player 2 no recibe ni
   comparte esos créditos. Cuando haya varios corazones de Vida extra se consumen
   del más antiguo al más reciente.
-- **Ayuda fantasmal — concepto pendiente:** durante 10 segundos aparece
-  un eco invulnerable de Player 1 que repite sus movimientos y ataques con
-  retraso y aporta un segundo daño. Debe ser un actor visual sin hitbox ni plaza
-  cooperativa, nunca otro jugador real. No hace parry, no revive, no toca objetos
-  del escenario y desaparece con la muerte de Player 1 o al terminar el intento.
-  Copiará disparos, EX y súperes ofensivos mediante rutas de eco que no repitan
-  cinemáticas ni estados del jugador. Falta definir retraso, súperes defensivos
-  y su representación. Sólo habrá uno activo: los canjes adicionales esperan en
-  orden de llegada, cada uno dura 10 segundos completos y muestra sobre el
-  fantasma el nombre de su remitente con la etiqueta de los demás canjeables.
-  El diseño ampliado está en `FUTURE_IDEAS.md`.
+- **Ayuda fantasmal — primera versión pendiente de prueba manual:** durante 10
+  segundos aparece un eco invulnerable de Player 1. Copia inmediatamente el
+  sprite y orientación y flota cerca. En tierra sigue sin retraso los saltos,
+  caídas y dash, conserva el lado donde apareció aunque Player 1 voltee o apunte
+  al otro lado y mantiene únicamente su oscilación propia; nunca cruza sobre el
+  personaje. En avión conserva el seguimiento suavizado. Los disparos
+  normales y EX muestran una copia visual que nace en el fantasma y alcanza la
+  trayectoria real en 0.22 segundos; no tiene hitbox ni crea otra colisión. El
+  cierre usa los últimos 0.24 segundos para reintegrar el fantasma en la
+  posición de Player 1 mientras cuerpo, nombre y regalo se desvanecen. El
+  multiplicador central aporta 2× de daño total a disparos, EX y súperes
+  ofensivos, y compone con Daño a la mitad para dar 1×. Nunca ocupa una plaza
+  cooperativa, hace parry, revive, toca objetos, repite cinemáticas ni consume
+  cartas. Sólo hay uno activo; los demás canjes esperan FIFO y conservan su
+  remitente. Falta validar separación en tierra/avión y decidir si se reduce el
+  2× después de sentirlo en combate. Diseño ampliado en `FUTURE_IDEAS.md`.
 - El siguiente reto previsto cambia aleatoriamente por tiempo, respetando
   compatibilidad y duraciones probadas.
 - Continuar los diseños de overlays, incluido el de interacciones y sus canjes,
@@ -202,9 +207,9 @@ fallidos no se reintentan automáticamente durante la misma sesión.
 
 ## Infraestructura prioritaria de Ayudas (2026-09-25)
 
-Después de cerrar HP.1 temporal en `e553c28`, comenzó la categoría Ayudas. Se
-reservaron `help_extra_life` y `help_ghost`; Vida extra ya está en el catálogo
-público y Ayuda fantasmal sigue reservada. `CreatorToolsInteractionQueue` mantiene una
+Después de cerrar HP.1 temporal en `e553c28`, comenzó la categoría Ayudas. Los
+IDs `help_extra_life` y `help_ghost` ya están en el catálogo público y tienen
+ejecutor. `CreatorToolsInteractionQueue` mantiene una
 vía lógica con 50 lugares propios: inserta ayudas en FIFO antes de todos los
 pendientes normales, las publica primero en la lista y no las cuenta contra los
 200 lugares de ataques. El backlog también busca primero una ayuda despachable;
@@ -238,7 +243,7 @@ Durante cualquier HP.1 los créditos no se consumen. Sus corazones usan el mismo
 material gris reversible del escudo suspendido. Si Player 1 sobrevive al HP.1
 temporal, recuperan color y función al finalizar; si muere, las vistas se
 retiran y los créditos vuelven sólo en el siguiente intento. Player 2 nunca los
-recibe ni los consume. El catálogo web expone 30 interacciones. Modo Molestoso
+recibe ni los consume. El catálogo web expone 31 interacciones. Modo Molestoso
 incluye el grupo Ayudas para probar el catálogo completo y conserva la regla de
 nombres: elige uno de su lista o no muestra ninguno si está vacía. Batalla
 Molestosa sigue excluyendo ayudas. La selección manual también puede adelantar

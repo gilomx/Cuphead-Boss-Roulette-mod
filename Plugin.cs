@@ -232,6 +232,7 @@ namespace Gilomx.CupheadBossRoulette
         private ModifierId activeChallenge = ModifierId.None;
         private int activeChallengeBoss = -1;
         private bool loggedHalfDamageSample;
+        private bool loggedGhostDamageSample;
         private TimedChallengeInteractionExecutor timedChallengeInteractions;
         private float blackAndWhiteBlend;
         private float blackAndWhiteTransitionStartedAt = -1f;
@@ -770,9 +771,9 @@ namespace Gilomx.CupheadBossRoulette
                 typeof(DamageDealer), "DealDamage",
                 new[] { typeof(GameObject) });
             var reducePlayerDamagePrefix = AccessTools.Method(
-                typeof(Plugin), "ReducePlayerDamagePrefix");
+                typeof(Plugin), "ApplyPlayerDamageModifiersPrefix");
             var restorePlayerDamagePostfix = AccessTools.Method(
-                typeof(Plugin), "RestorePlayerDamagePostfix");
+                typeof(Plugin), "RestorePlayerDamageModifiersPostfix");
             var restartSoloMiniOnInvalidDamagePostfix = AccessTools.Method(
                 typeof(Plugin), "RestartSoloMiniOnInvalidDamagePostfix");
             if (dealDamage != null && reducePlayerDamagePrefix != null &&
@@ -782,7 +783,26 @@ namespace Gilomx.CupheadBossRoulette
                     postfix: new HarmonyMethod(restorePlayerDamagePostfix));
             else
                 Logger.LogWarning(
-                    "Could not install the half-damage challenge guard.");
+                    "Could not install the player damage modifiers.");
+
+            var createLevelProjectile = AccessTools.Method(
+                typeof(AbstractLevelWeapon), "fireProjectile");
+            var createPlaneProjectile = AccessTools.Method(
+                typeof(AbstractPlaneWeapon), "fireProjectile");
+            var ghostProjectilePostfix = AccessTools.Method(
+                typeof(Plugin), "GhostProjectileFirePostfix");
+            if (createLevelProjectile != null &&
+                createPlaneProjectile != null &&
+                ghostProjectilePostfix != null)
+            {
+                harmony.Patch(createLevelProjectile,
+                    postfix: new HarmonyMethod(ghostProjectilePostfix));
+                harmony.Patch(createPlaneProjectile,
+                    postfix: new HarmonyMethod(ghostProjectilePostfix));
+            }
+            else
+                Logger.LogWarning(
+                    "Could not install the ghost projectile echo.");
 
             if (dealDamage != null &&
                 restartSoloMiniOnInvalidDamagePostfix != null)
@@ -3243,32 +3263,57 @@ namespace Gilomx.CupheadBossRoulette
             return activeChallenge == TimedChallengeModifier(item);
         }
 
-        private static void ReducePlayerDamagePrefix(
+        private static void ApplyPlayerDamageModifiersPrefix(
             GameObject hit,
             PlayerId ___playerId,
+            Transform ___origin,
             ref float ___damageMultiplier,
             out float __state)
         {
             __state = ___damageMultiplier;
             var plugin = activeInstance;
             if (plugin == null ||
-                !((plugin.activeChallenge == ModifierId.HalfDamage && plugin.ShouldShowActiveChallenge()) ||
-                  (plugin.timedChallengeInteractions != null && plugin.timedChallengeInteractions.IsActive(CreatorToolsTimedChallenge.HalfDamage))) ||
                 (int)___playerId == int.MaxValue ||
                 !IsPlayerOffensiveDamageTarget(hit))
                 return;
 
-            ___damageMultiplier *= 0.5f;
-            if (!plugin.loggedHalfDamageSample)
+            var halfDamage =
+                (plugin.activeChallenge == ModifierId.HalfDamage &&
+                 plugin.ShouldShowActiveChallenge()) ||
+                (plugin.timedChallengeInteractions != null &&
+                 plugin.timedChallengeInteractions.IsActive(
+                     CreatorToolsTimedChallenge.HalfDamage));
+            var ghostMarker = ___origin == null
+                ? null
+                : ___origin.GetComponent<CreatorToolsGhostProjectileEcho>();
+            var ghostDamage = ghostMarker == null
+                ? plugin.creatorToolsInteractions != null &&
+                  plugin.creatorToolsInteractions
+                      .IsGhostDamageBoostActive(___playerId)
+                : ghostMarker.IsGhostShot;
+            var modifier = CreatorToolsGhostDamagePolicy.CalculateMultiplier(
+                halfDamage, ghostDamage);
+            if (Mathf.Approximately(modifier, 1f))
+                return;
+
+            ___damageMultiplier *= modifier;
+            if (halfDamage && !plugin.loggedHalfDamageSample)
             {
                 plugin.loggedHalfDamageSample = true;
                 plugin.Logger.LogInfo(
                     "Half Damage verified: multiplier " + __state +
                     " -> " + ___damageMultiplier + ".");
             }
+            if (ghostDamage && !plugin.loggedGhostDamageSample)
+            {
+                plugin.loggedGhostDamageSample = true;
+                plugin.Logger.LogInfo(
+                    "Ghost Help verified: multiplier " + __state +
+                    " -> " + ___damageMultiplier + ".");
+            }
         }
 
-        private static void RestorePlayerDamagePostfix(
+        private static void RestorePlayerDamageModifiersPostfix(
             ref float ___damageMultiplier,
             float __state)
         {

@@ -870,7 +870,9 @@
     },
     "helps": {
       "extraLife": "VIDA EXTRA",
-      "extraLifeEffect": "Añade a Player 1 un corazón protector con el nombre de quien lo envió. Se pueden acumular varios y se consumen del más antiguo al más reciente. Se conservan entre intentos y niveles de esta sesión."
+      "extraLifeEffect": "Añade a Player 1 un corazón protector con el nombre de quien lo envió. Se pueden acumular varios y se consumen del más antiguo al más reciente. Se conservan entre intentos y niveles de esta sesión.",
+      "ghost": "AYUDA FANTASMAL",
+      "ghostEffect": "Invoca durante 10 segundos un doble fantasmal de Player 1. Flota cerca, repite visualmente sus disparos y duplica todo el daño que inflige. Los canjes adicionales esperan su turno."
     },
     "challenges": {
       "halfDamage": "Daño a la mitad",

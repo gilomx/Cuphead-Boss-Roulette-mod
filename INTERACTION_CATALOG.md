@@ -35,7 +35,7 @@ espera propia sólo empieza al desaparecer uno. Los ataques normales no consumen
 ni reinician ese reloj. Pausa congela los dos relojes y reintento los restablece.
 El límite físico de un minijefe y las reglas nativas de compatibilidad se mantienen.
 
-## Ayudas y Vida extra
+## Ayudas, Vida extra y Ayuda fantasmal
 
 `help_extra_life` pertenece al grupo y categoría `help`. Las ayudas de canjes
 usan una vía FIFO prioritaria con capacidad propia y aparecen antes que los
@@ -55,6 +55,20 @@ Los créditos sobreviven a reintentos y niveles de la sesión y se borran al
 cerrar Cuphead. En cooperativo sólo pertenecen a Player 1. HP.1 los vuelve
 grises e inoperantes; si Player 1 muere durante el reto, permanecen reservados
 hasta el siguiente intento y una reanimación no los reactiva en ese combate.
+
+`help_ghost` activa durante 10 segundos efectivos un doble visual translúcido
+de Player 1. Copia su frame y orientación inmediatamente, pero flota a corta
+distancia con seguimiento suavizado y sin collider, vida, HUD, cámara, parry ni
+estado cooperativo. El nombre y regalo siguen ese cuerpo. Sólo puede existir uno;
+los canjes adicionales esperan FIFO y reciben después su duración completa.
+
+El daño real sigue usando el único ataque del jugador y aplica un multiplicador
+2× en `DamageDealer`, por lo que abarca disparos, EX y súperes ofensivos sin
+repetir consumos, cinemáticas ni penalizaciones. Los disparos normales y EX
+reciben además un eco puramente visual que nace en el fantasma y alcanza la ruta
+real en 0.22 segundos. La marca se fija al disparar, conserva el beneficio para
+el proyectil en vuelo y no agrega colisiones. Con Daño a la mitad ambos factores
+se combinan en 1×.
 
 ## Perritos globo de Beppi
 

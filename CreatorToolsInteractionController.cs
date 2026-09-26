@@ -42,6 +42,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly BaronessMiniBossInteractionExecutor miniBossExecutor;
         private readonly TimedChallengeInteractionExecutor timedChallenges;
         private readonly CreatorToolsExtraLifeExecutor extraLives;
+        private readonly CreatorToolsGhostExecutor ghosts;
         private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly CreatorToolsPeskyBattleController peskyBattle;
         private readonly CreatorToolsTapFarmingController tapFarming;
@@ -133,6 +134,9 @@ namespace Gilomx.CupheadBossRoulette
                 logInfo,
                 logWarning);
             executors.Add(extraLives);
+            ghosts = new CreatorToolsGhostExecutor(
+                canSpawnInteraction, logInfo, logWarning);
+            executors.Add(ghosts);
             executors.Add(timedChallenges);
             executors.Add(new ZeppelinInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
@@ -186,6 +190,8 @@ namespace Gilomx.CupheadBossRoulette
         internal void Update(
             CreatorToolsServer server, bool gameplayDispatchAllowed)
         {
+            ghosts.SetGameplayAdvancing(
+                gameplayDispatchAllowed && gameplayLevelActive);
             for (var i = 0; i < executors.Count; i++)
                 executors[i].Update();
             var interactionsFinished = interactionQueue.RemoveFinished();
@@ -351,6 +357,20 @@ namespace Gilomx.CupheadBossRoulette
         {
             return extraLives != null &&
                 extraLives.TryProtect(stats, damage);
+        }
+
+        internal bool IsGhostDamageBoostActive(PlayerId playerId)
+        {
+            return ghosts != null &&
+                ghosts.IsDamageBoostActive(playerId);
+        }
+
+        internal bool TryGetGhostProjectileOffset(
+            PlayerId playerId, out Vector3 offset)
+        {
+            offset = Vector3.zero;
+            return ghosts != null &&
+                ghosts.TryGetProjectileOffset(playerId, out offset);
         }
 
         internal int StreamQueueAvailableCapacityFor(string item)

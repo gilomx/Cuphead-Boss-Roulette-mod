@@ -22,6 +22,7 @@ namespace Gilomx.CupheadBossRoulette
             RunMiniBossArenaPolicyTests();
             RunTimedChallengeTests();
             RunExtraLifeInventoryTests();
+            RunGhostHelpTests();
             RunDonorLabelLifetimeTests();
             RunPeskyModeSettingsTests();
             RunPeskyPacingTests();

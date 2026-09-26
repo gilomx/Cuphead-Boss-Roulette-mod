@@ -224,6 +224,12 @@ namespace Gilomx.CupheadBossRoulette
                 follower.FadeInWhenActorVisible(duration);
         }
 
+        internal void FadeOut(float duration)
+        {
+            if (follower != null)
+                follower.FadeOut(duration);
+        }
+
         internal bool CreateLevelEndSnapshot(Transform parent)
         {
             if (parent == null || labelRenderer == null ||
@@ -416,6 +422,10 @@ namespace Gilomx.CupheadBossRoulette
         private float fadeInElapsed;
         private bool waitingForActorVisibility;
         private bool fadingIn;
+        private bool fadingOut;
+        private float fadeOutDuration;
+        private float fadeOutElapsed;
+        private float fadeOutFromOpacity;
         private bool giftImagePreferenceVisible = true;
         private bool giftImageLifecycleSuppressed;
 
@@ -537,6 +547,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             waitingForActorVisibility = false;
             fadingIn = false;
+            fadingOut = false;
             fadeInElapsed = 0f;
             currentOpacity = 0f;
             ApplyOpacity(currentOpacity);
@@ -544,12 +555,23 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void FadeInWhenActorVisible(float duration)
         {
+            fadingOut = false;
             fadeInDuration = Mathf.Max(0.01f, duration);
             fadeInElapsed = 0f;
             currentOpacity = 0f;
             waitingForActorVisibility = true;
             fadingIn = false;
             ApplyOpacity(currentOpacity);
+        }
+
+        internal void FadeOut(float duration)
+        {
+            waitingForActorVisibility = false;
+            fadingIn = false;
+            fadingOut = true;
+            fadeOutDuration = Mathf.Max(0.01f, duration);
+            fadeOutElapsed = 0f;
+            fadeOutFromOpacity = currentOpacity;
         }
 
         private void LateUpdate()
@@ -729,6 +751,19 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateFadeIn()
         {
+            if (fadingOut)
+            {
+                var fadeSpeed = Mathf.Max(0f, CupheadTime.GlobalSpeed);
+                if (fadeSpeed <= 0f)
+                    return;
+                fadeOutElapsed += Time.unscaledDeltaTime * fadeSpeed;
+                currentOpacity = fadeOutFromOpacity *
+                    (1f - Mathf.Clamp01(
+                        fadeOutElapsed / fadeOutDuration));
+                if (currentOpacity <= 0f)
+                    fadingOut = false;
+                return;
+            }
             if (waitingForActorVisibility)
             {
                 if (!ActorIsVisible())

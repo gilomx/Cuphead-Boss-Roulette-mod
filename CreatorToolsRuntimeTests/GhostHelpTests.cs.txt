@@ -1,0 +1,49 @@
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunGhostHelpTests()
+        {
+            Run("Ghost Help keeps FIFO donor credits", delegate
+            {
+                var queue = new CreatorToolsGhostQueue();
+                var first = queue.Enqueue("First helper", "gift-a.png");
+                var second = queue.Enqueue("Second helper", "gift-b.png");
+
+                CreatorToolsGhostQueue.Credit credit;
+                True(queue.TryDequeue(out credit),
+                    "the oldest ghost credit can start");
+                Equal(first.Id, credit.Id,
+                    "the first redemption starts first");
+                Equal("First helper", credit.Donor,
+                    "the donor stays attached to the active ghost");
+                Equal(1, queue.Count,
+                    "the second redemption keeps waiting");
+                True(queue.TryDequeue(out credit),
+                    "the next ghost can start after the first");
+                Equal(second.Id, credit.Id,
+                    "the second redemption starts next");
+            });
+
+            Run("Ghost Help composes with Half Damage", delegate
+            {
+                Equal(1f,
+                    CreatorToolsGhostDamagePolicy.CalculateMultiplier(
+                        false, false),
+                    "no modifier keeps normal damage");
+                Equal(0.5f,
+                    CreatorToolsGhostDamagePolicy.CalculateMultiplier(
+                        true, false),
+                    "Half Damage still halves damage");
+                Equal(2f,
+                    CreatorToolsGhostDamagePolicy.CalculateMultiplier(
+                        false, true),
+                    "Ghost Help doubles total damage");
+                Equal(1f,
+                    CreatorToolsGhostDamagePolicy.CalculateMultiplier(
+                        true, true),
+                    "Ghost Help and Half Damage cancel to normal damage");
+            });
+        }
+    }
+}

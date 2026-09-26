@@ -870,7 +870,9 @@
     },
     "helps": {
       "extraLife": "EXTRA LIFE",
-      "extraLifeEffect": "Adds a protective heart to Player 1 with the sender's name. Multiple hearts can be stored and are consumed oldest first. They remain between attempts and levels in this session."
+      "extraLifeEffect": "Adds a protective heart to Player 1 with the sender's name. Multiple hearts can be stored and are consumed oldest first. They remain between attempts and levels in this session.",
+      "ghost": "GHOST HELP",
+      "ghostEffect": "Summons a ghost double of Player 1 for 10 seconds. It floats nearby, visually echoes shots, and doubles all damage dealt. Additional redemptions wait their turn."
     },
     "challenges": {
       "halfDamage": "Half damage",

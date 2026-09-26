@@ -80,6 +80,7 @@ namespace Gilomx.CupheadBossRoulette
     internal static class CreatorToolsInteractionIds
     {
         internal const string ExtraLifeHelp = "help_extra_life";
+        internal const string GhostHelp = "help_ghost";
 
         internal static readonly string[] All =
         {
@@ -88,7 +89,7 @@ namespace Gilomx.CupheadBossRoulette
             "robot_homing_bomb", "baroness_head_toss", "dragon_fireballs",
             "train_bone_ring", "devil_fire_circle", "beppi_balloon_dog",
             "beppi_pink_balloon_dog", "baroness_cupcake", "baroness_gumball",
-            "baroness_waffle", "baroness_candy_corn", "baroness_jawbreaker", "challenge_half_damage", "challenge_no_ex", "challenge_no_dash", "challenge_stiff_mode", "challenge_black_and_white", "challenge_no_bombs", "challenge_no_peashooter", "challenge_rgb_shift", "challenge_upside_down", "challenge_ink_rain", "challenge_mini_plane_only", "challenge_hp_one", "help_extra_life"
+            "baroness_waffle", "baroness_candy_corn", "baroness_jawbreaker", "challenge_half_damage", "challenge_no_ex", "challenge_no_dash", "challenge_stiff_mode", "challenge_black_and_white", "challenge_no_bombs", "challenge_no_peashooter", "challenge_rgb_shift", "challenge_upside_down", "challenge_ink_rain", "challenge_mini_plane_only", "challenge_hp_one", "help_extra_life", "help_ghost"
         };
     }
 

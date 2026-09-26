@@ -41,9 +41,8 @@ Una ayuda nueva se coloca detrás de las ayudas anteriores y delante de ataques,
 minijefes y retos, tanto al materializar el backlog como en la lista publicada.
 No cancela ni interrumpe lo que ya está activo, pero su despacho no espera los
 límites de actores, el ritmo ni el intervalo común. Sigue respetando el
-interruptor general y Pausar cola. Los IDs reservados son `help_extra_life` y
-`help_ghost`. `help_extra_life` ya se publica en el catálogo; Ayuda fantasmal
-permanece reservada hasta tener su ejecutor.
+interruptor general y Pausar cola. Los IDs `help_extra_life` y `help_ghost` ya
+se publican en el catálogo y tienen ejecutor.
 
 En cooperativo, **Vida extra y todas las demás funciones futuras de la categoría
 Ayudas se asignan exclusivamente a Player 1**. Player 2 no recibe ni comparte
@@ -51,19 +50,26 @@ sus efectos, aunque participe en la pelea o sea quien reviva a Player 1.
 
 ## Ayuda fantasmal
 
-Idea registrada el 2026-09-25 con el nombre **Ayuda fantasmal**. Al canjearla
-aparece durante 10 segundos de tiempo de juego una copia translúcida de Player 1.
-Reproduce sus movimientos y ataques con un pequeño retraso, dispara y aporta un
-segundo daño equivalente; no puede recibir daño. Por la regla común de Ayudas,
-en cooperativo siempre copia y beneficia únicamente a Player 1. Sobre el
-fantasma aparece el nombre de la persona que canjeó la ayuda, con el mismo estilo
-de etiqueta de los demás canjeables y seguimiento continuo del actor visual.
+Primera versión implementada el 2026-09-25 con el nombre **Ayuda fantasmal**.
+Al canjearla aparece durante 10 segundos de tiempo de juego una copia
+translúcida de Player 1. No reproduce una grabación retrasada: copia en el mismo
+frame la orientación y el sprite animado, pero flota cerca con seguimiento
+suavizado en avión para no sentirse pegada al personaje. En tierra sigue sin
+retraso los saltos, caídas y dash, conserva durante toda la aparición el lado
+donde nació y mantiene sólo su pequeña flotación propia: voltear o apuntar en
+otra dirección cambia su animación, pero no lo hace cruzar sobre el personaje.
+Aporta un segundo daño
+equivalente, de modo que la primera prueba usa 2× de daño total. Por la regla
+común de Ayudas, en cooperativo siempre copia y beneficia únicamente a Player 1.
+Sobre el fantasma aparece el nombre de la persona que canjeó la ayuda, con el
+mismo estilo de etiqueta de los demás canjeables y seguimiento continuo.
 
-No debe implementarse como otro `LevelPlayerController`: ocupar un jugador real
+No se implementa como otro `LevelPlayerController`: ocupar un jugador real
 duplicaría HUD, cámara, colisiones, parry, cartas, vida y estados cooperativos.
-La ruta segura es un actor visual sin hitbox que reproduce un búfer de posición,
-orientación y animación, acompañado por una ruta de ataques marcada como eco.
-Esa marca evita grabar nuevamente sus propios disparos y crear una recursión.
+Es un actor visual sin hitbox. Cada disparo normal o EX recibe una marca al
+salir del arma; su copia visual nace en el fantasma y alcanza la trayectoria
+real en 0.22 segundos. La marca conserva el doble daño para ese proyectil sin
+crear una segunda colisión, repetir el disparo ni generar recursión.
 
 Reglas propuestas:
 
@@ -72,24 +78,26 @@ Reglas propuestas:
 - Imita salto, agachado, carrera, dash, tamaño de avión, orientación y animación,
   pero no hace parry, no revive, no recoge cartas, no mueve la cámara y no activa
   colisiones ni objetos del escenario.
-- Sus ataques pertenecen a Player 1, heredan los modificadores y restricciones
-  vigentes y sólo pueden dañar objetivos que sigan siendo válidos al reproducirse.
-  No deben generar una segunda penalización en retos que castigan un arma.
-- Copiará disparos normales, cargados, EX y súperes ofensivos. Los EX y súperes
-  necesitan rutas de eco específicas: reproducen con retraso su animación y
-  daño, pero no vuelven a bloquear a Player 1, repetir la cinemática, consumir
-  cartas ni llenar el medidor. Los súperes defensivos o sin daño requieren una
-  regla aparte antes de implementarse.
+- Sus ataques pertenecen a Player 1 y componen el multiplicador central de daño
+  con los modificadores vigentes. Con Daño a la mitad, 0.5× y 2× se cancelan y
+  el resultado es 1×. No generan una segunda penalización en retos que castigan
+  un arma porque sólo existe una colisión real.
+- El doble daño cubre disparos normales, cargados, EX, daño de contacto ofensivo
+  y súperes ofensivos. Los proyectiles normales y EX muestran el eco visual de
+  alcance; los súperes conservan su animación y cinemática únicas, sin volver a
+  bloquear a Player 1, consumir cartas ni llenar el medidor.
 - Desaparece al morir Player 1, perder, reiniciar, salir o cambiar de escena; no
-  continúa atacando después de su dueño.
+  continúa atacando después de su dueño. Al agotar sus 10 segundos, durante los
+  últimos 0.24 segundos regresa a la posición del personaje mientras cuerpo,
+  nombre y regalo se desvanecen.
 - Puede coexistir con HP.1 temporal y con las vidas extra porque no posee vida
   propia ni consume sus créditos.
 - Sólo puede existir una Ayuda fantasmal activa. Los canjes adicionales esperan
   en orden de llegada y cada uno recibe sus 10 segundos completos con el nombre
   de su propio remitente; no se acumulan fantasmas ni multiplicadores simultáneos.
 
-Antes de implementarla falta elegir el retraso exacto y definir qué representación
-tendrán los súperes defensivos.
+Pendiente de ajuste manual: validar la separación y flotación en tierra y avión,
+el alcance visual de 0.22 segundos y si 2× de daño total se siente excesivo.
 
 | Función | Estado actual en `ExperimentalFeatures.cs` |
 | --- | --- |
