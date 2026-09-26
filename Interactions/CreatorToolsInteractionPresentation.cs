@@ -64,6 +64,18 @@ namespace Gilomx.CupheadBossRoulette
             return false;
         }
 
+        internal static bool IsWinningLevelEnd()
+        {
+            try
+            {
+                return Level.Current != null && Level.Won;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         internal static float MatchGameplayBodyScale(
             GameObject actor,
             Action<string> logWarning)

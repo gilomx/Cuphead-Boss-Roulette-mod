@@ -64,6 +64,9 @@ namespace Gilomx.CupheadBossRoulette
 
             donorLabel = gameObject.AddComponent<CreatorToolsDonorLabel>();
             donorLabel.Initialize(donor, ghostRenderer);
+            // Ghost Help continues moving during the K.O. presentation, so
+            // its name must follow the actor without a frozen duplicate.
+            donorLabel.KeepLiveAtLevelEnd();
             donorLabel.SetGiftImage(giftImagePath);
             donorLabel.FollowAnimatedBody(
                 ghostRenderer, null, false, null);
@@ -94,12 +97,22 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (!owner.gameObject.activeInHierarchy)
                 return;
-            if (!Evaluate(canAdvance))
+            var effectAdvancing = Evaluate(canAdvance);
+            var winningLevelEnd = CreatorToolsInteractionPresentation
+                .IsWinningLevelEnd();
+            if (!effectAdvancing && !winningLevelEnd)
                 return;
 
-            gameplayDelta = Time.unscaledDeltaTime *
+            var effectDelta = Time.unscaledDeltaTime *
                 Mathf.Max(0f, CupheadTime.GlobalSpeed);
-            elapsed += gameplayDelta;
+            // K.O. slows or stops the gameplay clock. Preserve the ghost's
+            // normal visual float and aircraft follow during the victory
+            // presentation without spending the remaining help duration.
+            gameplayDelta = winningLevelEnd
+                ? Time.unscaledDeltaTime
+                : effectDelta;
+            if (effectAdvancing)
+                elapsed += effectDelta;
             hoverTime += gameplayDelta * HoverSpeed;
             if (!exitStarted &&
                 LifetimeSeconds - elapsed <= ExitDuration)

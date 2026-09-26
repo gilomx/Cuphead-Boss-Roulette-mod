@@ -39,6 +39,7 @@ namespace Gilomx.CupheadBossRoulette
         private TextMeshPro labelText;
         private Renderer labelRenderer;
         private SpriteRenderer giftRenderer;
+        private bool keepLiveAtLevelEnd;
 
         internal static void SetGiftImagesVisible(bool visible)
         {
@@ -230,15 +231,24 @@ namespace Gilomx.CupheadBossRoulette
                 follower.FadeOut(duration);
         }
 
+        internal void KeepLiveAtLevelEnd()
+        {
+            keepLiveAtLevelEnd = true;
+        }
+
         internal bool CreateLevelEndSnapshot(Transform parent)
         {
             if (parent == null || labelRenderer == null ||
-                follower == null || !follower.HasVisibleActor)
+                follower == null)
                 return false;
             var source = labelRenderer.GetComponent<TextMeshPro>();
-            if (source == null || !source.enabled ||
-                !source.gameObject.activeInHierarchy ||
-                source.color.a <= 0.01f)
+            var sourceVisible = source != null && source.enabled &&
+                source.gameObject.activeInHierarchy &&
+                source.color.a > 0.01f;
+            if (!CreatorToolsVisualSnapshotHierarchy.ShouldCaptureLabel(
+                    keepLiveAtLevelEnd,
+                    follower.HasVisibleActor,
+                    sourceVisible))
                 return false;
 
             var frozenObject = new GameObject(

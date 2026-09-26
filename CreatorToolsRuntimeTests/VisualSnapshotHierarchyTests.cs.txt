@@ -13,6 +13,24 @@ namespace Gilomx.CupheadBossRoulette
         {
             Run("Level-end snapshots retain animated sprite paths and skip nonvisual branches",
                 TestVisualSnapshotHierarchy);
+            Run("Level-end snapshots leave moving help labels live",
+                TestLiveHelpLabelSnapshotPolicy);
+        }
+
+        private static void TestLiveHelpLabelSnapshotPolicy()
+        {
+            True(CreatorToolsVisualSnapshotHierarchy.ShouldCaptureLabel(
+                    false, true, true),
+                "ordinary catalog labels keep their frozen knockout copy");
+            False(CreatorToolsVisualSnapshotHierarchy.ShouldCaptureLabel(
+                    true, true, true),
+                "moving help labels do not gain a frozen knockout copy");
+            False(CreatorToolsVisualSnapshotHierarchy.ShouldCaptureLabel(
+                    false, false, true),
+                "labels without a visible actor remain excluded");
+            False(CreatorToolsVisualSnapshotHierarchy.ShouldCaptureLabel(
+                    false, true, false),
+                "hidden labels remain excluded");
         }
 
         private static void TestVisualSnapshotHierarchy()

@@ -31,6 +31,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool planePresentation;
         private bool entering;
         private bool popping;
+        private bool levelEndOrbitStarted;
 
         internal int CreditId { get; private set; }
 
@@ -83,6 +84,10 @@ namespace Gilomx.CupheadBossRoulette
             var anchor = FindAnchorRenderer();
             donorLabel = gameObject.AddComponent<CreatorToolsDonorLabel>();
             donorLabel.Initialize(donor, anchor);
+            // The heart keeps orbiting through the K.O. presentation. Keep
+            // its attached name live as well instead of adding a second,
+            // frozen copy at the position where the knockout began.
+            donorLabel.KeepLiveAtLevelEnd();
             donorLabel.SetGiftImage(giftImagePath);
             // The prefab begins with a larger arrival frame. Re-measure while
             // it settles so the label is anchored to the heart, not that first
@@ -150,6 +155,10 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (popping || player == null)
                 return;
+            // The winning presentation is updated from LateUpdate with an
+            // unscaled clock. Avoid a second, slow gameplay-clock step here.
+            if (CreatorToolsInteractionPresentation.IsWinningLevelEnd())
+                return;
             if (planePresentation && entering)
             {
                 // Hold the same orbital point relative to the moving plane,
@@ -161,6 +170,13 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (!fallbackVisual)
                 return;
+
+            AdvanceOrbit(CupheadTime.FixedDelta);
+        }
+
+        private void AdvanceOrbit(float delta)
+        {
+            delta = Mathf.Max(0f, delta);
 
             // PlayerSuperChaliceShieldHeart.FixedUpdate expressed directly so
             // aircraft levels can use the exact native orbit even though they
@@ -175,13 +191,13 @@ namespace Gilomx.CupheadBossRoulette
                 hoverWidth * cosine / denominator,
                 hoverWidth * sine * cosine / denominator,
                 0f);
-            fallbackHoverTime += CupheadTime.FixedDelta * 2f;
+            fallbackHoverTime += delta * 2f;
             fallbackLerpSpeed = Mathf.Min(
-                fallbackLerpSpeed + CupheadTime.FixedDelta, 3f);
+                fallbackLerpSpeed + delta, 3f);
             transform.position = Vector3.Lerp(
                 transform.position,
                 FollowPosition() + offset,
-                CupheadTime.FixedDelta * fallbackLerpSpeed);
+                delta * fallbackLerpSpeed);
         }
 
         private void BeginEntrance()
@@ -223,6 +239,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void LateUpdate()
         {
+            UpdateLevelEndOrbit();
             // The native heart copies an unscaled value from the player on
             // every fixed frame. Reapply the same per-level body compensation
             // used by the rest of the interaction catalog afterwards. Read
@@ -233,6 +250,40 @@ namespace Gilomx.CupheadBossRoulette
                 popping && fallbackVisual
                     ? fallbackPopScale
                     : entering ? entranceScale : 1f);
+        }
+
+        private void UpdateLevelEndOrbit()
+        {
+            if (popping || player == null ||
+                !player.gameObject.activeInHierarchy ||
+                !CreatorToolsInteractionPresentation.IsWinningLevelEnd())
+                return;
+
+            if (!levelEndOrbitStarted)
+            {
+                levelEndOrbitStarted = true;
+                FinishEntrance(true);
+                if (nativeHeart != null)
+                {
+                    try
+                    {
+                        var native = Traverse.Create(nativeHeart);
+                        fallbackHoverTime = native.Field("hoverTime")
+                            .GetValue<float>();
+                        fallbackLerpSpeed = native.Field("lerpSpeed")
+                            .GetValue<float>();
+                    }
+                    catch
+                    {
+                        // The visible position remains continuous even if a
+                        // game build renames its private orbit state.
+                        fallbackLerpSpeed = 3f;
+                    }
+                    nativeHeart.enabled = false;
+                }
+            }
+
+            AdvanceOrbit(Time.unscaledDeltaTime);
         }
 
         private void UpdateFallbackPop()

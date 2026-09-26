@@ -2,6 +2,28 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Nombres únicos de Ayudas durante el K.O. (2026-09-26)
+
+La captura visual que conserva los elementos del catálogo durante el knockout
+ya no crea una segunda etiqueta congelada para **Vida extra** ni **Ayuda
+fantasmal**. Sus actores y nombres originales siguen vivos y moviéndose durante
+la presentación del K.O.; únicamente se omite la copia estática que dejaba el
+nombre repetido en la posición donde terminó el combate. Las demás
+interacciones conservan sin cambios su actor y nombre congelados.
+
+El K.O. reduce o detiene el reloj jugable. Vida extra y Ayuda fantasmal usan
+ahora tiempo real exclusivamente para su órbita, flotación y seguimiento
+visuales durante esa presentación, por lo que conservan la velocidad normal.
+La duración de Ayuda fantasmal permanece pausada y no se consume después de
+terminar el combate.
+
+La suite runtime completa, los catálogos web y la compilación Release aprobaron
+sin errores ni advertencias. Paquete Dev publicado por el proceso independiente,
+538 archivos y ruta física verificada. SHA256:
+`5449F9685417CA0C5FE46DC5961E12F7D5B8B0F6A0F745112CB1699E56607982`.
+Falta confirmar visualmente ambos nombres durante un K.O. en el siguiente
+arranque.
+
 ## Vida extra: corazón nativo también al iniciar en avión (2026-09-25)
 
 Se retiraron el ajuste aéreo de posición y el respaldo `pop.wav`. El registro

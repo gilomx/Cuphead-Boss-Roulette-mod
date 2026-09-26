@@ -5,6 +5,14 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal static class CreatorToolsVisualSnapshotHierarchy
     {
+        internal static bool ShouldCaptureLabel(
+            bool keepLiveAtLevelEnd,
+            bool hasVisibleActor,
+            bool sourceVisible)
+        {
+            return !keepLiveAtLevelEnd && hasVisibleActor && sourceVisible;
+        }
+
         internal static void RetainBranch<T>(HashSet<T> retained, T leaf, T root,
             Func<T, T> getParent) where T : class
         {

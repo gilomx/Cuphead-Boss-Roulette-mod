@@ -2,6 +2,14 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Durante el K.O., **Vida extra** y **Ayuda fantasmal** conservan únicamente su
+  nombre móvil unido al actor. Ya no reciben además la copia estática que el
+  resto del catálogo mantiene al finalizar el nivel, evitando que el remitente
+  aparezca duplicado mientras el corazón o el fantasma continúan moviéndose.
+  Su órbita, flotación y seguimiento visual usan tiempo real durante la
+  presentación de victoria y mantienen la velocidad normal aunque el reloj del
+  combate se ralentice; la duración de la ayuda no se consume después del K.O.
+
 - **Vida extra** conserva el mismo prefab nativo animado que ya se usaba en
   tierra durante la preparación inicial, de modo que también esté disponible
   si la sesión comienza directamente en avión. El clip nativo exacto del
