@@ -93,6 +93,7 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsGiftResolver resolveGift,
             Func<bool> hpOneProtectionBlocked,
             Func<Shader> getHpOneSuspendedShader,
+            Func<bool> playExtraLifeArrivalSound,
             Func<bool> getPhaseTransitionProtectionEnabled,
             Action<bool> setPhaseTransitionProtectionEnabled,
             Action<string> logInfo,
@@ -124,9 +125,11 @@ namespace Gilomx.CupheadBossRoulette
             liveEvents = new CreatorToolsLiveEventsCoordinator();
             extraLives = new CreatorToolsExtraLifeExecutor(
                 assetsDirectory,
+                canPreloadNativeAssets,
                 canSpawnInteraction,
                 hpOneProtectionBlocked,
                 getHpOneSuspendedShader,
+                playExtraLifeArrivalSound,
                 logInfo,
                 logWarning);
             executors.Add(extraLives);

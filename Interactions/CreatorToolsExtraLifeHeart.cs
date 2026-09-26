@@ -8,10 +8,13 @@ namespace Gilomx.CupheadBossRoulette
         private const float EntranceDelay = 0.12f;
         private const float EntranceDuration = 0.46f;
         private const float FallbackHoverWidth = 100f;
-        private const float PlaneFallbackHoverWidth = 60f;
+        private const float PlaneHoverWidth = 60f;
+        private const float DonorLabelVerticalOffsetPixels = -125f;
+        private const float PlaneDonorLabelVerticalOffsetPixels = -101f;
         private const float FallbackPopDuration = 0.2f;
 
         private AbstractPlayerController player;
+        private Transform followTarget;
         private PlayerSuperChaliceShieldHeart nativeHeart;
         private CreatorToolsDonorLabel donorLabel;
         private SpriteRenderer[] entranceRenderers;
@@ -23,7 +26,9 @@ namespace Gilomx.CupheadBossRoulette
         private float fallbackLerpSpeed;
         private float fallbackPopElapsed;
         private float fallbackPopScale = 1f;
+        private Vector3 planeEntrancePosition;
         private bool fallbackVisual;
+        private bool planePresentation;
         private bool entering;
         private bool popping;
 
@@ -37,17 +42,29 @@ namespace Gilomx.CupheadBossRoulette
         {
             CreditId = creditId;
             player = owner;
+            planePresentation = player is PlanePlayerController;
+            followTarget = ResolveFollowTarget(player);
             nativeHeart = GetComponent<PlayerSuperChaliceShieldHeart>();
             fallbackVisual = nativeHeart == null;
 
             if (nativeHeart != null && player != null)
             {
                 var native = Traverse.Create(nativeHeart);
-                native.Field("player").SetValue(player.transform);
+                native.Field("player").SetValue(followTarget);
                 // Keep the exact native orbit and follow behavior, but start
                 // at another point on that same path. This keeps the redeemed
                 // heart visible when Ms. Chalice also owns her Super II heart.
                 native.Field("hoverTime").SetValue(0f);
+                if (planePresentation)
+                {
+                    // The native radius is calibrated for terrestrial
+                    // characters. Aircraft use the same native motion with a
+                    // tighter orbit around their visible animated body.
+                    native.Field("hoverWidth").SetValue(PlaneHoverWidth);
+                    // Keep the arrival at its authored point. The native
+                    // follower starts only after the reveal finishes.
+                    nativeHeart.enabled = false;
+                }
             }
             else
             {
@@ -56,6 +73,12 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             UpdatePresentationScale();
+            ApplyPresentationScale(1f);
+            if (planePresentation)
+            {
+                planeEntrancePosition = ResolvePlaneEntrancePosition();
+                transform.position = planeEntrancePosition;
+            }
 
             var anchor = FindAnchorRenderer();
             donorLabel = gameObject.AddComponent<CreatorToolsDonorLabel>();
@@ -66,7 +89,10 @@ namespace Gilomx.CupheadBossRoulette
             // frame. The calibrated offset remains in presentation units, so
             // the follower scales it with the live camera zoom.
             donorLabel.RebindTo(gameObject, anchor, 1.5f);
-            donorLabel.SetVerticalOffsetPixels(-125f);
+            donorLabel.SetVerticalOffsetPixels(
+                planePresentation
+                    ? PlaneDonorLabelVerticalOffsetPixels
+                    : DonorLabelVerticalOffsetPixels);
             donorLabel.Hide();
             BeginEntrance();
         }
@@ -122,7 +148,18 @@ namespace Gilomx.CupheadBossRoulette
 
         private void FixedUpdate()
         {
-            if (!fallbackVisual || popping || player == null)
+            if (popping || player == null)
+                return;
+            if (planePresentation && entering)
+            {
+                // Hold the same orbital point relative to the moving plane,
+                // not a stale world position. Enabling the native follower
+                // after the reveal is then continuous and needs no catch-up.
+                planeEntrancePosition = ResolvePlaneEntrancePosition();
+                transform.position = planeEntrancePosition;
+                return;
+            }
+            if (!fallbackVisual)
                 return;
 
             // PlayerSuperChaliceShieldHeart.FixedUpdate expressed directly so
@@ -131,8 +168,8 @@ namespace Gilomx.CupheadBossRoulette
             var sine = Mathf.Sin(fallbackHoverTime);
             var cosine = Mathf.Cos(fallbackHoverTime);
             var denominator = 1f + sine * sine;
-            var hoverWidth = player is PlanePlayerController
-                ? PlaneFallbackHoverWidth
+            var hoverWidth = planePresentation
+                ? PlaneHoverWidth
                 : FallbackHoverWidth;
             var offset = new Vector3(
                 hoverWidth * cosine / denominator,
@@ -143,7 +180,7 @@ namespace Gilomx.CupheadBossRoulette
                 fallbackLerpSpeed + CupheadTime.FixedDelta, 3f);
             transform.position = Vector3.Lerp(
                 transform.position,
-                player.transform.position + offset,
+                FollowPosition() + offset,
                 CupheadTime.FixedDelta * fallbackLerpSpeed);
         }
 
@@ -247,6 +284,8 @@ namespace Gilomx.CupheadBossRoulette
             entering = false;
             ApplyEntranceOpacity(1f);
             ApplyPresentationScale(1f);
+            if (planePresentation && nativeHeart != null)
+                nativeHeart.enabled = true;
             if (revealDonor && donorLabel != null)
                 donorLabel.FadeInWhenActorVisible(0.22f);
         }
@@ -281,6 +320,38 @@ namespace Gilomx.CupheadBossRoulette
                 if (renderers[i] != null)
                     return renderers[i];
             return null;
+        }
+
+        private Transform ResolveFollowTarget(
+            AbstractPlayerController owner)
+        {
+            var plane = owner as PlanePlayerController;
+            if (plane != null && plane.animationController != null)
+            {
+                var renderer = plane.animationController.GetSpriteRenderer();
+                if (renderer != null)
+                    return renderer.transform;
+            }
+            return owner == null ? null : owner.transform;
+        }
+
+        private Vector3 FollowPosition()
+        {
+            return followTarget == null
+                ? (player == null ? Vector3.zero : player.transform.position)
+                : followTarget.position;
+        }
+
+        private Vector3 ResolvePlaneEntrancePosition()
+        {
+            // Start at the first exact point of the native aircraft orbit.
+            // Do not use renderer bounds: airplane sprites have large canvas
+            // bounds that do not describe the visible character.
+            var origin = FollowPosition();
+            return new Vector3(
+                origin.x + PlaneHoverWidth,
+                origin.y,
+                transform.position.z);
         }
     }
 }

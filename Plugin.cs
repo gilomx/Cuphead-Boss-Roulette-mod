@@ -194,6 +194,7 @@ namespace Gilomx.CupheadBossRoulette
         private AudioClip battleHudImpactClip;
         private AudioClip upsideDownTurnClip;
         private AudioClip hpOneRejectedParryClip;
+        private AudioClip extraLifeArrivalClip;
         private AssetBundle blackAndWhiteShaderBundle;
         private Shader blackAndWhiteTransitionShader;
         private Shader battleHudSaturationShader;
@@ -3724,6 +3725,9 @@ namespace Gilomx.CupheadBossRoulette
                 "sounds/hp_one_rejected_parry.wav", AudioType.WAV,
                 clip => hpOneRejectedParryClip = clip));
             yield return StartCoroutine(LoadClip(
+                "sounds/chalice_shield.wav", AudioType.WAV,
+                clip => extraLifeArrivalClip = clip));
+            yield return StartCoroutine(LoadClip(
                 "sounds/pirate_shark_warning.wav", AudioType.WAV,
                 clip => timedWarningClip = clip));
         }
@@ -3793,6 +3797,14 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (clip != null && effectsAudioSource != null)
                 effectsAudioSource.PlayOneShot(clip, volume);
+        }
+
+        private bool PlayExtraLifeArrivalSound()
+        {
+            if (extraLifeArrivalClip == null || effectsAudioSource == null)
+                return false;
+            effectsAudioSource.PlayOneShot(extraLifeArrivalClip, 1f);
+            return true;
         }
 
         private void StopSpinAudio()

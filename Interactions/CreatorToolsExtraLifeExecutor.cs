@@ -13,9 +13,11 @@ namespace Gilomx.CupheadBossRoulette
             "creator-tools/interactions/extra-life-heart.png";
 
         private readonly string assetsDirectory;
+        private readonly Func<bool> canPreloadNativeAssets;
         private readonly Func<bool> canSpawn;
         private readonly Func<bool> hpOneActive;
         private readonly Func<Shader> suspendedShader;
+        private readonly Func<bool> playArrivalSound;
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
         private readonly CreatorToolsExtraLifeInventory inventory =
@@ -36,16 +38,20 @@ namespace Gilomx.CupheadBossRoulette
 
         internal CreatorToolsExtraLifeExecutor(
             string assetsDirectory,
+            Func<bool> canPreloadNativeAssets,
             Func<bool> canSpawn,
             Func<bool> hpOneActive,
             Func<Shader> suspendedShader,
+            Func<bool> playArrivalSound,
             Action<string> logInfo,
             Action<string> logWarning)
         {
             this.assetsDirectory = assetsDirectory ?? string.Empty;
+            this.canPreloadNativeAssets = canPreloadNativeAssets;
             this.canSpawn = canSpawn;
             this.hpOneActive = hpOneActive;
             this.suspendedShader = suspendedShader;
+            this.playArrivalSound = playArrivalSound;
             this.logInfo = logInfo;
             this.logWarning = logWarning;
         }
@@ -72,6 +78,14 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (disposed)
                 return;
+
+            // Aircraft levels do not load Ms. Chalice's terrestrial shield
+            // prefab. Capture its native heart while the shared interaction
+            // catalog is already visiting a ground scene behind the loading
+            // fade, so a session that starts in an aircraft gets the exact
+            // same animated heart as a session that visited ground first.
+            if (heartPrefab == null && Evaluate(canPreloadNativeAssets))
+                ResolveHeartPrefab();
 
             var player = PlayerOne();
             var currentAttempt = CurrentAttemptSerial();
@@ -415,6 +429,10 @@ namespace Gilomx.CupheadBossRoulette
                         .InverseTransformPoint(spawn.position);
                     hasHeartSpawnOffset = true;
                 }
+                if (heartPrefab != null && logInfo != null)
+                    logInfo(
+                        "Corazon nativo de Vida extra guardado para " +
+                        "niveles terrestres y de avion.");
             }
             catch
             {
@@ -476,15 +494,29 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PlayArrival(AbstractPlayerController player)
         {
+            var played = false;
             try
             {
-                AudioManager.Play("player_super_chalice_shield");
+                played = playArrivalSound != null && playArrivalSound();
             }
             catch (Exception exception)
             {
                 if (logWarning != null)
-                    logWarning("Could not play the extra-life arrival: " +
-                        exception.Message);
+                    logWarning("Could not play the packaged extra-life " +
+                        "arrival: " + exception.Message);
+            }
+            if (!played)
+            {
+                try
+                {
+                    AudioManager.Play("player_super_chalice_shield");
+                }
+                catch (Exception exception)
+                {
+                    if (logWarning != null)
+                        logWarning("Could not play the extra-life arrival: " +
+                            exception.Message);
+                }
             }
 
             try

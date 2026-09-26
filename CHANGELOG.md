@@ -2,6 +2,19 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- **Vida extra** conserva el mismo prefab nativo animado que ya se usaba en
+  tierra durante la preparación inicial, de modo que también esté disponible
+  si la sesión comienza directamente en avión. El clip nativo exacto del
+  escudo de Ms. Chalice se incluye con el mod y se reproduce por su salida SFX
+  en cualquier nivel, incluso cuando una escena de avión no carga el banco
+  terrestre que atendía el evento original.
+- En niveles de avión, el corazón de **Vida extra** sigue ahora el sprite
+  visible del personaje en vez del origen del controlador del nivel, conserva
+  un radio aéreo más corto y permanece fijo en el primer punto de esa órbita,
+  a la misma altura y siguiendo el movimiento del avión, mientras termina de
+  aparecer. Su nombre se separó veinticuatro unidades sin modificar la
+  presentación terrestre.
+
 - La zanahoria teledirigida vuelve a prepararse para el catálogo. Su jefe nativo
   todavía no existe cuando se bloquea el ciclo de vida de la escena temporal,
   así que ahora se obtiene desde la tabla serializada de prefabs de La Pandilla

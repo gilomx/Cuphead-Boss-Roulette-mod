@@ -204,6 +204,7 @@ namespace Gilomx.CupheadBossRoulette
                 },
                 ShouldApplyHpOneHealthLock,
                 delegate { return hpOneRejectedHeartShader; },
+                PlayExtraLifeArrivalSound,
                 GetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 SetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 delegate(string message) { Logger.LogInfo(message); },

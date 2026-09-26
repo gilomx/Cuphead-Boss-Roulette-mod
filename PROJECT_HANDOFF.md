@@ -2,6 +2,45 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Vida extra: corazón nativo también al iniciar en avión (2026-09-25)
+
+Se retiraron el ajuste aéreo de posición y el respaldo `pop.wav`. El registro
+de una sesión iniciada directamente en `scene_level_flying_bird` mostró la
+causa restante: `Vida extra` usaba su PNG de contingencia porque el avión no
+carga `PlayerSuperChaliceShieldHeart`; si antes se visitaba tierra, el prefab
+nativo quedaba disponible y la presentación sí era correcta. Ahora el ejecutor
+captura esa misma referencia nativa durante la preparación inicial del catálogo
+en una escena terrestre, detrás del fundido de carga. La presentación terrestre
+no cambió; los ajustes de órbita, entrada y etiqueta descritos abajo se aplican
+exclusivamente a los niveles de avión.
+
+El clip nativo exacto `sfx_DLC_Player_Chalice_Shield`, de 2.12 segundos, se
+extrajo de `sharedassets8.assets` de la copia de ejecución del launcher y quedó
+versionado como `assets/sounds/chalice_shield.wav`, junto con el extractor
+reproducible `tools/extract_native_chalice_shield.py`. La fuente SFX del mod lo
+reproduce en cualquier escena; si el recurso empaquetado no pudiera cargarse,
+se conserva como respaldo el evento nativo anterior.
+
+La presentación aérea sigue el `SpriteRenderer` animado del avión, no el
+`Transform` raíz de `PlanePlayerController`, cuyo origen puede quedar muy lejos
+del dibujo visible. Durante los 0.58 segundos de entrada el corazón permanece
+fijo en el primer punto exacto de su órbita: 60 unidades horizontales desde el
+pivote visible del avión y sin desplazamiento vertical. Ese punto se actualiza
+durante la entrada para acompañar al avión en movimiento y evitar que el
+seguidor tenga que alcanzarlo lentamente al final. No se usan `bounds` del
+avión ni del corazón, porque ambos incluyen lienzos transparentes que no
+describen la figura visible. Después se habilita su seguidor nativo con ese
+radio 60 en vez del radio terrestre 100. La etiqueta aérea usa `-101` píxeles
+de ajuste vertical frente a `-125` en tierra, por lo que se separa veinticuatro
+unidades hacia arriba sin cambiar la presentación terrestre.
+
+Suite runtime completa, catálogos web y compilación Release aprobados sin
+advertencias ni errores. Paquete Dev publicado por el proceso independiente,
+538 archivos y ruta física verificada. SHA256:
+`7AE4E337C8CB4C91047188F74704A287812A4BB84E31D9DBA812340F381A2A83`.
+La partida que estaba abierta no se cerró ni recargó; la comprobación visual y
+auditiva corresponde al siguiente arranque.
+
 ## Recuperación de la zanahoria teledirigida (2026-09-25)
 
 Dos registros consecutivos confirmaron que `rootpack_homing_carrot` no era una
