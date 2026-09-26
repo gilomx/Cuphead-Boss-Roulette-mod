@@ -159,7 +159,7 @@ namespace Gilomx.CupheadBossRoulette
                 settings.Save();
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(22, json.RootElement.GetProperty("version").GetInt32(),
+                    Equal(23, json.RootElement.GetProperty("version").GetInt32(),
                         "saved file uses the interval schema");
                     Equal(3f, json.RootElement.GetProperty("minimumInterval")
                         .GetSingle(), "new minimum is serialized");
@@ -203,10 +203,14 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private static CreatorToolsPeskyModeSettings LoadPeskySettings(TestScope scope)
+        private static CreatorToolsPeskyModeSettings LoadPeskySettings(
+            TestScope scope,
+            int legacyMaximumActive =
+                CreatorToolsPeskyModeSettings.DefaultMaximumActive)
         {
             return CreatorToolsPeskyModeSettings.Load(
-                Path.Combine(scope.ConfigDirectory, "plugin.cfg"), null);
+                Path.Combine(scope.ConfigDirectory, "plugin.cfg"), null,
+                legacyMaximumActive);
         }
     }
 }

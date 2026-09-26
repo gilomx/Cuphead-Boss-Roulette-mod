@@ -130,7 +130,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(legacy, File.ReadAllText(path + ".bak"), "migration keeps original backup");
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(22, json.RootElement.GetProperty("version").GetInt32(), "migrated version");
+                    Equal(23, json.RootElement.GetProperty("version").GetInt32(), "migrated version");
                     True(settings.IsItemEnabled(CreatorToolsInteractionIds.ExtraLifeHelp),
                         "migration exposes helps in automatic testing");
                     False(json.RootElement.GetProperty("allowConcurrentStrongInteractions").GetBoolean(), "saved default");

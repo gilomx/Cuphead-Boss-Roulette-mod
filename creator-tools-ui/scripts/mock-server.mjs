@@ -85,6 +85,7 @@ function resetStreamRuleAccumulators(ruleId) {
 
 let peskyEnabled = false;
 let peskyAllowConcurrentStrongInteractions = false;
+let peskyMaxActive = interactionMaxActive;
 let peskyRevision = 0;
 let peskyFeedback = "ready";
 let peskyError = false;
@@ -1796,7 +1797,9 @@ createServer((req, res) => {
       challengeWaitSeconds: peskyChallengeWaitSeconds,
       queueCount: 0,
       activeCount: 0,
-      maxActive: interactionMaxActive,
+      maxActive: peskyMaxActive,
+      maxActiveLimit: 20,
+      defaultMaxActive: 1,
       queue: [],
       blockedByPeskyBattle: peskyBattleIsExclusive(),
     });
@@ -1816,17 +1819,22 @@ createServer((req, res) => {
       if (!Number.isInteger(seconds) || seconds < 1 || seconds > 120 || !Number.isInteger(countdown) || countdown < 0 || countdown > 30 || !Number.isInteger(wait) || wait < 0 || wait > 300) {
         peskyError = true; peskyFeedback = "invalid_setting";
       } else { peskyChallengeDurationSeconds = seconds; peskyChallengeCountdownSeconds = countdown; peskyChallengeWaitSeconds = wait; peskyFeedback = "items_saved"; }
-    } else if (minimumIntervalValue !== null || maximumIntervalValue !== null) {
+    } else if (minimumIntervalValue !== null || maximumIntervalValue !== null ||
+        url.searchParams.has("maxActive")) {
       const candidate = pacingCandidate(url.searchParams, peskyIntervals);
+      const maximumActive = settingNumber(
+        url.searchParams.get("maxActive") ?? String(peskyMaxActive),
+        1, 20, true);
       const strongToken = url.searchParams.get("allowConcurrentStrongInteractions");
       const strong = strongToken === null ? peskyAllowConcurrentStrongInteractions
         : strongToken === "1" || strongToken.trim().toLowerCase() === "true" ? true
         : strongToken === "0" || strongToken.trim().toLowerCase() === "false" ? false : null;
-      if (!candidate || strong === null) {
+      if (!candidate || strong === null || maximumActive === null) {
         peskyFeedback = "invalid_interval";
         peskyError = true;
       } else {
         peskyIntervals = candidate;
+        peskyMaxActive = maximumActive;
         peskyAllowConcurrentStrongInteractions = strong;
         peskyFeedback = "intervals_saved";
       }

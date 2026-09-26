@@ -112,6 +112,37 @@ namespace Gilomx.CupheadBossRoulette
             }
             return dispatched;
         }
+
+        // The first candidate chooses the pressure group. Every remaining
+        // slot performs its own draw from that group's current candidates;
+        // duplicates are possible only when the random draw selects them.
+        internal static List<string> SelectAutomaticBatch(
+            string first,
+            IEnumerable<string> candidates,
+            int quantity,
+            Func<int, int> chooseIndex,
+            Func<string, bool> isExclusive)
+        {
+            var selected = new List<string>();
+            if (string.IsNullOrEmpty(first) || quantity <= 0)
+                return selected;
+            var pool = new List<string>(candidates ?? new string[0]);
+            if (!pool.Contains(first))
+                pool.Add(first);
+            selected.Add(first);
+            if (isExclusive != null && isExclusive(first))
+                pool.Remove(first);
+            while (selected.Count < quantity && pool.Count > 0)
+            {
+                var index = chooseIndex == null ? 0 : chooseIndex(pool.Count);
+                index = Math.Max(0, Math.Min(pool.Count - 1, index));
+                var item = pool[index];
+                selected.Add(item);
+                if (isExclusive != null && isExclusive(item))
+                    pool.RemoveAt(index);
+            }
+            return selected;
+        }
     }
 
     internal sealed class CreatorToolsAutomaticSpawnPlan

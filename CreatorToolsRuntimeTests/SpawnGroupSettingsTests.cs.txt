@@ -63,6 +63,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(3, pesky.LightMaximumBatch, "Pesky light maximum default");
                 Equal(1, pesky.StrongMinimumBatch, "Pesky strong minimum default");
                 Equal(1, pesky.StrongMaximumBatch, "Pesky strong maximum default");
+                Equal(1, pesky.MaximumActive, "Pesky owns a safe concurrency default");
                 var builder = new StringBuilder("{\"ready\":true");
                 pesky.AppendSpawnSettingsJson(builder, true);
                 builder.Append('}');
@@ -71,6 +72,7 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(18f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "controller default prefix");
                     Equal(3, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "controller light batch default");
                     Equal(1, json.RootElement.GetProperty("defaultStrongMaximumBatch").GetInt32(), "controller batch default");
+                    Equal(1, json.RootElement.GetProperty("defaultMaxActive").GetInt32(), "controller concurrency default");
                 }
                 builder.Length = 0;
                 CreatorToolsInteractionPacingSettings.AppendDefaultsJson(builder);
@@ -113,13 +115,17 @@ namespace Gilomx.CupheadBossRoulette
                 var peskyPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
                 var legacyPesky = BalanceJson("47.5", "4", "0").Replace("\"version\":3", "\"version\":5");
                 File.WriteAllText(peskyPath, legacyPesky);
-                var pesky = LoadPeskySettings(scope);
+                var pesky = LoadPeskySettings(scope, 7);
                 Equal(47.5f, pesky.MiniBossMinimumInterval, "legacy Pesky cooldown becomes minimum");
                 Equal(47.5f, pesky.MiniBossMaximumInterval, "legacy Pesky cooldown becomes maximum");
                 Equal(6f, pesky.MinimumInterval, "normal cadence remains customized");
+                Equal(7, pesky.MaximumActive, "legacy shared concurrency migrates into Pesky once");
                 Equal(legacyPesky, File.ReadAllText(peskyPath + ".bak"), "original Pesky backup");
                 using (var json = JsonDocument.Parse(File.ReadAllText(peskyPath)))
-                    Equal(22, json.RootElement.GetProperty("version").GetInt32(), "new schema version");
+                {
+                    Equal(23, json.RootElement.GetProperty("version").GetInt32(), "new schema version");
+                    Equal(7, json.RootElement.GetProperty("maxActive").GetInt32(), "migrated concurrency is persisted");
+                }
 
                 var interactionPath = Path.Combine(scope.ConfigDirectory, CreatorToolsInteractionPacingSettings.FileName);
                 const string legacyInteractions = "{\"enabled\":true,\"minimumInterval\":2,\"maximumInterval\":5," +
@@ -169,6 +175,15 @@ namespace Gilomx.CupheadBossRoulette
                     False(interactions.TrySet(interactionValues, "pacing."), "Interactions rejects " + bad[0]);
                     Equal(originalInteractions, SpawnGroupJson(interactions), "Interactions rejection also preserves enabled state");
                 }
+                foreach (var invalidMaximum in new[] { "0", "21", "1.5" })
+                {
+                    var peskyValues = SpawnGroupValues();
+                    peskyValues["maxActive"] = invalidMaximum;
+                    False(pesky.TrySetPacing(peskyValues),
+                        "Pesky rejects maxActive " + invalidMaximum);
+                    Equal(originalPesky, SpawnGroupJson(pesky),
+                        "invalid Pesky concurrency leaves every value untouched");
+                }
                 foreach (var key in CreatorToolsSpawnGroupSettings.PropertyNames)
                 {
                     var values = SpawnGroupValues();
@@ -195,10 +210,13 @@ namespace Gilomx.CupheadBossRoulette
             using (var scope = new TestScope("spawn-group-persistence"))
             {
                 var pesky = LoadPeskySettings(scope);
-                True(pesky.TrySetPacing(SpawnGroupValues()), "set Pesky groups");
+                var peskyValues = SpawnGroupValues();
+                peskyValues["maxActive"] = "6";
+                True(pesky.TrySetPacing(peskyValues), "set Pesky groups");
                 pesky.Save();
                 var originalPesky = SpawnGroupJson(pesky);
                 Equal(originalPesky, SpawnGroupJson(LoadPeskySettings(scope)), "all Pesky group fields round trip");
+                Equal(6, LoadPeskySettings(scope).MaximumActive, "Pesky concurrency round trips independently");
                 var peskyPath = Path.Combine(scope.ConfigDirectory, PeskySettingsFileName);
                 var persistedPesky = File.ReadAllText(peskyPath);
                 var interactions = LoadInteractionPacing(scope);
@@ -214,6 +232,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(persistedPesky, File.ReadAllText(peskyPath), "saving interactions never rewrites Pesky");
 
                 True(pesky.TrySetPacing("2", "4", null, null, null), "old interval-only Pesky client");
+                Equal(6, pesky.MaximumActive, "legacy request preserves Pesky concurrency");
                 Equal(17f, pesky.MiniBossMaximumInterval, "omitting cooldown preserves variable maximum");
                 Equal(5, pesky.LightMaximumBatch, "omitted batch range preserved");
                 True(pesky.TrySetPacing("2", "4", "50", "2", "1"), "old complete Pesky client");

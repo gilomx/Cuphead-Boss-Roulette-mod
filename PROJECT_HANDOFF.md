@@ -2,6 +2,31 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Límites independientes y lotes aleatorios (2026-09-26)
+
+**Interacciones** y **Modo Molestoso** tienen ahora valores independientes de
+**Máximo de ataques en pantalla**. El límite de Interacciones permanece en la
+configuración de BepInEx que ya lo guardaba; Modo Molestoso lo persiste desde
+el esquema 23 de `pesky-mode.json`. Al migrar, Modo Molestoso hereda una sola
+vez el antiguo valor compartido para no cambiar la presión efectiva existente.
+El botón **Usar en ambos modos** copia también este máximo, además de tiempos y
+cantidades, mientras la opción de molestias intensas continúa perteneciendo
+únicamente a Modo Molestoso.
+
+En los lotes automáticos de Modo Molestoso, la primera elección determina el
+grupo leve o intenso y cada lugar de la cantidad sorteada elige su actor de
+forma independiente entre los candidatos disponibles de ese grupo. Un actor
+puede repetirse sólo si vuelve a salir al azar; los actores exclusivos se
+retiran del sorteo después de elegirse. Las cantidades de regalos o pruebas de
+Interacciones conservan su semántica exacta: pedir dos unidades de un actor
+específico sigue creando dos entradas de ese actor.
+
+Suite runtime completa, contrato HTTP del panel, catálogos web y compilación
+Release aprobados sin errores ni advertencias. Paquete Dev publicado por el
+proceso independiente, 538 archivos y ruta física verificada. SHA256:
+`CD1E71E2AD419ABEC82A2C0DD0A3177A1D82BA01E0DDEAD1E0AF2D417E377A9F`.
+Falta validar visualmente ambos límites y un lote automático múltiple en juego.
+
 ## Nombres únicos de Ayudas durante el K.O. (2026-09-26)
 
 La captura visual que conserva los elementos del catálogo durante el knockout

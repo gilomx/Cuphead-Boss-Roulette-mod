@@ -70,7 +70,7 @@ export function InteractionSettingsPanel() {
             setDraft(pacingDraftFor(interaction?.defaultPacing)); setEnabledDraft(interaction?.defaultPacing.enabled ?? false); setDirty(true);
           }}>{t("interactions.settings.pacingRestore")}</button>
           <button type="button" disabled={!interaction?.ready || !pesky?.ready || !valid || saving} onClick={() => {
-            applyPacingToBoth(values); setAppliedBoth(true);
+            applyPacingToBoth(maxActiveDraft, values); setAppliedBoth(true);
           }}>{t("pesky.intervals.applyBoth")}</button>
         </div>
         <p className="pesky-interval-panel__hint">{t("pesky.intervals.applyBothHint")}</p>

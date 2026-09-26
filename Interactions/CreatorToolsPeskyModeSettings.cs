@@ -19,7 +19,9 @@ namespace Gilomx.CupheadBossRoulette
         internal const int DefaultLightMaximumBatch = 3;
         internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
         internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
-        private const int CurrentVersion = 22;
+        internal const int DefaultMaximumActive = 1;
+        internal const int MaximumActiveLimit = 20;
+        private const int CurrentVersion = 23;
         private static readonly string[] DefaultNames =
         {
             "Claudia",
@@ -59,6 +61,7 @@ namespace Gilomx.CupheadBossRoulette
         internal int StrongMaximumBatch { get { return spawnGroups.StrongMaximumBatch; } }
         internal float MiniBossIntervalMultiplier { get; private set; }
         internal int MaximumCompanionsDuringMiniBoss { get; private set; }
+        internal int MaximumActive { get; private set; }
         internal readonly List<string> Names = new List<string>();
         internal readonly HashSet<string> DisabledItems =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -73,7 +76,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static CreatorToolsPeskyModeSettings Load(
             string pluginConfigPath,
-            Action<string> logWarning)
+            Action<string> logWarning,
+            int legacyMaximumActive = DefaultMaximumActive)
         {
             var directory = Path.GetDirectoryName(
                 string.IsNullOrEmpty(pluginConfigPath)
@@ -86,6 +90,10 @@ namespace Gilomx.CupheadBossRoulette
             var settings = new CreatorToolsPeskyModeSettings(
                 path, logWarning);
             settings.ResetToDefaults();
+            // Before schema 23 both modes used the Interactions limit. Keep
+            // the effective value once while giving Pesky its own setting.
+            settings.MaximumActive = Math.Max(1, Math.Min(
+                MaximumActiveLimit, legacyMaximumActive));
 
             if (settings.TryLoadFile(path))
             {
@@ -170,12 +178,16 @@ namespace Gilomx.CupheadBossRoulette
         internal bool TrySetPacing(Dictionary<string, string> values)
         {
             if (values == null) return false;
-            float minimum, maximum, multiplierValue, companionsValue;
+            float minimum, maximum, multiplierValue, companionsValue,
+                maximumActiveValue;
             string multiplier, companions;
             if (!values.TryGetValue("miniBossIntervalMultiplier", out multiplier))
                 multiplier = MiniBossIntervalMultiplier.ToString("R", CultureInfo.InvariantCulture);
             if (!values.TryGetValue("maximumCompanionsDuringMiniBoss", out companions))
                 companions = MaximumCompanionsDuringMiniBoss.ToString(CultureInfo.InvariantCulture);
+            string maximumActive;
+            if (!values.TryGetValue("maxActive", out maximumActive))
+                maximumActive = MaximumActive.ToString(CultureInfo.InvariantCulture);
             CreatorToolsSpawnGroupSettings updated;
             var allowStrong = AllowConcurrentStrongInteractions;
             string strongToken;
@@ -192,11 +204,14 @@ namespace Gilomx.CupheadBossRoulette
                     IntervalLowerLimit, IntervalUpperLimit, false, out maximum) || minimum > maximum ||
                 !TryBalanceNumber(multiplier, 1f, 10f, false, out multiplierValue) ||
                 !TryBalanceNumber(companions, 0f, 20f, true, out companionsValue) ||
+                !TryBalanceNumber(maximumActive, 1f, MaximumActiveLimit,
+                    true, out maximumActiveValue) ||
                 !spawnGroups.TryUpdate(values, "", out updated)) return false;
             MinimumInterval = minimum;
             MaximumInterval = maximum;
             MiniBossIntervalMultiplier = multiplierValue;
             MaximumCompanionsDuringMiniBoss = (int)companionsValue;
+            MaximumActive = (int)maximumActiveValue;
             spawnGroups = updated;
             AllowConcurrentStrongInteractions = allowStrong;
             return true;
@@ -207,6 +222,8 @@ namespace Gilomx.CupheadBossRoulette
             (defaults ? CreateDefaultSpawnGroups() : spawnGroups).AppendJson(builder, defaults);
             builder.Append(defaults ? ",\"defaultAllowConcurrentStrongInteractions\":" : ",\"allowConcurrentStrongInteractions\":")
                 .Append(!defaults && AllowConcurrentStrongInteractions ? "true" : "false");
+            builder.Append(defaults ? ",\"defaultMaxActive\":" : ",\"maxActive\":")
+                .Append(defaults ? DefaultMaximumActive : MaximumActive);
         }
 
         internal void Save()
@@ -249,6 +266,7 @@ namespace Gilomx.CupheadBossRoulette
             spawnGroups = CreateDefaultSpawnGroups();
             MiniBossIntervalMultiplier = DefaultMiniBossIntervalMultiplier;
             MaximumCompanionsDuringMiniBoss = DefaultMaximumCompanionsDuringMiniBoss;
+            MaximumActive = DefaultMaximumActive;
             DisabledItems.Clear();
             DisabledItems.Add(CreatorToolsTimedChallenge.HalfDamage);
             DisabledItems.Add(CreatorToolsTimedChallenge.NoEx);
@@ -371,6 +389,8 @@ namespace Gilomx.CupheadBossRoulette
                 MaximumCompanionsDuringMiniBoss = (int)ReadBalanceNumber(json,
                     "maximumCompanionsDuringMiniBoss", DefaultMaximumCompanionsDuringMiniBoss,
                     0f, 20f, true);
+                MaximumActive = (int)ReadBalanceNumber(json,
+                    "maxActive", MaximumActive, 1f, MaximumActiveLimit, true);
                 // Retire the former shared opt-in. Interactions owns its own file.
                 if (FindPropertyValue(json, "applyToInteractions") >= 0)
                     needsMigration = true;

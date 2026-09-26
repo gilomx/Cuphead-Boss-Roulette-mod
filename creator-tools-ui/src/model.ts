@@ -139,6 +139,8 @@ export interface PeskyModeConfigState extends Omit<InteractionPacingConfig, "ena
   queueCount: number;
   activeCount: number;
   maxActive: number;
+  maxActiveLimit: number;
+  defaultMaxActive: number;
   queue: InteractionQueueEntry[];
   blockedByPeskyBattle?: boolean;
 }

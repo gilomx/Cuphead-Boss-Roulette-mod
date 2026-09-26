@@ -2065,6 +2065,10 @@ textarea:focus-visible {
   filter: drop-shadow(0 0.35rem 0.5rem rgb(0 0 0 / 23%));
 }
 
+:is(.interaction-card__visual, .interaction-item-label, .pesky-attack) img[src$="/ghost-help.png"] {
+  opacity: 0.82;
+}
+
 .interaction-card__content {
   display: flex;
   min-width: 0;

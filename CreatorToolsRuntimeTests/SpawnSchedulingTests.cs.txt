@@ -13,6 +13,7 @@ namespace Gilomx.CupheadBossRoulette
             Run("Opted-in modes reserve common slots across queues without changing bypass mode", TestSharedMiniBossReservation);
             Run("Mini-boss recovery is independent and freezes through pauses and transitions", TestSplitSpawnClocks);
             Run("Spawn groups classify all seventeen attacks independently of difficulty", TestInteractionGroups);
+            Run("Automatic batches draw every actor independently and allow chance repeats", TestAutomaticBatchActors);
             Run("Batches retain donor identity, delayed gifts and incompatible siblings", TestEarnedSpawnBatches);
             Run("Batches recheck capacity and exclusivity after each admission", TestSpawnBatchCapacity);
         }
@@ -164,6 +165,33 @@ namespace Gilomx.CupheadBossRoulette
                 "baroness_candy_corn", "baroness_jawbreaker" })
                 Equal("mini_boss", CreatorToolsInteractionGroups.ForItem(id), id);
             Equal("strong", CreatorToolsInteractionGroups.ForItem("future_attack"), "future IDs start conservatively");
+        }
+
+        private static void TestAutomaticBatchActors()
+        {
+            var draws = new Queue<int>(new[] { 1, 0, 0 });
+            var batch = CreatorToolsInteractionGroups.SelectAutomaticBatch(
+                "rootpack_homing_carrot",
+                new[] { "rootpack_homing_carrot", "cagney_homing_plant" },
+                4,
+                delegate { return draws.Dequeue(); },
+                delegate { return false; });
+            Equal(4, batch.Count, "sampled quantity creates four independent slots");
+            Equal("rootpack_homing_carrot", batch[0], "first random draw chooses the group and first actor");
+            Equal("cagney_homing_plant", batch[1], "second slot performs another actor draw");
+            Equal("rootpack_homing_carrot", batch[2], "later slot can return to the first actor");
+            Equal("rootpack_homing_carrot", batch[3], "same actor repeats only when selected again");
+
+            draws = new Queue<int>(new[] { 0, 0 });
+            batch = CreatorToolsInteractionGroups.SelectAutomaticBatch(
+                "dragon_fireballs",
+                new[] { "dragon_fireballs", "train_bone_ring" },
+                3,
+                delegate { return draws.Dequeue(); },
+                delegate(string item) { return item == "dragon_fireballs"; });
+            Equal(3, batch.Count, "exclusive actor leaves its sibling available");
+            Equal("train_bone_ring", batch[1], "exclusive first actor cannot be drawn twice");
+            Equal("train_bone_ring", batch[2], "nonexclusive sibling can repeat by chance");
         }
 
         private sealed class SpawnBatchEntry

@@ -95,6 +95,9 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
   const initialPesky = await getPesky();
   assert.equal(initialPesky.allowConcurrentStrongInteractions, false);
   assert.equal(initialPesky.defaultAllowConcurrentStrongInteractions, false);
+  assert.equal(initialPesky.maxActive, 1);
+  assert.equal(initialPesky.defaultMaxActive, 1);
+  assert.equal(initialPesky.maxActiveLimit, 20);
   const initialInteractions = await getInteractions();
   const peskyDefaults = Object.fromEntries(numericKeys.map((key) => [
     key, initialPesky["default" + key[0].toUpperCase() + key.slice(1)],
@@ -140,9 +143,10 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
       lightMinimumBatch: 2, lightMaximumBatch: 5,
       strongMinimumBatch: 1, strongMaximumBatch: 3,
     };
-    accepted(await setPesky(peskyValues));
+    accepted(await setPesky({ ...peskyValues, maxActive: 4 }));
     assert.deepEqual((await getInteractions()).pacing, initialInteractions.pacing);
     assert.deepEqual(numericSettings(await getPesky()), { ...peskyValues, miniBossCooldownSeconds: 5 });
+    assert.equal((await getPesky()).maxActive, 4);
     accepted(await setInteractions({
       ...mandatoryPacing, miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
       lightMinimumBatch: 3, lightMaximumBatch: 6,
@@ -154,6 +158,7 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
     assert.equal(saved.maxActive, 8);
     assert.equal(saved.showGiftImage, false);
     assert.deepEqual(numericSettings(await getPesky()), { ...peskyValues, miniBossCooldownSeconds: 5 });
+    assert.equal((await getPesky()).maxActive, 4);
   });
 
   await t.test("omitted new pairs survive ordinary edits and legacy requests", async () => {
@@ -232,6 +237,16 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
         select(beforeInteractions, ["pacing", "maxActive", "showGiftImage", "settingsRevision"]));
       assert.deepEqual(numericSettings(await getPesky()), numericSettings(beforePesky));
     }
+    for (const maxActive of [0, 21, 1.5]) {
+      const beforePesky = await getPesky();
+      const rejected = await setPesky({
+        minimumInterval: 3,
+        maximumInterval: 4,
+        maxActive,
+      });
+      assert.equal(rejected.body.ok, false, `maxActive ${maxActive}`);
+      assert.equal((await getPesky()).maxActive, beforePesky.maxActive);
+    }
     const before = await getInteractions();
     for (const other of [{ maxActive: "invalid" }, { maxActive: 1.5 }, { maxMiniBosses: "bad" }, { showGiftImage: "bad" }]) {
       assert.equal((await setInteractions({ ...mandatoryPacing, minimumInterval: 3 }, other)).status, 400);
@@ -284,14 +299,16 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
       strongMinimumBatch: 1, strongMaximumBatch: 2,
     };
     // The UI copies with one request per owner, preserving the saved switches.
-    accepted(await setPesky(copied));
-    accepted(await setInteractions({ ...copied, enabled: beforeInteractions.pacing.enabled }));
+    accepted(await setPesky({ ...copied, maxActive: 6 }));
+    accepted(await setInteractions({ ...copied, enabled: beforeInteractions.pacing.enabled }, { maxActive: 6 }));
     assert.deepEqual(numericSettings(await getPesky()), { ...copied, miniBossCooldownSeconds: 8 });
     assert.deepEqual(numericSettings((await getInteractions()).pacing), { ...copied, miniBossCooldownSeconds: 8 });
+    assert.equal((await getPesky()).maxActive, 6);
+    assert.equal((await getInteractions()).maxActive, 6);
     accepted(await setPesky({ minimumInterval: 4, maximumInterval: 5 }));
     assert.equal((await getInteractions()).pacing.minimumInterval, 1.2);
     // Restore uses snapshot defaults and the normal save endpoints.
-    accepted(await setPesky(peskyDefaults));
+    accepted(await setPesky({ ...peskyDefaults, maxActive: initialPesky.defaultMaxActive }));
     assert.equal((await getInteractions()).pacing.lightMaximumBatch, 5);
     accepted(await setInteractions({ ...initialInteractions.defaultPacing, enabled: beforeInteractions.pacing.enabled }));
     const afterPesky = await getPesky();
@@ -300,7 +317,8 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
     assert.deepEqual(afterInteractions.pacing, initialInteractions.defaultPacing);
     assert.deepEqual(select(afterPesky, ["enabled", "names", "disabledItems"]),
       select(beforePesky, ["enabled", "names", "disabledItems"]));
-    assert.deepEqual(select(afterInteractions, ["interactionsEnabled", "queuePaused", "queue", "maxActive", "showGiftImage", "maxMiniBosses"]),
-      select(beforeInteractions, ["interactionsEnabled", "queuePaused", "queue", "maxActive", "showGiftImage", "maxMiniBosses"]));
+    assert.deepEqual(select(afterInteractions, ["interactionsEnabled", "queuePaused", "queue", "showGiftImage", "maxMiniBosses"]),
+      select(beforeInteractions, ["interactionsEnabled", "queuePaused", "queue", "showGiftImage", "maxMiniBosses"]));
+    assert.equal(afterInteractions.maxActive, 6);
   });
 });

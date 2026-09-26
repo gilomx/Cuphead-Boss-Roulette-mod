@@ -8,18 +8,21 @@ export function PeskyIntervalPanel() {
   const { pesky, interaction, status, interactionSettingsStatus, applyPeskyIntervals, applyPacingToBoth } = useConfig();
   const { t } = useLocalization();
   const [appliedBoth, setAppliedBoth] = useState(false);
+  const [maxActiveDraft, setMaxActiveDraft] = useState(1);
   const [draft, setDraft] = useState(() => pacingDraftFor());
   const [dirty, setDirty] = useState(false);
   const [allowStrongDraft, setAllowStrongDraft] = useState(false);
   useEffect(() => {
     if (!dirty && pesky?.ready) {
       setDraft(pacingDraftFor(pesky));
+      setMaxActiveDraft(pesky.maxActive);
       setAllowStrongDraft(pesky.allowConcurrentStrongInteractions ?? false);
     }
   }, [dirty, pesky]);
   const values = pacingValuesFor(draft);
   const valid = validPacingDraft(draft);
-  const hasChanges = !samePacing(values, pesky ?? undefined) ||
+  const hasChanges = maxActiveDraft !== pesky?.maxActive ||
+    !samePacing(values, pesky ?? undefined) ||
     allowStrongDraft !== (pesky?.allowConcurrentStrongInteractions ?? false);
   const saving = status === "saving" || status === "pending";
   const unavailable = status === "error" || status === "connecting";
@@ -33,10 +36,16 @@ export function PeskyIntervalPanel() {
       <form className="interaction-settings pesky-interval-panel__form" onSubmit={(event) => {
         event.preventDefault();
         if (!valid || !pesky?.ready || saving) return;
-        applyPeskyIntervals(values, allowStrongDraft);
+        applyPeskyIntervals(maxActiveDraft, values, allowStrongDraft);
         setAppliedBoth(false);
         setDirty(false);
       }}>
+        <label className="interaction-settings__number">
+          <span><strong>{t("interactions.settings.maxActiveLabel")}</strong><small>{t("interactions.settings.maxActiveHint")}</small></span>
+          <input type="number" min={1} max={pesky?.maxActiveLimit ?? 20} value={maxActiveDraft}
+            onChange={(event) => { setMaxActiveDraft(Math.max(1, Math.min(pesky?.maxActiveLimit ?? 20,
+              Number(event.target.value) || 1))); setDirty(true); }} />
+        </label>
         <SpawnPacingFields draft={draft} disabled={!pesky?.ready || saving} mode="pesky"
           allowConcurrentStrongInteractions={allowStrongDraft}
           onAllowConcurrentStrongChange={(value) => {
@@ -64,11 +73,12 @@ export function PeskyIntervalPanel() {
           <button type="button" disabled={!pesky?.ready || saving} onClick={() => {
             if (!pesky) return;
             setDraft(pacingDraftFor(peskyDefaults(pesky)));
+            setMaxActiveDraft(pesky.defaultMaxActive ?? 1);
             setAllowStrongDraft(pesky.defaultAllowConcurrentStrongInteractions ?? false);
             setDirty(true);
           }}>{t("pesky.intervals.restore")}</button>
           <button type="button" disabled={!pesky?.ready || !interaction?.ready || !valid || saving} onClick={() => {
-            applyPacingToBoth(values, allowStrongDraft); setDirty(false); setAppliedBoth(true);
+            applyPacingToBoth(maxActiveDraft, values, allowStrongDraft); setDirty(false); setAppliedBoth(true);
           }}>{t("pesky.intervals.applyBoth")}</button>
           <button type="submit" disabled={!pesky?.ready || !valid || !hasChanges || saving}>{t("pesky.intervals.save")}</button>
         </div>

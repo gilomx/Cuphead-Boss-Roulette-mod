@@ -49,8 +49,8 @@ interface ConfigValue {
   applyPeskyNames: (names: string) => void;
   applyPeskyItem: (item: string, enabled: boolean) => void;
   applyPeskyChallengeDuration: (seconds: number, countdown: number, wait: number) => void;
-  applyPeskyIntervals: (pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => void;
-  applyPacingToBoth: (pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => void;
+  applyPeskyIntervals: (maxActive: number, pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => void;
+  applyPacingToBoth: (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => void;
   applyPeskyBattleGift: (giftId: string) => void;
   applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
   applyPeskyBattleItem: (item: string, enabled: boolean) => void;
@@ -990,9 +990,15 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPeskyIntervals = useCallback(
-    (pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => {
+    (maxActive: number, pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => {
       if (!pesky?.ready || !validPacing(pacing)) return;
-      const changes = allowConcurrentStrongInteractions === undefined ? pacing : { ...pacing, allowConcurrentStrongInteractions };
+      const normalizedMaxActive = Math.max(
+        1,
+        Math.min(pesky.maxActiveLimit ?? 20, Math.floor(maxActive) || 1),
+      );
+      const changes = allowConcurrentStrongInteractions === undefined
+        ? { ...pacing, maxActive: normalizedMaxActive }
+        : { ...pacing, maxActive: normalizedMaxActive, allowConcurrentStrongInteractions };
       sendPeskyUpdate(
         new URLSearchParams(Object.fromEntries(Object.entries(changes).map(([key, value]) => [key, String(value)]))),
         (state) => ({
@@ -1006,10 +1012,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPacingToBoth = useCallback(
-    (pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => {
+    (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => {
       if (!pesky?.ready || !interaction?.ready || !interaction.pacing) return;
-      applyPeskyIntervals(pacing, allowConcurrentStrongInteractions);
-      applyInteractionSettings(interaction.maxActive, interaction.showGiftImage !== false,
+      applyPeskyIntervals(maxActive, pacing, allowConcurrentStrongInteractions);
+      applyInteractionSettings(maxActive, interaction.showGiftImage !== false,
         { ...pacing, enabled: interaction.pacing.enabled });
     },
     [pesky?.ready, interaction, applyPeskyIntervals, applyInteractionSettings],

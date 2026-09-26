@@ -2,6 +2,15 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- **Máximo de ataques en pantalla** se configura por separado en Interacciones
+  y Modo Molestoso. Al actualizar, el modo hereda el límite que ambos usaban y
+  después guarda el suyo; **Usar en ambos modos** sincroniza también este valor
+  junto con tiempos y cantidades.
+- Los lotes automáticos de Modo Molestoso sortean cada actor por separado dentro
+  del grupo leve o intenso elegido. El mismo actor sólo se repite si vuelve a
+  salir al azar; las cantidades explícitas de regalos y pruebas continúan
+  respetando el actor solicitado.
+
 - Durante el K.O., **Vida extra** y **Ayuda fantasmal** conservan únicamente su
   nombre móvil unido al actor. Ya no reciben además la copia estática que el
   resto del catálogo mantiene al finalizar el nivel, evitando que el remitente

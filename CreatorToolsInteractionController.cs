@@ -120,7 +120,7 @@ namespace Gilomx.CupheadBossRoulette
                 setPhaseTransitionProtectionEnabled;
             CreatorToolsDonorLabel.SetGiftImagesVisible(ShowGiftImage);
             peskySettings = CreatorToolsPeskyModeSettings.Load(
-                pluginConfigPath, logWarning);
+                pluginConfigPath, logWarning, InteractionMaximumActive);
             peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             interactionPacingSettings = CreatorToolsInteractionPacingSettings.Load(pluginConfigPath, logWarning);
             liveEvents = new CreatorToolsLiveEventsCoordinator();
@@ -848,7 +848,8 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
             else if (values.ContainsKey("minimumInterval") ||
-                values.ContainsKey("maximumInterval"))
+                values.ContainsKey("maximumInterval") ||
+                values.ContainsKey("maxActive"))
                 SetPeskyIntervals(values);
             else if (values.ContainsKey("names"))
                 SetPeskyNames(values);
@@ -990,7 +991,7 @@ namespace Gilomx.CupheadBossRoulette
             var plan = CreatorToolsInteractionGroups.PlanAutomaticSpawn(
                 CreatorToolsInteractionIds.All, peskyPacing.MiniBossReady,
                 peskyPacing.IntervalReady && peskyQueue.PendingCount == 0 &&
-                    ActiveActorCount(peskyQueue) < MaximumActive,
+                    ActiveActorCount(peskyQueue) < PeskyMaximumActive,
                 delegate(string item) { return !IsTimedChallenge(item) && peskySettings.IsItemEnabled(item); },
                 IsItemAvailable, CanSelectPeskyItem, HasWaitingInteractionMiniBoss());
             peskyMiniBossReserved = plan.MiniBossReserved;
@@ -1008,7 +1009,7 @@ namespace Gilomx.CupheadBossRoulette
                     peskyQueue.Reject(obsolete);
                     InvalidateState();
                 }
-                if (chosen == null && ActiveActorCount(peskyQueue) < MaximumActive &&
+                if (chosen == null && ActiveActorCount(peskyQueue) < PeskyMaximumActive &&
                     CanSelectPeskyItem(miniBosses[0]))
                     EnqueuePeskyItem(miniBosses[UnityEngine.Random.Range(0, miniBosses.Count)]);
                 return;
@@ -1029,7 +1030,7 @@ namespace Gilomx.CupheadBossRoulette
                 InvalidateState();
             }
             if (!peskyPacing.IntervalReady || peskyQueue.PendingCount > 0 ||
-                ActiveActorCount(peskyQueue) >= MaximumActive)
+                ActiveActorCount(peskyQueue) >= PeskyMaximumActive)
                 return;
 
             var availableItems = plan.Candidates;
@@ -1040,20 +1041,25 @@ namespace Gilomx.CupheadBossRoulette
             availableItems.RemoveAll(delegate(string item)
                 { return CreatorToolsInteractionGroups.ForItem(item) != group; });
             var quantity = Math.Min(SampleBatchSize(group, true),
-                MaximumActive - ActiveActorCount(peskyQueue));
+                PeskyMaximumActive - ActiveActorCount(peskyQueue));
             if (peskyPacing.MiniBossPresent)
                 quantity = Math.Min(quantity, Math.Max(0,
                     peskySettings.MaximumCompanionsDuringMiniBoss - CountActiveCompanions()));
-            for (var i = 0; i < quantity && availableItems.Count > 0; i++)
-            {
-                var item = i == 0 ? first : availableItems[
-                    UnityEngine.Random.Range(0, availableItems.Count)];
-                EnqueuePeskyItem(item);
-                // An exclusive attack (currently the dragon) cannot have two
-                // simultaneous copies; choose a different eligible sibling.
-                if (FindExecutor(item) is ICreatorToolsExclusiveInteractionExecutor)
-                    availableItems.Remove(item);
-            }
+            var batch = CreatorToolsInteractionGroups.SelectAutomaticBatch(
+                first,
+                availableItems,
+                quantity,
+                delegate(int count)
+                {
+                    return UnityEngine.Random.Range(0, count);
+                },
+                delegate(string item)
+                {
+                    return FindExecutor(item) is
+                        ICreatorToolsExclusiveInteractionExecutor;
+                });
+            for (var i = 0; i < batch.Count; i++)
+                EnqueuePeskyItem(batch[i]);
         }
 
         private void UpdatePeskyChallenges(bool gameplayDispatchAllowed)
@@ -1289,7 +1295,7 @@ namespace Gilomx.CupheadBossRoulette
             Dictionary<string, string> values)
         {
             string value;
-            var maximumActive = MaximumActive;
+            var maximumActive = InteractionMaximumActive;
             var maximumMiniBosses = MaximumMiniBosses;
             var showGiftImage = ShowGiftImage;
             if (values.TryGetValue("maxActive", out value))
@@ -1408,7 +1414,10 @@ namespace Gilomx.CupheadBossRoulette
                     { return candidate.IsReady && IsTimedChallenge(candidate.Item) && CanDispatchEntry(candidate, false); });
                 if (challenge != null && TryDispatchEntry(queue, challenge, false)) return true;
             }
-            if (ActiveActorCount(queue) >= MaximumActive)
+            var maximumActive = pesky
+                ? PeskyMaximumActive
+                : InteractionMaximumActive;
+            if (ActiveActorCount(queue) >= maximumActive)
                 return false;
 
             var now = Time.realtimeSinceStartup;
@@ -1457,6 +1466,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (first == null)
                 return false;
+            var maximumActive = pesky
+                ? PeskyMaximumActive
+                : InteractionMaximumActive;
             var group = CreatorToolsInteractionGroups.ForItem(first.Item);
             var battle = first.Source == CreatorToolsInteractionSource.PeskyBattle;
             var paced = !battle && (pesky || interactionPacingSettings.Enabled);
@@ -1465,7 +1477,7 @@ namespace Gilomx.CupheadBossRoulette
             var dispatched = CreatorToolsInteractionGroups.DispatchBatch(first, maximum,
                 delegate(CreatorToolsInteractionQueue.Entry entry)
                 {
-                    return ActiveActorCount(queue) < MaximumActive &&
+                    return ActiveActorCount(queue) < maximumActive &&
                         CanDispatchEntry(entry, pesky) &&
                         TryDispatchEntry(queue, entry, pesky);
                 },
@@ -1474,7 +1486,7 @@ namespace Gilomx.CupheadBossRoulette
                     // Keep the battle's existing reserved opportunity when a
                     // regular group reaches the shared queue's last slot.
                     if (!pesky && !battle &&
-                        ActiveActorCount(queue) == MaximumActive - 1 &&
+                        ActiveActorCount(queue) == maximumActive - 1 &&
                         queue.ActiveCountFor(CreatorToolsInteractionSource.PeskyBattle) == 0 &&
                         queue.Peek(delegate(CreatorToolsInteractionQueue.Entry candidate)
                         {
@@ -1523,7 +1535,8 @@ namespace Gilomx.CupheadBossRoulette
             if (regularEntry == null)
                 return battleEntry;
 
-            var remainingCapacity = MaximumActive - ActiveActorCount(queue);
+            var remainingCapacity = InteractionMaximumActive -
+                ActiveActorCount(queue);
             if (remainingCapacity == 1)
             {
                 // Do not let either lane consume the final slot while only
@@ -1681,12 +1694,24 @@ namespace Gilomx.CupheadBossRoulette
 
         internal const int MaximumActiveLimit = 20;
 
-        private int MaximumActive
+        private int InteractionMaximumActive
         {
             get
             {
                 var value = getMaximumActive == null ? 1 : getMaximumActive();
                 return Math.Max(1, Math.Min(MaximumActiveLimit, value));
+            }
+        }
+
+        private int PeskyMaximumActive
+        {
+            get
+            {
+                return peskySettings == null
+                    ? CreatorToolsPeskyModeSettings.DefaultMaximumActive
+                    : Math.Max(1, Math.Min(
+                        CreatorToolsPeskyModeSettings.MaximumActiveLimit,
+                        peskySettings.MaximumActive));
             }
         }
 
@@ -1768,7 +1793,7 @@ namespace Gilomx.CupheadBossRoulette
                     ? 0L
                     : Math.Max(0L, getStreamBacklogCount()))
                 .Append(",\"deferredTestCount\":0")
-                .Append(",\"maxActive\":").Append(MaximumActive)
+                .Append(",\"maxActive\":").Append(InteractionMaximumActive)
                 .Append(",\"maxMiniBosses\":").Append(MaximumMiniBosses)
                 .Append(",\"maxActiveLimit\":").Append(MaximumActiveLimit)
                 .Append(",\"maxBatch\":")
@@ -1870,7 +1895,8 @@ namespace Gilomx.CupheadBossRoulette
             }
             builder.Append("],\"queueCount\":").Append(peskyQueue.Count)
                 .Append(",\"activeCount\":").Append(peskyQueue.ActiveCount)
-                .Append(",\"maxActive\":").Append(MaximumActive)
+                .Append(",\"maxActiveLimit\":")
+                .Append(CreatorToolsPeskyModeSettings.MaximumActiveLimit)
                 .Append(",\"queue\":");
             peskyQueue.AppendJson(builder);
             builder.Append('}');

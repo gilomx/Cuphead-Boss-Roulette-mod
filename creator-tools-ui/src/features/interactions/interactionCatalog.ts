@@ -23,7 +23,7 @@ export const interactionItems = [
     descriptionKey: "interactions.helps.ghostEffect",
     imageAltKey: "interactions.helps.ghost",
     typeKey: "interactions.groups.help",
-    image: "/assets/creator-tools/supers/super3.png",
+    image: "/assets/creator-tools/interactions/ghost-help.png",
   },
   {
     id: "challenge_half_damage",
