@@ -41,6 +41,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsPeskyPacing interactionPacing = new CreatorToolsPeskyPacing();
         private readonly BaronessMiniBossInteractionExecutor miniBossExecutor;
         private readonly TimedChallengeInteractionExecutor timedChallenges;
+        private readonly CreatorToolsExtraLifeExecutor extraLives;
         private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly CreatorToolsPeskyBattleController peskyBattle;
         private readonly CreatorToolsTapFarmingController tapFarming;
@@ -74,6 +75,7 @@ namespace Gilomx.CupheadBossRoulette
         internal CreatorToolsInteractionController(
             UnityEngine.MonoBehaviour coroutineHost,
             string pluginConfigPath,
+            string assetsDirectory,
             Func<bool> canPreloadNativeAssets,
             Func<bool> canSpawnInteraction,
             TimedChallengeInteractionExecutor timedChallenges,
@@ -89,6 +91,8 @@ namespace Gilomx.CupheadBossRoulette
             Action clearStreamBacklog,
             Action resetStreamRuntimeState,
             CreatorToolsGiftResolver resolveGift,
+            Func<bool> hpOneProtectionBlocked,
+            Func<Shader> getHpOneSuspendedShader,
             Func<bool> getPhaseTransitionProtectionEnabled,
             Action<bool> setPhaseTransitionProtectionEnabled,
             Action<string> logInfo,
@@ -118,6 +122,14 @@ namespace Gilomx.CupheadBossRoulette
             peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             interactionPacingSettings = CreatorToolsInteractionPacingSettings.Load(pluginConfigPath, logWarning);
             liveEvents = new CreatorToolsLiveEventsCoordinator();
+            extraLives = new CreatorToolsExtraLifeExecutor(
+                assetsDirectory,
+                canSpawnInteraction,
+                hpOneProtectionBlocked,
+                getHpOneSuspendedShader,
+                logInfo,
+                logWarning);
+            executors.Add(extraLives);
             executors.Add(timedChallenges);
             executors.Add(new ZeppelinInteractionExecutor(
                 coroutineHost, canPreloadNativeAssets, canSpawnInteraction,
@@ -190,7 +202,7 @@ namespace Gilomx.CupheadBossRoulette
                 var processedCommands = 0;
                 while (processedCommands < MaximumCommandsPerUpdate &&
                        server.TryTakeInteractionCommand(
-                           interactionQueue.AvailableCapacity > 0,
+                           CanMaterializeInteractionTest,
                            out query,
                            out backgroundApplied,
                            out isTest,
@@ -321,6 +333,28 @@ namespace Gilomx.CupheadBossRoulette
                     ? interactionQueue.AvailableCapacity
                     : 0;
             }
+        }
+
+        private bool CanMaterializeInteractionTest(string query)
+        {
+            var values = ParseQuery(query);
+            string item;
+            return values.TryGetValue("item", out item) &&
+                interactionQueue.AvailableCapacityFor(item) > 0;
+        }
+
+        internal bool TryProtectPlayerOneWithExtraLife(
+            PlayerStatsManager stats, DamageDealer.DamageInfo damage)
+        {
+            return extraLives != null &&
+                extraLives.TryProtect(stats, damage);
+        }
+
+        internal int StreamQueueAvailableCapacityFor(string item)
+        {
+            return InteractionsEnabled
+                ? interactionQueue.AvailableCapacityFor(item)
+                : 0;
         }
 
         internal bool InteractionsEnabled
@@ -605,7 +639,9 @@ namespace Gilomx.CupheadBossRoulette
             peskyBattle.OnPhaseTransition();
             tapFarming.OnPhaseTransition();
             for (var i = 0; i < executors.Count; i++)
-                if (executors[i] != timedChallenges)
+                if (executors[i] != timedChallenges &&
+                    !(executors[i] is
+                        ICreatorToolsPhasePersistentInteractionExecutor))
                     executors[i].EndGameplayLevel();
             peskyPacing.ResetInterval();
             nextAnyDispatchAt = -1f;
@@ -1030,7 +1066,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private static int ActiveActorCount(CreatorToolsInteractionQueue queue)
         {
-            return queue.ActiveCount - queue.ActiveCountMatching(IsTimedChallenge);
+            return queue.ActiveCount -
+                queue.ActiveCountMatching(IsTimedChallenge) -
+                queue.ActiveCountMatching(CreatorToolsHelp.Supports);
         }
 
         internal bool NativeAssetsSettled
@@ -1098,7 +1136,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool IsCommonInteraction(string item)
         {
-            return !miniBossExecutor.Supports(item) && !IsTimedChallenge(item);
+            return !miniBossExecutor.Supports(item) &&
+                !IsTimedChallenge(item) &&
+                !CreatorToolsHelp.Supports(item);
         }
 
         private void ResetPeskySchedule()
@@ -1124,7 +1164,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private int SampleBatchSize(string group, bool pesky)
         {
-            if (group == CreatorToolsInteractionGroups.Challenge ||
+            if (group == CreatorToolsInteractionGroups.Help ||
+                group == CreatorToolsInteractionGroups.Challenge ||
                 group == CreatorToolsInteractionGroups.MiniBoss ||
                 (pesky && group == CreatorToolsInteractionGroups.Strong &&
                  !peskySettings.AllowConcurrentStrongInteractions))
@@ -1287,6 +1328,11 @@ namespace Gilomx.CupheadBossRoulette
             if (!canDispatchInteractions && !canDispatchPesky)
                 return;
 
+            // Helps own a priority lane. They do not wait behind actor
+            // capacity, pacing or the shared attack dispatch interval.
+            if (canDispatchInteractions && ProcessHelpQueue())
+                return;
+
             var now = Time.realtimeSinceStartup;
             if (nextAnyDispatchAt >= 0f && now < nextAnyDispatchAt)
                 return;
@@ -1313,6 +1359,19 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (canDispatchPesky && ProcessQueue(peskyQueue, true))
                 preferPeskyNext = false;
+        }
+
+        private bool ProcessHelpQueue()
+        {
+            var entry = interactionQueue.Peek(
+                delegate(CreatorToolsInteractionQueue.Entry candidate)
+                {
+                    return candidate.IsReady &&
+                        CreatorToolsHelp.Supports(candidate.Item) &&
+                        CanDispatchEntry(candidate, false);
+                });
+            return entry != null &&
+                TryDispatchEntry(interactionQueue, entry, false);
         }
 
         private bool ProcessQueue(
@@ -1547,6 +1606,8 @@ namespace Gilomx.CupheadBossRoulette
                 return peskyBattle.Active;
             if (!InteractionsEnabled || queuePaused)
                 return false;
+            if (CreatorToolsHelp.Supports(entry.Item))
+                return true;
             if (IsTimedChallenge(entry.Item))
                 return entry.Source != CreatorToolsInteractionSource.Stream || peskyBattle.StreamAttacksAllowed;
             // Never reject an earned redemption for pacing. It remains queued,
@@ -1656,7 +1717,7 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"item\":\"")
                 .Append(CreatorToolsInteractionIds.All[0])
                 .Append("\",\"items\":[");
-            AppendItemList(builder);
+            AppendItemList(builder, false);
             builder.Append("],\"lastItem\":\"");
             AppendJson(builder, lastItem);
             builder.Append("\",\"feedback\":\"");
@@ -1769,7 +1830,7 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append('"');
             }
             builder.Append("],\"items\":[");
-            AppendItemList(builder);
+            AppendItemList(builder, false);
             builder.Append("],\"disabledItems\":[");
             var first = true;
             for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
@@ -1793,15 +1854,21 @@ namespace Gilomx.CupheadBossRoulette
             return builder.ToString();
         }
 
-        private static void AppendItemList(StringBuilder builder)
+        private static void AppendItemList(
+            StringBuilder builder, bool excludeHelps)
         {
+            var first = true;
             for (var i = 0; i < CreatorToolsInteractionIds.All.Length; i++)
             {
-                if (i > 0)
+                var item = CreatorToolsInteractionIds.All[i];
+                if (excludeHelps && CreatorToolsHelp.Supports(item))
+                    continue;
+                if (!first)
                     builder.Append(',');
                 builder.Append('"');
-                AppendJson(builder, CreatorToolsInteractionIds.All[i]);
+                AppendJson(builder, item);
                 builder.Append('"');
+                first = false;
             }
         }
 

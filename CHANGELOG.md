@@ -2,6 +2,31 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- La zanahoria teledirigida vuelve a prepararse para el catálogo. Su jefe nativo
+  todavía no existe cuando se bloquea el ciclo de vida de la escena temporal,
+  así que ahora se obtiene desde la tabla serializada de prefabs de La Pandilla
+  Raíz. La creación acepta tanto la firma nativa normal como la variante con el
+  parámetro adicional presente en la copia de ejecución del launcher. Si la
+  preparación falla, continúa fuera del sorteo en vez de fingir una selección.
+
+- **Vida extra** inaugura la categoría **Ayudas** sobre una vía prioritaria
+  propia. Cada canje añade a Player 1 un crédito con el nombre del remitente y
+  un corazón animado basado en el Súper II de Ms. Chalice; Cuphead y Mugman
+  reciben una entrada visual equivalente con su propio personaje. Pueden
+  acumularse varios, se consumen del más antiguo al más reciente y sobreviven a
+  reintentos y cambios de nivel durante la sesión, pero se borran al cerrar
+  Cuphead. La protección usa la barrera nativa de daño sin sumar HP ni compartir
+  créditos con Player 2. Durante HP.1 quedan grises e inoperantes; vuelven al
+  terminar si Player 1 sobrevivió, o esperan al siguiente intento si murió.
+  Las
+  ayudas conservan FIFO entre sí, aparecen antes que cualquier canje no benéfico,
+  no consumen espacios de ataques y mantienen capacidad reservada aunque la cola
+  normal esté llena. No interrumpen una interacción ya activa y obedecen Pausar
+  cola. Modo Molestoso incluye las ayudas para probar todo el catálogo: usa un
+  nombre aleatorio de su lista o ninguno cuando está vacía. El panel les da una
+  sección con Activar/Desactivar todo antes de Retos temporales; Batalla
+  Molestosa no las genera.
+
 - Se cerró la ronda de validación en juego de los cambios recientes: minijefes
   en Grim Matchstick, selección masiva y orden del panel, regreso animado de
   Volteada de cabeza, Solo balas de miniavión, cuenta previa con nombre y audio,

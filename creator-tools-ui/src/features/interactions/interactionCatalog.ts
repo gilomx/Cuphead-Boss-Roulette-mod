@@ -1,10 +1,20 @@
-export const interactionCategories = ["attack", "mini_boss", "challenge"] as const;
+export const interactionCategories = ["help", "attack", "mini_boss", "challenge"] as const;
 export type InteractionCategory = typeof interactionCategories[number];
-export const interactionGroups = ["light", "strong", "mini_boss", "challenge"] as const;
+export const interactionGroups = ["help", "light", "strong", "mini_boss", "challenge"] as const;
 export type InteractionGroup = typeof interactionGroups[number];
 export type InteractionCategoryFilter = "all" | InteractionGroup;
 
 export const interactionItems = [
+  {
+    id: "help_extra_life",
+    category: "help",
+    group: "help",
+    titleKey: "interactions.helps.extraLife",
+    descriptionKey: "interactions.helps.extraLifeEffect",
+    imageAltKey: "interactions.helps.extraLife",
+    typeKey: "interactions.groups.help",
+    image: "/assets/creator-tools/interactions/extra-life-heart.png",
+  },
   {
     id: "challenge_half_damage",
     category: "challenge",

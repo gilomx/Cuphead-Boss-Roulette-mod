@@ -41,10 +41,26 @@ namespace Gilomx.CupheadBossRoulette
             // PlayerManager already holds the real players. Looking through
             // the entire scene for a missing plane player is costly on ground
             // levels, especially while repeatedly checking spawn candidates.
-            foreach (var player in PlayerManager.GetAllPlayers())
-                if (player is PlanePlayerController && player != null &&
-                    player.gameObject.activeInHierarchy)
-                    return true;
+            // During the first frames of a level transition Cuphead can expose
+            // no player collection yet. Availability checks still run in that
+            // window, so treat it as "not ready" instead of aborting the whole
+            // interaction queue with a NullReferenceException.
+            try
+            {
+                var players = PlayerManager.GetAllPlayers();
+                if (players == null)
+                    return false;
+                foreach (var player in players)
+                    if (player != null &&
+                        player is PlanePlayerController &&
+                        player.gameObject != null &&
+                        player.gameObject.activeInHierarchy)
+                        return true;
+            }
+            catch
+            {
+                return false;
+            }
             return false;
         }
 

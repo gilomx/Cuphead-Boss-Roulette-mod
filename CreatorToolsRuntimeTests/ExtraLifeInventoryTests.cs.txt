@@ -1,0 +1,38 @@
+using System;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunExtraLifeInventoryTests()
+        {
+            Run("Extra lives keep FIFO credits and honor suspension", delegate
+            {
+                var inventory = new CreatorToolsExtraLifeInventory();
+                var first = inventory.Add("First helper");
+                var second = inventory.Add("Second helper");
+                Equal(2, inventory.Count, "two credits are stored");
+
+                CreatorToolsExtraLifeInventory.Credit consumed;
+                False(inventory.TryConsume(true, out consumed),
+                    "suspended HP.1 cannot consume a credit");
+                Equal(2, inventory.Count,
+                    "suspension preserves every credit");
+                True(inventory.TryConsume(false, out consumed),
+                    "an eligible hit consumes one credit");
+                Equal(first.Id, consumed.Id,
+                    "the oldest credit is consumed first");
+                Equal("First helper", consumed.Donor,
+                    "the donor remains attached to its credit");
+                Equal(1, inventory.Count,
+                    "only one credit was consumed");
+                Equal(second.Id, inventory[0].Id,
+                    "the newer credit remains reserved");
+
+                inventory.Clear();
+                Equal(0, inventory.Count,
+                    "closing the session clears the inventory");
+            });
+        }
+    }
+}

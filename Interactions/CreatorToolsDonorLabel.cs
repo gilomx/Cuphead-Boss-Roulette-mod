@@ -198,6 +198,12 @@ namespace Gilomx.CupheadBossRoulette
                 follower.SetVerticalOffsetPixels(offsetPixels);
         }
 
+        internal void RefreshAnchor()
+        {
+            if (follower != null)
+                follower.RefreshAnchor();
+        }
+
         internal void FollowAnimatedBody(
             SpriteRenderer primary, SpriteRenderer secondary, bool includeSecondary,
             Action prepareBody)
@@ -519,6 +525,11 @@ namespace Gilomx.CupheadBossRoulette
                 actorOffset.y +=
                     scaledOffset - additionalVerticalOffset;
             additionalVerticalOffset = scaledOffset;
+            rendererAnchorCaptured = false;
+        }
+
+        internal void RefreshAnchor()
+        {
             rendererAnchorCaptured = false;
         }
 

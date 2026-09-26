@@ -95,9 +95,10 @@ namespace Gilomx.CupheadBossRoulette
             while (entries.Count > 0 &&
                    batches < MaximumBatchesPerUpdate)
             {
-                if (nextEntry >= entries.Count)
-                    nextEntry = 0;
-                var entry = entries[nextEntry];
+                var entryIndex = FindNextDrainableEntry(interactions);
+                if (entryIndex < 0)
+                    break;
+                var entry = entries[entryIndex];
                 string feedbackCode;
                 var added = DrainEntry(
                     entry, interactions, out feedbackCode);
@@ -107,14 +108,40 @@ namespace Gilomx.CupheadBossRoulette
 
                 queued += added;
                 if (entry.Remaining <= 0)
-                    entries.RemoveAt(nextEntry);
-                else
-                    nextEntry = (nextEntry + 1) % entries.Count;
-
-                if (interactions.StreamQueueAvailableCapacity <= 0)
-                    break;
+                {
+                    entries.RemoveAt(entryIndex);
+                    if (entryIndex < nextEntry)
+                        nextEntry--;
+                    if (nextEntry < 0 || nextEntry >= entries.Count)
+                        nextEntry = 0;
+                }
+                else if (!CreatorToolsHelp.Supports(entry.Interaction))
+                    nextEntry = (entryIndex + 1) % entries.Count;
             }
             return queued;
+        }
+
+        private int FindNextDrainableEntry(
+            CreatorToolsInteractionController interactions)
+        {
+            for (var i = 0; i < entries.Count; i++)
+                if (CreatorToolsHelp.Supports(entries[i].Interaction) &&
+                    interactions.StreamQueueAvailableCapacityFor(
+                        entries[i].Interaction) > 0)
+                    return i;
+
+            if (nextEntry < 0 || nextEntry >= entries.Count)
+                nextEntry = 0;
+            for (var offset = 0; offset < entries.Count; offset++)
+            {
+                var index = (nextEntry + offset) % entries.Count;
+                if (CreatorToolsHelp.Supports(entries[index].Interaction))
+                    continue;
+                if (interactions.StreamQueueAvailableCapacityFor(
+                        entries[index].Interaction) > 0)
+                    return index;
+            }
+            return -1;
         }
 
         internal int DrainEntry(
@@ -126,7 +153,8 @@ namespace Gilomx.CupheadBossRoulette
             if (entry == null || entry.Remaining <= 0 ||
                 interactions == null)
                 return 0;
-            if (interactions.StreamQueueAvailableCapacity <= 0)
+            if (interactions.StreamQueueAvailableCapacityFor(
+                    entry.Interaction) <= 0)
             {
                 feedbackCode = "queue_full";
                 return 0;

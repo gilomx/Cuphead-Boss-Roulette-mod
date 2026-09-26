@@ -21,6 +21,7 @@ namespace Gilomx.CupheadBossRoulette
             RunMiniBossSpawnPolicyTests();
             RunMiniBossArenaPolicyTests();
             RunTimedChallengeTests();
+            RunExtraLifeInventoryTests();
             RunDonorLabelLifetimeTests();
             RunPeskyModeSettingsTests();
             RunPeskyPacingTests();
@@ -46,6 +47,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestCreatorToolsAssetsBypassCache);
             Run("Server counts and prioritizes deferred manual tests",
                 TestDeferredManualTestCommands);
+            Run("Manual help tests bypass a full regular lane",
+                TestManualHelpTestPriority);
             Run("Control projections wait for their exact command sequence",
                 TestExactControlProjectionAcknowledgement);
             Run("Projected master state governs manual test admission",
@@ -563,6 +566,72 @@ namespace Gilomx.CupheadBossRoulette
                             .GetProperty("deferredTestCount").GetInt64(),
                         "manual test count after dequeue");
                 }
+            }
+        }
+
+        private static void TestManualHelpTestPriority()
+        {
+            using (var scope = new TestScope("manual-help-priority"))
+            using (var server = scope.StartServer())
+            {
+                server.SetInteractionsState(
+                    "{\"ready\":true,\"interactionsEnabled\":true," +
+                    "\"masterRevision\":0,\"queuePaused\":false," +
+                    "\"queueControlRevision\":0,\"pendingCount\":0," +
+                    "\"backlogCount\":0,\"deferredTestCount\":0}", 0, 0);
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/test?item=test_attack" +
+                    "&donor=Attack&quantity=1"))
+                {
+                }
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/test?item=help_extra_life" +
+                    "&donor=Helper&quantity=1"))
+                {
+                }
+
+                string query;
+                bool backgroundApplied;
+                bool isTest;
+                int pendingQuantity;
+                long commandSequence;
+                long testGeneration;
+                True(server.TryTakeInteractionCommand(
+                    delegate(string candidate)
+                    {
+                        return candidate.StartsWith(
+                            "item=help_extra_life",
+                            StringComparison.Ordinal);
+                    },
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "help test was not selected");
+                True(query.StartsWith("item=help_extra_life",
+                        StringComparison.Ordinal),
+                    "help test jumps the blocked regular request");
+                server.ProcessInteractionTestCommand(
+                    query, pendingQuantity, testGeneration,
+                    delegate { return 0; });
+
+                True(server.TryTakeInteractionCommand(
+                    true,
+                    out query,
+                    out backgroundApplied,
+                    out isTest,
+                    out pendingQuantity,
+                    out commandSequence,
+                    out testGeneration),
+                    "regular test was lost while help advanced");
+                True(query.StartsWith("item=test_attack",
+                        StringComparison.Ordinal),
+                    "regular FIFO remains intact");
+                server.ProcessInteractionTestCommand(
+                    query, pendingQuantity, testGeneration,
+                    delegate { return 0; });
             }
         }
 

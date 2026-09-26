@@ -34,6 +34,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string InkRainChallenge = "challenge_ink_rain";
         internal const string MiniPlaneOnlyChallenge = "challenge_mini_plane_only";
         internal const string HpOneChallenge = "challenge_hp_one";
+        internal const string ExtraLifeHelp = "help_extra_life";
 
         internal static readonly string[] All =
         {
@@ -65,7 +66,8 @@ namespace Gilomx.CupheadBossRoulette
             UpsideDownChallenge,
             InkRainChallenge,
             MiniPlaneOnlyChallenge,
-            HpOneChallenge
+            HpOneChallenge,
+            ExtraLifeHelp
         };
     }
 
@@ -91,6 +93,12 @@ namespace Gilomx.CupheadBossRoulette
     internal interface ICreatorToolsExclusiveInteractionExecutor
     {
         bool BlocksConcurrentSpawn(string item);
+    }
+
+    // Durable player aids survive an internal boss phase transition. They are
+    // still cleared by the normal end-of-level lifecycle.
+    internal interface ICreatorToolsPhasePersistentInteractionExecutor
+    {
     }
 
     internal interface ICreatorToolsTimedInteractionExecutor

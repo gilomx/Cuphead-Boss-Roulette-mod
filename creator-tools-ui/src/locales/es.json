@@ -651,6 +651,7 @@
     },
     "categories": {
       "all": "Todos",
+      "help": "Ayudas",
       "attack": "Ataques",
       "mini_boss": "Mini jefes",
       "challenge": "Retos temporales"
@@ -857,6 +858,7 @@
       "title": "Grupo de molestia",
       "description": "Los grupos separan los ataques por la presión que añaden a la pelea. No cambian la dificultad elegida en Cuphead.",
       "all": "Todos los grupos",
+      "help": "Ayudas",
       "light": "Molestias leves",
       "strong": "Molestias intensas",
       "mini_boss": "Minijefes",
@@ -865,6 +867,10 @@
       "mini_bossHint": "Enemigos con vida propia. Solo puede aparecer uno a la vez.",
       "filter": "Filtrar por grupo",
       "challenge": "Retos temporales"
+    },
+    "helps": {
+      "extraLife": "VIDA EXTRA",
+      "extraLifeEffect": "Añade a Player 1 un corazón protector con el nombre de quien lo envió. Se pueden acumular varios y se consumen del más antiguo al más reciente. Se conservan entre intentos y niveles de esta sesión."
     },
     "challenges": {
       "halfDamage": "Daño a la mitad",
@@ -1014,6 +1020,9 @@
       "title": "Ataques disponibles",
       "description": "Marca los elementos que podrán aparecer. Los artículos nuevos se activarán automáticamente.",
       "required": "Activa al menos un ataque para poder iniciar el modo."
+    },
+    "helps": {
+      "description": "Marca las ayudas que Modo Molestoso podrá generar para probarlas. Usan un nombre aleatorio de la lista; si la lista está vacía, aparecen sin nombre."
     },
     "feedback": {
       "ready": "La configuración está lista.",

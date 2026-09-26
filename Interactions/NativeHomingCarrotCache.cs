@@ -13,9 +13,19 @@ namespace Gilomx.CupheadBossRoulette
 
         private static readonly System.Reflection.FieldInfo HomingPrefabField =
             AccessTools.Field(typeof(VeggiesLevelCarrot), "homingPrefab");
+        private static readonly System.Reflection.FieldInfo VeggiesPrefabsField =
+            AccessTools.Field(typeof(VeggiesLevel), "prefabs");
+        private static readonly Type VeggiesPrefabsType =
+            AccessTools.Inner(typeof(VeggiesLevel), "Prefabs");
+        private static readonly System.Reflection.FieldInfo CarrotPrefabField =
+            VeggiesPrefabsType == null
+                ? null
+                : AccessTools.Field(VeggiesPrefabsType, "carrot");
         private static readonly System.Reflection.FieldInfo ParentField =
             AccessTools.Field(
                 typeof(VeggiesLevelCarrotHomingProjectile), "parent");
+        private static readonly System.Reflection.MethodInfo NativeCreateMethod =
+            FindNativeCreateMethod();
         private static bool suppressPreloadLifecycle;
 
         private readonly MonoBehaviour coroutineHost;
@@ -132,13 +142,7 @@ namespace Gilomx.CupheadBossRoulette
                     throw new InvalidOperationException(
                         "No active player can be targeted by the homing carrot.");
 
-                spawned = template.Create(
-                    target,
-                    inertParent,
-                    parameters.Position,
-                    parameters.Speed,
-                    parameters.RotationSpeed,
-                    parameters.Health);
+                spawned = CreateNativeProjectile(target, parameters);
                 if (spawned == null)
                     throw new InvalidOperationException(
                         "Cuphead did not create the native homing carrot.");
@@ -345,6 +349,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private void CaptureFromLoadedVeggies()
         {
+            var levels = Resources.FindObjectsOfTypeAll<VeggiesLevel>();
+            for (var i = 0; i < levels.Length && !Ready; i++)
+                CaptureTemplateFromLevel(levels[i]);
+
             var carrots = Resources.FindObjectsOfTypeAll<
                 VeggiesLevelCarrot>();
             for (var i = 0; i < carrots.Length && !Ready; i++)
@@ -353,6 +361,10 @@ namespace Gilomx.CupheadBossRoulette
 
         private void CaptureFromLoadedResources()
         {
+            var levels = Resources.FindObjectsOfTypeAll<VeggiesLevel>();
+            for (var i = 0; i < levels.Length && !Ready; i++)
+                CaptureTemplateFromLevel(levels[i]);
+
             var carrots = Resources.FindObjectsOfTypeAll<
                 VeggiesLevelCarrot>();
             for (var i = 0; i < carrots.Length && !Ready; i++)
@@ -381,11 +393,90 @@ namespace Gilomx.CupheadBossRoulette
             var roots = scene.GetRootGameObjects();
             for (var i = 0; i < roots.Length && !Ready; i++)
             {
+                var levels = roots[i].GetComponentsInChildren<
+                    VeggiesLevel>(true);
+                for (var j = 0; j < levels.Length && !Ready; j++)
+                    CaptureTemplateFromLevel(levels[j]);
+
                 var carrots = roots[i].GetComponentsInChildren<
                     VeggiesLevelCarrot>(true);
                 for (var j = 0; j < carrots.Length && !Ready; j++)
                     CaptureTemplate(carrots[j]);
             }
+        }
+
+        private bool CaptureTemplateFromLevel(VeggiesLevel level)
+        {
+            if (level == null || Ready || VeggiesPrefabsField == null ||
+                CarrotPrefabField == null)
+                return Ready;
+            try
+            {
+                var prefabs = VeggiesPrefabsField.GetValue(level);
+                var carrot = prefabs == null
+                    ? null
+                    : CarrotPrefabField.GetValue(prefabs) as VeggiesLevelCarrot;
+                return CaptureTemplate(carrot);
+            }
+            catch (Exception exception)
+            {
+                if (logWarning != null)
+                    logWarning(
+                        "Could not inspect the Root Pack carrot prefab table: " +
+                        exception.Message);
+                return false;
+            }
+        }
+
+        private VeggiesLevelCarrotHomingProjectile CreateNativeProjectile(
+            AbstractPlayerController target,
+            NativeHomingCarrotSpawnParameters parameters)
+        {
+            if (NativeCreateMethod == null)
+                throw new MissingMethodException(
+                    "Cuphead's native homing carrot Create method was not found.");
+            var nativeParameters = NativeCreateMethod.GetParameters();
+            var arguments = nativeParameters.Length == 7
+                ? new object[]
+                {
+                    target, inertParent, parameters.Position, parameters.Speed,
+                    parameters.RotationSpeed, parameters.Health, true
+                }
+                : new object[]
+                {
+                    target, inertParent, parameters.Position, parameters.Speed,
+                    parameters.RotationSpeed, parameters.Health
+                };
+            return NativeCreateMethod.Invoke(template, arguments) as
+                VeggiesLevelCarrotHomingProjectile;
+        }
+
+        private static System.Reflection.MethodInfo FindNativeCreateMethod()
+        {
+            var methods = typeof(VeggiesLevelCarrotHomingProjectile).GetMethods(
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic);
+            for (var i = 0; i < methods.Length; i++)
+            {
+                var method = methods[i];
+                if (!string.Equals(method.Name, "Create", StringComparison.Ordinal))
+                    continue;
+                var parameters = method.GetParameters();
+                if (parameters.Length != 6 && parameters.Length != 7)
+                    continue;
+                if (parameters[0].ParameterType != typeof(AbstractPlayerController) ||
+                    parameters[1].ParameterType != typeof(VeggiesLevelCarrot) ||
+                    parameters[2].ParameterType != typeof(Vector2) ||
+                    parameters[3].ParameterType != typeof(float) ||
+                    parameters[4].ParameterType != typeof(float) ||
+                    parameters[5].ParameterType != typeof(float) ||
+                    (parameters.Length == 7 &&
+                     parameters[6].ParameterType != typeof(bool)))
+                    continue;
+                return method;
+            }
+            return null;
         }
 
         private bool CaptureTemplate(VeggiesLevelCarrot carrot)

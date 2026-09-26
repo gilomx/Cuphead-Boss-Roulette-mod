@@ -153,6 +153,8 @@ namespace Gilomx.CupheadBossRoulette
                 var heart = hearts[i];
                 if (heart == null)
                     continue;
+                if (heart.GetComponent<CreatorToolsExtraLifeHeart>() != null)
+                    continue;
                 try
                 {
                     var owner = Traverse.Create(heart)

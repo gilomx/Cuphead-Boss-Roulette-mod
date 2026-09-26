@@ -71,6 +71,21 @@ try {
     $fadeMove = ($loader.NestedTypes | Where-Object Name -like '<in_cr>*').Methods | Where-Object Name -eq 'MoveNext'
     $cover = @(Calls $fadeMove 'SceneLoader' 'SetFaderAlpha')
     Require ($cover.Count -eq 1 -and $cover[0].Previous.Operand -eq 1) 'Immediate transition no longer covers the scene'
+
+    $veggies = $module.Types | Where-Object Name -eq 'VeggiesLevel'
+    $prefabsField = $veggies.Fields | Where-Object Name -eq 'prefabs'
+    Require ($null -ne $prefabsField) 'Root Pack level prefab table changed'
+    $prefabsType = $prefabsField.FieldType.Resolve()
+    $carrotField = $prefabsType.Fields | Where-Object Name -eq 'carrot'
+    Require ($null -ne $carrotField -and $carrotField.FieldType.FullName -eq 'VeggiesLevelCarrot') 'Root Pack carrot prefab entry changed'
+    $carrotType = $module.Types | Where-Object Name -eq 'VeggiesLevelCarrot'
+    $homingField = $carrotType.Fields | Where-Object Name -eq 'homingPrefab'
+    Require ($null -ne $homingField -and $homingField.FieldType.FullName -eq 'VeggiesLevelCarrotHomingProjectile') 'Root Pack homing projectile prefab entry changed'
+    $homingType = $module.Types | Where-Object Name -eq 'VeggiesLevelCarrotHomingProjectile'
+    $homingCreate = @($homingType.Methods | Where-Object {
+        $_.Name -eq 'Create' -and $_.Parameters.Count -in @(6, 7)
+    })
+    Require ($homingCreate.Count -ge 1) 'Root Pack homing projectile Create signature changed'
     Write-Output 'Native loading contract passed: fade completes before lazy scene loading, completion is awaited, and immediate transitions stay covered.'
 }
 finally {
@@ -102,6 +117,23 @@ try {
     }
     Require ($cacheCount -eq 10) 'Expected all ten native source scene caches'
     Write-Output 'Compiled catalog contract passed: all ten caches await native resources before unloading; the final loading barrier also drains asset requests.'
+
+    $carrotCache = $mod.Types | Where-Object Name -eq 'NativeHomingCarrotCache'
+    $captureCarrot = $carrotCache.Methods | Where-Object Name -eq 'CaptureTemplateFromLevel'
+    $carrotFields = @($captureCarrot.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldsfld' -and
+        $_.Operand -is [Mono.Cecil.FieldReference] -and
+        $_.Operand.Name -in @('VeggiesPrefabsField', 'CarrotPrefabField')
+    } | ForEach-Object { $_.Operand.Name } | Sort-Object -Unique)
+    Require ($carrotFields.Count -eq 2) 'Homing carrot preload must read the serialized Root Pack prefab table'
+    $createNative = $carrotCache.Methods | Where-Object Name -eq 'CreateNativeProjectile'
+    $reflectionInvoke = @($createNative.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.Name -eq 'Invoke' -and
+        $_.Operand.DeclaringType.FullName -in @('System.Reflection.MethodBase', 'System.Reflection.MethodInfo')
+    })
+    Require ($reflectionInvoke.Count -eq 1) 'Homing carrot spawn must support both native Create signatures'
+    Write-Output 'Compiled homing carrot contract passed: preload reaches the serialized carrot prefab before boss lifecycle runs.'
 
     $plugin = $mod.Types | Where-Object Name -eq 'Plugin'
     $preload = $plugin.Methods | Where-Object Name -eq 'CanPreloadNativeInteractionAssets'

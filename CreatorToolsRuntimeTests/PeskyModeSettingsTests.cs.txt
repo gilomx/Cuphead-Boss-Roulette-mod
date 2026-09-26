@@ -122,6 +122,7 @@ namespace Gilomx.CupheadBossRoulette
 
                 reloaded.Enabled = false;
                 reloaded.DisabledItems.Add(CreatorToolsInteractionIds.All[0]);
+                reloaded.DisabledItems.Add(CreatorToolsInteractionIds.ExtraLifeHelp);
                 True(reloaded.TrySetIntervals("7", "7"), "fixed interval");
                 reloaded.Save();
                 var finalSettings = LoadPeskySettings(scope);
@@ -131,6 +132,8 @@ namespace Gilomx.CupheadBossRoulette
                 True(finalSettings.DisabledItems.Contains(
                         CreatorToolsInteractionIds.All[0]),
                     "item toggles survive interval save");
+                False(finalSettings.IsItemEnabled(CreatorToolsInteractionIds.ExtraLifeHelp),
+                    "help toggles survive interval save");
                 Equal("Invitado", finalSettings.Names[0], "names remain unchanged");
                 True(File.Exists(Path.Combine(scope.ConfigDirectory,
                         PeskySettingsFileName + ".bak")),
@@ -148,13 +151,15 @@ namespace Gilomx.CupheadBossRoulette
                     "\"names\":[\"Nombre anterior\"],\"disabledItems\":[]}");
                 var settings = LoadPeskySettings(scope);
                 True(settings.Enabled, "legacy enabled mode remains enabled");
+                True(settings.IsItemEnabled(CreatorToolsInteractionIds.ExtraLifeHelp),
+                    "legacy mode gains automatic help testing");
                 Equal("Nombre anterior", settings.Names[0], "legacy name retained");
                 Equal(3f, settings.MinimumInterval, "legacy minimum default");
                 Equal(5.2f, settings.MaximumInterval, "legacy maximum default");
                 settings.Save();
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(21, json.RootElement.GetProperty("version").GetInt32(),
+                    Equal(22, json.RootElement.GetProperty("version").GetInt32(),
                         "saved file uses the interval schema");
                     Equal(3f, json.RootElement.GetProperty("minimumInterval")
                         .GetSingle(), "new minimum is serialized");

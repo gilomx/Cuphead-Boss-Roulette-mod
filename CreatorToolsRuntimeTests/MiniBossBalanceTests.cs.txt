@@ -31,9 +31,13 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var settings = LoadPeskySettings(scope);
                 False(settings.AllowConcurrentStrongInteractions, "default opt-in");
-                Equal(CreatorToolsInteractionIds.All.Length - CreatorToolsTimedChallenge.Items.Length, settings.EnabledItemCount, "existing attacks remain eligible; timed challenges opt in");
+                Equal(CreatorToolsInteractionIds.All.Length - CreatorToolsTimedChallenge.Items.Length, settings.EnabledItemCount, "attacks and helps remain eligible while timed challenges start disabled");
                 foreach (var item in CreatorToolsInteractionIds.All)
-                    Equal(!CreatorToolsTimedChallenge.Supports(item), settings.IsItemEnabled(item), "default pool " + item);
+                    Equal(!CreatorToolsTimedChallenge.Supports(item),
+                        settings.IsItemEnabled(item),
+                        "default pool " + item);
+                True(settings.IsItemEnabled(CreatorToolsInteractionIds.ExtraLifeHelp),
+                    "extra life help participates in automatic testing");
                 settings.DisabledItems.Add("robot_homing_bomb");
                 var values = SpawnGroupValues();
                 values["allowConcurrentStrongInteractions"] = "true";
@@ -126,7 +130,9 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(legacy, File.ReadAllText(path + ".bak"), "migration keeps original backup");
                 using (var json = JsonDocument.Parse(File.ReadAllText(path)))
                 {
-                    Equal(21, json.RootElement.GetProperty("version").GetInt32(), "migrated version");
+                    Equal(22, json.RootElement.GetProperty("version").GetInt32(), "migrated version");
+                    True(settings.IsItemEnabled(CreatorToolsInteractionIds.ExtraLifeHelp),
+                        "migration exposes helps in automatic testing");
                     False(json.RootElement.GetProperty("allowConcurrentStrongInteractions").GetBoolean(), "saved default");
                     False(json.RootElement.TryGetProperty("allowStrongInteractions", out _), "incorrect old setting removed");
                 }

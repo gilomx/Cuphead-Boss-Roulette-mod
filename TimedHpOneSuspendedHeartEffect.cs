@@ -21,7 +21,8 @@ namespace Gilomx.CupheadBossRoulette
             get { return receiver; }
         }
 
-        internal void Initialize(Shader shader, LevelPlayerController player)
+        internal void Initialize(
+            Shader shader, AbstractPlayerController player)
         {
             if (initialized)
                 return;

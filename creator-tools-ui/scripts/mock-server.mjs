@@ -393,7 +393,12 @@ const interactionItems = [
   "challenge_ink_rain",
   "challenge_mini_plane_only",
   "challenge_hp_one",
+  "help_extra_life",
 ];
+const automaticInteractionItems = interactionItems.filter(
+  (item) => !item.startsWith("help_"),
+);
+const peskyInteractionItems = interactionItems;
 const miniBossItems = new Set([
   "baroness_cupcake",
   "baroness_gumball",
@@ -430,7 +435,7 @@ function peskyBattleState() {
     allowStreamAttacks: peskyBattleAllowStreamAttacks,
     participants: peskyBattleParticipants.map(({ identity: _identity, ...participant }) =>
       participant),
-    items: interactionItems,
+    items: automaticInteractionItems,
     disabledItems: peskyBattleDisabledItems,
     feedback: peskyBattleFeedback,
     error: peskyBattleError,
@@ -1783,7 +1788,7 @@ createServer((req, res) => {
       ...Object.fromEntries(Object.entries(peskyPacingDefaults).map(([key, value]) =>
         ["default" + key[0].toUpperCase() + key.slice(1), value])),
       names: peskyNames,
-      items: interactionItems,
+      items: peskyInteractionItems,
       disabledItems: peskyDisabledItems,
       challengeDurationSeconds: peskyChallengeDurationSeconds,
       challengeCountdownSeconds: peskyChallengeCountdownSeconds,

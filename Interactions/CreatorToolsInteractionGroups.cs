@@ -12,6 +12,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string Strong = "strong";
         internal const string MiniBoss = "mini_boss";
         internal const string Challenge = "challenge";
+        internal const string Help = "help";
 
         internal static bool CanAddStrongInteraction(string item,
             bool allowConcurrent, int activeStrongCount)
@@ -23,6 +24,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             switch (item)
             {
+                case "help_extra_life":
+                case "help_ghost":
+                    return Help;
                 case "challenge_half_damage":
                 case "challenge_no_ex":
                 case "challenge_no_dash":

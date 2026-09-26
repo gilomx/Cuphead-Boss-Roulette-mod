@@ -23,7 +23,7 @@ pero no los HP retirados antes de morir. El escudo del Súper II de Cáliz se
 conserva gris e inoperante durante el temporal y recupera color y función al
 terminar únicamente si Cáliz no murió durante esa activación.
 
-Para la futura ayuda **Vida extra**, cada vida canjeada será un crédito propio
+La ayuda **Vida extra** usa un crédito propio
 con el nombre del remitente y un corazón visible; podrá haber varios. No debe
 modelarse con el único estado nativo del Súper II. Durante HP.1 temporal esos
 créditos no protegen ni se consumen. Si el jugador sobrevive hasta el final del
@@ -31,7 +31,19 @@ contador, los corazones suspendidos, incluso los recibidos durante el reto,
 recuperan color y función inmediatamente. Si muere durante HP.1, permanecen
 reservados y reaparecen en el reintento o nivel siguiente; el golpe mortal no
 consume ninguno y una reanimación cooperativa no los reactiva en ese intento.
-Los corazones acumulados se consumen del más antiguo al más reciente.
+Los corazones acumulados se consumen del más antiguo al más reciente. El
+inventario vive entre intentos y niveles, pero sólo en memoria: se borra al
+cerrar Cuphead.
+
+La infraestructura de cola comenzó el 2026-09-25. Ayudas usa una vía lógica
+prioritaria con 50 lugares reservados, independiente de los 200 canjes normales.
+Una ayuda nueva se coloca detrás de las ayudas anteriores y delante de ataques,
+minijefes y retos, tanto al materializar el backlog como en la lista publicada.
+No cancela ni interrumpe lo que ya está activo, pero su despacho no espera los
+límites de actores, el ritmo ni el intervalo común. Sigue respetando el
+interruptor general y Pausar cola. Los IDs reservados son `help_extra_life` y
+`help_ghost`. `help_extra_life` ya se publica en el catálogo; Ayuda fantasmal
+permanece reservada hasta tener su ejecutor.
 
 En cooperativo, **Vida extra y todas las demás funciones futuras de la categoría
 Ayudas se asignan exclusivamente a Player 1**. Player 2 no recibe ni comparte

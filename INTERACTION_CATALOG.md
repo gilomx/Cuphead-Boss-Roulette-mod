@@ -35,6 +35,27 @@ espera propia sólo empieza al desaparecer uno. Los ataques normales no consumen
 ni reinician ese reloj. Pausa congela los dos relojes y reintento los restablece.
 El límite físico de un minijefe y las reglas nativas de compatibilidad se mantienen.
 
+## Ayudas y Vida extra
+
+`help_extra_life` pertenece al grupo y categoría `help`. Las ayudas de canjes
+usan una vía FIFO prioritaria con capacidad propia y aparecen antes que los
+canjes normales. Modo Molestoso también las incluye como pruebas automáticas:
+usa un nombre aleatorio cuando su lista contiene entradas y, si está vacía,
+las presenta sin nombre. Batalla Molestosa no las genera.
+
+Cada canje guarda un crédito en memoria para Player 1 con el nombre y la imagen
+del regalo. El corazón visual reutiliza el prefab animado del escudo de Ms.
+Chalice, sigue al personaje actual y distribuye varios créditos alrededor de él.
+Cuphead y Mugman reciben además un eco breve de su propio sprite como entrada
+equivalente, sin iniciar un súper, gastar cartas, pausar el juego ni bloquear
+controles. Al recibir un golpe válido se consume únicamente el crédito más
+antiguo mediante la rama nativa del escudo, sin sumar vida real.
+
+Los créditos sobreviven a reintentos y niveles de la sesión y se borran al
+cerrar Cuphead. En cooperativo sólo pertenecen a Player 1. HP.1 los vuelve
+grises e inoperantes; si Player 1 muere durante el reto, permanecen reservados
+hasta el siguiente intento y una reanimación no los reactiva en ese combate.
+
 ## Perritos globo de Beppi
 
 Dos artículos comparten `BeppiBalloonDogInteractionExecutor`:
@@ -681,13 +702,19 @@ antes de apagar los sprites originales; no congelan nombres huérfanos.
 
 `rootpack_homing_carrot` reutiliza
 `VeggiesLevelCarrotHomingProjectile`, no una animación aproximada. La precarga
-de `scene_level_veggies` conserva su prefab y un `VeggiesLevelCarrot` inerte que
+de `scene_level_veggies` toma el jefe desde la tabla serializada
+`VeggiesLevel.Prefabs` antes de que su ciclo de vida pueda instanciarlo, conserva
+el prefab del proyectil y un `VeggiesLevelCarrot` inerte que
 permanece válido para la suscripción nativa de muerte. Cada aparición usa la
 velocidad, rotación y HP de la dificultad actual, elige cualquier X del borde
 superior y selecciona al jugador mediante la API original. Después de crear y
 escalar el actor, sus bounds se desplazan hasta que el pixel visible más bajo
 queda 16 unidades base por encima del límite; cuerpo y etiqueta nacen totalmente
 fuera de cámara y entran mediante el homing nativo.
+
+La llamada de creación se resuelve por firma: admite los seis parámetros del
+juego original y la variante de siete parámetros encontrada en la copia de
+ejecución del launcher; en esta última se conserva la muerte al tocar el suelo.
 
 No existe un TTL agregado por el mod. La zanahoria conserva su muerte por
 disparos, choque con jugador, choque con suelo y el respaldo nativo de 1000

@@ -651,6 +651,7 @@
     },
     "categories": {
       "all": "All",
+      "help": "Helps",
       "attack": "Attacks",
       "mini_boss": "Mini-bosses",
       "challenge": "Timed challenges"
@@ -857,6 +858,7 @@
       "title": "Nuisance group",
       "description": "Groups separate attacks by the pressure they add to the fight. They do not change the difficulty selected in Cuphead.",
       "all": "All groups",
+      "help": "Helps",
       "light": "Light nuisances",
       "strong": "Intense nuisances",
       "mini_boss": "Mini-bosses",
@@ -865,6 +867,10 @@
       "mini_bossHint": "Enemies with their own health. Only one can appear at a time.",
       "filter": "Filter by group",
       "challenge": "Timed challenges"
+    },
+    "helps": {
+      "extraLife": "EXTRA LIFE",
+      "extraLifeEffect": "Adds a protective heart to Player 1 with the sender's name. Multiple hearts can be stored and are consumed oldest first. They remain between attempts and levels in this session."
     },
     "challenges": {
       "halfDamage": "Half damage",
@@ -1014,6 +1020,9 @@
       "title": "Available attacks",
       "description": "Check the items that may appear. New catalog items will be enabled automatically.",
       "required": "Enable at least one attack before starting the mode."
+    },
+    "helps": {
+      "description": "Choose the helps Pesky Mode may generate for testing. They use a random name from the list; when the list is empty, they appear without a name."
     },
     "feedback": {
       "ready": "The configuration is ready.",

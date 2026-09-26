@@ -2,6 +2,27 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Recuperación de la zanahoria teledirigida (2026-09-25)
+
+Dos registros consecutivos confirmaron que `rootpack_homing_carrot` no era una
+racha aleatoria: `NativeHomingCarrotCache` terminaba en `Failed` porque buscaba
+un `VeggiesLevelCarrot` ya instanciado durante una precarga que, correctamente,
+bloquea el ciclo de vida temporal del nivel. Modo Molestoso excluía entonces la
+entrada mediante `IsAvailable`, por lo que la otra opción podía ganar todos los
+sorteos aunque sólo hubiera dos casillas activas.
+
+La captura ahora lee `VeggiesLevel.prefabs.carrot` desde la tabla serializada de
+la escena y después conserva su `homingPrefab`; no ejecuta `Start`, no activa el
+jefe temporal y mantiene los guardas globales. Además, la instalación original
+y la copia de ejecución del launcher exponen firmas nativas distintas de
+`VeggiesLevelCarrotHomingProjectile.Create` —seis y siete parámetros—, por lo
+que la llamada se resuelve en ejecución y, cuando existe el séptimo booleano,
+usa `true` para conservar la muerte al tocar el suelo. El contrato se verifica
+contra ambas DLL de Cuphead y la suite runtime completa continúa aprobada.
+Compilación Release sin errores ni advertencias; ZIP Dev publicado por el
+proceso independiente con 536 archivos y ruta física verificada. SHA256:
+`19E4BDBF534948F0742CAF9ACEB140AE00484DC1402239DD9E3406B03C07891E`.
+
 ## Minijefes en Grim Matchstick (2026-09-24)
 
 Los cinco minijefes de la Baronesa quedaban fuera del sorteo en `Dragon`: el
@@ -102,7 +123,7 @@ carga. Esas validaciones quedan cerradas y ya no forman parte de los pendientes.
   el proceso independiente, 536 archivos y ruta física verificada. SHA256:
   `49ABF934F3C8B1D632F1C85BE2BE665C610530836773B918932C5C10370A5E40`.
 
-  La futura ayuda **Vida extra** debe usar un inventario propio de créditos, no
+  La ayuda **Vida extra** usa un inventario propio de créditos, no
   el único booleano nativo del Súper II: cada corazón conserva remitente y dueño,
   admite varios acumulados y consume sólo uno al proteger. Los créditos no
   funcionan ni se consumen durante HP.1 temporal. Si el jugador sigue vivo al
@@ -112,7 +133,7 @@ carga. Esas validaciones quedan cerradas y ya no forman parte de los pendientes.
   reintento o nivel siguiente; el golpe mortal no gasta ningún crédito. Una
   reanimación cooperativa durante el mismo intento no elimina esa reserva.
 
-  Regla general de la futura categoría **Ayudas**: en cooperativo todos sus
+  Regla general de la categoría **Ayudas**: en cooperativo todos sus
   canjes y efectos beneficiosos pertenecen exclusivamente a Player 1. Esto
   incluye Vida extra y cualquier ayuda añadida después; Player 2 no recibe ni
   comparte esos créditos. Cuando haya varios corazones de Vida extra se consumen
@@ -140,11 +161,60 @@ prepara cuando hace falta. El trabajo nativo que no haya comenzado al agotar el
 presupuesto de carga puede continuar en otra carga. Los recursos marcados como
 fallidos no se reintentan automáticamente durante la misma sesión.
 
+## Infraestructura prioritaria de Ayudas (2026-09-25)
+
+Después de cerrar HP.1 temporal en `e553c28`, comenzó la categoría Ayudas. Se
+reservaron `help_extra_life` y `help_ghost`; Vida extra ya está en el catálogo
+público y Ayuda fantasmal sigue reservada. `CreatorToolsInteractionQueue` mantiene una
+vía lógica con 50 lugares propios: inserta ayudas en FIFO antes de todos los
+pendientes normales, las publica primero en la lista y no las cuenta contra los
+200 lugares de ataques. El backlog también busca primero una ayuda despachable;
+una cola normal llena no puede rechazarla ni impedir que se materialice.
+
+El controlador intenta esa vía antes del intervalo común, sin consumir cupos de
+actores ni ritmo de ataques. No interrumpe una interacción ya ejecutándose y
+respeta el interruptor general y Pausar cola. La suite runtime y el harness de
+avión verifican prioridad, FIFO, orden JSON y capacidad reservada. Release
+compila sin advertencias ni errores. ZIP Dev publicado con 536 archivos. SHA256:
+`F8AC33B51C0B59A036F9055AD0DECDF900866303D9CB90C32217A06DDBD21A74`.
+
+### Vida extra — primera versión instalable (2026-09-25)
+
+`CreatorToolsExtraLifeExecutor` conserva en memoria un inventario FIFO de
+créditos de Player 1. Cada crédito guarda remitente e imagen de regalo, se
+reconstruye al reintentar o cambiar de nivel y se borra únicamente al disponer
+el plugin/cerrar Cuphead. El golpe válido más antiguo usa temporalmente la rama
+nativa de `ChaliceShieldOn` durante `PlayerStatsManager.OnDamageTaken`, impide
+esa pérdida de HP y limpia el indicador inmediatamente; el inventario no depende
+del único booleano del Súper II y admite varios corazones sin protección doble.
+
+La presentación instancia el prefab nativo animado de
+`PlayerSuperChaliceShieldHeart`, coloca varios corazones alrededor del personaje
+y añade a cada uno la etiqueta y regalo de su remitente. En Cuphead y Mugman se
+añade un eco breve de su sprite como entrada equivalente sin iniciar un súper,
+gastar cartas ni bloquear controles. También se intenta resolver el prefab
+desde los recursos cargados para niveles de avión.
+
+Durante cualquier HP.1 los créditos no se consumen. Sus corazones usan el mismo
+material gris reversible del escudo suspendido. Si Player 1 sobrevive al HP.1
+temporal, recuperan color y función al finalizar; si muere, las vistas se
+retiran y los créditos vuelven sólo en el siguiente intento. Player 2 nunca los
+recibe ni los consume. El catálogo web expone 30 interacciones. Modo Molestoso
+incluye el grupo Ayudas para probar el catálogo completo y conserva la regla de
+nombres: elige uno de su lista o no muestra ninguno si está vacía. Batalla
+Molestosa sigue excluyendo ayudas. La selección manual también puede adelantar
+una ayuda aunque la vía normal esté llena.
+
+Suite runtime, harness de avión, contrato HTTP del mock, catálogo web y
+compilación Release pasan sin errores. ZIP Dev final publicado con 536 archivos.
+SHA256: `83B17468DFCB8FE0CC7429DAA81869AB99C9C9FDC6F2BF3193A0B1988518D6E6`.
+
 ## Modo Molestoso: orden y selección masiva (2026-09-24)
 
 El panel ordena ahora sus herramientas como Configuración, Nombres aleatorios,
-Retos temporales y Molestias. Las dos listas de selección quedan al final y cada
-una muestra el total activo junto a un botón `Activar todo` / `Desactivar todo`.
+Ayudas, Retos temporales y Molestias. Las tres listas de selección quedan al
+final y cada una muestra el total activo junto a un botón `Activar todo` /
+`Desactivar todo`.
 El control sólo escribe los elementos cuyo estado cambia; Retos temporales
 omite entradas no disponibles para el runtime. El diseño móvil expande el
 botón dentro del encabezado.

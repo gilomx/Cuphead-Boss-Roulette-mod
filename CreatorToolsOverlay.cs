@@ -178,6 +178,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractions = new CreatorToolsInteractionController(
                 this,
                 Config.ConfigFilePath,
+                AssetsDirectory,
                 CanPreloadNativeInteractionAssets,
                 CanSpawnCreatorToolsInteraction,
                 timedChallengeInteractions,
@@ -201,6 +202,8 @@ namespace Gilomx.CupheadBossRoulette
                         creatorToolsStreamRules.TryResolveGift(
                             giftId, out gift);
                 },
+                ShouldApplyHpOneHealthLock,
+                delegate { return hpOneRejectedHeartShader; },
                 GetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 SetCreatorToolsInteractionPhaseTransitionProtectionEnabled,
                 delegate(string message) { Logger.LogInfo(message); },
@@ -619,6 +622,7 @@ namespace Gilomx.CupheadBossRoulette
                 delegate(string message) { Logger.LogWarning(message); });
             InstallCreatorToolsGameplayLoadPatch();
             InstallCreatorToolsPhaseTransitionPatches();
+            InstallCreatorToolsExtraLifePatches();
 
             var levelStarted = HarmonyLib.AccessTools.Method(
                 typeof(Level), "_OnLevelStart");
@@ -701,6 +705,48 @@ namespace Gilomx.CupheadBossRoulette
             }
             harmony.Patch(loadCoroutine,
                 postfix: new HarmonyLib.HarmonyMethod(loadPostfix));
+        }
+
+        private void InstallCreatorToolsExtraLifePatches()
+        {
+            var damage = HarmonyLib.AccessTools.Method(
+                typeof(PlayerStatsManager), "OnDamageTaken");
+            var prefix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "ProtectPlayerOneWithExtraLifePrefix");
+            var postfix = HarmonyLib.AccessTools.Method(
+                typeof(Plugin),
+                "ClearExtraLifeShieldFlagPostfix");
+            if (damage != null && prefix != null && postfix != null)
+                harmony.Patch(
+                    damage,
+                    prefix: new HarmonyLib.HarmonyMethod(prefix),
+                    postfix: new HarmonyLib.HarmonyMethod(postfix));
+            else
+                Logger.LogWarning(
+                    "Could not install the extra-life protection hook.");
+        }
+
+        private static void ProtectPlayerOneWithExtraLifePrefix(
+            PlayerStatsManager __instance,
+            DamageDealer.DamageInfo __0,
+            out bool __state)
+        {
+            __state = false;
+            var plugin = activeInstance;
+            if (plugin == null || plugin.creatorToolsInteractions == null)
+                return;
+            __state = plugin.creatorToolsInteractions
+                .TryProtectPlayerOneWithExtraLife(__instance, __0);
+        }
+
+        private static void ClearExtraLifeShieldFlagPostfix(
+            PlayerStatsManager __instance,
+            bool __state)
+        {
+            if (__state && __instance != null &&
+                __instance.ChaliceShieldOn)
+                __instance.SetChaliceShield(false);
         }
 
         private static void CreatorToolsNativeSceneLoadPostfix(

@@ -444,13 +444,36 @@ namespace Gilomx.CupheadBossRoulette
             out long commandSequence,
             out long testGeneration)
         {
+            return TryTakeInteractionCommand(
+                includeTests
+                    ? (Func<string, bool>)delegate { return true; }
+                    : null,
+                out command,
+                out backgroundApplied,
+                out isTest,
+                out pendingQuantity,
+                out commandSequence,
+                out testGeneration);
+        }
+
+        internal bool TryTakeInteractionCommand(
+            Func<string, bool> includeTest,
+            out string command,
+            out bool backgroundApplied,
+            out bool isTest,
+            out int pendingQuantity,
+            out long commandSequence,
+            out long testGeneration)
+        {
             lock (interactionsLock)
             {
                 InteractionCommand entry;
                 if (interactionControlCommands.Count > 0)
                     entry = interactionControlCommands.Dequeue();
-                else if (includeTests && interactionTestCommands.Count > 0)
-                    entry = interactionTestCommands.Dequeue();
+                else if (TryTakeMatchingInteractionTest(
+                             includeTest, out entry))
+                {
+                }
                 else
                 {
                     command = null;
@@ -471,6 +494,32 @@ namespace Gilomx.CupheadBossRoulette
                 testGeneration = entry.TestGeneration;
                 return true;
             }
+        }
+
+        private bool TryTakeMatchingInteractionTest(
+            Func<string, bool> predicate,
+            out InteractionCommand entry)
+        {
+            entry = null;
+            if (predicate == null || interactionTestCommands.Count == 0)
+                return false;
+
+            var count = interactionTestCommands.Count;
+            for (var i = 0; i < count; i++)
+            {
+                var candidate = interactionTestCommands.Dequeue();
+                var accepted = entry == null;
+                if (accepted)
+                {
+                    try { accepted = predicate(candidate.Query); }
+                    catch { accepted = false; }
+                }
+                if (accepted)
+                    entry = candidate;
+                else
+                    interactionTestCommands.Enqueue(candidate);
+            }
+            return entry != null;
         }
 
         internal void ProcessInteractionTestCommand(

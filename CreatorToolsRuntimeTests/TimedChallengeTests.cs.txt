@@ -833,6 +833,16 @@ namespace Gilomx.CupheadBossRoulette
                 False(object.ReferenceEquals(first, noEx), "different effects with equal durations stay separate");
                 Equal(6L, backlog.PendingCount, "NO EX redemption also retained");
             });
+            Run("Help backlog jumps ahead and keeps independent capacity", delegate
+            {
+                var backlog = new CreatorToolsStreamDispatchBacklog();
+                backlog.Add(1, "connection", "test_attack", "", "Attack", 1);
+                backlog.Add(2, "connection", CreatorToolsHelp.ExtraLife, "", "Helper", 1);
+                var gameplay = new CreatorToolsInteractionController(0, 2);
+                Equal(1, backlog.Drain(gameplay), "help drains while regular queue is full");
+                Equal(CreatorToolsHelp.ExtraLife, gameplay.EnqueuedItems[0], "help is dispatched first");
+                Equal(1L, backlog.PendingCount, "regular redemption remains intact");
+            });
             Run("Stream rules validate and serialize challenge duration", delegate
             {
                 foreach (var item in CreatorToolsTimedChallenge.Items)

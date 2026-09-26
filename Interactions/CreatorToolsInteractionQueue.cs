@@ -19,6 +19,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const int MaximumBatchSize = 50;
         internal const int MaximumDelaySeconds = 3600;
         private const int MaximumQueued = 200;
+        private const int MaximumHelpQueued = 50;
 
         private readonly List<Entry> pending = new List<Entry>();
         private readonly List<Entry> active = new List<Entry>();
@@ -45,9 +46,16 @@ namespace Gilomx.CupheadBossRoulette
             {
                 return Math.Max(
                     0,
-                    MaximumQueued - CountExcept(
+                    MaximumQueued - CountRegularExcept(
                         CreatorToolsInteractionSource.PeskyBattle));
             }
+        }
+
+        internal int AvailableCapacityFor(string item)
+        {
+            return CreatorToolsHelp.Supports(item)
+                ? Math.Max(0, MaximumHelpQueued - CountMatchingHelp())
+                : AvailableCapacity;
         }
 
         internal int Enqueue(
@@ -63,8 +71,10 @@ namespace Gilomx.CupheadBossRoulette
             // Battle work shares this physical queue, but owns one reserved
             // pending slot. A paused stream backlog may therefore contain the
             // full 200 regular entries without starving the battle scheduler.
-            var availableSlots = source ==
-                    CreatorToolsInteractionSource.PeskyBattle
+            var help = CreatorToolsHelp.Supports(item);
+            var availableSlots = help
+                ? AvailableCapacityFor(item)
+                : source == CreatorToolsInteractionSource.PeskyBattle
                 ? Math.Max(0, 1 - PendingCountFor(source))
                 : AvailableCapacity;
             var count = Math.Max(
@@ -74,7 +84,7 @@ namespace Gilomx.CupheadBossRoulette
                     availableSlots));
             for (var i = 0; i < count; i++)
             {
-                pending.Add(new Entry
+                var entry = new Entry
                 {
                     Id = nextId++,
                     Item = item,
@@ -85,7 +95,11 @@ namespace Gilomx.CupheadBossRoulette
                     CountdownSeconds = countdownSeconds,
                     DelaySeconds = delaySeconds,
                     ReadyAt = Time.realtimeSinceStartup + delaySeconds
-                });
+                };
+                if (help)
+                    pending.Insert(FirstRegularPendingIndex(), entry);
+                else
+                    pending.Add(entry);
                 if (nextId <= 0)
                     nextId = 1;
             }
@@ -172,16 +186,38 @@ namespace Gilomx.CupheadBossRoulette
             return ActiveCountFor(source) + PendingCountFor(source);
         }
 
-        private int CountExcept(CreatorToolsInteractionSource source)
+        private int CountRegularExcept(CreatorToolsInteractionSource source)
         {
             var count = 0;
             for (var i = 0; i < active.Count; i++)
-                if (active[i].Source != source)
+                if (active[i].Source != source &&
+                    !CreatorToolsHelp.Supports(active[i].Item))
                     count++;
             for (var i = 0; i < pending.Count; i++)
-                if (pending[i].Source != source)
+                if (pending[i].Source != source &&
+                    !CreatorToolsHelp.Supports(pending[i].Item))
                     count++;
             return count;
+        }
+
+        private int CountMatchingHelp()
+        {
+            var count = 0;
+            for (var i = 0; i < active.Count; i++)
+                if (CreatorToolsHelp.Supports(active[i].Item))
+                    count++;
+            for (var i = 0; i < pending.Count; i++)
+                if (CreatorToolsHelp.Supports(pending[i].Item))
+                    count++;
+            return count;
+        }
+
+        private int FirstRegularPendingIndex()
+        {
+            for (var i = 0; i < pending.Count; i++)
+                if (!CreatorToolsHelp.Supports(pending[i].Item))
+                    return i;
+            return pending.Count;
         }
 
         internal int ActiveCountFor(CreatorToolsInteractionSource source)
@@ -297,20 +333,40 @@ namespace Gilomx.CupheadBossRoulette
         {
             builder.Append('[');
             var first = true;
-            for (var i = 0; i < active.Count; i++)
-            {
-                AppendEntry(builder, active[i], "active", first);
-                first = false;
-            }
-            for (var i = 0; i < pending.Count; i++)
-            {
-                AppendEntry(
-                    builder,
-                    pending[i],
-                    pending[i].IsReady ? (pendingStatus == null ? "queued" : pendingStatus(pending[i].Item)) : "scheduled", first);
-                first = false;
-            }
+            AppendEntries(builder, active, true, true, pendingStatus,
+                ref first);
+            AppendEntries(builder, pending, false, true, pendingStatus,
+                ref first);
+            AppendEntries(builder, active, true, false, pendingStatus,
+                ref first);
+            AppendEntries(builder, pending, false, false, pendingStatus,
+                ref first);
             builder.Append(']');
+        }
+
+        private static void AppendEntries(
+            StringBuilder builder,
+            List<Entry> entries,
+            bool activeEntries,
+            bool helps,
+            Func<string, string> pendingStatus,
+            ref bool first)
+        {
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                if (CreatorToolsHelp.Supports(entry.Item) != helps)
+                    continue;
+                var status = activeEntries
+                    ? "active"
+                    : entry.IsReady
+                        ? pendingStatus == null
+                            ? "queued"
+                            : pendingStatus(entry.Item)
+                        : "scheduled";
+                AppendEntry(builder, entry, status, first);
+                first = false;
+            }
         }
 
         private static void AppendEntry(

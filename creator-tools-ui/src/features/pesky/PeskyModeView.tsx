@@ -3,6 +3,7 @@ import { useConfig } from "../../config/ConfigContext";
 import { interactionItemFor, interactionItems } from "../interactions/interactionCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { PeskyIntervalPanel } from "./PeskyIntervalPanel";
+import { PeskyHelpsPanel } from "./PeskyHelpsPanel";
 import { PeskyChallengesPanel } from "./PeskyChallengesPanel";
 
 function validNames(value: string) {
@@ -56,7 +57,9 @@ export function PeskyModeView() {
 
   const normalizedNames = useMemo(() => validNames(namesDraft), [namesDraft]);
   const disabledItems = new Set(pesky?.disabledItems ?? []);
-  const nuisanceItems = interactionItems.filter((item) => item.group !== "challenge");
+  const nuisanceItems = interactionItems.filter(
+    (item) => item.group !== "challenge" && item.group !== "help",
+  );
   const enabledNuisanceItems = nuisanceItems.filter(
     (item) => !disabledItems.has(item.id),
   );
@@ -303,6 +306,8 @@ export function PeskyModeView() {
             </div>
           </div>
         </section>
+
+        <PeskyHelpsPanel />
 
         <PeskyChallengesPanel />
 

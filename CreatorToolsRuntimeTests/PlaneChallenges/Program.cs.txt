@@ -151,5 +151,38 @@ internal static class Program
         var secondPaid = separate.Peek();
         Check(secondPaid.Item == CreatorToolsTimedChallenge.StiffMode && secondPaid.Donor == "Second viewer" && secondPaid.DurationSeconds == 20 && secondPaid.CountdownSeconds == 4, "second paid variant retains all parameters");
         Console.WriteLine("PASS Earned equivalent challenges remain separate requests");
+
+        var priority = new CreatorToolsInteractionQueue();
+        priority.Enqueue("regular_first", "Attack A", "", 1, 0,
+            CreatorToolsInteractionSource.Stream);
+        priority.Enqueue(CreatorToolsHelp.ExtraLife, "Help A", "", 1, 0,
+            CreatorToolsInteractionSource.Stream);
+        priority.Enqueue(CreatorToolsHelp.Ghost, "Help B", "", 1, 0,
+            CreatorToolsInteractionSource.Stream);
+        priority.Enqueue("regular_second", "Attack B", "", 1, 0,
+            CreatorToolsInteractionSource.Stream);
+        Check(priority.Peek().Item == CreatorToolsHelp.ExtraLife,
+            "help jumps ahead of older regular redemptions");
+        priority.Reject(priority.Peek());
+        Check(priority.Peek().Item == CreatorToolsHelp.Ghost,
+            "helps retain FIFO order inside their priority lane");
+        var priorityJson = new StringBuilder();
+        priority.AppendJson(priorityJson);
+        Check(priorityJson.ToString().IndexOf(CreatorToolsHelp.Ghost,
+                StringComparison.Ordinal) <
+            priorityJson.ToString().IndexOf("regular_first",
+                StringComparison.Ordinal),
+            "help appears first in the published queue list");
+
+        var reserved = new CreatorToolsInteractionQueue();
+        for (var batch = 0; batch < 4; batch++)
+            reserved.Enqueue("regular", "Attack", "", 50, 0,
+                CreatorToolsInteractionSource.Stream);
+        Check(reserved.AvailableCapacity == 0,
+            "regular lane reaches its own capacity");
+        Check(reserved.Enqueue(CreatorToolsHelp.ExtraLife, "Help", "", 1,
+                0, CreatorToolsInteractionSource.Stream) == 1,
+            "full regular lane cannot reject a help");
+        Console.WriteLine("PASS Helps own priority order, FIFO and reserved capacity");
     }
 }
