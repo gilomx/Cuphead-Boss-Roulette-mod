@@ -2,6 +2,46 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Ayuda fantasmal menos invasiva y entrada desde el jugador (2026-09-27)
+
+La opacidad máxima del cuerpo del fantasma bajó de 52% a 44%; sus copias
+visuales de disparos conservan 50%. Durante los 0.22 segundos de entrada el
+fantasma comienza exactamente sobre el renderer de Player 1 y recorre hacia su
+posición lateral con la misma curva suave que usa la salida para regresar al
+personaje. El fundido de entrada se conserva y el seguimiento normal comienza
+al completar la separación. La salida existente de 0.24 segundos no cambia.
+Después de entrar, tierra conserva el seguimiento inmediato de saltos, caídas y
+dash. Se probó el suavizado de 0.12 segundos usado por avión, pero retrasar sólo
+la posición mientras el sprite copiaba el cuadro actual producía cortes
+visuales al caer, por lo que se descartó. Avión mantiene ese suavizado porque
+sus movimientos y animaciones continuas ya se ven correctamente.
+
+La política de movimiento tiene regresiones para el origen, punto medio y final
+de ambas direcciones, además del nuevo límite de opacidad. Queda pendiente
+validar en juego que la separación inicial se lea como una emanación del cuerpo
+y que 44% resulte cómodo durante un combate cargado, además de confirmar que la
+trayectoria de los ecos de disparos siga siendo legible.
+
+## Preset aceptado compartido por ambos modos (2026-09-27)
+
+La configuración activa de Modo Molestoso se leyó directamente del panel y se
+convirtió en el preset predeterminado de **Modo Molestoso** e **Interacciones**:
+intervalo común de 3–5.2 segundos, descanso de minijefes de 12–18 segundos,
+cantidad leve de 1–5, cantidad intensa de 1–1, multiplicador de minijefe 1.5,
+ocho acompañantes máximos durante un minijefe y seis ataques máximos en
+pantalla. La concurrencia intensa continúa desactivada y pertenece únicamente a
+Modo Molestoso; el ritmo automático de Interacciones continúa desactivado hasta
+que el usuario lo habilite.
+
+Los JSON y el CFG personales no se sustituyen ni se reescriben: sus valores
+guardados siguen teniendo prioridad sobre el preset. El cambio afecta
+instalaciones sin configuración y la acción **Restaurar valores**. Interacciones
+publica también su máximo predeterminado y su botón Restaurar lo devuelve a
+seis, igual que Modo Molestoso. **Usar en ambos modos** conserva su función de
+copiar los valores visibles, incluido el máximo en pantalla. Queda pendiente la
+prueba manual con valores distintos y su posterior sincronización desde el
+panel.
+
 ## Ayuda fantasmal continua en transiciones (2026-09-26)
 
 El doble ya no copia los huecos de visibilidad que usa el personaje real para
@@ -26,8 +66,9 @@ La suite runtime completa (incluida una regresión específica para conservar el
 cuadro con el renderer oculto), los catálogos web y la compilación Release
 aprobaron. Paquete Dev publicado por el proceso independiente, 539 archivos.
 SHA256: `BBB29CD41E97B454B75007CFD0BE3EAE2AA4D072CA3926BEBF813351038A08BD`.
-Falta validar en juego saltos repetidos de Cáliz en tierra y transformación,
-explosión y regreso de la bomba en avión.
+El usuario validó en juego los saltos de Cáliz en tierra y la transformación,
+explosión y regreso de la bomba en avión. La continuidad visual de estas
+transiciones queda cerrada.
 
 ## Límites independientes y lotes aleatorios (2026-09-26)
 
@@ -73,8 +114,9 @@ La suite runtime completa, los catálogos web y la compilación Release aprobaro
 sin errores ni advertencias. Paquete Dev publicado por el proceso independiente,
 538 archivos y ruta física verificada. SHA256:
 `5449F9685417CA0C5FE46DC5961E12F7D5B8B0F6A0F745112CB1699E56607982`.
-Falta confirmar visualmente ambos nombres durante un K.O. en el siguiente
-arranque.
+El usuario confirmó en juego que los nombres de Vida extra y Ayuda fantasmal ya
+no se duplican durante el K.O. y que ambos elementos conservan su movimiento a
+velocidad normal. Esta validación queda cerrada.
 
 ## Vida extra: corazón nativo también al iniciar en avión (2026-09-25)
 
@@ -179,7 +221,7 @@ depende de que el servidor HTTP esté activo: Modo Molestoso, Batalla Molestosa
 y Tap Farming siguen actualizándose con su estado guardado durante una colisión
 de puerto; únicamente los comandos y publicaciones web esperan al servidor.
 
-## Pendientes actuales (2026-09-25)
+## Pendientes actuales (2026-09-27)
 
 Esta lista resume el trabajo restante y sustituye los recuentos históricos de
 retos pendientes que aparecen más abajo. Hay doce retos temporales implementados.
@@ -251,7 +293,7 @@ carga. Esas validaciones quedan cerradas y ya no forman parte de los pendientes.
   incluye Vida extra y cualquier ayuda añadida después; Player 2 no recibe ni
   comparte esos créditos. Cuando haya varios corazones de Vida extra se consumen
   del más antiguo al más reciente.
-- **Ayuda fantasmal — primera versión pendiente de prueba manual:** durante 10
+- **Ayuda fantasmal — continuidad visual validada; balance pendiente:** durante 10
   segundos aparece un eco invulnerable de Player 1. Copia inmediatamente el
   sprite y orientación y flota cerca. En tierra sigue sin retraso los saltos,
   caídas y dash, conserva el lado donde apareció aunque Player 1 voltee o apunte
@@ -265,8 +307,10 @@ carga. Esas validaciones quedan cerradas y ya no forman parte de los pendientes.
   ofensivos, y compone con Daño a la mitad para dar 1×. Nunca ocupa una plaza
   cooperativa, hace parry, revive, toca objetos, repite cinemáticas ni consume
   cartas. Sólo hay uno activo; los demás canjes esperan FIFO y conservan su
-  remitente. Falta validar separación en tierra/avión y decidir si se reduce el
-  2× después de sentirlo en combate. Diseño ampliado en `FUTURE_IDEAS.md`.
+  remitente. El usuario confirmó los saltos de Cáliz y toda la transición de la
+  Súper bomba en avión sin desapariciones. Queda valorar la separación y
+  flotación generales, el alcance visual de los disparos copiados y si se reduce
+  el 2× después de sentirlo en combate. Diseño ampliado en `FUTURE_IDEAS.md`.
 - El siguiente reto previsto cambia aleatoriamente por tiempo, respetando
   compatibilidad y duraciones probadas.
 - Continuar los diseños de overlays, incluido el de interacciones y sus canjes,

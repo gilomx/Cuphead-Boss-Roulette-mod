@@ -16,10 +16,10 @@ namespace Gilomx.CupheadBossRoulette
         internal const float DefaultMaximumInterval = 5.2f;
         internal const float DefaultMiniBossCooldownSeconds = 12f;
         internal const float DefaultMiniBossMaximumInterval = 18f;
-        internal const int DefaultLightMaximumBatch = 3;
+        internal const int DefaultLightMaximumBatch = 5;
         internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
         internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
-        internal const int DefaultMaximumActive = 1;
+        internal const int DefaultMaximumActive = 6;
         internal const int MaximumActiveLimit = 20;
         private const int CurrentVersion = 23;
         private static readonly string[] DefaultNames =

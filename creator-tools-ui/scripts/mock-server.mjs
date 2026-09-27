@@ -20,17 +20,17 @@ let interactionFeedback = "ready";
 let interactionLastItem = "";
 let interactionNextId = 1;
 let interactionQueue = [];
-let interactionMaxActive = 1;
+let interactionMaxActive = 6;
 const interactionMaxMiniBosses = 1;
 let interactionShowGiftImage = true;
 const spawnGroupDefaults = {
-  miniBossMinimumInterval: 30, miniBossMaximumInterval: 30,
-  lightMinimumBatch: 1, lightMaximumBatch: 1,
+  miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
+  lightMinimumBatch: 1, lightMaximumBatch: 5,
   strongMinimumBatch: 1, strongMaximumBatch: 1,
 };
 const interactionPacingDefaults = {
-  enabled: false, minimumInterval: 1.25, maximumInterval: 3.25,
-  miniBossCooldownSeconds: 30, miniBossIntervalMultiplier: 2, maximumCompanionsDuringMiniBoss: 1,
+  enabled: false, minimumInterval: 3, maximumInterval: 5.2,
+  miniBossCooldownSeconds: 12, miniBossIntervalMultiplier: 1.5, maximumCompanionsDuringMiniBoss: 8,
   ...spawnGroupDefaults,
 };
 let interactionPacing = { ...interactionPacingDefaults };
@@ -101,7 +101,7 @@ const peskyPacingDefaults = {
   maximumCompanionsDuringMiniBoss: 8,
   ...spawnGroupDefaults,
   miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
-  lightMaximumBatch: 3,
+  lightMaximumBatch: 5,
 };
 let peskyIntervals = { ...peskyPacingDefaults };
 
@@ -1413,6 +1413,7 @@ createServer((req, res) => {
       pendingCount: interactionQueue.filter((entry) => entry.status !== "active").length,
       backlogCount: 0,
       maxActive: interactionMaxActive,
+      defaultMaxActive: 6,
       maxMiniBosses: interactionMaxMiniBosses,
       maxActiveLimit: 20,
       maxBatch: 50,
@@ -1799,7 +1800,7 @@ createServer((req, res) => {
       activeCount: 0,
       maxActive: peskyMaxActive,
       maxActiveLimit: 20,
-      defaultMaxActive: 1,
+      defaultMaxActive: 6,
       queue: [],
       blockedByPeskyBattle: peskyBattleIsExclusive(),
     });

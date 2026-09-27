@@ -129,7 +129,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractionMaximumActiveSetting = Config.Bind(
                 "Creator Tools",
                 "InteraccionesMaximasEnPantalla",
-                1,
+                CreatorToolsInteractionController.DefaultMaximumActive,
                 "Cantidad maxima de interacciones visibles al mismo tiempo.");
             creatorToolsInteractionShowGiftImageSetting = Config.Bind(
                 "Creator Tools",
@@ -1279,7 +1279,7 @@ namespace Gilomx.CupheadBossRoulette
         private int GetCreatorToolsInteractionMaximumActive()
         {
             if (creatorToolsInteractionMaximumActiveSetting == null)
-                return 1;
+                return CreatorToolsInteractionController.DefaultMaximumActive;
             return Mathf.Clamp(
                 creatorToolsInteractionMaximumActiveSetting.Value,
                 1,

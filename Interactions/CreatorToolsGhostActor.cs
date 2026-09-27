@@ -27,7 +27,6 @@ namespace Gilomx.CupheadBossRoulette
         private const float SnapDistance = 160f;
         private const float EntranceDuration = 0.22f;
         private const float ExitDuration = 0.24f;
-        private const float MaximumOpacity = 0.52f;
 
         private AbstractPlayerController owner;
         private SpriteRenderer sourceRenderer;
@@ -146,7 +145,8 @@ namespace Gilomx.CupheadBossRoulette
 
             UpdateDisplayedSide();
             var target = ResolveTargetPosition();
-            if (groundPresentation || exitStarted || !positioned ||
+            var entering = elapsed < EntranceDuration;
+            if (groundPresentation || entering || exitStarted || !positioned ||
                 Vector3.Distance(transform.position, target) > SnapDistance)
             {
                 transform.position = target;
@@ -185,18 +185,21 @@ namespace Gilomx.CupheadBossRoulette
                 : sourceRenderer.transform.position;
             if (exitStarted)
             {
-                var progress = Mathf.Clamp01(
-                    (elapsed - (LifetimeSeconds - ExitDuration)) /
-                    ExitDuration);
-                progress = progress * progress *
-                    (3f - 2f * progress);
-                return origin + exitStartOffset * (1f - progress);
+                var remaining = LifetimeSeconds - elapsed;
+                return origin + exitStartOffset *
+                    CreatorToolsGhostMotionPolicy.ResolveExitOffsetFactor(
+                        remaining, ExitDuration);
             }
-            return new Vector3(
+            var orbitTarget = new Vector3(
                 origin.x - displayedSide * SideSeparation +
                     Mathf.Cos(hoverTime) * HoverWidth,
                 origin.y + Mathf.Sin(hoverTime) * HoverHeight,
                 origin.z);
+            if (elapsed >= EntranceDuration)
+                return orbitTarget;
+            return origin + (orbitTarget - origin) *
+                CreatorToolsGhostMotionPolicy.ResolveEntranceOffsetFactor(
+                    elapsed, EntranceDuration);
         }
 
         private void BeginExit()
@@ -245,10 +248,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private float ResolveOpacity()
         {
-            var entrance = Mathf.Clamp01(elapsed / EntranceDuration);
-            var remaining = LifetimeSeconds - elapsed;
-            var exit = Mathf.Clamp01(remaining / ExitDuration);
-            return Mathf.Min(entrance, exit) * MaximumOpacity;
+            return CreatorToolsGhostMotionPolicy.ResolveOpacity(
+                elapsed, LifetimeSeconds, EntranceDuration, ExitDuration);
         }
 
         private void CopyFrame(float opacity)

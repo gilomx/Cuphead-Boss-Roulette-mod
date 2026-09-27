@@ -178,9 +178,9 @@ namespace Gilomx.CupheadBossRoulette
                 var saved = LoadPeskySettings(scope);
                 Equal(1.25f, saved.MinimumInterval, "panel update persists");
                 Equal(3f, saved.MiniBossIntervalMultiplier, "balance persists together");
-                True(settings.TrySetPacing("1.25", "3.25", "30", "2", "1"), "restore complete defaults");
-                Equal(30f, settings.MiniBossCooldownSeconds, "restored cooldown");
-                Equal(1, settings.MaximumCompanionsDuringMiniBoss, "restored companion cap");
+                True(settings.TrySetPacing("3", "5.2", "12", "1.5", "8"), "restore complete defaults");
+                Equal(12f, settings.MiniBossCooldownSeconds, "restored cooldown");
+                Equal(8, settings.MaximumCompanionsDuringMiniBoss, "restored companion cap");
             }
         }
 

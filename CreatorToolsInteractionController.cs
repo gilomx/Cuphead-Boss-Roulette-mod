@@ -1693,12 +1693,16 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal const int MaximumActiveLimit = 20;
+        internal const int DefaultMaximumActive =
+            CreatorToolsInteractionPacingSettings.DefaultMaximumActive;
 
         private int InteractionMaximumActive
         {
             get
             {
-                var value = getMaximumActive == null ? 1 : getMaximumActive();
+                var value = getMaximumActive == null
+                    ? DefaultMaximumActive
+                    : getMaximumActive();
                 return Math.Max(1, Math.Min(MaximumActiveLimit, value));
             }
         }
@@ -1794,6 +1798,7 @@ namespace Gilomx.CupheadBossRoulette
                     : Math.Max(0L, getStreamBacklogCount()))
                 .Append(",\"deferredTestCount\":0")
                 .Append(",\"maxActive\":").Append(InteractionMaximumActive)
+                .Append(",\"defaultMaxActive\":").Append(DefaultMaximumActive)
                 .Append(",\"maxMiniBosses\":").Append(MaximumMiniBosses)
                 .Append(",\"maxActiveLimit\":").Append(MaximumActiveLimit)
                 .Append(",\"maxBatch\":")

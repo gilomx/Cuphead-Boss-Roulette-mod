@@ -79,6 +79,7 @@ export interface InteractionConfigState {
   backlogCount: number;
   deferredTestCount: number;
   maxActive: number;
+  defaultMaxActive: number;
   maxMiniBosses: number;
   maxActiveLimit: number;
   maxBatch: number;

@@ -57,28 +57,29 @@ namespace Gilomx.CupheadBossRoulette
                 var interactions = LoadInteractionPacing(scope);
                 Equal(12f, pesky.MiniBossMinimumInterval, "Pesky mini minimum default");
                 Equal(18f, pesky.MiniBossMaximumInterval, "Pesky mini maximum default");
-                Equal(30f, interactions.MiniBossMinimumInterval, "Interactions mini minimum default");
-                Equal(30f, interactions.MiniBossMaximumInterval, "Interactions mini maximum default");
+                Equal(12f, interactions.MiniBossMinimumInterval, "Interactions mini minimum default");
+                Equal(18f, interactions.MiniBossMaximumInterval, "Interactions mini maximum default");
                 Equal(1, pesky.LightMinimumBatch, "Pesky light minimum default");
-                Equal(3, pesky.LightMaximumBatch, "Pesky light maximum default");
+                Equal(5, pesky.LightMaximumBatch, "Pesky light maximum default");
                 Equal(1, pesky.StrongMinimumBatch, "Pesky strong minimum default");
                 Equal(1, pesky.StrongMaximumBatch, "Pesky strong maximum default");
-                Equal(1, pesky.MaximumActive, "Pesky owns a safe concurrency default");
+                Equal(6, pesky.MaximumActive, "Pesky owns the accepted concurrency default");
                 var builder = new StringBuilder("{\"ready\":true");
                 pesky.AppendSpawnSettingsJson(builder, true);
                 builder.Append('}');
                 using (var json = JsonDocument.Parse(builder.ToString()))
                 {
                     Equal(18f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "controller default prefix");
-                    Equal(3, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "controller light batch default");
+                    Equal(5, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "controller light batch default");
                     Equal(1, json.RootElement.GetProperty("defaultStrongMaximumBatch").GetInt32(), "controller batch default");
-                    Equal(1, json.RootElement.GetProperty("defaultMaxActive").GetInt32(), "controller concurrency default");
+                    Equal(6, json.RootElement.GetProperty("defaultMaxActive").GetInt32(), "controller concurrency default");
                 }
                 builder.Length = 0;
                 CreatorToolsInteractionPacingSettings.AppendDefaultsJson(builder);
                 using (var json = JsonDocument.Parse(builder.ToString()))
                 {
                     Equal(1, json.RootElement.GetProperty("lightMinimumBatch").GetInt32(), "Interactions JSON batch default");
+                    Equal(5, json.RootElement.GetProperty("lightMaximumBatch").GetInt32(), "Interactions JSON light default");
                     Equal(1, json.RootElement.GetProperty("strongMaximumBatch").GetInt32(), "Interactions JSON strong default");
                 }
                 // A customized live value must never replace the restore preset.
@@ -95,7 +96,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     Equal(12f, json.RootElement.GetProperty("defaultMiniBossMinimumInterval").GetSingle(), "restore mini minimum is stable");
                     Equal(18f, json.RootElement.GetProperty("defaultMiniBossMaximumInterval").GetSingle(), "restore mini maximum is stable");
-                    Equal(3, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "restore light batch is stable");
+                    Equal(5, json.RootElement.GetProperty("defaultLightMaximumBatch").GetInt32(), "restore light batch is stable");
                 }
                 Equal(45f, pesky.MiniBossMinimumInterval, "reading defaults does not mutate current settings");
                 pesky.Save();
@@ -264,7 +265,7 @@ namespace Gilomx.CupheadBossRoulette
                 File.WriteAllText(path, stored);
                 settings = LoadPeskySettings(scope);
                 Equal(1, settings.LightMinimumBatch, "invalid light pair falls back together");
-                Equal(3, settings.LightMaximumBatch, "invalid light maximum falls back");
+                Equal(5, settings.LightMaximumBatch, "invalid light maximum falls back");
                 Equal(3, settings.StrongMaximumBatch, "valid strong pair survives");
                 Equal(17f, settings.MiniBossMaximumInterval, "valid mini-boss range survives");
                 Equal("Conservar nombre", settings.Names[0], "stored repair retains names");

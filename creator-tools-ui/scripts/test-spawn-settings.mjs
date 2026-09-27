@@ -8,15 +8,11 @@ import { fileURLToPath } from "node:url";
 
 const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const groupDefaults = {
-  miniBossMinimumInterval: 30, miniBossMaximumInterval: 30,
-  lightMinimumBatch: 1, lightMaximumBatch: 1,
+  miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
+  lightMinimumBatch: 1, lightMaximumBatch: 5,
   strongMinimumBatch: 1, strongMaximumBatch: 1,
 };
-const peskyGroupDefaults = {
-  ...groupDefaults,
-  miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
-  lightMaximumBatch: 3,
-};
+const peskyGroupDefaults = { ...groupDefaults };
 const numericKeys = [
   "minimumInterval", "maximumInterval", "miniBossCooldownSeconds",
   "miniBossIntervalMultiplier", "maximumCompanionsDuringMiniBoss",
@@ -95,8 +91,8 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
   const initialPesky = await getPesky();
   assert.equal(initialPesky.allowConcurrentStrongInteractions, false);
   assert.equal(initialPesky.defaultAllowConcurrentStrongInteractions, false);
-  assert.equal(initialPesky.maxActive, 1);
-  assert.equal(initialPesky.defaultMaxActive, 1);
+  assert.equal(initialPesky.maxActive, 6);
+  assert.equal(initialPesky.defaultMaxActive, 6);
   assert.equal(initialPesky.maxActiveLimit, 20);
   const initialInteractions = await getInteractions();
   const peskyDefaults = Object.fromEntries(numericKeys.map((key) => [
@@ -115,6 +111,8 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
     assert.deepEqual(select(initialInteractions.pacing, Object.keys(groupDefaults)), groupDefaults);
     assert.deepEqual(select(initialInteractions.defaultPacing, Object.keys(groupDefaults)), groupDefaults);
     assert.equal(initialInteractions.defaultPacing.enabled, false);
+    assert.equal(initialInteractions.maxActive, 6);
+    assert.equal(initialInteractions.defaultMaxActive, 6);
     assert.equal(initialInteractions.maxMiniBosses, 1);
     assert.deepEqual(numericSettings(initialPesky), peskyDefaults);
   });

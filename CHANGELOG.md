@@ -2,6 +2,20 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El cuerpo de **Ayuda fantasmal** baja de 52% a 44% de opacidad para reducir
+  la distracción durante el combate. Su entrada ya no aparece directamente en
+  la posición lateral: nace dentro de Player 1 y recorre hacia afuera la misma
+  transición suave que usa al regresar al personaje cuando termina. Después de
+  entrar, tierra conserva el seguimiento inmediato de saltos, caídas y dash;
+  avión mantiene su seguimiento suavizado de 0.12 s.
+
+- El balance actualmente aceptado de Modo Molestoso pasa a ser el preset
+  predeterminado de ambos modos: intervalo 3–5.2 s, minijefes 12–18 s,
+  cantidades leves 1–5, intensas 1–1, multiplicador 1.5, hasta ocho
+  acompañantes durante un minijefe y seis ataques máximos en pantalla. Los
+  archivos personales existentes siguen teniendo prioridad. Restaurar en
+  Interacciones también devuelve ahora su máximo en pantalla a seis.
+
 - **Ayuda fantasmal** conserva el último cuadro válido cuando Cáliz oculta por
   un instante su renderer al saltar y durante las transiciones de bomba en
   avión. Si la transformación activa otro sprite del jugador, el fantasma lo

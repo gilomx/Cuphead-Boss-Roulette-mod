@@ -96,8 +96,14 @@ Reglas propuestas:
   en orden de llegada y cada uno recibe sus 10 segundos completos con el nombre
   de su propio remitente; no se acumulan fantasmas ni multiplicadores simultáneos.
 
-Pendiente de ajuste manual: validar la separación y flotación en tierra y avión,
-el alcance visual de 0.22 segundos y si 2× de daño total se siente excesivo.
+La continuidad del cuerpo en los saltos de Cáliz y durante la transformación,
+explosión y regreso de la Súper bomba en avión ya fue validada en juego. Queda
+como ajuste manual valorar la separación y flotación generales, el alcance
+visual de 0.22 segundos y si 2× de daño total se siente excesivo. El cuerpo usa
+ahora 44% de opacidad y aparece saliendo desde Player 1 con una transición
+especular a su regreso final. Tierra conserva el seguimiento inmediato; la
+prueba con retraso sólo de posición se descartó porque cortaba visualmente las
+caídas. Falta confirmar en juego la comodidad de la nueva opacidad y entrada.
 
 | Función | Estado actual en `ExperimentalFeatures.cs` |
 | --- | --- |

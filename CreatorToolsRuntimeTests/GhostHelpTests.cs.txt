@@ -54,18 +54,48 @@ namespace Gilomx.CupheadBossRoulette
                         true, true, true, 0f),
                     "a fully transparent transition renderer is not adopted");
                 True(CreatorToolsGhostFramePolicy.ShouldDisplayCachedFrame(
-                        true, false, 0.52f),
+                        true, false,
+                        CreatorToolsGhostMotionPolicy.MaximumOpacity),
                     "the last valid ghost frame stays visible while the player renderer is hidden");
                 False(CreatorToolsGhostFramePolicy.MayUseAlternateRenderer(true),
                     "ground jumps cannot replace the full body with one auxiliary Chalice piece");
                 True(CreatorToolsGhostFramePolicy.MayUseAlternateRenderer(false),
                     "aircraft transformations may provide a complete alternate renderer");
-                Equal(0.52f,
-                    CreatorToolsGhostFramePolicy.ResolveGhostAlpha(0f, 0.52f),
+                Equal(0.44f,
+                    CreatorToolsGhostFramePolicy.ResolveGhostAlpha(
+                        0f, CreatorToolsGhostMotionPolicy.MaximumOpacity),
                     "player transparency does not erase the ghost");
                 False(CreatorToolsGhostFramePolicy.ShouldDisplayCachedFrame(
                         true, true, 0f),
                     "the normal ghost entrance and exit fades can still hide it");
+            });
+
+            Run("Ghost Help emerges from and returns to the player", delegate
+            {
+                Equal(0f,
+                    CreatorToolsGhostMotionPolicy.ResolveEntranceOffsetFactor(
+                        0f, 0.22f),
+                    "the entrance begins inside the player");
+                Equal(0.5f,
+                    CreatorToolsGhostMotionPolicy.ResolveEntranceOffsetFactor(
+                        0.11f, 0.22f),
+                    "the entrance uses the mirrored smooth transition");
+                Equal(1f,
+                    CreatorToolsGhostMotionPolicy.ResolveEntranceOffsetFactor(
+                        0.22f, 0.22f),
+                    "the entrance reaches its floating offset");
+                Equal(1f,
+                    CreatorToolsGhostMotionPolicy.ResolveExitOffsetFactor(
+                        0.24f, 0.24f),
+                    "the exit begins at its floating offset");
+                Equal(0f,
+                    CreatorToolsGhostMotionPolicy.ResolveExitOffsetFactor(
+                        0f, 0.24f),
+                    "the exit finishes inside the player");
+                Equal(0.44f,
+                    CreatorToolsGhostMotionPolicy.ResolveOpacity(
+                        1f, 10f, 0.22f, 0.24f),
+                    "the visible body is capped at forty-four percent opacity");
             });
         }
     }

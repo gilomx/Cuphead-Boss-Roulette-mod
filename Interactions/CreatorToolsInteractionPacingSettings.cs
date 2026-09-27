@@ -10,12 +10,23 @@ namespace Gilomx.CupheadBossRoulette
     internal sealed class CreatorToolsInteractionPacingSettings
     {
         internal const string FileName = "mx.gilomx.cuphead.bossroulette.interaction-pacing.json";
+        internal const float DefaultMinimumInterval = 3f;
+        internal const float DefaultMaximumInterval = 5.2f;
+        internal const float DefaultMiniBossMinimumInterval = 12f;
+        internal const float DefaultMiniBossMaximumInterval = 18f;
+        internal const int DefaultLightMinimumBatch = 1;
+        internal const int DefaultLightMaximumBatch = 5;
+        internal const int DefaultStrongMinimumBatch = 1;
+        internal const int DefaultStrongMaximumBatch = 1;
+        internal const float DefaultMiniBossIntervalMultiplier = 1.5f;
+        internal const int DefaultMaximumCompanionsDuringMiniBoss = 8;
+        internal const int DefaultMaximumActive = 6;
         private readonly string path;
         private readonly Action<string> warning;
-        private CreatorToolsSpawnGroupSettings spawnGroups = new CreatorToolsSpawnGroupSettings();
+        private CreatorToolsSpawnGroupSettings spawnGroups = CreateDefaultSpawnGroups();
         internal bool Enabled { get; private set; }
-        internal float MinimumInterval { get; private set; } = 1.25f;
-        internal float MaximumInterval { get; private set; } = 3.25f;
+        internal float MinimumInterval { get; private set; } = DefaultMinimumInterval;
+        internal float MaximumInterval { get; private set; } = DefaultMaximumInterval;
         internal float MiniBossCooldownSeconds { get { return MiniBossMinimumInterval; } }
         internal float MiniBossMinimumInterval { get { return spawnGroups.MiniBossMinimumInterval; } }
         internal float MiniBossMaximumInterval { get { return spawnGroups.MiniBossMaximumInterval; } }
@@ -23,8 +34,16 @@ namespace Gilomx.CupheadBossRoulette
         internal int LightMaximumBatch { get { return spawnGroups.LightMaximumBatch; } }
         internal int StrongMinimumBatch { get { return spawnGroups.StrongMinimumBatch; } }
         internal int StrongMaximumBatch { get { return spawnGroups.StrongMaximumBatch; } }
-        internal float MiniBossIntervalMultiplier { get; private set; } = 2f;
-        internal int MaximumCompanionsDuringMiniBoss { get; private set; } = 1;
+        internal float MiniBossIntervalMultiplier { get; private set; } = DefaultMiniBossIntervalMultiplier;
+        internal int MaximumCompanionsDuringMiniBoss { get; private set; } = DefaultMaximumCompanionsDuringMiniBoss;
+
+        private static CreatorToolsSpawnGroupSettings CreateDefaultSpawnGroups()
+        {
+            return new CreatorToolsSpawnGroupSettings(
+                DefaultMiniBossMinimumInterval, DefaultMiniBossMaximumInterval,
+                DefaultLightMinimumBatch, DefaultLightMaximumBatch,
+                DefaultStrongMinimumBatch, DefaultStrongMaximumBatch);
+        }
 
         private CreatorToolsInteractionPacingSettings(string path, Action<string> warning)
         {

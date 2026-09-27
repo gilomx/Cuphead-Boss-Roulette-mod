@@ -8,7 +8,7 @@ export function PeskyIntervalPanel() {
   const { pesky, interaction, status, interactionSettingsStatus, applyPeskyIntervals, applyPacingToBoth } = useConfig();
   const { t } = useLocalization();
   const [appliedBoth, setAppliedBoth] = useState(false);
-  const [maxActiveDraft, setMaxActiveDraft] = useState(1);
+  const [maxActiveDraft, setMaxActiveDraft] = useState(6);
   const [draft, setDraft] = useState(() => pacingDraftFor());
   const [dirty, setDirty] = useState(false);
   const [allowStrongDraft, setAllowStrongDraft] = useState(false);
@@ -73,7 +73,7 @@ export function PeskyIntervalPanel() {
           <button type="button" disabled={!pesky?.ready || saving} onClick={() => {
             if (!pesky) return;
             setDraft(pacingDraftFor(peskyDefaults(pesky)));
-            setMaxActiveDraft(pesky.defaultMaxActive ?? 1);
+            setMaxActiveDraft(pesky.defaultMaxActive ?? 6);
             setAllowStrongDraft(pesky.defaultAllowConcurrentStrongInteractions ?? false);
             setDirty(true);
           }}>{t("pesky.intervals.restore")}</button>

@@ -7,7 +7,7 @@ import { pacingDraftFor, pacingValuesFor, samePacing, validPacingDraft } from ".
 export function InteractionSettingsPanel() {
   const { interaction, interactionSettingsStatus, applyInteractionSettings, applyPacingToBoth, pesky, status } = useConfig();
   const { t } = useLocalization();
-  const [maxActiveDraft, setMaxActiveDraft] = useState(1);
+  const [maxActiveDraft, setMaxActiveDraft] = useState(6);
   const [showGiftImageDraft, setShowGiftImageDraft] = useState(true);
   const [enabledDraft, setEnabledDraft] = useState(false);
   const [draft, setDraft] = useState(() => pacingDraftFor());
@@ -67,7 +67,8 @@ export function InteractionSettingsPanel() {
         {dirty && !valid ? <p role="alert" className="interaction-settings__status" data-status="error">{t("interactions.settings.pacingInvalid")}</p> : null}
         <div className="pesky-interval-panel__actions">
           <button type="button" disabled={!interaction?.defaultPacing || saving} onClick={() => {
-            setDraft(pacingDraftFor(interaction?.defaultPacing)); setEnabledDraft(interaction?.defaultPacing.enabled ?? false); setDirty(true);
+            setDraft(pacingDraftFor(interaction?.defaultPacing)); setEnabledDraft(interaction?.defaultPacing.enabled ?? false);
+            setMaxActiveDraft(interaction?.defaultMaxActive ?? 6); setDirty(true);
           }}>{t("interactions.settings.pacingRestore")}</button>
           <button type="button" disabled={!interaction?.ready || !pesky?.ready || !valid || saving} onClick={() => {
             applyPacingToBoth(maxActiveDraft, values); setAppliedBoth(true);
