@@ -2,6 +2,51 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Buscador único para pruebas de Interacciones (2026-09-27)
+
+La sección **Pruebas** dejó de renderizar las 31 interacciones como filas con
+formularios repetidos. Ahora comparte el mismo selector buscable del editor de
+reglas —incluyendo imagen, grupo y búsqueda por nombre, tipo o categoría— y
+muestra únicamente los campos de la interacción elegida. Al cambiar la
+selección conserva durante la sesión los valores de prueba escritos para cada
+elemento. Los campos de duración y cuenta previa sólo aparecen para retos. El
+panel permite overflow en esta sección y eleva su capa para que el menú del
+buscador quede por encima del formulario, sin máscara ni corte en sus bordes.
+
+## Cooldowns por regla y máximo ilimitado de Interacciones (2026-09-27)
+
+Las reglas de stream guardan dos controles independientes, de 0 a 3600
+segundos: cooldown por usuario y cooldown global. El primero usa el `userId`
+estable con el nombre como respaldo. Para regalos, el segundo se comparte por
+conexión y `giftId`; si el mismo evento activa varias reglas, permanecen como
+un paquete y se usa el cooldown global más largo. Likes y follows conservan un
+cooldown global por regla. Los eventos recibidos durante una espera no se
+rechazan: el worker reserva una hora UTC mínima y el backlog conserva ese
+vencimiento hasta materializar la entrada programada en la cola de Unity. Las
+ráfagas consolidadas también se serializan por activación: 30 unidades con
+`every=1` reservan 30 turnos sucesivos, mientras que `quantity` conserva el
+tamaño de cada turno. El backlog representa estas series sin expandirlas en
+memoria y no pierde cantidades aunque la cola se llene. Los contadores activos
+se reinician con la sesión, pero los valores se persisten en el esquema 5 de
+`stream-rules.json` y las versiones anteriores migran con cero.
+
+Interacciones permite además **Sin límite** para ataques comunes mediante un
+booleano separado del máximo numérico guardado. Minijefes, ayudas, retos,
+compatibilidad y capacidad de cola conservan sus protecciones. El panel deja el
+máximo en la configuración principal y pliega ritmo/lotes como avanzados; si no
+hay máximo, cooldowns ni ritmo, muestra una advertencia sin bloquear el guardado.
+**Usar en ambos modos** copia ritmo y lotes, pero conserva el máximo numérico de
+Modo Molestoso cuando Interacciones está sin límite.
+
+Las regresiones runtime cubren programación por usuario/regalo, una ráfaga de
+30 unidades con cantidad dos por activación, conservación de canjeos,
+persistencia y rechazo atómico de cooldowns inválidos. El contrato HTTP del
+simulador comprueba además 30 rosas en los tiempos 0, 10, …, 290 segundos.
+Falta la prueba manual del formulario, la tabla y la advertencia antes de dar
+por cerrada la presentación. Suite runtime, catálogos web y compilación Release
+aprobaron sin errores ni advertencias. El hash del paquete Dev vigente se anota
+al volver a publicarlo.
+
 ## Ayuda fantasmal menos invasiva y entrada desde el jugador (2026-09-27)
 
 La opacidad máxima del cuerpo del fantasma bajó de 52% a 44%; sus copias
@@ -1233,8 +1278,9 @@ Se verificaron los cuatro PNG dentro del ZIP; el icono del overlay coincide
 exactamente con el archivo entregado por el usuario
 (`3C917D3DD15CA85166A094B0EF2D864F0DC9CF7AEBE4D9B683974417B131B91C`).
 La comprobación en navegador volvió a pasar con la nueva imagen. No se inició
-Cuphead ni se modificó su instalación original. La publicación del ZIP no
-verifica la integración pendiente del launcher.
+Cuphead ni se modificó su instalación original. Esa publicación del ZIP no
+probó el arranque desde el launcher; la integración se verificó posteriormente
+y el launcher actual sí consume `current.zip` desde **La Pichi Ruleta · Dev**.
 
 ## Estado vigente: nueva actualización con las funciones implementadas activas (2026-09-22)
 

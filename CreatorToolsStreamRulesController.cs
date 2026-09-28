@@ -9,7 +9,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsStreamRulesController
     {
-        private const int SchemaVersion = 4;
+        private const int SchemaVersion = 5;
         private const int MinimumSupportedSchemaVersion = 1;
         private const string GiftEventType = "gift";
         private const string LikeEventType = "like";
@@ -19,10 +19,12 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumRuleNameLength = 64;
         private const int MaximumEvery = 1000000;
         private const int MaximumQuantity = 50;
+        private const int MaximumCooldownSeconds = 3600;
         private const int MaximumRuntimeViewerKeys = 100000;
 
         private readonly string settingsPath;
         private readonly Func<bool> getInteractionsEnabled;
+        private readonly Func<DateTime> utcNow;
         private readonly Action<string> logWarning;
         private readonly object ruleStateLock = new object();
         private readonly Dictionary<string, GiftEntry> gifts =
@@ -30,6 +32,10 @@ namespace Gilomx.CupheadBossRoulette
         private readonly List<StreamRule> rules = new List<StreamRule>();
         private readonly Dictionary<string, long> accumulators =
             new Dictionary<string, long>(StringComparer.Ordinal);
+        private readonly Dictionary<string, DateTime> userCooldowns =
+            new Dictionary<string, DateTime>(StringComparer.Ordinal);
+        private readonly Dictionary<string, DateTime> globalCooldowns =
+            new Dictionary<string, DateTime>(StringComparer.Ordinal);
         private readonly HashSet<string> followedViewers =
             new HashSet<string>(StringComparer.Ordinal);
         private readonly CreatorToolsStreamDispatchBacklog dispatchBacklog =
@@ -48,10 +54,12 @@ namespace Gilomx.CupheadBossRoulette
             string assetsDirectory,
             string pluginConfigPath,
             Func<bool> getInteractionsEnabled,
-            Action<string> logWarning)
+            Action<string> logWarning,
+            Func<DateTime> utcNow = null)
         {
             this.getInteractionsEnabled = getInteractionsEnabled;
             this.logWarning = logWarning;
+            this.utcNow = utcNow ?? delegate { return DateTime.UtcNow; };
             var configDirectory = Path.GetDirectoryName(
                 string.IsNullOrEmpty(pluginConfigPath)
                     ? string.Empty
@@ -101,7 +109,7 @@ namespace Gilomx.CupheadBossRoulette
             // keep all gameplay queue access on this main-thread call.
             lock (ruleStateLock)
                 return InteractionsEnabled && streamAttacksAllowed
-                    ? dispatchBacklog.Drain(interactions)
+                    ? dispatchBacklog.Drain(interactions, UtcNow())
                     : 0;
         }
 
@@ -144,6 +152,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 dispatchBacklog.Clear();
                 accumulators.Clear();
+                userCooldowns.Clear();
+                globalCooldowns.Clear();
                 followedViewers.Clear();
                 lastPublishedState = null;
                 stateDirty = true;
@@ -270,16 +280,13 @@ namespace Gilomx.CupheadBossRoulette
                 return result;
             }
 
-            var viewerKey = string.Empty;
-            if (streamEvent.Type == LikeEventType ||
-                streamEvent.Type == FollowEventType)
+            var viewerKey = BuildViewerKey(streamEvent);
+            if ((streamEvent.Type == LikeEventType ||
+                 streamEvent.Type == FollowEventType) &&
+                viewerKey.Length == 0)
             {
-                viewerKey = BuildViewerKey(streamEvent);
-                if (viewerKey.Length == 0)
-                {
-                    result.MessageCode = "user_identity_missing";
-                    return result;
-                }
+                result.MessageCode = "user_identity_missing";
+                return result;
             }
 
             if (streamEvent.Type == FollowEventType)
@@ -307,6 +314,7 @@ namespace Gilomx.CupheadBossRoulette
 
             var matchedNames = new List<string>();
             var interactionIds = new List<string>();
+            var pending = new List<PendingRuleDispatch>();
             var thresholdObserved = false;
             for (var i = 0; i < rules.Count; i++)
             {
@@ -341,25 +349,23 @@ namespace Gilomx.CupheadBossRoulette
                 result.MatchedRules++;
                 matchedNames.Add(rule.Name);
                 interactionIds.Add(rule.Interaction);
-                var requestedLong = triggers * (long)rule.Quantity;
+                var requestedLong = triggers > long.MaxValue / rule.Quantity
+                    ? long.MaxValue
+                    : triggers * (long)rule.Quantity;
                 var giftImagePath = string.Empty;
                 GiftEntry gift;
                 if (rule.EventType == GiftEventType &&
                     gifts.TryGetValue(rule.GiftId, out gift))
                     giftImagePath = gift.ImagePath;
-                dispatchBacklog.Add(
-                    rule.Id,
-                    streamEvent.ConnectionId,
-                    rule.Interaction,
-                    giftImagePath,
-                    streamEvent.UserName,
-                    requestedLong, rule.DurationSeconds, rule.CountdownSeconds);
-                // Evaluation can run while Unity is suspended. The worker
-                // only records durable in-memory intent here; Update() is the
-                // sole main-thread boundary allowed to drain into the gameplay
-                // queue (which reads UnityEngine.Time).
-                result.DeferredInteractions += Math.Max(0L, requestedLong);
+                pending.Add(new PendingRuleDispatch(
+                    rule, triggers, rule.Quantity, giftImagePath));
+                result.DeferredInteractions = SaturatingAdd(
+                    result.DeferredInteractions,
+                    Math.Max(0L, requestedLong));
             }
+
+            ScheduleDispatches(
+                pending, streamEvent, viewerKey, UtcNow());
 
             result.RuleNames = string.Join(", ", matchedNames.ToArray());
             result.InteractionIds = string.Join(", ",
@@ -373,6 +379,188 @@ namespace Gilomx.CupheadBossRoulette
             else if (thresholdObserved)
                 result.MessageCode = "threshold_pending";
             return result;
+        }
+
+        private void ScheduleDispatches(
+            IList<PendingRuleDispatch> pending,
+            CreatorToolsStreamEvent streamEvent,
+            string viewerKey,
+            DateTime now)
+        {
+            if (pending == null || pending.Count == 0)
+                return;
+
+            if (streamEvent.Type == GiftEventType)
+            {
+                // Every rule attached to one gift event remains a bundle.
+                // Its shared gift cooldown is the longest configured by the
+                // rules that actually crossed their threshold.
+                var due = now;
+                var globalKey = BuildGlobalCooldownKey(
+                    pending[0].Rule, streamEvent.ConnectionId);
+                due = Later(due, GetCooldown(globalCooldowns, globalKey));
+                var globalSeconds = 0;
+                for (var i = 0; i < pending.Count; i++)
+                {
+                    var rule = pending[i].Rule;
+                    globalSeconds = Math.Max(
+                        globalSeconds, rule.GlobalCooldownSeconds);
+                    if (rule.UserCooldownSeconds <= 0 ||
+                        viewerKey.Length == 0)
+                        continue;
+                    due = Later(due, GetCooldown(
+                        userCooldowns,
+                        BuildAccumulatorKey(rule.Id,
+                            streamEvent.ConnectionId, viewerKey)));
+                }
+                var intervalSeconds = globalSeconds;
+                long maximumTriggers = 0;
+                for (var i = 0; i < pending.Count; i++)
+                {
+                    maximumTriggers = Math.Max(
+                        maximumTriggers, pending[i].TriggerCount);
+                    if (viewerKey.Length > 0)
+                        intervalSeconds = Math.Max(intervalSeconds,
+                            pending[i].Rule.UserCooldownSeconds);
+                }
+                var lastBundleDue = AdvanceDue(
+                    due, maximumTriggers - 1, intervalSeconds);
+                if (globalSeconds > 0)
+                    SetCooldown(globalCooldowns, globalKey,
+                        AdvanceDue(lastBundleDue, 1, globalSeconds));
+                for (var i = 0; i < pending.Count; i++)
+                {
+                    var rule = pending[i].Rule;
+                    if (rule.UserCooldownSeconds > 0 &&
+                        viewerKey.Length > 0)
+                    {
+                        var lastRuleDue = AdvanceDue(
+                            due, pending[i].TriggerCount - 1,
+                            intervalSeconds);
+                        SetCooldown(userCooldowns,
+                            BuildAccumulatorKey(rule.Id,
+                                streamEvent.ConnectionId, viewerKey),
+                            AdvanceDue(lastRuleDue, 1,
+                                rule.UserCooldownSeconds));
+                    }
+                    AddScheduledDispatchSeries(
+                        pending[i], streamEvent, due, intervalSeconds);
+                }
+                return;
+            }
+
+            for (var i = 0; i < pending.Count; i++)
+            {
+                var dispatch = pending[i];
+                var rule = dispatch.Rule;
+                var due = now;
+                var globalKey = BuildGlobalCooldownKey(
+                    rule, streamEvent.ConnectionId);
+                due = Later(due, GetCooldown(globalCooldowns, globalKey));
+                var userKey = BuildAccumulatorKey(
+                    rule.Id, streamEvent.ConnectionId, viewerKey);
+                if (rule.UserCooldownSeconds > 0)
+                    due = Later(due,
+                        GetCooldown(userCooldowns, userKey));
+                var intervalSeconds = Math.Max(
+                    rule.GlobalCooldownSeconds,
+                    rule.UserCooldownSeconds);
+                var lastDue = AdvanceDue(
+                    due, dispatch.TriggerCount - 1, intervalSeconds);
+                if (rule.GlobalCooldownSeconds > 0)
+                    SetCooldown(globalCooldowns, globalKey,
+                        AdvanceDue(lastDue, 1,
+                            rule.GlobalCooldownSeconds));
+                if (rule.UserCooldownSeconds > 0)
+                    SetCooldown(userCooldowns, userKey,
+                        AdvanceDue(lastDue, 1,
+                            rule.UserCooldownSeconds));
+                AddScheduledDispatchSeries(
+                    dispatch, streamEvent, due, intervalSeconds);
+            }
+        }
+
+        private void AddScheduledDispatchSeries(
+            PendingRuleDispatch dispatch,
+            CreatorToolsStreamEvent streamEvent,
+            DateTime due,
+            int intervalSeconds)
+        {
+            dispatchBacklog.AddSeries(
+                dispatch.Rule.Id,
+                streamEvent.ConnectionId,
+                dispatch.Rule.Interaction,
+                dispatch.GiftImagePath,
+                streamEvent.UserName,
+                dispatch.QuantityPerTrigger,
+                dispatch.TriggerCount,
+                due,
+                intervalSeconds,
+                dispatch.Rule.DurationSeconds,
+                dispatch.Rule.CountdownSeconds);
+            // Evaluation can run while Unity is suspended. The worker records
+            // an absolute UTC due time; Update is still the sole main-thread
+            // boundary that materializes it into Unity's gameplay clock.
+        }
+
+        private static DateTime GetCooldown(
+            IDictionary<string, DateTime> values, string key)
+        {
+            DateTime value;
+            return key != null && values.TryGetValue(key, out value)
+                ? value
+                : DateTime.MinValue;
+        }
+
+        private static DateTime Later(DateTime left, DateTime right)
+        {
+            return left >= right ? left : right;
+        }
+
+        private static DateTime AdvanceDue(
+            DateTime due, long intervals, int intervalSeconds)
+        {
+            if (intervals <= 0 || intervalSeconds <= 0)
+                return due;
+            var seconds = intervals * (double)intervalSeconds;
+            var maximumSeconds = (DateTime.MaxValue - due).TotalSeconds;
+            return seconds >= maximumSeconds
+                ? DateTime.MaxValue
+                : due.AddSeconds(seconds);
+        }
+
+        private static long SaturatingAdd(long left, long right)
+        {
+            if (right <= 0)
+                return left;
+            return left > long.MaxValue - right
+                ? long.MaxValue
+                : left + right;
+        }
+
+        private static void SetCooldown(
+            IDictionary<string, DateTime> values,
+            string key,
+            DateTime value)
+        {
+            if (string.IsNullOrEmpty(key))
+                return;
+            if (!values.ContainsKey(key) &&
+                values.Count >= MaximumRuntimeViewerKeys)
+            {
+                string oldestKey = null;
+                var oldest = DateTime.MaxValue;
+                foreach (var pair in values)
+                {
+                    if (pair.Value >= oldest)
+                        continue;
+                    oldest = pair.Value;
+                    oldestKey = pair.Key;
+                }
+                if (oldestKey != null)
+                    values.Remove(oldestKey);
+            }
+            values[key] = value;
         }
 
         private bool TryRememberFollowViewer(string key)
@@ -466,6 +654,10 @@ namespace Gilomx.CupheadBossRoulette
                     rules[index].Every != rule.Every ||
                     rules[index].Interaction != rule.Interaction ||
                     rules[index].Quantity != rule.Quantity ||
+                    rules[index].UserCooldownSeconds !=
+                        rule.UserCooldownSeconds ||
+                    rules[index].GlobalCooldownSeconds !=
+                        rule.GlobalCooldownSeconds ||
                     rules[index].DurationSeconds != rule.DurationSeconds ||
                     rules[index].CountdownSeconds != rule.CountdownSeconds ||
                     (rules[index].Enabled && !rule.Enabled);
@@ -541,10 +733,18 @@ namespace Gilomx.CupheadBossRoulette
                 enabled = true;
             int every;
             int quantity;
+            int userCooldown;
+            int globalCooldown;
             if (!TryReadBoundedInt(
                     Value(values, "every"), 1, MaximumEvery, out every) ||
                 !TryReadBoundedInt(Value(values, "quantity"),
-                    1, MaximumQuantity, out quantity))
+                    1, MaximumQuantity, out quantity) ||
+                !TryReadOptionalBoundedInt(
+                    Value(values, "userCooldownSeconds"),
+                    0, MaximumCooldownSeconds, out userCooldown) ||
+                !TryReadOptionalBoundedInt(
+                    Value(values, "globalCooldownSeconds"),
+                    0, MaximumCooldownSeconds, out globalCooldown))
             {
                 SetFeedback("invalid_rule", true);
                 return false;
@@ -574,6 +774,8 @@ namespace Gilomx.CupheadBossRoulette
                 Every = every,
                 Interaction = interaction,
                 Quantity = quantity,
+                UserCooldownSeconds = userCooldown,
+                GlobalCooldownSeconds = globalCooldown,
                 DurationSeconds = duration,
                 CountdownSeconds = countdown
             };
@@ -630,6 +832,8 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(MaximumEvery)
                 .Append(",\"maxQuantity\":")
                 .Append(MaximumQuantity)
+                .Append(",\"maxCooldownSeconds\":")
+                .Append(MaximumCooldownSeconds)
                 .Append(",\"rules\":[");
             for (var i = 0; i < rules.Count; i++)
             {
@@ -674,6 +878,10 @@ namespace Gilomx.CupheadBossRoulette
             AppendJson(builder, rule.Interaction);
             builder.Append("\",\"quantity\":")
                 .Append(rule.Quantity)
+                .Append(",\"userCooldownSeconds\":")
+                .Append(rule.UserCooldownSeconds)
+                .Append(",\"globalCooldownSeconds\":")
+                .Append(rule.GlobalCooldownSeconds)
                 .Append(",\"durationSeconds\":").Append(rule.DurationSeconds)
                 .Append(",\"countdownSeconds\":").Append(rule.CountdownSeconds);
             if (includeGift)
@@ -783,6 +991,8 @@ namespace Gilomx.CupheadBossRoulette
                     "\\\"every\\\":(?<every>\\d+)," +
                     "\\\"interaction\\\":\\\"(?<interaction>[^\\\"]+)\\\"," +
                     "\\\"quantity\\\":(?<quantity>\\d+)" +
+                    "(?:,\\\"userCooldownSeconds\\\":(?<userCooldown>\\d+))?" +
+                    "(?:,\\\"globalCooldownSeconds\\\":(?<globalCooldown>\\d+))?" +
                     "(?:,\\\"durationSeconds\\\":(?<duration>\\d+))?" +
                     "(?:,\\\"countdownSeconds\\\":(?<countdown>\\d+))?\\}",
                     RegexOptions.CultureInvariant);
@@ -793,6 +1003,8 @@ namespace Gilomx.CupheadBossRoulette
                     long id;
                     int every;
                     int quantity;
+                    int userCooldown;
+                    int globalCooldown;
                     int duration, countdown;
                     var eventType =
                         matches[i].Groups["eventType"].Value;
@@ -807,6 +1019,14 @@ namespace Gilomx.CupheadBossRoulette
                         !int.TryParse(matches[i].Groups["quantity"].Value,
                             NumberStyles.Integer,
                             CultureInfo.InvariantCulture, out quantity) ||
+                        !TryReadOptionalBoundedInt(
+                            matches[i].Groups["userCooldown"].Value,
+                            0, MaximumCooldownSeconds,
+                            out userCooldown) ||
+                        !TryReadOptionalBoundedInt(
+                            matches[i].Groups["globalCooldown"].Value,
+                            0, MaximumCooldownSeconds,
+                            out globalCooldown) ||
                         id <= 0 || !ids.Add(id) ||
                         every < 1 || every > MaximumEvery ||
                         quantity < 1 || quantity > MaximumQuantity ||
@@ -834,6 +1054,8 @@ namespace Gilomx.CupheadBossRoulette
                         Every = every,
                         Interaction = interaction,
                         Quantity = quantity,
+                        UserCooldownSeconds = userCooldown,
+                        GlobalCooldownSeconds = globalCooldown,
                         DurationSeconds = duration,
                         CountdownSeconds = countdown
                     });
@@ -942,6 +1164,16 @@ namespace Gilomx.CupheadBossRoulette
                     keys.Add(key);
             for (var i = 0; i < keys.Count; i++)
                 accumulators.Remove(keys[i]);
+            keys.Clear();
+            foreach (var key in userCooldowns.Keys)
+                if (key.StartsWith(prefix, StringComparison.Ordinal))
+                    keys.Add(key);
+            for (var i = 0; i < keys.Count; i++)
+                userCooldowns.Remove(keys[i]);
+            // Gift cooldowns are shared by every rule that maps the same
+            // gift. A rule edit invalidates those ephemeral reservations;
+            // persisted configuration remains untouched.
+            globalCooldowns.Clear();
             dispatchBacklog.RemoveRule(id);
         }
 
@@ -994,6 +1226,25 @@ namespace Gilomx.CupheadBossRoulette
                 (viewerKey ?? string.Empty);
         }
 
+        private static string BuildGlobalCooldownKey(
+            StreamRule rule,
+            string connectionId)
+        {
+            return (connectionId ?? string.Empty) + "\n" +
+                (rule.EventType == GiftEventType
+                    ? "gift:" + rule.GiftId
+                    : "rule:" + rule.Id.ToString(
+                        CultureInfo.InvariantCulture));
+        }
+
+        private DateTime UtcNow()
+        {
+            var value = utcNow();
+            return value.Kind == DateTimeKind.Utc
+                ? value
+                : value.ToUniversalTime();
+        }
+
         private static string NormalizeRuleName(string value)
         {
             value = (value ?? string.Empty).Trim();
@@ -1014,6 +1265,14 @@ namespace Gilomx.CupheadBossRoulette
             }
             return value == "0" || string.Equals(value, "false",
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryReadOptionalBoundedInt(
+            string value, int minimum, int maximum, out int result)
+        {
+            result = 0;
+            return string.IsNullOrEmpty(value) ||
+                TryReadBoundedInt(value, minimum, maximum, out result);
         }
 
         private static bool TryReadBoundedInt(
@@ -1228,6 +1487,8 @@ namespace Gilomx.CupheadBossRoulette
             internal int Every;
             internal string Interaction;
             internal int Quantity;
+            internal int UserCooldownSeconds;
+            internal int GlobalCooldownSeconds;
             internal int DurationSeconds = CreatorToolsTimedChallenge.DefaultDuration;
             internal int CountdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown;
 
@@ -1244,9 +1505,31 @@ namespace Gilomx.CupheadBossRoulette
                     Every = Every,
                     Interaction = Interaction,
                     Quantity = Quantity,
+                    UserCooldownSeconds = UserCooldownSeconds,
+                    GlobalCooldownSeconds = GlobalCooldownSeconds,
                     DurationSeconds = DurationSeconds,
                     CountdownSeconds = CountdownSeconds
                 };
+            }
+        }
+
+        private sealed class PendingRuleDispatch
+        {
+            internal readonly StreamRule Rule;
+            internal readonly long TriggerCount;
+            internal readonly int QuantityPerTrigger;
+            internal readonly string GiftImagePath;
+
+            internal PendingRuleDispatch(
+                StreamRule rule,
+                long triggerCount,
+                int quantityPerTrigger,
+                string giftImagePath)
+            {
+                Rule = rule;
+                TriggerCount = triggerCount;
+                QuantityPerTrigger = quantityPerTrigger;
+                GiftImagePath = giftImagePath ?? string.Empty;
             }
         }
     }

@@ -34,7 +34,7 @@ async function unusedPort() {
   return port;
 }
 
-test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (t) => {
+test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
   const port = await unusedPort();
   const child = spawn(process.execPath, ["scripts/mock-server.mjs", String(port), "127.0.0.1"], {
     cwd: uiRoot,
@@ -112,9 +112,25 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
     assert.deepEqual(select(initialInteractions.defaultPacing, Object.keys(groupDefaults)), groupDefaults);
     assert.equal(initialInteractions.defaultPacing.enabled, false);
     assert.equal(initialInteractions.maxActive, 6);
+    assert.equal(initialInteractions.maxActiveUnlimited, false);
     assert.equal(initialInteractions.defaultMaxActive, 6);
     assert.equal(initialInteractions.maxMiniBosses, 1);
     assert.deepEqual(numericSettings(initialPesky), peskyDefaults);
+  });
+
+  await t.test("unlimited belongs only to Interactions", async () => {
+    const peskyMaximum = (await getPesky()).maxActive;
+    accepted(await setInteractions(initialInteractions.pacing, {
+      maxActive: 8, maxActiveUnlimited: 1,
+    }));
+    const unlimited = await getInteractions();
+    assert.equal(unlimited.maxActive, 8);
+    assert.equal(unlimited.maxActiveUnlimited, true);
+    assert.equal((await getPesky()).maxActive, peskyMaximum);
+    accepted(await setInteractions(initialInteractions.pacing, {
+      maxActive: initialInteractions.maxActive, maxActiveUnlimited: 0,
+    }));
+    assert.equal((await getInteractions()).maxActiveUnlimited, false);
   });
 
   await t.test("intense concurrency is atomic, defaults off and belongs only to Pesky", async () => {
@@ -318,5 +334,48 @@ test("HTTP spawn settings contract (mock only; no gameplay scheduling)", async (
     assert.deepEqual(select(afterInteractions, ["interactionsEnabled", "queuePaused", "queue", "showGiftImage", "maxMiniBosses"]),
       select(beforeInteractions, ["interactionsEnabled", "queuePaused", "queue", "showGiftImage", "maxMiniBosses"]));
     assert.equal(afterInteractions.maxActive, 6);
+  });
+
+  await t.test("a batch of thirty gifts keeps thirty cooldown slots", async () => {
+    accepted(await request("/api/config/interactions/set", {
+      interactionsEnabled: 1,
+    }));
+    accepted(await request("/api/config/interactions/set", {
+      clearPending: 1,
+    }));
+    accepted(await request("/api/config/interactions/set", {
+      queuePaused: 0,
+    }));
+    const created = await request("/api/config/interactions/rules/set", {
+      action: "create",
+      name: "Thirty roses",
+      eventType: "gift",
+      giftId: "8913",
+      every: 1,
+      interaction: "hilda_green_zeppelin",
+      quantity: 1,
+      userCooldownSeconds: 10,
+      globalCooldownSeconds: 4,
+      enabled: 1,
+    });
+    assert.equal(created.status, 200);
+    assert.equal(created.body.feedback, "created");
+
+    accepted(await request("/api/dashboard/simulate", {
+      platform: "tiktok",
+      type: "gift",
+      user: "Cooldown tester",
+      userId: "cooldown-tester",
+      giftId: "8913",
+      count: 30,
+      delaySeconds: 0,
+    }));
+
+    const state = await getInteractions();
+    assert.equal(state.queueCount, 30);
+    assert.equal(state.queue[0].delaySeconds, 0);
+    assert.equal(state.queue[1].delaySeconds, 10);
+    assert.equal(state.queue[29].delaySeconds, 290);
+    assert.equal(state.queue.filter((entry) => entry.status === "scheduled").length, 29);
   });
 });

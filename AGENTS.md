@@ -39,10 +39,10 @@ deben conservarse: [docs/launcher-dev-deployment.md](docs/launcher-dev-deploymen
   referencias. Mod y companion deben resolver recursos desde el plugin en
   ejecución, sin depender de rutas de desarrollo.
 - No escribas en la carpeta de ejecución compartida ni modifiques el catálogo
-  del launcher. La futura opción «La Pichi Ruleta · Dev» aplicará el paquete en
-  el siguiente arranque, compartiendo una carpeta de ejecución con los demás
-  mods. Esa carga aún está pendiente: no afirmes que el launcher actual puede
-  consumir `current.zip`.
+  del launcher. El launcher actual detecta `current.zip` y la opción
+  «La Pichi Ruleta · Dev» aplica el paquete en el siguiente arranque,
+  compartiendo una carpeta de ejecución con los demás mods. El script sólo
+  publica el ZIP; el launcher se encarga de aplicarlo y arrancar el juego.
 - Puedes publicar mientras se juega. No cierres Cuphead ni su companion, no
   arranques el juego y no intentes recargar DLL en una sesión activa.
 - No borres todavía los archivos del mod instalados en el original. La

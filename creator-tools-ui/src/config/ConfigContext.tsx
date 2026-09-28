@@ -40,7 +40,7 @@ interface ConfigValue {
   status: ConnectionStatus;
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
-  applyInteractionSettings: (maxActive: number, showGiftImage: boolean, pacing: InteractionPacingConfig) => void;
+  applyInteractionSettings: (maxActive: number, maxActiveUnlimited: boolean, showGiftImage: boolean, pacing: InteractionPacingConfig) => void;
   applyInteractionsEnabled: (enabled: boolean) => void;
   applyInteractionQueuePaused: (paused: boolean) => void;
   clearPendingInteractions: () => void;
@@ -50,7 +50,7 @@ interface ConfigValue {
   applyPeskyItem: (item: string, enabled: boolean) => void;
   applyPeskyChallengeDuration: (seconds: number, countdown: number, wait: number) => void;
   applyPeskyIntervals: (maxActive: number, pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => void;
-  applyPacingToBoth: (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => void;
+  applyPacingToBoth: (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean, interactionUnlimited?: boolean) => void;
   applyPeskyBattleGift: (giftId: string) => void;
   applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
   applyPeskyBattleItem: (item: string, enabled: boolean) => void;
@@ -103,6 +103,7 @@ type InteractionSettingsStatus =
 interface DesiredInteractionSettings {
   pacing: InteractionPacingConfig;
   maxActive: number;
+  maxActiveUnlimited: boolean;
   showGiftImage: boolean;
   baselineRevision: number;
   requestRevision: number;
@@ -426,6 +427,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           (nextInteraction.settingsRevision ?? 0) >
             desiredInteractionSettings.baselineRevision &&
           nextInteraction.maxActive === desiredInteractionSettings.maxActive &&
+          nextInteraction.maxActiveUnlimited ===
+            desiredInteractionSettings.maxActiveUnlimited &&
           (nextInteraction.showGiftImage !== false) ===
             desiredInteractionSettings.showGiftImage &&
           Object.keys(desiredInteractionSettings.pacing).every((key) =>
@@ -458,6 +461,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           visibleInteraction = {
             ...visibleInteraction,
             maxActive: desiredInteractionSettings.maxActive,
+            maxActiveUnlimited:
+              desiredInteractionSettings.maxActiveUnlimited,
             showGiftImage: desiredInteractionSettings.showGiftImage,
             pacing: desiredInteractionSettings.pacing,
           };
@@ -621,7 +626,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyInteractionSettings = useCallback(
-    (value: number, showGiftImage: boolean, pacing: InteractionPacingConfig) => {
+    (value: number, maxActiveUnlimited: boolean, showGiftImage: boolean, pacing: InteractionPacingConfig) => {
       if (!interaction?.ready || !validPacing(pacing)) return;
       const normalized = Math.max(
         1,
@@ -632,6 +637,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       desiredInteractionSettingsRef.current = {
         pacing: { ...pacing },
         maxActive: normalized,
+        maxActiveUnlimited,
         showGiftImage,
         baselineRevision: interaction.settingsRevision ?? 0,
         requestRevision,
@@ -645,6 +651,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         ? {
             ...current,
             maxActive: normalized,
+            maxActiveUnlimited,
             pacing: { ...pacing },
             maxMiniBosses: 1,
             showGiftImage,
@@ -657,6 +664,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
       const query = new URLSearchParams({
         maxActive: String(normalized),
+        maxActiveUnlimited: maxActiveUnlimited ? "1" : "0",
         maxMiniBosses: "1",
         showGiftImage: showGiftImage ? "1" : "0",
         "pacing.enabled": pacing.enabled ? "1" : "0",
@@ -1012,13 +1020,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPacingToBoth = useCallback(
-    (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean) => {
+    (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean, interactionUnlimited = false) => {
       if (!pesky?.ready || !interaction?.ready || !interaction.pacing) return;
-      applyPeskyIntervals(maxActive, pacing, allowConcurrentStrongInteractions);
-      applyInteractionSettings(maxActive, interaction.showGiftImage !== false,
+      applyPeskyIntervals(interactionUnlimited ? pesky.maxActive : maxActive,
+        pacing, allowConcurrentStrongInteractions);
+      applyInteractionSettings(maxActive, interactionUnlimited,
+        interaction.showGiftImage !== false,
         { ...pacing, enabled: interaction.pacing.enabled });
     },
-    [pesky?.ready, interaction, applyPeskyIntervals, applyInteractionSettings],
+    [pesky?.ready, pesky?.maxActive, interaction,
+      applyPeskyIntervals, applyInteractionSettings],
   );
 
   const applyPeskyNames = useCallback(
@@ -1440,6 +1451,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         every: String(draft.every),
         interaction: draft.interaction,
         quantity: String(draft.quantity),
+        userCooldownSeconds: String(draft.userCooldownSeconds),
+        globalCooldownSeconds: String(draft.globalCooldownSeconds),
         durationSeconds: String(draft.durationSeconds ?? 15),
         countdownSeconds: String(draft.countdownSeconds ?? 3),
       });

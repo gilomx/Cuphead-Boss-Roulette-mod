@@ -21,6 +21,7 @@ let interactionLastItem = "";
 let interactionNextId = 1;
 let interactionQueue = [];
 let interactionMaxActive = 6;
+let interactionMaxActiveUnlimited = false;
 const interactionMaxMiniBosses = 1;
 let interactionShowGiftImage = true;
 const spawnGroupDefaults = {
@@ -47,12 +48,14 @@ let streamRulesFeedback = "ready";
 let streamRulesError = false;
 let streamRules = [];
 const streamRuleAccumulators = new Map();
+const streamRuleUserCooldowns = new Map();
+const streamRuleGlobalCooldowns = new Map();
 const followedViewers = new Set();
 
 function streamRulesState() {
   return {
     ready: true,
-    schemaVersion: 2,
+    schemaVersion: 5,
     revision: streamRulesRevision,
     engineActive: interactionsEnabled,
     catalogVersion: giftCatalog.catalogVersion,
@@ -61,6 +64,7 @@ function streamRulesState() {
     maxRules: 100,
     maxEvery: 1000000,
     maxQuantity: 50,
+    maxCooldownSeconds: 3600,
     rules: streamRules.map((rule) => {
       const gift = giftsById.get(rule.giftId);
       return {
@@ -81,6 +85,10 @@ function resetStreamRuleAccumulators(ruleId) {
   for (const key of streamRuleAccumulators.keys()) {
     if (key.startsWith(prefix)) streamRuleAccumulators.delete(key);
   }
+  for (const key of streamRuleUserCooldowns.keys()) {
+    if (key.startsWith(prefix)) streamRuleUserCooldowns.delete(key);
+  }
+  streamRuleGlobalCooldowns.clear();
 }
 
 let peskyEnabled = false;
@@ -752,6 +760,7 @@ function executeDashboardSimulation(command) {
       if (command.type === "follow" && viewerKey && !repeatedFollow) {
         followedViewers.add(followKey);
       }
+      const triggeredRules = [];
       for (const rule of streamRules.filter((candidate) =>
         !repeatedFollow && candidate.enabled && candidate.eventType === command.type &&
         (candidate.eventType !== "gift" || candidate.giftId === command.itemId))) {
@@ -767,22 +776,91 @@ function executeDashboardSimulation(command) {
         if (triggers <= 0) continue;
         matchedRules.push(rule.name);
         queuedActions.push(rule.interaction);
-        const requested = triggers * rule.quantity;
-        const accepted = Math.max(0, Math.min(
+        triggeredRules.push({
+          rule,
+          triggers,
+          requested: triggers * rule.quantity,
+        });
+      }
+      const now = Date.now();
+      let giftDue = now;
+      let giftIntervalMs = 0;
+      if (command.type === "gift" && triggeredRules.length > 0) {
+        const globalKey = `simulator-tiktok\ngift:${command.itemId}`;
+        giftDue = Math.max(giftDue, streamRuleGlobalCooldowns.get(globalKey) ?? 0);
+        for (const { rule } of triggeredRules) {
+          if ((rule.userCooldownSeconds ?? 0) > 0 && viewerKey) {
+            giftDue = Math.max(giftDue,
+              streamRuleUserCooldowns.get(`${rule.id}:simulator-tiktok\n${viewerKey}`) ?? 0);
+          }
+        }
+        const globalSeconds = Math.max(0,
+          ...triggeredRules.map(({ rule }) => rule.globalCooldownSeconds ?? 0));
+        const userSeconds = viewerKey
+          ? Math.max(0,
+            ...triggeredRules.map(({ rule }) => rule.userCooldownSeconds ?? 0))
+          : 0;
+        giftIntervalMs = Math.max(globalSeconds, userSeconds) * 1000;
+        const maximumTriggers = Math.max(0,
+          ...triggeredRules.map(({ triggers }) => triggers));
+        const lastBundleDue = giftDue + Math.max(0, maximumTriggers - 1) * giftIntervalMs;
+        if (globalSeconds > 0) {
+          streamRuleGlobalCooldowns.set(globalKey,
+            lastBundleDue + globalSeconds * 1000);
+        }
+        for (const { rule, triggers } of triggeredRules) {
+          if ((rule.userCooldownSeconds ?? 0) > 0 && viewerKey) {
+            const lastRuleDue = giftDue + Math.max(0, triggers - 1) * giftIntervalMs;
+            streamRuleUserCooldowns.set(`${rule.id}:simulator-tiktok\n${viewerKey}`,
+              lastRuleDue + (rule.userCooldownSeconds ?? 0) * 1000);
+          }
+        }
+      }
+      for (const { rule, triggers, requested } of triggeredRules) {
+        let due = giftDue;
+        let intervalMs = giftIntervalMs;
+        if (command.type !== "gift") {
+          const globalKey = `simulator-tiktok\nrule:${rule.id}`;
+          const userKey = `${rule.id}:simulator-tiktok\n${viewerKey}`;
+          due = Math.max(now, streamRuleGlobalCooldowns.get(globalKey) ?? 0,
+            streamRuleUserCooldowns.get(userKey) ?? 0);
+          intervalMs = Math.max(
+            rule.globalCooldownSeconds ?? 0,
+            rule.userCooldownSeconds ?? 0,
+          ) * 1000;
+          const lastDue = due + Math.max(0, triggers - 1) * intervalMs;
+          if ((rule.globalCooldownSeconds ?? 0) > 0) {
+            streamRuleGlobalCooldowns.set(globalKey,
+              lastDue + (rule.globalCooldownSeconds ?? 0) * 1000);
+          }
+          if ((rule.userCooldownSeconds ?? 0) > 0) {
+            streamRuleUserCooldowns.set(userKey,
+              lastDue + (rule.userCooldownSeconds ?? 0) * 1000);
+          }
+        }
+        let accepted = 0;
+        const maximumAccepted = Math.max(0, Math.min(
           requested,
-          50,
           200 - interactionQueue.length,
         ));
-        for (let index = 0; index < accepted; index += 1) {
-          interactionQueue.push({
-            id: interactionNextId,
-            item: rule.interaction,
-            donor: command.user,
-            delaySeconds: 0,
-            readyAt: Date.now(),
-            status: "queued",
-          });
-          interactionNextId += 1;
+        for (let triggerIndex = 0;
+          triggerIndex < triggers && accepted < maximumAccepted;
+          triggerIndex += 1) {
+          const activationDue = due + triggerIndex * intervalMs;
+          for (let quantityIndex = 0;
+            quantityIndex < rule.quantity && accepted < maximumAccepted;
+            quantityIndex += 1) {
+            interactionQueue.push({
+              id: interactionNextId,
+              item: rule.interaction,
+              donor: command.user,
+              delaySeconds: Math.max(0, (activationDue - now) / 1000),
+              readyAt: activationDue,
+              status: activationDue > now ? "scheduled" : "queued",
+            });
+            interactionNextId += 1;
+            accepted += 1;
+          }
         }
         dashboardCounters.queued += accepted;
         interactionQueueChanged ||= accepted > 0;
@@ -1413,6 +1491,7 @@ createServer((req, res) => {
       pendingCount: interactionQueue.filter((entry) => entry.status !== "active").length,
       backlogCount: 0,
       maxActive: interactionMaxActive,
+      maxActiveUnlimited: interactionMaxActiveUnlimited,
       defaultMaxActive: 6,
       maxMiniBosses: interactionMaxMiniBosses,
       maxActiveLimit: 20,
@@ -1453,12 +1532,16 @@ createServer((req, res) => {
       const interaction = url.searchParams.get("interaction") ?? "";
       const every = Number(url.searchParams.get("every"));
       const quantity = Number(url.searchParams.get("quantity"));
+      const userCooldownSeconds = Number(url.searchParams.get("userCooldownSeconds") ?? 0);
+      const globalCooldownSeconds = Number(url.searchParams.get("globalCooldownSeconds") ?? 0);
       const name = (url.searchParams.get("name") ?? "").trim().slice(0, 64);
       if (!name || !["gift", "like", "follow"].includes(eventType) ||
           (eventType === "gift" && !giftsById.has(giftId)) ||
           !interactionItems.includes(interaction) ||
           !Number.isInteger(every) || every < 1 ||
-          !Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
+          !Number.isInteger(quantity) || quantity < 1 || quantity > 50 ||
+          !Number.isInteger(userCooldownSeconds) || userCooldownSeconds < 0 || userCooldownSeconds > 3600 ||
+          !Number.isInteger(globalCooldownSeconds) || globalCooldownSeconds < 0 || globalCooldownSeconds > 3600) {
         streamRulesFeedback = "invalid_rule";
         streamRulesError = true;
       } else {
@@ -1471,6 +1554,8 @@ createServer((req, res) => {
           every: eventType === "follow" ? 1 : every,
           interaction,
           quantity,
+          userCooldownSeconds,
+          globalCooldownSeconds,
           durationSeconds: Number(url.searchParams.get("durationSeconds") ?? 15),
           countdownSeconds: Number(url.searchParams.get("countdownSeconds") ?? 3),
         };
@@ -1497,6 +1582,7 @@ createServer((req, res) => {
     const queuePausedValue = url.searchParams.get("queuePaused");
     const clearPendingValue = url.searchParams.get("clearPending");
     const maxActiveValue = url.searchParams.get("maxActive");
+    const maxActiveUnlimitedValue = url.searchParams.get("maxActiveUnlimited");
     const maxMiniBossesValue = url.searchParams.get("maxMiniBosses");
     const showGiftImageValue = url.searchParams.get("showGiftImage");
     const pacingRequested = [...url.searchParams.keys()].some((key) => key.startsWith("pacing."));
@@ -1508,6 +1594,7 @@ createServer((req, res) => {
     if (!nextPacing ||
         (maxActiveValue !== null && !integerSetting(maxActiveValue)) ||
         (maxMiniBossesValue !== null && !integerSetting(maxMiniBossesValue)) ||
+        (maxActiveUnlimitedValue !== null && settingSwitch(maxActiveUnlimitedValue) === null) ||
         (showGiftImageValue !== null && settingSwitch(showGiftImageValue) === null)) {
       json(res, { ok: false, feedback: "invalid_setting" }, 400);
       return;
@@ -1523,6 +1610,8 @@ createServer((req, res) => {
         interactionQueuePaused = false;
         interactionQueueControlRevision += 1;
         streamRuleAccumulators.clear();
+        streamRuleUserCooldowns.clear();
+        streamRuleGlobalCooldowns.clear();
         followedViewers.clear();
       }
       nextFeedback = interactionsEnabled
@@ -1546,10 +1635,13 @@ createServer((req, res) => {
         Math.min(20, Number(maxActiveValue) || 1),
       );
     }
+    if (maxActiveUnlimitedValue !== null) {
+      interactionMaxActiveUnlimited = settingSwitch(maxActiveUnlimitedValue);
+    }
     if (showGiftImageValue !== null) {
       interactionShowGiftImage = settingSwitch(showGiftImageValue);
     }
-    if (maxActiveValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null || pacingRequested) {
+    if (maxActiveValue !== null || maxActiveUnlimitedValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null || pacingRequested) {
       interactionSettingsRevision += 1;
     }
     const phaseTransitionProtectionValue = url.searchParams.get(

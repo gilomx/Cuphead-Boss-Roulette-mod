@@ -2,6 +2,32 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Las pruebas de Interacciones ya no repiten un formulario por cada elemento
+  del catálogo. Ahora usan el mismo buscador visual del editor de reglas y
+  muestran un único formulario para la interacción seleccionada. Su menú flota
+  sobre el panel completo sin quedar recortado por el contenedor.
+
+- La documentación y la salida del publicador Dev reflejan el estado real del
+  launcher: `current.zip` ya se consume desde **La Pichi Ruleta · Dev**. El
+  script sólo publica el paquete; el launcher lo aplica y abre el juego desde
+  esa entrada, sin instalar nada en el Cuphead original.
+
+- Cada regla de Interacciones admite ahora un **cooldown por usuario** y un
+  **cooldown global**. En regalos, el global se comparte entre todos los
+  usuarios y todas las reglas que usan ese mismo regalo. Los eventos recibidos
+  durante una espera no se descartan: conservan remitente y cantidad y se
+  programan para el siguiente momento permitido. Si un evento contiene varias
+  unidades, cada activación resultante conserva su cantidad configurada y
+  ocupa un turno sucesivo del cooldown; por ejemplo, 30 rosas con una regla
+  cada 1 producen 30 turnos, no un solo bloque. El editor muestra ambos valores,
+  con `0` como desactivado, y la tabla resume los cooldowns activos.
+  El máximo de ataques de Interacciones también puede marcarse **Sin límite**;
+  no elimina el límite especial de minijefes, la capacidad de la cola ni las
+  compatibilidades. El ritmo global y los lotes quedan agrupados como
+  configuración avanzada. Si se usa **Usar en ambos modos**, el estado sin
+  límite permanece exclusivo de Interacciones y no altera el máximo guardado
+  de Modo Molestoso.
+
 - El cuerpo de **Ayuda fantasmal** baja de 52% a 44% de opacidad para reducir
   la distracción durante el combate. Su entrada ya no aparece directamente en
   la posición lateral: nace dentro de Player 1 y recorre hacia afuera la misma

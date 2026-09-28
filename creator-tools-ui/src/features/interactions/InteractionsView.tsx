@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import { interactionItems, type InteractionCategoryFilter } from "./interactionCatalog";
+import {
+  interactionItemFor,
+  interactionItems,
+  type InteractionCategoryFilter,
+} from "./interactionCatalog";
 import { InteractionCategorySelect } from "./InteractionCategorySelect";
+import { InteractionPicker } from "./InteractionPicker";
 import { InteractionSettingsPanel } from "./InteractionSettingsPanel";
 import { StreamRulesView } from "./StreamRulesView";
 
@@ -20,11 +25,28 @@ export function InteractionsView() {
   const [durations, setDurations] = useState<Record<string, number>>({});
   const [countdowns, setCountdowns] = useState<Record<string, number>>({});
   const [testingItem, setTestingItem] = useState<string | null>(null);
+  const [selectedTestItemId, setSelectedTestItemId] = useState<string>(
+    interactionItems[0]?.id ?? "",
+  );
   const [category, setCategory] = useState<InteractionCategoryFilter>("all");
   const visibleItems = interactionItems.filter((item) =>
     category === "all" || item.group === category);
+  const selectedTestItem = interactionItemFor(selectedTestItemId);
+  const donor = donors[selectedTestItemId] ?? "";
+  const quantity = quantities[selectedTestItemId] ?? 1;
+  const delay = delays[selectedTestItemId] ?? 0;
+  const duration = durations[selectedTestItemId] ?? 15;
+  const countdown = countdowns[selectedTestItemId] ?? 3;
   const maxBatch = interaction?.maxBatch ?? 50;
   const maxDelay = interaction?.maxDelay ?? 3600;
+  const canQueue = Boolean(
+    selectedTestItem &&
+    (interaction?.ready ?? false) &&
+    (interaction?.interactionsEnabled ?? false) &&
+    donor.trim().length > 0 &&
+    Number.isInteger(duration) && duration >= 1 && duration <= 120 &&
+    Number.isInteger(countdown) && countdown >= 0 && countdown <= 30,
+  );
   const testFeedback = optimisticInteractionQueue.length > 0
     ? "waiting_game"
     : interaction?.feedback ?? "ready";
@@ -88,119 +110,107 @@ export function InteractionsView() {
               <h2 id="interaction-tests-title">{t("interactions.test.title")}</h2>
               <p>{t("interactions.test.description")}</p>
             </div>
-            <InteractionCategorySelect value={category} onChange={setCategory} />
           </div>
 
-          <div className="interaction-table-wrap">
-            <table className="interaction-table test-table">
-              <thead>
-                <tr>
-                  <th scope="col">{t("interactions.test.item")}</th>
-                  <th scope="col">{t("interactions.test.configuration")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleItems.map((item) => {
-                  const donor = donors[item.id] ?? "";
-                  const quantity = quantities[item.id] ?? 1;
-                  const delay = delays[item.id] ?? 0;
-                  const duration = durations[item.id] ?? 15;
-                  const countdown = countdowns[item.id] ?? 3;
-                  const canQueue = (interaction?.ready ?? false) &&
-                    (interaction?.interactionsEnabled ?? false) &&
-                    donor.trim().length > 0 && Number.isInteger(duration) && duration >= 1 && duration <= 120 &&
-                    Number.isInteger(countdown) && countdown >= 0 && countdown <= 30;
-                  return (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="interaction-item-label interaction-item-label--test">
-                          <img src={item.image} alt="" />
-                          <span>{t(item.titleKey)}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="interaction-test-fields">
-                          {item.group === "challenge" ? (
-                            <>
-                            <label>
-                              <span>{t("interactions.challenges.countdown")}</span>
-                              <input type="number" min={0} max={30} step={1} value={countdown}
-                                onChange={(event) => setCountdowns((current) => ({ ...current, [item.id]: Number(event.target.value) }))} />
-                            </label>
-                            <label>
-                              <span>{t("interactions.challenges.duration")}</span>
-                              <input type="number" min={1} max={120} step={1} value={duration}
-                                onChange={(event) => setDurations((current) => ({ ...current, [item.id]: Number(event.target.value) }))} />
-                            </label>
-                            </>
-                          ) : null}
-                          <label>
-                            <span>{t("interactions.test.donorLabel")}</span>
-                            <input
-                              type="text"
-                              maxLength={32}
-                              value={donor}
-                              placeholder={t("interactions.test.donorPlaceholder")}
-                              onChange={(event) => setDonors((current) => ({
-                                ...current,
-                                [item.id]: event.target.value,
-                              }))}
-                            />
-                          </label>
-                          <div className="interaction-test-fields__action">
-                            <label className="interaction-quantity">
-                              <span>{t("interactions.test.quantityLabel")}</span>
-                              <input
-                                type="number"
-                                min={1}
-                                max={maxBatch}
-                                value={quantity}
-                                onChange={(event) => setQuantities((current) => ({
-                                  ...current,
-                                  [item.id]: Math.max(
-                                    1,
-                                    Math.min(maxBatch, Number(event.target.value) || 1),
-                                  ),
-                                }))}
-                              />
-                            </label>
-                            <label className="interaction-delay">
-                              <span>{t("interactions.test.delayLabel")}</span>
-                              <input
-                                type="number"
-                                min={0}
-                                max={maxDelay}
-                                step={0.5}
-                                value={delay}
-                                onChange={(event) => setDelays((current) => ({
-                                  ...current,
-                                  [item.id]: Math.max(
-                                    0,
-                                    Math.min(maxDelay, Number(event.target.value) || 0),
-                                  ),
-                                }))}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              disabled={!canQueue}
-                              onClick={() => {
-                                setTestingItem(item.id);
-                                testInteraction(item.id, donor, quantity, delay, duration, countdown);
-                              }}
-                            >
-                              {interactionTesting && testingItem === item.id
-                                ? t("interactions.test.testing")
-                                : t("interactions.test.action")}
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="interaction-test-form">
+            <InteractionPicker
+              id="interaction-test-item"
+              label={t("interactions.test.item")}
+              selectedKey={selectedTestItemId}
+              onSelect={(item) => setSelectedTestItemId(item.id)}
+            />
+
+            {selectedTestItem ? (
+              <div className="interaction-test-fields">
+                {selectedTestItem.group === "challenge" ? (
+                  <div className="interaction-test-fields__challenge">
+                    <label>
+                      <span>{t("interactions.challenges.countdown")}</span>
+                      <input type="number" min={0} max={30} step={1} value={countdown}
+                        onChange={(event) => setCountdowns((current) => ({
+                          ...current,
+                          [selectedTestItem.id]: Number(event.target.value),
+                        }))} />
+                    </label>
+                    <label>
+                      <span>{t("interactions.challenges.duration")}</span>
+                      <input type="number" min={1} max={120} step={1} value={duration}
+                        onChange={(event) => setDurations((current) => ({
+                          ...current,
+                          [selectedTestItem.id]: Number(event.target.value),
+                        }))} />
+                    </label>
+                  </div>
+                ) : null}
+                <label>
+                  <span>{t("interactions.test.donorLabel")}</span>
+                  <input
+                    type="text"
+                    maxLength={32}
+                    value={donor}
+                    placeholder={t("interactions.test.donorPlaceholder")}
+                    onChange={(event) => setDonors((current) => ({
+                      ...current,
+                      [selectedTestItem.id]: event.target.value,
+                    }))}
+                  />
+                </label>
+                <div className="interaction-test-fields__action">
+                  <label className="interaction-quantity">
+                    <span>{t("interactions.test.quantityLabel")}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={maxBatch}
+                      value={quantity}
+                      onChange={(event) => setQuantities((current) => ({
+                        ...current,
+                        [selectedTestItem.id]: Math.max(
+                          1,
+                          Math.min(maxBatch, Number(event.target.value) || 1),
+                        ),
+                      }))}
+                    />
+                  </label>
+                  <label className="interaction-delay">
+                    <span>{t("interactions.test.delayLabel")}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={maxDelay}
+                      step={0.5}
+                      value={delay}
+                      onChange={(event) => setDelays((current) => ({
+                        ...current,
+                        [selectedTestItem.id]: Math.max(
+                          0,
+                          Math.min(maxDelay, Number(event.target.value) || 0),
+                        ),
+                      }))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!canQueue}
+                    onClick={() => {
+                      setTestingItem(selectedTestItem.id);
+                      testInteraction(
+                        selectedTestItem.id,
+                        donor,
+                        quantity,
+                        delay,
+                        duration,
+                        countdown,
+                      );
+                    }}
+                  >
+                    {interactionTesting && testingItem === selectedTestItem.id
+                      ? t("interactions.test.testing")
+                      : t("interactions.test.action")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {showTestFeedback ? (

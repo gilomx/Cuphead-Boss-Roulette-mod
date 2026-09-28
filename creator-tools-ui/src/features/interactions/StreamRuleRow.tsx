@@ -49,6 +49,20 @@ export function StreamRuleRow({
     : rule.eventType === "like"
       ? t("interactions.rules.list.likeEvery").replace("{count}", String(rule.every))
       : t("interactions.rules.list.followOnce");
+  const cooldownDetail = [
+    rule.userCooldownSeconds > 0
+      ? t("interactions.rules.list.userCooldown").replace(
+          "{seconds}", String(rule.userCooldownSeconds),
+        )
+      : "",
+    rule.globalCooldownSeconds > 0
+      ? t(rule.eventType === "gift"
+          ? "interactions.rules.list.giftCooldown"
+          : "interactions.rules.list.globalCooldown").replace(
+          "{seconds}", String(rule.globalCooldownSeconds),
+        )
+      : "",
+  ].filter(Boolean).join(" · ");
 
   useEffect(() => () => {
     if (returnAnimationTimerRef.current !== null) {
@@ -147,6 +161,7 @@ export function StreamRuleRow({
                     String(rule.quantity),
                   )}
                 </small>
+                {cooldownDetail ? <small>{cooldownDetail}</small> : null}
               </span>
             </div>
           </td>

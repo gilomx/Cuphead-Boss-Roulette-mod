@@ -30,9 +30,12 @@ namespace Gilomx.CupheadBossRoulette
         internal int EnqueuedCount { get; private set; }
         internal int LastDurationSeconds { get; private set; }
         internal int LastCountdownSeconds { get; private set; }
+        internal float LastDelaySeconds { get; private set; }
         internal string LastItem { get; private set; }
         internal readonly System.Collections.Generic.List<string>
             EnqueuedItems = new System.Collections.Generic.List<string>();
+        internal readonly System.Collections.Generic.List<float>
+            EnqueueDelays = new System.Collections.Generic.List<float>();
 
         internal int StreamQueueAvailableCapacity
         {
@@ -51,12 +54,17 @@ namespace Gilomx.CupheadBossRoulette
             string donor,
             string giftImagePath,
             int quantity,
-            out string feedbackCode, int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration, int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown)
+            out string feedbackCode,
+            int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration,
+            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown,
+            float delaySeconds = 0f)
         {
             EnqueueCallCount++;
             LastDurationSeconds = durationSeconds;
             LastCountdownSeconds = countdownSeconds;
+            LastDelaySeconds = delaySeconds;
             LastItem = item;
+            EnqueueDelays.Add(delaySeconds);
             var available = StreamQueueAvailableCapacityFor(item);
             var accepted = Math.Max(
                 0, Math.Min(Math.Max(0, quantity), available));

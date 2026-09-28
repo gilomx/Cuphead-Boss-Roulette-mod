@@ -285,6 +285,7 @@ export function StreamRulesView() {
               gifts={catalog.gifts}
               maxEvery={streamRules?.maxEvery ?? 1_000_000}
               maxQuantity={streamRules?.maxQuantity ?? 50}
+              maxCooldownSeconds={streamRules?.maxCooldownSeconds ?? 3_600}
               saving={savePending}
               onChange={setDraft}
               onCancel={() => setDraft(null)}

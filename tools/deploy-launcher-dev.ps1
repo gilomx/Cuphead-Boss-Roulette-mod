@@ -199,7 +199,7 @@ try {
     finally { $published.Dispose() }
     [pscustomobject]@{ Package = $packagePath; Files = $manifest.Count; Sha256 = $hash;
         PhysicalPackage = $physicalPackage;
-        LauncherIntegration = 'Pending; package prepared for the next supported launch.' } | ConvertTo-Json
+        LauncherIntegration = 'Ready; select La Pichi Ruleta Dev in the launcher on the next game start.' } | ConvertTo-Json
 }
 finally {
     # Delete only this run's temporary paths, after checking their absolute containment.

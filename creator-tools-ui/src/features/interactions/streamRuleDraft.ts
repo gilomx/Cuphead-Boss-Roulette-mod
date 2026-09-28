@@ -12,6 +12,8 @@ export function createStreamRuleDraft(gift?: TikTokGift): StreamRuleDraft {
     durationSeconds: 15,
     countdownSeconds: 3,
     quantity: 1,
+    userCooldownSeconds: 0,
+    globalCooldownSeconds: 0,
   };
 }
 
@@ -25,6 +27,8 @@ export function draftForStreamRule(rule: StreamRule): StreamRuleDraft {
     every: rule.every,
     interaction: rule.interaction,
     quantity: rule.quantity,
+    userCooldownSeconds: rule.userCooldownSeconds ?? 0,
+    globalCooldownSeconds: rule.globalCooldownSeconds ?? 0,
     durationSeconds: rule.durationSeconds ?? 15,
     countdownSeconds: rule.countdownSeconds ?? 3,
   };

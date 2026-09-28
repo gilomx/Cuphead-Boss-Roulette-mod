@@ -17,6 +17,8 @@ namespace Gilomx.CupheadBossRoulette
             new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
         private readonly Action<int> setMaximumActive;
+        private readonly Func<bool> getMaximumActiveUnlimited;
+        private readonly Action<bool> setMaximumActiveUnlimited;
         private readonly Func<int> getMaximumMiniBosses;
         private readonly Action<int> setMaximumMiniBosses;
         private readonly Func<bool> getShowGiftImage;
@@ -82,6 +84,8 @@ namespace Gilomx.CupheadBossRoulette
             TimedChallengeInteractionExecutor timedChallenges,
             Func<int> getMaximumActive,
             Action<int> setMaximumActive,
+            Func<bool> getMaximumActiveUnlimited,
+            Action<bool> setMaximumActiveUnlimited,
             Func<int> getMaximumMiniBosses,
             Action<int> setMaximumMiniBosses,
             Func<bool> getShowGiftImage,
@@ -105,6 +109,8 @@ namespace Gilomx.CupheadBossRoulette
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
             this.setMaximumActive = setMaximumActive;
+            this.getMaximumActiveUnlimited = getMaximumActiveUnlimited;
+            this.setMaximumActiveUnlimited = setMaximumActiveUnlimited;
             this.getMaximumMiniBosses = getMaximumMiniBosses;
             this.setMaximumMiniBosses = setMaximumMiniBosses;
             this.getShowGiftImage = getShowGiftImage;
@@ -120,7 +126,8 @@ namespace Gilomx.CupheadBossRoulette
                 setPhaseTransitionProtectionEnabled;
             CreatorToolsDonorLabel.SetGiftImagesVisible(ShowGiftImage);
             peskySettings = CreatorToolsPeskyModeSettings.Load(
-                pluginConfigPath, logWarning, InteractionMaximumActive);
+                pluginConfigPath, logWarning,
+                InteractionConfiguredMaximumActive);
             peskyChallengePacing.Reset(peskySettings.ChallengeWaitSeconds);
             interactionPacingSettings = CreatorToolsInteractionPacingSettings.Load(pluginConfigPath, logWarning);
             liveEvents = new CreatorToolsLiveEventsCoordinator();
@@ -545,7 +552,8 @@ namespace Gilomx.CupheadBossRoulette
             int quantity,
             out string feedbackCode,
             int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration,
-            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown)
+            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown,
+            float delaySeconds = 0f)
         {
             if (!InteractionsEnabled)
             {
@@ -563,7 +571,8 @@ namespace Gilomx.CupheadBossRoulette
 
             donor = NormalizeDonor(donor);
             var added = interactionQueue.Enqueue(
-                item, donor, giftImagePath, quantity, 0f,
+                item, donor, giftImagePath, quantity,
+                Math.Max(0f, delaySeconds),
                 CreatorToolsInteractionSource.Stream, durationSeconds, countdownSeconds);
             lastItem = item ?? string.Empty;
             if (added <= 0)
@@ -1295,7 +1304,8 @@ namespace Gilomx.CupheadBossRoulette
             Dictionary<string, string> values)
         {
             string value;
-            var maximumActive = InteractionMaximumActive;
+            var maximumActive = InteractionConfiguredMaximumActive;
+            var maximumActiveUnlimited = InteractionMaximumActiveUnlimited;
             var maximumMiniBosses = MaximumMiniBosses;
             var showGiftImage = ShowGiftImage;
             if (values.TryGetValue("maxActive", out value))
@@ -1308,6 +1318,12 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 maximumActive = Math.Max(
                     1, Math.Min(MaximumActiveLimit, requested));
+            }
+            if (values.TryGetValue("maxActiveUnlimited", out value) &&
+                !TryParseSwitch(value, out maximumActiveUnlimited))
+            {
+                SetInteractionFeedback("invalid_setting", true);
+                return;
             }
             if (values.TryGetValue("showGiftImage", out value) &&
                 !TryParseSwitch(value, out showGiftImage))
@@ -1340,6 +1356,8 @@ namespace Gilomx.CupheadBossRoulette
 
             if (setMaximumActive != null)
                 setMaximumActive(maximumActive);
+            if (setMaximumActiveUnlimited != null)
+                setMaximumActiveUnlimited(maximumActiveUnlimited);
             if (setMaximumMiniBosses != null)
                 setMaximumMiniBosses(maximumMiniBosses);
             if (setShowGiftImage != null)
@@ -1696,7 +1714,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const int DefaultMaximumActive =
             CreatorToolsInteractionPacingSettings.DefaultMaximumActive;
 
-        private int InteractionMaximumActive
+        private int InteractionConfiguredMaximumActive
         {
             get
             {
@@ -1704,6 +1722,25 @@ namespace Gilomx.CupheadBossRoulette
                     ? DefaultMaximumActive
                     : getMaximumActive();
                 return Math.Max(1, Math.Min(MaximumActiveLimit, value));
+            }
+        }
+
+        private bool InteractionMaximumActiveUnlimited
+        {
+            get
+            {
+                return getMaximumActiveUnlimited != null &&
+                    getMaximumActiveUnlimited();
+            }
+        }
+
+        private int InteractionMaximumActive
+        {
+            get
+            {
+                return InteractionMaximumActiveUnlimited
+                    ? int.MaxValue
+                    : InteractionConfiguredMaximumActive;
             }
         }
 
@@ -1797,7 +1834,12 @@ namespace Gilomx.CupheadBossRoulette
                     ? 0L
                     : Math.Max(0L, getStreamBacklogCount()))
                 .Append(",\"deferredTestCount\":0")
-                .Append(",\"maxActive\":").Append(InteractionMaximumActive)
+                .Append(",\"maxActive\":")
+                .Append(InteractionConfiguredMaximumActive)
+                .Append(",\"maxActiveUnlimited\":")
+                .Append(InteractionMaximumActiveUnlimited
+                    ? "true"
+                    : "false")
                 .Append(",\"defaultMaxActive\":").Append(DefaultMaximumActive)
                 .Append(",\"maxMiniBosses\":").Append(MaximumMiniBosses)
                 .Append(",\"maxActiveLimit\":").Append(MaximumActiveLimit)

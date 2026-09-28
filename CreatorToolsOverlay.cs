@@ -48,6 +48,8 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsRetryBehaviorSetting;
         private ConfigEntry<int>
             creatorToolsInteractionMaximumActiveSetting;
+        private ConfigEntry<bool>
+            creatorToolsInteractionMaximumActiveUnlimitedSetting;
         private ConfigEntry<int> creatorToolsMiniBossMaximumActiveSetting;
         private ConfigEntry<bool>
             creatorToolsInteractionShowGiftImageSetting;
@@ -131,6 +133,11 @@ namespace Gilomx.CupheadBossRoulette
                 "InteraccionesMaximasEnPantalla",
                 CreatorToolsInteractionController.DefaultMaximumActive,
                 "Cantidad maxima de interacciones visibles al mismo tiempo.");
+            creatorToolsInteractionMaximumActiveUnlimitedSetting = Config.Bind(
+                "Creator Tools",
+                "InteraccionesSinLimiteEnPantalla",
+                false,
+                "Elimina el limite numerico de ataques comunes de Interacciones. No cambia el limite compartido de mini jefes ni Modo Molestoso.");
             creatorToolsInteractionShowGiftImageSetting = Config.Bind(
                 "Creator Tools",
                 "MostrarImagenDelRegalo",
@@ -184,6 +191,8 @@ namespace Gilomx.CupheadBossRoulette
                 timedChallengeInteractions,
                 GetCreatorToolsInteractionMaximumActive,
                 SetCreatorToolsInteractionMaximumActive,
+                GetCreatorToolsInteractionMaximumActiveUnlimited,
+                SetCreatorToolsInteractionMaximumActiveUnlimited,
                 GetCreatorToolsMiniBossMaximumActive,
                 SetCreatorToolsMiniBossMaximumActive,
                 GetCreatorToolsInteractionShowGiftImage,
@@ -1298,6 +1307,20 @@ namespace Gilomx.CupheadBossRoulette
                 normalized)
                 creatorToolsInteractionMaximumActiveSetting.Value =
                     normalized;
+        }
+
+        private bool GetCreatorToolsInteractionMaximumActiveUnlimited()
+        {
+            return creatorToolsInteractionMaximumActiveUnlimitedSetting != null &&
+                creatorToolsInteractionMaximumActiveUnlimitedSetting.Value;
+        }
+
+        private void SetCreatorToolsInteractionMaximumActiveUnlimited(
+            bool value)
+        {
+            if (creatorToolsInteractionMaximumActiveUnlimitedSetting != null &&
+                creatorToolsInteractionMaximumActiveUnlimitedSetting.Value != value)
+                creatorToolsInteractionMaximumActiveUnlimitedSetting.Value = value;
         }
 
         private bool GetCreatorToolsInteractionShowGiftImage()

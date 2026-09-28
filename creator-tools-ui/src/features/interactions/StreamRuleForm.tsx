@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { StreamRuleDraft, StreamRuleTrigger, TikTokGift } from "../../model";
-import { interactionItemFor, interactionItems } from "./interactionCatalog";
+import { interactionItemFor } from "./interactionCatalog";
+import { InteractionPicker } from "./InteractionPicker";
 import { TikTokGiftPicker } from "./TikTokGiftPicker";
 
 interface StreamRuleFormProps {
@@ -10,6 +10,7 @@ interface StreamRuleFormProps {
   gifts: TikTokGift[];
   maxEvery: number;
   maxQuantity: number;
+  maxCooldownSeconds: number;
   saving: boolean;
   onChange: (draft: StreamRuleDraft) => void;
   onCancel: () => void;
@@ -20,11 +21,17 @@ function boundedInteger(value: string, maximum: number) {
   return Math.max(1, Math.min(maximum, Math.floor(Number(value)) || 1));
 }
 
+function boundedCooldown(value: string, maximum: number) {
+  const parsed = Math.floor(Number(value));
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(maximum, parsed)) : 0;
+}
+
 export function StreamRuleForm({
   draft,
   gifts,
   maxEvery,
   maxQuantity,
+  maxCooldownSeconds,
   saving,
   onChange,
   onCancel,
@@ -42,6 +49,10 @@ export function StreamRuleForm({
     (!needsGift || selectedGift) && selectedInteraction &&
     (!hasThreshold || (draft.every >= 1 && draft.every <= maxEvery)) &&
     draft.quantity >= 1 && draft.quantity <= maxQuantity &&
+    Number.isInteger(draft.userCooldownSeconds) &&
+    draft.userCooldownSeconds >= 0 && draft.userCooldownSeconds <= maxCooldownSeconds &&
+    Number.isInteger(draft.globalCooldownSeconds) &&
+    draft.globalCooldownSeconds >= 0 && draft.globalCooldownSeconds <= maxCooldownSeconds &&
     (selectedInteraction?.group !== "challenge" ||
       (Number.isInteger(draft.durationSeconds ?? 15) &&
        (draft.durationSeconds ?? 15) >= 1 && (draft.durationSeconds ?? 15) <= 120 &&
@@ -148,23 +159,11 @@ export function StreamRuleForm({
           ) : null}
 
           <div className="stream-rule-execution__interaction">
-            <SearchableSelectField
+            <InteractionPicker
               id="stream-rule-interaction"
               label={t("interactions.rules.editor.interaction")}
-              options={interactionItems}
               selectedKey={draft.interaction}
-              placeholder={t("interactions.rules.editor.interactionPlaceholder")}
-              noResults={t("interactions.rules.editor.noInteractionResults")}
               disabled={saving}
-              getKey={(item) => item.id}
-              getLabel={(item) => t(item.titleKey)}
-              getImage={(item) => item.image}
-              getMeta={(item) => t(`interactions.groups.${item.group}`)}
-              getSearchTerms={(item) => [
-                item.id,
-                t(item.typeKey),
-                t(`interactions.categories.${item.category}`),
-              ]}
               onSelect={(item) => onChange({
                 ...draft,
                 interaction: item.id,
@@ -199,6 +198,37 @@ export function StreamRuleForm({
             {t("interactions.miniBoss.compatibility")}
           </p>
         ) : null}
+      </fieldset>
+
+      <fieldset className="stream-rule-execution stream-rule-cooldowns stream-rule-form__wide">
+        <legend>{t("interactions.rules.editor.cooldownTitle")}</legend>
+        <div className="stream-rule-execution__grid stream-rule-cooldowns__grid">
+          <label>
+            <span>{t("interactions.rules.editor.userCooldown")}</span>
+            <input type="number" min={0} max={maxCooldownSeconds} step={1}
+              disabled={saving} value={draft.userCooldownSeconds}
+              onChange={(event) => onChange({ ...draft,
+                userCooldownSeconds: boundedCooldown(event.target.value, maxCooldownSeconds),
+              })} />
+            <small>{t("interactions.rules.editor.userCooldownHint")}</small>
+          </label>
+          <label>
+            <span>{t(draft.eventType === "gift"
+              ? "interactions.rules.editor.giftCooldown"
+              : "interactions.rules.editor.globalCooldown")}</span>
+            <input type="number" min={0} max={maxCooldownSeconds} step={1}
+              disabled={saving} value={draft.globalCooldownSeconds}
+              onChange={(event) => onChange({ ...draft,
+                globalCooldownSeconds: boundedCooldown(event.target.value, maxCooldownSeconds),
+              })} />
+            <small>{t(draft.eventType === "gift"
+              ? "interactions.rules.editor.giftCooldownHint"
+              : "interactions.rules.editor.globalCooldownHint")}</small>
+          </label>
+        </div>
+        <p className="stream-rule-execution__notice">
+          {t("interactions.rules.editor.cooldownQueueHint")}
+        </p>
       </fieldset>
 
       {selectedInteraction?.group === "challenge" ? (

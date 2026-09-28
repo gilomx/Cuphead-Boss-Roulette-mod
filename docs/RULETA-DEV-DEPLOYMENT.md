@@ -33,9 +33,10 @@ Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'CupheadModLaun
 ```
 
 No cambiar ese sufijo ni guardar rutas absolutas de una PC en Git. Cada equipo
-publica su propio paquete. El contrato del launcher prevé detectar la tarjeta
-**La Pichi Ruleta · Dev** al existir `current.zip`; publicar el ZIP no implementa
-ni comprueba esa integración en el launcher instalado.
+publica su propio paquete. El launcher instalado detecta la tarjeta
+**La Pichi Ruleta · Dev** al existir `current.zip` y aplica el paquete al abrir
+el juego desde esa entrada. El publicador sólo entrega y valida el ZIP: no
+inicia el launcher ni el juego.
 
 Para separar la compilación de la autorización de escritura en datos locales:
 

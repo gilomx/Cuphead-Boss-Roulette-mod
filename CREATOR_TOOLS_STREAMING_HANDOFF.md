@@ -104,6 +104,12 @@ separados.
 - Todas las reglas que coincidan se ejecutan independientemente. Cada regla
   mantiene su propio acumulador y conserva el sobrante al usar umbrales de
   "cada N".
+- Cada regla permite cooldown por usuario y global. En regalos, el global se
+  comparte por conexión y `giftId`; las reglas coincidentes permanecen juntas.
+  Un evento recibido durante cooldown se programa, nunca se descarta. Un evento
+  con varias unidades conserva cada activación como un turno sucesivo; la
+  `quantity` de la regla sigue siendo el tamaño de cada turno. Los valores se
+  guardan, mientras que los relojes se reinician con la sesión.
 - Nunca se mezclan Coins, Bits ni monedas reales en un acumulador global.
 - Las reglas se guardan en el mod; no deben depender de que el navegador siga
   abierto.
@@ -116,7 +122,7 @@ Interacciones ya presenta el catálogo, las pruebas y `Reglas de stream` en un
 solo recorrido visible, sin pestañas. El CRUD inicial crea, edita, duplica,
 activa/desactiva y elimina reglas TikTok de
 regalo exacto. Cada regla guarda `giftId`, copia del nombre conocido, umbral de
-unidades, interacción destino y cantidad en
+unidades, interacción destino, cantidad y cooldowns en
 `mx.gilomx.cuphead.bossroulette.stream-rules.json`, junto al config principal;
 la escritura mantiene `.bak` y el mod recupera ese respaldo si hace falta.
 

@@ -1,9 +1,10 @@
 # La Pichi Ruleta · Dev: paquete para el launcher
 
 Este es el procedimiento Dev para ambas PCs. Sustituye las instalaciones y
-arranques de desarrollo sobre el Cuphead original. La integración de carga en
-una carpeta compartida del launcher **todavía está pendiente**: el script deja
-listo el paquete, pero no hace que el launcher actual pueda consumirlo.
+arranques de desarrollo sobre el Cuphead original. El script deja listo el
+paquete y el launcher actual lo consume desde **«La Pichi Ruleta · Dev»** en el
+siguiente arranque. El launcher administra la carpeta de ejecución compartida;
+el publicador no escribe directamente en ella.
 
 Se conserva también una [alternativa compatible con Windows PowerShell 5](RULETA-DEV-DEPLOYMENT.md)
 para separar preparación y publicación. Usa el mismo destino; no ejecutar los
@@ -142,14 +143,14 @@ pwsh -NoProfile -File ./tools/test-launcher-dev-deployment.ps1
 dotnet run --project ./CreatorToolsRuntimeTests/CreatorToolsRuntimeTests.csproj
 ```
 
-## Independencia e integración pendiente
+## Independencia y arranque desde el launcher
 
-El script no copia nada al original, no escribe en la futura carpeta compartida,
-no modifica el catálogo y no inicia o detiene procesos del juego. Puedes
-generar un paquete mientras juegas. Una compilación nueva se aplicará en el
-siguiente arranque cuando el launcher implemente la selección
-**«La Pichi Ruleta · Dev»** y su carga compartida con los demás mods. No existe
-recarga de DLL durante una partida.
+El script no copia nada al original, no escribe en la carpeta de ejecución
+compartida, no modifica el catálogo y no inicia o detiene procesos del juego.
+Puedes generar un paquete mientras juegas. El launcher detecta `current.zip` y
+aplica una compilación nueva en el siguiente arranque al seleccionar
+**«La Pichi Ruleta · Dev»**, compartiendo la ejecución con los demás mods. No
+existe recarga de DLL durante una partida.
 
 `Plugin.AssetsDirectory` parte de `Info.Location`. El host del companion recibe
 esa misma carpeta del plugin y abre `companion/LaPichiRuleta.TikFinity.exe`, con
@@ -158,7 +159,7 @@ el ejecutable del companion dependen del checkout o de una biblioteca de Steam.
 `CupheadDir` sólo se utiliza durante la compilación; `BepInExCoreDir` apunta al
 cargador temporal preparado por el script.
 
-## Datos que el launcher deberá conservar
+## Datos que el launcher debe conservar
 
 En la ejecución normal de BepInEx, la ruleta guarda junto a
 `Config.ConfigFilePath`, bajo `BepInEx/config` de la **raíz de ejecución**. El
@@ -192,8 +193,8 @@ no se redistribuyen ni se mueven con este script. El reto manual por ranura se
 guarda en el `.cfg` del plugin, no en un archivo nuevo de partida.
 
 Antes de limpiar o migrar el original se coordinará un respaldo de sus archivos
-del mod y de estos datos. **Todavía no se borra nada del original**. Para la
-futura carpeta compartida, el launcher deberá respaldar/restaurar los datos de
-esta ruleta al cambiar versiones o mods, evitando que la sustitución de binarios
-los elimine. La migración y esa política de conservación no están implementadas
-por el script de publicación.
+del mod y de estos datos. **Todavía no se borra nada del original**. En la
+carpeta de ejecución compartida, el launcher debe respaldar/restaurar los datos
+de esta ruleta al cambiar versiones o mods, evitando que la sustitución de
+binarios los elimine. El script de publicación no realiza esa migración ni
+administra esa política de conservación.

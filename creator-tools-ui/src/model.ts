@@ -79,6 +79,7 @@ export interface InteractionConfigState {
   backlogCount: number;
   deferredTestCount: number;
   maxActive: number;
+  maxActiveUnlimited: boolean;
   defaultMaxActive: number;
   maxMiniBosses: number;
   maxActiveLimit: number;
@@ -309,6 +310,8 @@ export interface StreamRule {
   every: number;
   interaction: string;
   quantity: number;
+  userCooldownSeconds: number;
+  globalCooldownSeconds: number;
 }
 
 export interface StreamRuleDraft {
@@ -322,6 +325,8 @@ export interface StreamRuleDraft {
   every: number;
   interaction: string;
   quantity: number;
+  userCooldownSeconds: number;
+  globalCooldownSeconds: number;
 }
 
 export interface StreamRulesConfigState {
@@ -335,6 +340,7 @@ export interface StreamRulesConfigState {
   maxRules: number;
   maxEvery: number;
   maxQuantity: number;
+  maxCooldownSeconds: number;
   rules: StreamRule[];
 }
 

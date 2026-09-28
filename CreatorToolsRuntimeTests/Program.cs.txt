@@ -36,6 +36,12 @@ namespace Gilomx.CupheadBossRoulette
                 TestEvaluateOnlyCreatesBacklog);
             Run("Explicit drain moves the exact quantity",
                 TestExplicitDrainMovesExactQuantity);
+            Run("Rule cooldowns schedule every redeem without dropping it",
+                TestRuleCooldownScheduling);
+            Run("Rule cooldowns serialize activations inside one gift batch",
+                TestRuleCooldownBatchScheduling);
+            Run("Rule cooldowns persist and reject invalid updates atomically",
+                TestRuleCooldownPersistence);
             Run("Dashboard retains exactly 30 newest events",
                 TestDashboardRetainsThirtyEvents);
             Run("Server projects the worker backlog into interaction JSON",
@@ -127,6 +133,112 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(1, gameplay.EnqueueCallCount, "Enqueue call count");
                 Equal(6, gameplay.EnqueuedCount, "gameplay queue additions");
                 Equal(0L, rules.BacklogCount, "remaining backlog");
+            }
+        }
+
+        private static void TestRuleCooldownScheduling()
+        {
+            using (var scope = new TestScope("rule-cooldowns"))
+            {
+                var now = new DateTime(
+                    2026, 9, 27, 12, 0, 0, DateTimeKind.Utc);
+                var rules = scope.CreateRules(
+                    1, 10, 4, delegate { return now; });
+                var gameplay = new CreatorToolsInteractionController(200);
+
+                rules.Evaluate(NewGiftEvent(1, 1), true);
+                Equal(1, rules.Update(null, gameplay, true),
+                    "first redeem drained");
+                Equal(0f, gameplay.LastDelaySeconds,
+                    "first redeem has no delay");
+
+                now = now.AddSeconds(1);
+                rules.Evaluate(NewGiftEvent(1, 1), true);
+                Equal(1L, rules.BacklogCount,
+                    "same-user redeem retained during cooldown");
+                Equal(1, rules.Update(null, gameplay, true),
+                    "same-user redeem drained into scheduled queue");
+                True(Math.Abs(gameplay.LastDelaySeconds - 9f) < 0.01f,
+                    "per-user cooldown reserves the next slot");
+
+                rules.Evaluate(NewGiftEvent(2, 1), true);
+                Equal(1, rules.Update(null, gameplay, true),
+                    "other-user redeem also retained");
+                True(Math.Abs(gameplay.LastDelaySeconds - 13f) < 0.01f,
+                    "shared gift cooldown follows the reserved slot");
+                Equal(0L, rules.BacklogCount,
+                    "all cooldown redeems materialized without loss");
+            }
+        }
+
+        private static void TestRuleCooldownPersistence()
+        {
+            using (var scope = new TestScope("rule-cooldown-persistence"))
+            {
+                var rules = scope.CreateRules(2, 17, 23, null);
+                var reloaded = scope.ReloadRules(rules);
+                var state = reloaded.ProcessServerCommand(
+                    "action=toggle&id=1&enabled=1");
+                True(state.Contains("\"schemaVersion\":5"),
+                    "cooldown schema version");
+                True(state.Contains("\"maxCooldownSeconds\":3600"),
+                    "cooldown limit published");
+                True(state.Contains("\"userCooldownSeconds\":17"),
+                    "per-user cooldown persisted");
+                True(state.Contains("\"globalCooldownSeconds\":23"),
+                    "global cooldown persisted");
+
+                var rejected = reloaded.ProcessServerCommand(
+                    "action=update&id=1&name=Runtime+rule&eventType=gift" +
+                    "&giftId=1&every=1&interaction=test_attack&quantity=2" +
+                    "&userCooldownSeconds=3601&globalCooldownSeconds=23" +
+                    "&enabled=true");
+                True(rejected.Contains("\"feedback\":\"invalid_rule\""),
+                    "out-of-range cooldown rejected");
+                var after = scope.ReloadRules(reloaded).ProcessServerCommand(
+                    "action=toggle&id=1&enabled=1");
+                True(after.Contains("\"userCooldownSeconds\":17"),
+                    "invalid update preserved stored cooldowns");
+            }
+        }
+
+        private static void TestRuleCooldownBatchScheduling()
+        {
+            using (var scope = new TestScope("rule-cooldown-batch"))
+            {
+                var now = new DateTime(
+                    2026, 9, 27, 13, 0, 0, DateTimeKind.Utc);
+                var rules = scope.CreateRules(
+                    2, 10, 4, delegate { return now; });
+                var gameplay = new CreatorToolsInteractionController(200);
+
+                var result = rules.Evaluate(NewGiftEvent(7, 30), true);
+                Equal(60L, result.DeferredInteractions,
+                    "thirty gifts preserve two interactions per activation");
+                Equal(60L, rules.BacklogCount,
+                    "all interactions remain in the backlog before drain");
+
+                var drained = 0;
+                var updates = 0;
+                while (rules.BacklogCount > 0 && updates < 10)
+                {
+                    drained += rules.Update(null, gameplay, true);
+                    updates++;
+                }
+                Equal(60, drained,
+                    "all scheduled batches materialize into the gameplay queue");
+                Equal(30, gameplay.EnqueueCallCount,
+                    "one enqueue batch is retained per gift activation");
+                Equal(30, gameplay.EnqueueDelays.Count,
+                    "every activation publishes its own due time");
+                True(Math.Abs(gameplay.EnqueueDelays[0] - 0f) < 0.01f,
+                    "first activation is immediate");
+                True(Math.Abs(gameplay.EnqueueDelays[1] - 10f) < 0.01f,
+                    "second activation waits for the effective cooldown");
+                True(Math.Abs(gameplay.EnqueueDelays[29] - 290f) < 0.01f,
+                    "thirtieth activation reserves the final cooldown slot");
+                Equal(0L, rules.BacklogCount,
+                    "the serialized batch loses no interactions");
             }
         }
 
@@ -1820,7 +1932,10 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             internal CreatorToolsStreamRulesController CreateRules(
-                int quantity)
+                int quantity,
+                int userCooldownSeconds = 0,
+                int globalCooldownSeconds = 0,
+                Func<DateTime> utcNow = null)
             {
                 var uniqueConfigDirectory = Path.Combine(
                     configDirectory, Guid.NewGuid().ToString("N"));
@@ -1829,11 +1944,16 @@ namespace Gilomx.CupheadBossRoulette
                     assetsDirectory,
                     Path.Combine(uniqueConfigDirectory, "plugin.cfg"),
                     delegate { return true; },
-                    delegate(string ignored) { });
+                    delegate(string ignored) { },
+                    utcNow);
                 var state = rules.ProcessServerCommand(
                     "action=create&name=Runtime+rule&eventType=gift" +
                     "&giftId=1&every=1&interaction=test_attack" +
                     "&quantity=" + quantity.ToString(
+                        CultureInfo.InvariantCulture) +
+                    "&userCooldownSeconds=" + userCooldownSeconds.ToString(
+                        CultureInfo.InvariantCulture) +
+                    "&globalCooldownSeconds=" + globalCooldownSeconds.ToString(
                         CultureInfo.InvariantCulture) +
                     "&enabled=true");
                 if (state.IndexOf("\"feedback\":\"created\"",
