@@ -264,17 +264,14 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
 
-            var interactionsEnabled = InteractionsEnabled;
             var gameplayAvailable = AnyItemAvailable();
-            var interactionsAvailable =
-                interactionsEnabled && gameplayAvailable;
+            var interactionsAvailable = gameplayAvailable;
             if (gameplayLevelActive && gameplayAvailable)
                 gameplayAvailabilityObserved = true;
 
             var canDispatchInteractions = gameplayDispatchAllowed &&
                 gameplayAvailable &&
-                (peskyBattle.Active ||
-                 (interactionsEnabled && !queuePaused));
+                (peskyBattle.Active || !queuePaused);
             if (!canDispatchInteractions)
                 nextInteractionDispatchAt = -1f;
 
@@ -422,7 +419,7 @@ namespace Gilomx.CupheadBossRoulette
             if (server == null || !server.IsRunning)
                 return;
             PublishInteractionState(
-                server, InteractionsEnabled && AnyItemAvailable());
+                server, AnyItemAvailable());
         }
 
         private void PublishInteractionState(
@@ -742,12 +739,9 @@ namespace Gilomx.CupheadBossRoulette
             if (!enabled)
             {
                 interactionQueue.ClearPending(
-                    CreatorToolsInteractionSource.Manual);
-                interactionQueue.ClearPending(
                     CreatorToolsInteractionSource.Stream);
                 if (!backgroundApplied && resetStreamRuntimeState != null)
                     resetStreamRuntimeState();
-                queuePaused = false;
                 nextInteractionDispatchAt = -1f;
             }
             masterRevision++;
@@ -764,14 +758,9 @@ namespace Gilomx.CupheadBossRoulette
             string value;
             bool paused;
             if (!values.TryGetValue("queuePaused", out value) ||
-                !TryParseSwitch(value, out paused) ||
-                !InteractionsEnabled)
+                !TryParseSwitch(value, out paused))
             {
-                SetInteractionFeedback(
-                    InteractionsEnabled
-                        ? "invalid_setting"
-                        : "interactions_disabled",
-                    !InteractionsEnabled ? false : true);
+                SetInteractionFeedback("invalid_setting", true);
                 return;
             }
 
@@ -914,7 +903,7 @@ namespace Gilomx.CupheadBossRoulette
 
             peskySettings.Enabled = enabled;
             if (!enabled)
-                peskyQueue.Clear();
+                ClearPendingPeskyMode();
             ResetPeskySchedule();
             peskySettings.Save();
             SetPeskyFeedback(enabled ? "enabled" : "disabled", false);
@@ -923,12 +912,21 @@ namespace Gilomx.CupheadBossRoulette
                     (enabled ? "activado." : "desactivado."));
         }
 
+        private void ClearPendingPeskyMode()
+        {
+            peskyQueue.ClearPending();
+            extraLives.ClearPendingForSource(
+                CreatorToolsInteractionSource.Pesky);
+            ghosts.ClearPendingForSource(
+                CreatorToolsInteractionSource.Pesky);
+        }
+
         private void DisableFreePeskyForBattle()
         {
             if (!peskySettings.Enabled && peskyQueue.Count == 0)
                 return;
             peskySettings.Enabled = false;
-            peskyQueue.Clear();
+            ClearPendingPeskyMode();
             ResetPeskySchedule();
             peskySettings.Save();
             SetPeskyFeedback("disabled_by_pesky_battle", false);
@@ -971,7 +969,7 @@ namespace Gilomx.CupheadBossRoulette
             if (peskySettings.Enabled && peskySettings.EnabledItemCount == 0)
             {
                 peskySettings.Enabled = false;
-                peskyQueue.Clear();
+                ClearPendingPeskyMode();
                 ResetPeskySchedule();
                 SetPeskyFeedback("disabled_invalid_config", true);
             }
@@ -1222,11 +1220,6 @@ namespace Gilomx.CupheadBossRoulette
             Dictionary<string, string> values,
             int deferredTestQuantity)
         {
-            if (!InteractionsEnabled)
-            {
-                SetInteractionFeedback("interactions_disabled", false);
-                return 0;
-            }
             string item;
             if (!values.TryGetValue("item", out item))
             {
@@ -1594,15 +1587,26 @@ namespace Gilomx.CupheadBossRoulette
             string feedbackCode;
             string error;
             var timedExecutor = executor as ICreatorToolsTimedInteractionExecutor;
-            var spawned = timedExecutor != null
-                ? timedExecutor.TrySpawn(entry.Item, entry.Donor, entry.GiftImagePath,
-                    entry.DurationSeconds, entry.CountdownSeconds, out handle, out feedbackCode, out error)
-                : executor.TrySpawn(
-                entry.Item,
-                entry.Donor,
-                entry.GiftImagePath,
-                out handle,
-                out feedbackCode, out error);
+            bool spawned;
+            if (timedExecutor != null)
+                spawned = timedExecutor.TrySpawn(
+                    entry.Item, entry.Donor, entry.GiftImagePath,
+                    entry.DurationSeconds, entry.CountdownSeconds,
+                    out handle, out feedbackCode, out error);
+            else if (executor == extraLives)
+                spawned = extraLives.TrySpawn(
+                    entry.Item, entry.Donor, entry.GiftImagePath,
+                    entry.Source, entry.Id,
+                    out handle, out feedbackCode, out error);
+            else if (executor == ghosts)
+                spawned = ghosts.TrySpawn(
+                    entry.Item, entry.Donor, entry.GiftImagePath,
+                    entry.Source, entry.Id,
+                    out handle, out feedbackCode, out error);
+            else
+                spawned = executor.TrySpawn(
+                    entry.Item, entry.Donor, entry.GiftImagePath,
+                    out handle, out feedbackCode, out error);
             if (spawned)
             {
                 queue.Activate(entry, handle);
@@ -1658,7 +1662,10 @@ namespace Gilomx.CupheadBossRoulette
                     (miniBossExecutor.Supports(entry.Item) || !HasWaitingInteractionMiniBoss());
             if (entry.Source == CreatorToolsInteractionSource.PeskyBattle)
                 return peskyBattle.Active;
-            if (!InteractionsEnabled || queuePaused)
+            if (queuePaused)
+                return false;
+            if (entry.Source == CreatorToolsInteractionSource.Stream &&
+                !InteractionsEnabled)
                 return false;
             if (CreatorToolsHelp.Supports(entry.Item))
                 return true;
@@ -1682,7 +1689,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private bool HasWaitingInteractionMiniBoss()
         {
-            if (!interactionPacingSettings.Enabled || !InteractionsEnabled || queuePaused ||
+            if (!interactionPacingSettings.Enabled || queuePaused ||
                 !interactionPacing.MiniBossReady)
                 return false;
             return interactionQueue.Peek(delegate(CreatorToolsInteractionQueue.Entry candidate)
@@ -1690,7 +1697,8 @@ namespace Gilomx.CupheadBossRoulette
                 return candidate.Source != CreatorToolsInteractionSource.PeskyBattle &&
                     candidate.IsReady && miniBossExecutor.Supports(candidate.Item) &&
                     (candidate.Source != CreatorToolsInteractionSource.Stream ||
-                        peskyBattle.StreamAttacksAllowed) &&
+                        (InteractionsEnabled &&
+                         peskyBattle.StreamAttacksAllowed)) &&
                     miniBossExecutor.IsAvailable(candidate.Item);
             }) != null;
         }
@@ -1859,6 +1867,26 @@ namespace Gilomx.CupheadBossRoulette
 
         private string BuildPeskyState(bool available)
         {
+            var helpEntries = new List<
+                CreatorToolsInteractionQueue.DisplayEntry>();
+            extraLives.CollectDisplayEntries(
+                CreatorToolsInteractionSource.Pesky, helpEntries);
+            ghosts.CollectDisplayEntries(
+                CreatorToolsInteractionSource.Pesky, helpEntries);
+            for (var i = helpEntries.Count - 1; i >= 0; i--)
+                if (helpEntries[i].Id <= 0 ||
+                    peskyQueue.ContainsId(helpEntries[i].Id))
+                    helpEntries.RemoveAt(i);
+            helpEntries.Sort(delegate(
+                CreatorToolsInteractionQueue.DisplayEntry left,
+                CreatorToolsInteractionQueue.DisplayEntry right)
+            {
+                return left.Id.CompareTo(right.Id);
+            });
+            var activeHelpCount = 0;
+            for (var i = 0; i < helpEntries.Count; i++)
+                if (helpEntries[i].Active)
+                    activeHelpCount++;
             var running = peskySettings.Enabled && available &&
                 !gameplayLevelLoadPending;
             var startingBattle = peskySettings.Enabled &&
@@ -1940,12 +1968,14 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append('"');
                 first = false;
             }
-            builder.Append("],\"queueCount\":").Append(peskyQueue.Count)
-                .Append(",\"activeCount\":").Append(peskyQueue.ActiveCount)
+            builder.Append("],\"queueCount\":")
+                .Append(peskyQueue.Count + helpEntries.Count)
+                .Append(",\"activeCount\":")
+                .Append(peskyQueue.ActiveCount + activeHelpCount)
                 .Append(",\"maxActiveLimit\":")
                 .Append(CreatorToolsPeskyModeSettings.MaximumActiveLimit)
                 .Append(",\"queue\":");
-            peskyQueue.AppendJson(builder);
+            peskyQueue.AppendJson(builder, null, helpEntries);
             builder.Append('}');
             return builder.ToString();
         }

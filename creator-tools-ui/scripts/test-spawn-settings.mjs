@@ -294,6 +294,26 @@ test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
     assert.equal((await getPesky()).minimumInterval, 0.35);
   });
 
+  await t.test("manual tests work while live interactions are disabled", async () => {
+    accepted(await request("/api/config/interactions/set", { clearPending: 1 }));
+    accepted(await request("/api/config/interactions/set", { interactionsEnabled: 0 }));
+    accepted(await request("/api/config/interactions/test", {
+      item: "hilda_green_zeppelin",
+      donor: "Offline test",
+      quantity: 2,
+      delay: 3600,
+    }));
+    accepted(await request("/api/config/interactions/set", { queuePaused: 1 }));
+    const state = await getInteractions();
+    assert.equal(state.interactionsEnabled, false);
+    assert.equal(state.queuePaused, true);
+    assert.equal(state.queue.length, 2);
+    assert.ok(state.queue.every((entry) => entry.donor === "Offline test"));
+    accepted(await request("/api/config/interactions/set", { queuePaused: 0 }));
+    accepted(await request("/api/config/interactions/set", { clearPending: 1 }));
+    accepted(await request("/api/config/interactions/set", { interactionsEnabled: 1 }));
+  });
+
   await t.test("copy and restore requests preserve toggles, queues and unrelated settings", async () => {
     accepted(await setPesky({ enabled: 1 }));
     accepted(await setPesky({ names: "Preserved viewer" }));

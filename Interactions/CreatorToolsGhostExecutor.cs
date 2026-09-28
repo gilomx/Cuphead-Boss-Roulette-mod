@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Gilomx.CupheadBossRoulette
@@ -14,6 +15,7 @@ namespace Gilomx.CupheadBossRoulette
             new CreatorToolsGhostQueue();
 
         private CreatorToolsGhostActor ghost;
+        private CreatorToolsGhostQueue.Credit activeCredit;
         private int attemptSerial;
         private bool gameplayAdvancing;
         private bool defeatedDuringAttempt;
@@ -57,6 +59,9 @@ namespace Gilomx.CupheadBossRoulette
             if (disposed)
                 return;
 
+            if (ghost == null)
+                activeCredit = null;
+
             var currentAttempt = CurrentAttemptSerial();
             if (currentAttempt != attemptSerial)
             {
@@ -93,6 +98,22 @@ namespace Gilomx.CupheadBossRoulette
             out string feedbackCode,
             out string error)
         {
+            return TrySpawn(
+                item, donor, giftImagePath,
+                CreatorToolsInteractionSource.Manual, 0,
+                out handle, out feedbackCode, out error);
+        }
+
+        internal bool TrySpawn(
+            string item,
+            string donor,
+            string giftImagePath,
+            CreatorToolsInteractionSource source,
+            int queueEntryId,
+            out ICreatorToolsInteractionHandle handle,
+            out string feedbackCode,
+            out string error)
+        {
             handle = null;
             feedbackCode = "requires_gameplay_level";
             error = string.Empty;
@@ -104,7 +125,8 @@ namespace Gilomx.CupheadBossRoulette
             if (!IsAvailable(item))
                 return false;
 
-            var credit = queue.Enqueue(donor, giftImagePath);
+            var credit = queue.Enqueue(
+                donor, giftImagePath, source, queueEntryId);
             if (ghost == null && !defeatedDuringAttempt)
             {
                 var player = PlayerOne();
@@ -119,6 +141,45 @@ namespace Gilomx.CupheadBossRoulette
             handle = CompletedHandle.Instance;
             feedbackCode = "spawned";
             return true;
+        }
+
+        internal void ClearPendingForSource(
+            CreatorToolsInteractionSource source)
+        {
+            queue.Clear(source);
+        }
+
+        internal void CollectDisplayEntries(
+            CreatorToolsInteractionSource source,
+            IList<CreatorToolsInteractionQueue.DisplayEntry> entries)
+        {
+            if (entries == null)
+                return;
+            if (activeCredit != null && activeCredit.Source == source)
+            {
+                entries.Add(new CreatorToolsInteractionQueue.DisplayEntry
+                {
+                    Id = activeCredit.QueueEntryId,
+                    Item = CreatorToolsHelp.Ghost,
+                    Donor = activeCredit.Donor,
+                    Source = activeCredit.Source,
+                    Active = true
+                });
+            }
+            for (var i = 0; i < queue.Count; i++)
+            {
+                var credit = queue[i];
+                if (credit.Source != source)
+                    continue;
+                entries.Add(new CreatorToolsInteractionQueue.DisplayEntry
+                {
+                    Id = credit.QueueEntryId,
+                    Item = CreatorToolsHelp.Ghost,
+                    Donor = credit.Donor,
+                    Source = credit.Source,
+                    Active = false
+                });
+            }
         }
 
         internal bool IsDamageBoostActive(PlayerId playerId)
@@ -175,6 +236,7 @@ namespace Gilomx.CupheadBossRoulette
                     credit.GiftImagePath,
                     CanAdvance);
                 ghost = created;
+                activeCredit = credit;
                 if (logInfo != null)
                     logInfo(
                         "Ayuda fantasmal activada durante " +
@@ -205,6 +267,7 @@ namespace Gilomx.CupheadBossRoulette
             if (ghost != null)
                 UnityEngine.Object.Destroy(ghost.gameObject);
             ghost = null;
+            activeCredit = null;
         }
 
         private static AbstractPlayerController PlayerOne()

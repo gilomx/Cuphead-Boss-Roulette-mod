@@ -2,6 +2,38 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- La cola de **Modo Molestoso** muestra ahora las vidas extra y ayudas
+  fantasmales que ya fueron entregadas a sus reservas internas, distinguiendo
+  la ayuda activa de las siguientes en espera. Cada crédito conserva su origen
+  para que al desactivar el modo se eliminen solamente sus molestias pendientes
+  —incluidas las ayudas reservadas— mientras los ataques y ayudas ya activos
+  terminan normalmente.
+
+- El control para activar las interacciones del live vive ahora dentro del
+  panel **Canjeos en curso**, junto a la cola que controla. Al apagarlo se
+  detienen y limpian solamente los ataques pendientes provenientes de reglas
+  del live; las pruebas manuales pueden enviarse, pausarse y conservarse en la
+  cola aunque el live esté desactivado.
+
+- El espacio de **Interacciones** usa ahora un solo panel de ancho completo.
+  **Configuración** reemplaza el contenido del mismo contenedor, igual que el
+  editor de una interacción, y ahora incluye **Pruebas** como su sección final.
+  En el encabezado, el botón circular de Configuración recupera el color
+  principal y aparece junto al botón circular de **Nueva interacción**, que usa
+  el icono `Plus` de Lucide en lugar del contador anterior. Los controles
+  de Configuración y los dos grupos de ritmo aprovechan dos columnas en
+  pantallas amplias. Pruebas permite omitir el nombre usando **DONADOR DE
+  PRUEBA**, llama **Enviar** a la acción y vuelve a la tabla después de
+  solicitarla. Al volver, un aviso indica que puede seguirse desde
+  **Interacciones en curso** en Inicio; crear, eliminar, activar o desactivar
+  una regla ya no muestra confirmaciones redundantes. La interfaz llama ahora
+  **interacciones** a los elementos de Interacciones y Modo Molestoso, y usa
+  **en espera** en vez de «en cola». Se ampliaron los textos pequeños del panel.
+  Los cooldowns se presentan con el nombre más claro **Espera entre ataques**
+  y explican la diferencia entre una espera por persona y para todos. También
+  indican que `0` desactiva esa espera sin omitir el máximo de ataques en
+  pantalla ni los demás límites.
+
 - Las pruebas de Interacciones ya no repiten un formulario por cada elemento
   del catálogo. Ahora usan el mismo buscador visual del editor de reglas y
   muestran un único formulario para la interacción seleccionada. Su menú flota

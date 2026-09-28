@@ -58,8 +58,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestManualHelpTestPriority);
             Run("Control projections wait for their exact command sequence",
                 TestExactControlProjectionAcknowledgement);
-            Run("Projected master state governs manual test admission",
-                TestProjectedMasterGovernsTestAdmission);
+            Run("Manual tests remain available while live interactions are off",
+                TestManualTestsIgnoreProjectedMaster);
             Run("Deferred tests preserve partial materialization remainders",
                 TestDeferredTestRemainder);
             Run("Clearing deferred tests invalidates in-flight generations",
@@ -840,7 +840,7 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private static void TestProjectedMasterGovernsTestAdmission()
+        private static void TestManualTestsIgnoreProjectedMaster()
         {
             using (var scope = new TestScope("projected-master-admission"))
             using (var server = scope.StartServer())
@@ -851,6 +851,11 @@ namespace Gilomx.CupheadBossRoulette
                     "\"queueControlRevision\":1,\"pendingCount\":0," +
                     "\"backlogCount\":0,\"deferredTestCount\":0}";
                 server.SetInteractionsState(enabledState, 1, 1, 0);
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/test?item=test_attack" +
+                    "&donor=BeforeDisable&quantity=1"))
+                {
+                }
                 server.SetInteractionControlObserver(
                     delegate(string query, long commandSequence)
                     {
@@ -867,11 +872,18 @@ namespace Gilomx.CupheadBossRoulette
                 // This mimics a main-thread snapshot built just before the
                 // HTTP disable was projected.
                 server.SetInteractionsState(enabledState, 1, 1, 0);
-                Equal(HttpStatusCode.Conflict,
+                Equal(HttpStatusCode.Accepted,
                     GetStatusCode(server,
                         "/api/config/interactions/test?item=test_attack" +
                         "&donor=Viewer&quantity=1"),
-                    "test admission while projected master is disabled");
+                    "manual test admission while live interactions are disabled");
+                using (var json = GetJson(
+                    server, "/api/config/interactions"))
+                {
+                    Equal(2L, json.RootElement
+                            .GetProperty("deferredTestCount").GetInt64(),
+                        "disabling live interactions preserved manual tests");
+                }
             }
         }
 

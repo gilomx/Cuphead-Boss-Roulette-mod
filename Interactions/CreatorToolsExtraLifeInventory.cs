@@ -10,6 +10,8 @@ namespace Gilomx.CupheadBossRoulette
             internal int Id;
             internal string Donor;
             internal string GiftImagePath;
+            internal CreatorToolsInteractionSource Source;
+            internal int QueueEntryId;
         }
 
         private readonly List<Credit> credits = new List<Credit>();
@@ -26,13 +28,19 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal Credit Add(
-            string donor, string giftImagePath = "")
+            string donor,
+            string giftImagePath = "",
+            CreatorToolsInteractionSource source =
+                CreatorToolsInteractionSource.Manual,
+            int queueEntryId = 0)
         {
             var credit = new Credit
             {
                 Id = nextId++,
                 Donor = (donor ?? string.Empty).Trim(),
-                GiftImagePath = giftImagePath ?? string.Empty
+                GiftImagePath = giftImagePath ?? string.Empty,
+                Source = source,
+                QueueEntryId = queueEntryId
             };
             if (nextId <= 0)
                 nextId = 1;
@@ -79,6 +87,21 @@ namespace Gilomx.CupheadBossRoulette
         internal void Clear()
         {
             credits.Clear();
+        }
+
+        internal int ClearPending(
+            CreatorToolsInteractionSource source, int activeCreditId)
+        {
+            var cleared = 0;
+            for (var i = credits.Count - 1; i >= 0; i--)
+            {
+                if (credits[i].Source != source ||
+                    credits[i].Id == activeCreditId)
+                    continue;
+                credits.RemoveAt(i);
+                cleared++;
+            }
+            return cleared;
         }
     }
 }

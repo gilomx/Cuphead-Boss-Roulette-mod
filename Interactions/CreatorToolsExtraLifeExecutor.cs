@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
 using UnityEngine;
@@ -127,6 +128,22 @@ namespace Gilomx.CupheadBossRoulette
             out string feedbackCode,
             out string error)
         {
+            return TrySpawn(
+                item, donor, giftImagePath,
+                CreatorToolsInteractionSource.Manual, 0,
+                out handle, out feedbackCode, out error);
+        }
+
+        internal bool TrySpawn(
+            string item,
+            string donor,
+            string giftImagePath,
+            CreatorToolsInteractionSource source,
+            int queueEntryId,
+            out ICreatorToolsInteractionHandle handle,
+            out string feedbackCode,
+            out string error)
+        {
             handle = null;
             feedbackCode = "requires_gameplay_level";
             error = string.Empty;
@@ -139,7 +156,8 @@ namespace Gilomx.CupheadBossRoulette
                 return false;
 
             var player = PlayerOne();
-            var credit = inventory.Add(donor, giftImagePath);
+            var credit = inventory.Add(
+                donor, giftImagePath, source, queueEntryId);
             if (player != null && !player.IsDead &&
                 !defeatedDuringHpOne && heart == null)
             {
@@ -161,6 +179,36 @@ namespace Gilomx.CupheadBossRoulette
             handle = CompletedHandle.Instance;
             feedbackCode = "spawned";
             return true;
+        }
+
+        internal void ClearPendingForSource(
+            CreatorToolsInteractionSource source)
+        {
+            inventory.ClearPending(
+                source, heart == null ? 0 : heart.CreditId);
+        }
+
+        internal void CollectDisplayEntries(
+            CreatorToolsInteractionSource source,
+            IList<CreatorToolsInteractionQueue.DisplayEntry> entries)
+        {
+            if (entries == null)
+                return;
+            var activeCreditId = heart == null ? 0 : heart.CreditId;
+            for (var i = 0; i < inventory.Count; i++)
+            {
+                var credit = inventory[i];
+                if (credit.Source != source)
+                    continue;
+                entries.Add(new CreatorToolsInteractionQueue.DisplayEntry
+                {
+                    Id = credit.QueueEntryId,
+                    Item = CreatorToolsHelp.ExtraLife,
+                    Donor = credit.Donor,
+                    Source = credit.Source,
+                    Active = credit.Id == activeCreditId
+                });
+            }
         }
 
         internal bool TryProtect(

@@ -569,7 +569,7 @@ function refreshInteractionQueue() {
       entry.status = "queued";
     }
   }
-  if (!interactionsEnabled || interactionQueuePaused) return;
+  if (interactionQueuePaused) return;
   let active = interactionQueue.filter((entry) => entry.status === "active").length;
   const activeMiniBosses = new Set(interactionQueue
     .filter((entry) => entry.status === "active" && miniBossItems.has(entry.item))
@@ -577,6 +577,7 @@ function refreshInteractionQueue() {
   for (const entry of interactionQueue) {
     if (active >= interactionMaxActive) break;
     if (entry.status === "queued") {
+      if (entry.source === "stream" && !interactionsEnabled) continue;
       if (process.env.MOCK_PLANE_LEVEL === "0" &&
           ["challenge_no_bombs", "challenge_no_peashooter"].includes(entry.item)) continue;
       if (miniBossItems.has(entry.item)) {
@@ -857,6 +858,7 @@ function executeDashboardSimulation(command) {
               delaySeconds: Math.max(0, (activationDue - now) / 1000),
               readyAt: activationDue,
               status: activationDue > now ? "scheduled" : "queued",
+              source: "stream",
             });
             interactionNextId += 1;
             accepted += 1;
@@ -1469,7 +1471,7 @@ createServer((req, res) => {
     refreshInteractionQueue();
     json(res, {
       ready: true,
-      available: interactionsEnabled,
+      available: true,
       interactionsEnabled,
       masterRevision: interactionMasterRevision,
       queuePaused: interactionQueuePaused,
@@ -1606,8 +1608,8 @@ createServer((req, res) => {
       interactionsEnabled = interactionsEnabledValue === "1";
       interactionMasterRevision += 1;
       if (!interactionsEnabled) {
-        interactionQueue = interactionQueue.filter((entry) => entry.status === "active");
-        interactionQueuePaused = false;
+        interactionQueue = interactionQueue.filter((entry) =>
+          entry.status === "active" || entry.source !== "stream");
         interactionQueueControlRevision += 1;
         streamRuleAccumulators.clear();
         streamRuleUserCooldowns.clear();
@@ -1617,7 +1619,7 @@ createServer((req, res) => {
       nextFeedback = interactionsEnabled
         ? "interactions_enabled"
         : "interactions_disabled";
-    } else if (queuePausedValue !== null && interactionsEnabled) {
+    } else if (queuePausedValue !== null) {
       interactionQueuePaused = queuePausedValue === "1";
       interactionQueueControlRevision += 1;
       nextFeedback = interactionQueuePaused ? "queue_paused" : "queue_resumed";
@@ -1958,12 +1960,6 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === "/api/config/interactions/test") {
-    if (!interactionsEnabled) {
-      interactionFeedback = "interactions_disabled";
-      interactionRevision += 1;
-      json(res, { ok: true }, 202);
-      return;
-    }
     interactionLastItem = url.searchParams.get("item") ?? "";
     const donor = (url.searchParams.get("donor") ?? "DONOR").slice(0, 32);
     const quantity = Math.max(1, Math.min(50, Number(url.searchParams.get("quantity")) || 1));
@@ -1977,6 +1973,7 @@ createServer((req, res) => {
         delaySeconds,
         readyAt,
         status: delaySeconds > 0 ? "scheduled" : "queued",
+        source: "manual",
       });
       interactionNextId += 1;
     }

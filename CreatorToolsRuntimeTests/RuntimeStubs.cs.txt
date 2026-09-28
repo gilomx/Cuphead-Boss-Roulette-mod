@@ -80,6 +80,14 @@ namespace Gilomx.CupheadBossRoulette
         }
     }
 
+    internal enum CreatorToolsInteractionSource
+    {
+        Manual,
+        Stream,
+        Pesky,
+        PeskyBattle
+    }
+
     internal static class CreatorToolsInteractionQueue
     {
         internal const int MaximumBatchSize = 50;

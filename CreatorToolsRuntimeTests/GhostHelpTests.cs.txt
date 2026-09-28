@@ -25,6 +25,25 @@ namespace Gilomx.CupheadBossRoulette
                     "the second redemption starts next");
             });
 
+            Run("Ghost Help clears only waiting Pesky credits", delegate
+            {
+                var queue = new CreatorToolsGhostQueue();
+                queue.Enqueue(
+                    "Pesky helper", "",
+                    CreatorToolsInteractionSource.Pesky, 20);
+                var manual = queue.Enqueue(
+                    "Manual helper", "",
+                    CreatorToolsInteractionSource.Manual, 21);
+
+                Equal(1, queue.Clear(
+                        CreatorToolsInteractionSource.Pesky),
+                    "one waiting Pesky ghost was removed");
+                Equal(1, queue.Count,
+                    "other sources remain queued");
+                Equal(manual.Id, queue[0].Id,
+                    "the manual ghost remains intact");
+            });
+
             Run("Ghost Help composes with Half Damage", delegate
             {
                 Equal(1f,

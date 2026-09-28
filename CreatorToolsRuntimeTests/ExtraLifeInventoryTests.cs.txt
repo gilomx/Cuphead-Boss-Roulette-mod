@@ -29,6 +29,24 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(second.Id, inventory[0].Id,
                     "the newer credit remains reserved");
 
+                var activePesky = inventory.Add(
+                    "Active pesky", "",
+                    CreatorToolsInteractionSource.Pesky, 10);
+                inventory.Add(
+                    "Waiting pesky", "",
+                    CreatorToolsInteractionSource.Pesky, 11);
+                inventory.Add(
+                    "Manual helper", "",
+                    CreatorToolsInteractionSource.Manual, 12);
+                Equal(1, inventory.ClearPending(
+                        CreatorToolsInteractionSource.Pesky,
+                        activePesky.Id),
+                    "disabling Pesky clears only its waiting lives");
+                Equal(3, inventory.Count,
+                    "the active Pesky life and other sources survive");
+                True(inventory.Contains(activePesky.Id),
+                    "the visible Pesky life finishes normally");
+
                 inventory.Clear();
                 Equal(0, inventory.Count,
                     "closing the session clears the inventory");

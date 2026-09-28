@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { InteractionTestSection } from "./InteractionTestSection";
 import { SpawnPacingFields } from "./SpawnPacingFields";
 import { pacingDraftFor, pacingValuesFor, samePacing, validPacingDraft } from "./pacingValues";
 
-export function InteractionSettingsPanel() {
+interface InteractionSettingsPanelProps {
+  onBack: () => void;
+  onTestSent: () => void;
+}
+
+export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSettingsPanelProps) {
   const { interaction, interactionSettingsStatus, applyInteractionSettings, applyPacingToBoth, pesky, streamRules, status } = useConfig();
   const { t } = useLocalization();
   const [maxActiveDraft, setMaxActiveDraft] = useState(6);
@@ -37,9 +43,18 @@ export function InteractionSettingsPanel() {
 
   return (
     <section className="interaction-panel interaction-settings-section" aria-labelledby="interaction-settings-title">
-      <div className="interaction-panel__heading interaction-settings-heading">
-        <h2 id="interaction-settings-title">{t("interactions.settings.title")}</h2>
-        <p>{t("interactions.settings.description")}</p>
+      <div className="interaction-panel__heading stream-rules-panel__heading interaction-settings-heading">
+        <div>
+          <span className="stream-rules-panel__eyebrow">
+            {t("interactions.workspace.eyebrow")}
+          </span>
+          <h2 id="interaction-settings-title">{t("interactions.settings.title")}</h2>
+          <p>{t("interactions.settings.description")}</p>
+        </div>
+        <button type="button" className="stream-rule-back" onClick={onBack}>
+          <span aria-hidden="true">&larr;</span>
+          {t("interactions.workspace.back")}
+        </button>
       </div>
       <form className="interaction-settings" onSubmit={(event) => {
         event.preventDefault();
@@ -110,6 +125,7 @@ export function InteractionSettingsPanel() {
         </p> : null}
         <button type="submit" disabled={!interaction?.ready || !valid || saving}>{t("interactions.settings.save")}</button>
       </form>
+      <InteractionTestSection onSent={onTestSent} />
     </section>
   );
 }

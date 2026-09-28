@@ -361,13 +361,6 @@ namespace Gilomx.CupheadBossRoulette
                 projectedInteractionMasterCommandSequence = Math.Max(
                     0L, commandSequence);
                 hasInteractionMasterProjection = true;
-                if (!enabled)
-                {
-                    AdvanceInteractionTestGenerationLocked();
-                    interactionTestCommands.Clear();
-                    pendingInteractionTestCount = 0L;
-                    inFlightInteractionTestCommands = 0;
-                }
             }
         }
 
@@ -1456,13 +1449,6 @@ namespace Gilomx.CupheadBossRoulette
                             json,
                             "masterRevision",
                             projectedInteractionMasterRevision);
-                        if (!projectedInteractionsEnabled)
-                        {
-                            json = ReplaceBooleanProperty(
-                                json, "queuePaused", false);
-                            json = ReplaceBooleanProperty(
-                                json, "available", false);
-                        }
                     }
                     if (hasInteractionQueueControlProjection)
                     {
@@ -1514,15 +1500,11 @@ namespace Gilomx.CupheadBossRoulette
                 var query = request.Query ?? string.Empty;
                 var quantity = ParseInteractionTestQuantity(query);
                 var accepted = false;
-                var enabled = false;
                 lock (interactionsProcessingLock)
                 {
                     lock (interactionsLock)
                     {
-                        enabled = hasInteractionMasterProjection
-                            ? projectedInteractionsEnabled
-                            : latestInteractionsEnabled;
-                        if (enabled && interactionTestCommands.Count +
+                        if (interactionTestCommands.Count +
                                 inFlightInteractionTestCommands <
                                 MaximumInteractionTestCommands &&
                             pendingInteractionTestCount + quantity <=
@@ -1538,18 +1520,13 @@ namespace Gilomx.CupheadBossRoulette
                     }
                 }
                 WriteResponse(stream,
-                    accepted ? 202 : enabled ? 429 : 409,
-                    accepted ? "Accepted" : enabled
-                        ? "Too Many Requests"
-                        : "Conflict",
+                    accepted ? 202 : 429,
+                    accepted ? "Accepted" : "Too Many Requests",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes(accepted
                         ? "{\"ok\":true}"
-                        : enabled
-                            ? "{\"ok\":false,\"error\":" +
-                              "\"interaction_command_queue_full\"}"
-                            : "{\"ok\":false,\"error\":" +
-                              "\"interactions_disabled\"}"), false);
+                        : "{\"ok\":false,\"error\":" +
+                          "\"interaction_command_queue_full\"}"), false);
                 return;
             }
             if (path == "/api/config/interactions/set")

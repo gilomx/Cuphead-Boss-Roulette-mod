@@ -316,10 +316,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           pendingCount: 0,
         };
       }
-      if (
-        visibleInteraction.pendingClearProjected ||
-        !visibleInteraction.interactionsEnabled
-      ) {
+      if (visibleInteraction.pendingClearProjected) {
         interactionRevisionRef.current = null;
         setOptimisticInteractionQueue((current) => current.length === 0
           ? current
@@ -339,26 +336,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           visibleInteraction = {
             ...visibleInteraction,
             interactionsEnabled: desiredInteractionMaster.enabled,
-            available: desiredInteractionMaster.enabled
-              ? visibleInteraction.available
-              : false,
-            queuePaused: desiredInteractionMaster.enabled
-              ? visibleInteraction.queuePaused
-              : false,
-            queue: desiredInteractionMaster.enabled
-              ? visibleInteraction.queue
-              : visibleInteraction.queue.filter((entry) => entry.status === "active"),
-            queueCount: desiredInteractionMaster.enabled
-              ? visibleInteraction.queueCount
-              : visibleInteraction.activeCount,
-            pendingCount: desiredInteractionMaster.enabled
-              ? visibleInteraction.pendingCount
-              : 0,
             backlogCount: desiredInteractionMaster.enabled
               ? visibleInteraction.backlogCount
-              : 0,
-            deferredTestCount: desiredInteractionMaster.enabled
-              ? visibleInteraction.deferredTestCount
               : 0,
           };
         }
@@ -372,7 +351,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           visibleInteraction.queuePaused === desiredInteractionQueuePause.paused;
         if (confirmed) {
           desiredInteractionQueuePauseRef.current = null;
-        } else if (visibleInteraction.interactionsEnabled) {
+        } else {
           interactionQueuePausePending = true;
           visibleInteraction = {
             ...visibleInteraction,
@@ -752,27 +731,15 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         baselineRevision: interaction.masterRevision ?? 0,
       };
       desiredInteractionMasterRef.current = desired;
-      if (!enabled) {
-        desiredInteractionQueuePauseRef.current = null;
-        desiredInteractionQueueClearRef.current = null;
-      }
       setInteraction((current) => current
         ? {
             ...current,
             interactionsEnabled: enabled,
-            queuePaused: enabled ? current.queuePaused : false,
-            queue: enabled
-              ? current.queue
-              : current.queue.filter((entry) => entry.status === "active"),
-            queueCount: enabled ? current.queueCount : current.activeCount,
-            pendingCount: enabled ? current.pendingCount : 0,
             backlogCount: enabled ? current.backlogCount : 0,
-            deferredTestCount: enabled ? current.deferredTestCount : 0,
             feedback: enabled ? "interactions_enabled" : "interactions_disabled",
             error: false,
           }
         : current);
-      if (!enabled) setOptimisticInteractionQueue([]);
       sendInteractionControl(
         new URLSearchParams({ interactionsEnabled: enabled ? "1" : "0" }),
         () => {
@@ -787,7 +754,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const applyInteractionQueuePaused = useCallback(
     (paused: boolean) => {
-      if (!interaction?.ready || !interaction.interactionsEnabled) return;
+      if (!interaction?.ready) return;
       const desired: DesiredInteractionQueuePause = {
         paused,
         baselineRevision: interaction.queueControlRevision ?? 0,
@@ -981,17 +948,22 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       if (!pesky?.ready) return;
       sendPeskyUpdate(
         new URLSearchParams({ enabled: enabled ? "1" : "0" }),
-        (state) => ({
-          ...state,
-          enabled,
-          feedback: enabled ? "enabled" : "disabled",
-          error: false,
-          running: enabled ? state.running : false,
-          startingBattle: enabled ? state.startingBattle : false,
-          queue: enabled ? state.queue : [],
-          queueCount: enabled ? state.queueCount : 0,
-          activeCount: enabled ? state.activeCount : 0,
-        }),
+        (state) => {
+          const activeQueue = enabled
+            ? state.queue
+            : state.queue.filter((entry) => entry.status === "active");
+          return {
+            ...state,
+            enabled,
+            feedback: enabled ? "enabled" : "disabled",
+            error: false,
+            running: enabled ? state.running : false,
+            startingBattle: enabled ? state.startingBattle : false,
+            queue: activeQueue,
+            queueCount: activeQueue.length,
+            activeCount: enabled ? state.activeCount : activeQueue.length,
+          };
+        },
       );
     },
     [pesky, sendPeskyUpdate],
@@ -1347,7 +1319,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const testInteraction = useCallback(
     (item: string, donor: string, quantity: number, delay: number, durationSeconds = 15, countdownSeconds = 3) => {
-      if (!interaction?.ready || !interaction.interactionsEnabled) return;
+      if (!interaction?.ready) return;
       const normalizedQuantity = Math.max(
         1,
         Math.min(interaction.maxBatch ?? 50, Math.floor(quantity) || 1),

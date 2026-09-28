@@ -150,9 +150,9 @@ namespace Gilomx.CupheadBossRoulette
                 "Creator Tools",
                 "InteraccionesActivadas",
                 false,
-                "Permite que eventos y pruebas de Interacciones generen " +
-                "ataques dentro del juego. Modo Molestoso se controla " +
-                "por separado.");
+                "Permite que eventos y reglas del live generen ataques " +
+                "dentro del juego. Las pruebas manuales siguen disponibles " +
+                "al desactivarlo. Modo Molestoso se controla por separado.");
             creatorToolsInteractionsEnabled =
                 creatorToolsInteractionsEnabledSetting.Value;
 
@@ -1446,11 +1446,6 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 if (creatorToolsServer != null)
                 {
-                    if (!enabled)
-                    {
-                        creatorToolsServer.ProjectInteractionQueueCleared(
-                            commandSequence);
-                    }
                     creatorToolsServer.ProjectInteractionMasterState(
                         enabled, commandSequence);
                 }

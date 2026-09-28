@@ -40,6 +40,17 @@ namespace Gilomx.CupheadBossRoulette
             get { return pending.Count; }
         }
 
+        internal bool ContainsId(int id)
+        {
+            for (var i = 0; i < active.Count; i++)
+                if (active[i].Id == id)
+                    return true;
+            for (var i = 0; i < pending.Count; i++)
+                if (pending[i].Id == id)
+                    return true;
+            return false;
+        }
+
         internal int AvailableCapacity
         {
             get
@@ -329,19 +340,63 @@ namespace Gilomx.CupheadBossRoulette
             entry.Handle = null;
         }
 
-        internal void AppendJson(StringBuilder builder, Func<string, string> pendingStatus = null)
+        internal void AppendJson(
+            StringBuilder builder,
+            Func<string, string> pendingStatus = null,
+            IList<DisplayEntry> supplemental = null)
         {
             builder.Append('[');
             var first = true;
             AppendEntries(builder, active, true, true, pendingStatus,
                 ref first);
+            AppendDisplayEntries(
+                builder, supplemental, true, ref first);
             AppendEntries(builder, pending, false, true, pendingStatus,
                 ref first);
+            AppendDisplayEntries(
+                builder, supplemental, false, ref first);
             AppendEntries(builder, active, true, false, pendingStatus,
                 ref first);
             AppendEntries(builder, pending, false, false, pendingStatus,
                 ref first);
             builder.Append(']');
+        }
+
+        private static void AppendDisplayEntries(
+            StringBuilder builder,
+            IList<DisplayEntry> entries,
+            bool activeEntries,
+            ref bool first)
+        {
+            if (entries == null)
+                return;
+            for (var i = 0; i < entries.Count; i++)
+            {
+                if (entries[i].Active != activeEntries)
+                    continue;
+                AppendDisplayEntry(builder, entries[i], first);
+                first = false;
+            }
+        }
+
+        private static void AppendDisplayEntry(
+            StringBuilder builder, DisplayEntry entry, bool first)
+        {
+            if (!first)
+                builder.Append(',');
+            builder.Append("{\"id\":")
+                .Append(entry.Id)
+                .Append(",\"item\":\"");
+            AppendJsonValue(builder, entry.Item);
+            builder.Append("\",\"donor\":\"");
+            AppendJsonValue(builder, entry.Donor);
+            builder.Append("\",\"status\":\"")
+                .Append(entry.Active ? "active" : "queued")
+                .Append("\",\"source\":\"")
+                .Append(SourceValue(entry.Source))
+                .Append("\",\"delaySeconds\":0")
+                .Append(",\"durationSeconds\":0")
+                .Append(",\"countdownSeconds\":0}");
         }
 
         private static void AppendEntries(
@@ -442,6 +497,15 @@ namespace Gilomx.CupheadBossRoulette
         public void Dispose()
         {
             Clear();
+        }
+
+        internal sealed class DisplayEntry
+        {
+            internal int Id;
+            internal string Item;
+            internal string Donor;
+            internal CreatorToolsInteractionSource Source;
+            internal bool Active;
         }
 
         internal sealed class Entry

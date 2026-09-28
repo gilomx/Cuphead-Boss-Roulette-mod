@@ -13,6 +13,7 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
   const {
     interaction,
     optimisticInteractionQueue,
+    applyInteractionsEnabled,
     applyInteractionQueuePaused,
     clearPendingInteractions,
   } = useConfig();
@@ -104,7 +105,7 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
             className="interaction-queue__round-action interaction-queue__pause"
             type="button"
             data-paused={paused}
-            disabled={!interaction?.ready || !enabled}
+            disabled={!interaction?.ready}
             aria-label={t(paused
               ? "interactions.queue.resume"
               : "interactions.queue.pause")}
@@ -161,6 +162,38 @@ export function InteractionQueuePanel({ className, onConfigure }: InteractionQue
             ) : null}
           </div>
         </div>
+      </div>
+
+      <div
+        className="interaction-queue__master-control dashboard-interaction-control"
+        data-enabled={enabled}
+        aria-labelledby="interaction-queue-master-title"
+      >
+        <div className="dashboard-interaction-control__copy">
+          <p className="dashboard-eyebrow">{t("dashboard.interactionControl.eyebrow")}</p>
+          <strong id="interaction-queue-master-title">
+            {t("dashboard.interactionControl.title")}
+          </strong>
+          <p>{t(enabled
+            ? "dashboard.interactionControl.enabledDescription"
+            : "dashboard.interactionControl.disabledDescription")}</p>
+        </div>
+        <button
+          className="dashboard-master-switch"
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          disabled={!interaction?.ready}
+          data-enabled={enabled}
+          onClick={() => applyInteractionsEnabled(!enabled)}
+        >
+          <span className="dashboard-master-switch__track" aria-hidden="true">
+            <i />
+          </span>
+          <span>{t(enabled
+            ? "dashboard.interactionControl.enabled"
+            : "dashboard.interactionControl.disabled")}</span>
+        </button>
       </div>
 
       {paused ? (

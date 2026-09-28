@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus, Settings } from "lucide-react";
 import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
@@ -22,7 +23,19 @@ interface VisibleRuleFeedback {
   error: boolean;
 }
 
-export function StreamRulesView() {
+interface StreamRulesViewProps {
+  onOpenSettings: () => void;
+  testSentNotice: boolean;
+  onTestSentNoticeDismissed: () => void;
+}
+
+const silentRuleFeedback = new Set(["created", "deleted", "enabled", "disabled"]);
+
+export function StreamRulesView({
+  onOpenSettings,
+  testSentNotice,
+  onTestSentNoticeDismissed,
+}: StreamRulesViewProps) {
   const {
     streamRules,
     saveStreamRule,
@@ -53,10 +66,12 @@ export function StreamRulesView() {
   );
   const feedbackKey = catalogError
     ? "interactions.rules.notice.catalogError"
-    : !catalog
-      ? "interactions.rules.notice.catalogLoading"
-      : visibleRuleFeedback?.key ?? null;
-  const feedbackError = Boolean(catalogError || visibleRuleFeedback?.error);
+    : testSentNotice
+        ? "interactions.test.sentNotice"
+        : !catalog
+          ? "interactions.rules.notice.catalogLoading"
+          : visibleRuleFeedback?.key ?? null;
+  const feedbackError = Boolean(catalogError || (!testSentNotice && visibleRuleFeedback?.error));
 
   const highlightRule = useCallback((id: number) => {
     if (highlightTimerRef.current !== null) {
@@ -80,6 +95,12 @@ export function StreamRulesView() {
       window.cancelAnimationFrame(scrollFrameRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!testSentNotice) return;
+    const timer = window.setTimeout(onTestSentNoticeDismissed, 5200);
+    return () => window.clearTimeout(timer);
+  }, [onTestSentNoticeDismissed, testSentNotice]);
 
   useEffect(() => {
     if (draft !== null || highlightedRuleId === null) return;
@@ -116,6 +137,10 @@ export function StreamRulesView() {
     }
 
     if (!feedback || feedback === "ready") {
+      setVisibleRuleFeedback(null);
+      return;
+    }
+    if (!streamRules.error && silentRuleFeedback.has(feedback)) {
       setVisibleRuleFeedback(null);
       return;
     }
@@ -252,23 +277,26 @@ export function StreamRulesView() {
             </button>
           ) : (
             <div className="stream-rules-panel__tools">
-              <span
-                className="interaction-count"
-                aria-label={t("interactions.rules.list.countLabel")}
-              >
-                {rules.length}
-              </span>
               <button
                 type="button"
-                className="stream-rule-create"
+                className="stream-rule-tool stream-rule-settings"
+                onClick={onOpenSettings}
+                aria-label={t("interactions.settings.title")}
+                title={t("interactions.settings.title")}
+              >
+                <Settings aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="stream-rule-create stream-rule-create--icon"
                 onClick={beginCreate}
                 disabled={!canCreate}
+                aria-label={t("interactions.rules.list.create")}
                 title={streamRules?.ready && rules.length >= streamRules.maxRules
                   ? t("interactions.rules.list.limitReached")
-                  : undefined}
+                  : t("interactions.rules.list.create")}
               >
-                <span aria-hidden="true">+</span>
-                {t("interactions.rules.list.create")}
+                <Plus aria-hidden="true" />
               </button>
             </div>
           )}
