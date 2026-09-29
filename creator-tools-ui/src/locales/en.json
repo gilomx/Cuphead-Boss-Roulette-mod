@@ -679,10 +679,10 @@
     "settings": {
       "title": "Settings",
       "description": "Adjust active redeems and how the donor appears in the game.",
-      "maxActiveLabel": "Maximum attacks on screen",
-      "maxActiveHint": "When this number is reached, the next attacks wait their turn.",
+      "maxActiveLabel": "Maximum active interactions",
+      "maxActiveHint": "When this many interactions are active, the next ones wait their turn.",
       "maxActiveUnlimited": "Unlimited",
-      "unlimitedWarning": "With no maximum, wait times, or global pacing, a large burst may affect performance. Waiting interactions and special rules remain protected.",
+      "unlimitedWarning": "Using Unlimited may affect your PC's performance if too many interactions are active at the same time.",
       "maxMiniBossesLabel": "One mini-boss at a time",
       "maxMiniBossesHint": "Interactions, Pesky Mode and Pesky Battle share a limit of one mini-boss. The next one waits until the current one disappears and there is room for another attack.",
       "showGiftImage": "Show gift image",

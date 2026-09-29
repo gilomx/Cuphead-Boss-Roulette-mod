@@ -212,9 +212,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     DesiredInteractionSettings | null
   >(null);
   const interactionSettingsRequestRevisionRef = useRef(0);
-  const interactionSettingsWriteChainRef = useRef<Promise<void>>(
-    Promise.resolve(),
-  );
+  const pendingInteractionSettingsWriteRef = useRef<
+    (() => Promise<void>) | null
+  >(null);
+  const interactionSettingsWriteActiveRef = useRef(false);
   const interactionControlWriteChainRef = useRef<Promise<void>>(
     Promise.resolve(),
   );
@@ -604,6 +605,17 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [load],
   );
 
+  const drainInteractionSettingsWrites = useCallback(async () => {
+    if (interactionSettingsWriteActiveRef.current) return;
+    interactionSettingsWriteActiveRef.current = true;
+    while (pendingInteractionSettingsWriteRef.current !== null) {
+      const send = pendingInteractionSettingsWriteRef.current;
+      pendingInteractionSettingsWriteRef.current = null;
+      await send();
+    }
+    interactionSettingsWriteActiveRef.current = false;
+  }, []);
+
   const applyInteractionSettings = useCallback(
     (value: number, maxActiveUnlimited: boolean, showGiftImage: boolean, pacing: InteractionPacingConfig) => {
       if (!interaction?.ready || !validPacing(pacing)) return;
@@ -692,10 +704,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             void load();
           }
         });
-      interactionSettingsWriteChainRef.current =
-        interactionSettingsWriteChainRef.current.then(send, send);
+      // Do not replay every intermediate click. One request may already be in
+      // flight, but all unsent snapshots collapse into the latest complete
+      // configuration chosen by the user.
+      pendingInteractionSettingsWriteRef.current = send;
+      void drainInteractionSettingsWrites();
     },
-    [interaction, load],
+    [drainInteractionSettingsWrites, interaction, load],
   );
 
   const sendInteractionControl = useCallback(

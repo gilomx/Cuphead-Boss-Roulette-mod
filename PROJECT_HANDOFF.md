@@ -2,6 +2,26 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Guardado optimista de última escritura en Interacciones (2026-09-28)
+
+La configuración principal de Interacciones ya no bloquea sus campos ni el
+botón por una confirmación pendiente. Después de cada guardado, el estado
+optimista pasa a ser la base visible; cualquier cambio posterior vuelve a
+habilitar **Guardar cambios** y envía una fotografía completa nueva. Mientras
+Cuphead no ejecuta `Update`, `CreatorToolsServer` elimina únicamente las
+fotografías anteriores de configuración y conserva la última. Activar o
+desactivar Interacciones, pausar la cola y vaciarla mantienen sus comandos FIFO
+y no se pierden durante esa compactación.
+
+La regresión runtime intercala dos fotografías con un comando de pausa y
+comprueba que Unity recibe la pausa y sólo la fotografía más reciente. El build
+del panel, toda la suite runtime y la compilación Release aprobaron sin errores
+ni advertencias. El paquete Dev publicado contiene 539 archivos y tiene SHA-256
+`732280323AFA14F25EDEF4143A2D10488ED51CC5B3B6B04B93A02030F28F95D1`.
+Queda comprobar manualmente con el juego sin foco: guardar, cambiar varios
+campos, guardar otra vez y confirmar al volver que sólo aparece el último
+conjunto.
+
 ## Buscador único para pruebas de Interacciones (2026-09-27)
 
 La sección **Pruebas** dejó de renderizar las 31 interacciones como filas con
@@ -30,11 +50,13 @@ memoria y no pierde cantidades aunque la cola se llene. Los contadores activos
 se reinician con la sesión, pero los valores se persisten en el esquema 5 de
 `stream-rules.json` y las versiones anteriores migran con cero.
 
-Interacciones permite además **Sin límite** para ataques comunes mediante un
+Interacciones permite además **Sin límite** para interacciones comunes mediante un
 booleano separado del máximo numérico guardado. Minijefes, ayudas, retos,
 compatibilidad y capacidad de cola conservan sus protecciones. El panel deja el
-máximo en la configuración principal y pliega ritmo/lotes como avanzados; si no
-hay máximo, cooldowns ni ritmo, muestra una advertencia sin bloquear el guardado.
+**Máximo de interacciones activas** en la configuración principal y pliega
+ritmo/lotes como avanzados. Al marcar **Sin límite**, siempre muestra dentro de
+ese mismo contenedor una advertencia sobre el posible impacto en el rendimiento
+de la PC, sin bloquear el guardado.
 **Usar en ambos modos** copia ritmo y lotes, pero conserva el máximo numérico de
 Modo Molestoso cuando Interacciones está sin límite.
 
@@ -118,7 +140,7 @@ transiciones queda cerrada.
 ## Límites independientes y lotes aleatorios (2026-09-26)
 
 **Interacciones** y **Modo Molestoso** tienen ahora valores independientes de
-**Máximo de ataques en pantalla**. El límite de Interacciones permanece en la
+**Máximo de interacciones activas**. El límite de Interacciones permanece en la
 configuración de BepInEx que ya lo guardaba; Modo Molestoso lo persiste desde
 el esquema 23 de `pesky-mode.json`. Al migrar, Modo Molestoso hereda una sola
 vez el antiguo valor compartido para no cambiar la presión efectiva existente.

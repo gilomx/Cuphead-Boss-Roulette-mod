@@ -48,6 +48,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestServerBacklogProjection);
             Run("Server marks controls applied before Unity consumes them",
                 TestBackgroundControlObservation);
+            Run("Interaction settings retain only the latest pending snapshot",
+                TestInteractionSettingsLatestWriteWins);
             Run("Server Stop releases its listening port immediately",
                 TestServerStopReleasesPort);
             Run("Creator Tools assets bypass the browser cache",
@@ -593,6 +595,46 @@ namespace Gilomx.CupheadBossRoulette
                     "main-thread cleanup query");
                 True(backgroundApplied,
                     "background-applied metadata was not preserved");
+            }
+        }
+
+        private static void TestInteractionSettingsLatestWriteWins()
+        {
+            using (var scope = new TestScope("interaction-settings-latest"))
+            using (var server = scope.StartServer())
+            {
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/set?maxActive=3" +
+                    "&maxActiveUnlimited=0&showGiftImage=1"))
+                {
+                }
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/set?queuePaused=1"))
+                {
+                }
+                using (var ignored = GetJson(server,
+                    "/api/config/interactions/set?maxActive=8" +
+                    "&maxActiveUnlimited=1&showGiftImage=0"))
+                {
+                }
+
+                string query;
+                bool backgroundApplied;
+                True(server.TryTakeInteractionCommand(
+                    out query, out backgroundApplied),
+                    "operational control was not retained");
+                Equal("queuePaused=1", query,
+                    "settings replacement changed operational controls");
+
+                True(server.TryTakeInteractionCommand(
+                    out query, out backgroundApplied),
+                    "latest settings snapshot was not retained");
+                Equal("maxActive=8&maxActiveUnlimited=1&showGiftImage=0",
+                    query, "latest settings snapshot");
+
+                False(server.TryTakeInteractionCommand(
+                    out query, out backgroundApplied),
+                    "an obsolete settings snapshot remained queued");
             }
         }
 

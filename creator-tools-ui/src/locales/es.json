@@ -679,10 +679,10 @@
     "settings": {
       "title": "Configuración",
       "description": "Ajusta cómo se comportan las interacciones y cómo aparece el donador dentro del juego.",
-      "maxActiveLabel": "Máximo de ataques en pantalla",
-      "maxActiveHint": "Cuando se alcanza esta cantidad, los siguientes ataques esperan su turno.",
+      "maxActiveLabel": "Máximo de interacciones activas",
+      "maxActiveHint": "Cuando se alcanza esta cantidad de interacciones activas, las siguientes esperan su turno.",
       "maxActiveUnlimited": "Sin límite",
-      "unlimitedWarning": "Sin máximo, tiempos de espera ni ritmo global, una ráfaga grande puede afectar el rendimiento. Las interacciones en espera y las reglas especiales siguen protegidas.",
+      "unlimitedWarning": "Usar «Sin límite» puede afectar el rendimiento de tu PC si hay demasiadas interacciones activas al mismo tiempo.",
       "maxMiniBossesLabel": "Un minijefe a la vez",
       "maxMiniBossesHint": "Entre Interacciones, Modo Molestoso y Batalla Molestosa solo puede haber un minijefe. El siguiente espera a que desaparezca el actual y haya espacio para otro ataque.",
       "showGiftImage": "Mostrar imagen del regalo",

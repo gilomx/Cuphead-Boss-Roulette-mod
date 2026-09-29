@@ -73,11 +73,13 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   configuración sobre la tabla de pruebas. Cada fila de prueba acepta donador,
   cantidad y espera en segundos. Un lote o varios tipos se agregan al final sin
   alterar el orden existente.
-- El máximo simultáneo es persistente y configurable de 1 a 20. Se admiten 50
-  elementos por lote, esperas de hasta 3600 segundos y 200 registros entre
-  activos y pendientes. El canjeo activo permanece visible hasta que su actor
-  termina o muere; entonces libera su cupo. Estos límites y el despacho
-  pertenecen a C#, no a la vista.
+- El **Máximo de interacciones activas** es persistente y configurable de 1 a
+  20. Al marcar **Sin límite**, el aviso de posible impacto en el rendimiento
+  aparece dentro del mismo contenedor y permanece visible mientras la opción
+  esté marcada. Se admiten 50 elementos por lote, esperas de hasta 3600
+  segundos y 200 registros entre activos y pendientes. El canjeo activo
+  permanece visible hasta que su actor termina o muere; entonces libera su
+  cupo. Estos límites y el despacho pertenecen a C#, no a la vista.
 - Los mini jefes tienen además un máximo fijo de uno en pantalla, compartido
   entre Interacciones, Modo Molestoso y Batalla Molestosa. Los siguientes esperan
   a que desaparezca el actual, aunque sean distintos. La UI muestra esta regla
@@ -176,6 +178,11 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   modos copia tiempos y cantidades, conservando interruptores y otros ajustes.
   Volver a los ajustes originales prepara un borrador y requiere guardar.
   El estado de conexión/guardado siempre refleja la confirmación autoritativa.
+- La configuración de Interacciones usa guardado optimista de última escritura:
+  después de guardar, cualquier edición nueva vuelve a habilitar el botón aunque
+  Unity aún no haya confirmado la anterior. Cada clic envía una fotografía
+  completa y el servidor conserva sólo la última configuración pendiente. Los
+  controles operativos de activar, pausar y vaciar mantienen su cola propia.
 - `Nombres aleatorios` es una configuración opcional. Cero nombres no es un
   error ni bloquea el interruptor: el panel debe explicar que los ataques se
   mostrarán sin nombre y permitir guardar la lista vacía.

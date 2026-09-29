@@ -1539,6 +1539,14 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     lock (interactionsLock)
                     {
+                        // Settings are complete snapshots. While Unity is
+                        // paused because the game is unfocused, retain only
+                        // the newest snapshot instead of replaying every
+                        // intermediate click when Update resumes. Operational
+                        // controls such as pause, clear and master enable keep
+                        // their normal FIFO ordering.
+                        if (IsInteractionSettingsCommand(query))
+                            RemovePendingInteractionSettingsLocked();
                         accepted = interactionControlCommands.Count <
                             MaximumInteractionControlCommands;
                         if (accepted)
@@ -2334,6 +2342,54 @@ namespace Gilomx.CupheadBossRoulette
                 offset += read;
             }
             return result;
+        }
+
+        private void RemovePendingInteractionSettingsLocked()
+        {
+            var count = interactionControlCommands.Count;
+            for (var i = 0; i < count; i++)
+            {
+                var command = interactionControlCommands.Dequeue();
+                if (!IsInteractionSettingsCommand(command.Query))
+                    interactionControlCommands.Enqueue(command);
+            }
+        }
+
+        private static bool IsInteractionSettingsCommand(string query)
+        {
+            return HasQueryParameter(query, "maxActive") ||
+                HasQueryParameter(query, "maxActiveUnlimited") ||
+                HasQueryParameter(query, "maxMiniBosses") ||
+                HasQueryParameter(query, "showGiftImage") ||
+                HasQueryParameterPrefix(query, "pacing.");
+        }
+
+        private static bool HasQueryParameter(string query, string name)
+        {
+            return HasQueryParameterPrefix(query, name + "=");
+        }
+
+        private static bool HasQueryParameterPrefix(
+            string query, string prefix)
+        {
+            if (string.IsNullOrEmpty(query) || string.IsNullOrEmpty(prefix))
+                return false;
+            var segmentStart = 0;
+            while (segmentStart <= query.Length)
+            {
+                var segmentEnd = query.IndexOf('&', segmentStart);
+                if (segmentEnd < 0)
+                    segmentEnd = query.Length;
+                if (segmentEnd - segmentStart >= prefix.Length &&
+                    string.Compare(query, segmentStart, prefix, 0,
+                        prefix.Length,
+                        StringComparison.OrdinalIgnoreCase) == 0)
+                    return true;
+                if (segmentEnd >= query.Length)
+                    break;
+                segmentStart = segmentEnd + 1;
+            }
+            return false;
         }
 
         private sealed class InteractionCommand

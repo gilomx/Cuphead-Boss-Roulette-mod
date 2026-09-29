@@ -303,6 +303,12 @@ modos** guarda los tiempos y cantidades de esa sección en ambos, conservando
 los interruptores y los demás ajustes; después pueden editarse por separado.
 **Restaurar ajustes** prepara los valores y requiere guardar.
 
+La configuración de Interacciones permanece editable mientras Cuphead está sin
+foco. Si se vuelve a cambiar después de guardar, el botón se habilita de nuevo;
+cada clic sustituye la configuración pendiente anterior y sólo la última
+fotografía completa se aplica cuando Unity reanuda `Update`. Activar, pausar y
+vaciar no se descartan junto con esas fotografías.
+
 | Ajuste | Predeterminado de Modo Molestoso | Predeterminado de Interacciones |
 | --- | --- | --- |
 | Espera entre molestias normales | 3–5.2 segundos | 1.25–3.25 segundos |
