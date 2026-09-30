@@ -13,11 +13,11 @@ namespace Gilomx.CupheadBossRoulette
 
         private static void RunMiniBossSpawnPolicyTests()
         {
-            Run("Mini-boss capacity is fixed at one for every legacy setting",
+            Run("Mini-boss capacity defaults to one and supports an explicit opt-out",
                 TestMiniBossCapacityLimits);
-            Run("Mini-boss admission blocks all second actors regardless of type",
+            Run("Mini-boss admission follows the shared one-at-a-time toggle",
                 TestMiniBossSecondAdmission);
-            Run("Existing multiple mini-bosses block all new admissions",
+            Run("Unlimited mini-boss admission preserves existing actors",
                 TestMiniBossThirdAdmission);
             Run("Mini-boss default capacity admits only one actor",
                 TestMiniBossDefaultCapacity);
@@ -33,12 +33,12 @@ namespace Gilomx.CupheadBossRoulette
         {
             Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(int.MinValue),
                 "negative capacity");
-            Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(0),
-                "unset capacity");
+            Equal(0, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(0),
+                "zero explicitly disables the shared limit");
             Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(1),
                 "one capacity");
             Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(2),
-                "legacy capacity two must normalize to one");
+                "legacy capacity two migrates to the safe default");
             Equal(1, CreatorToolsMiniBossSpawnPolicy.ClampMaximum(int.MaxValue),
                 "oversized legacy capacity must normalize to one");
         }
@@ -47,11 +47,14 @@ namespace Gilomx.CupheadBossRoulette
         {
             foreach (var first in MiniBossItems)
                 foreach (var candidate in MiniBossItems)
-                    foreach (var legacyMaximum in new[] { 2, int.MaxValue })
-                        False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
-                                candidate, new[] { first }, legacyMaximum),
-                            "second actor after " + first + ": " + candidate +
-                            " with legacy maximum " + legacyMaximum);
+                {
+                    False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                            candidate, new[] { first }, 1),
+                        "checked limit blocks " + candidate + " after " + first);
+                    True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                            candidate, new[] { first }, 0),
+                        "unchecked limit admits " + candidate + " after " + first);
+                }
         }
 
         private static void TestMiniBossThirdAdmission()
@@ -59,9 +62,14 @@ namespace Gilomx.CupheadBossRoulette
             foreach (var first in MiniBossItems)
                 foreach (var second in MiniBossItems)
                     foreach (var candidate in MiniBossItems)
+                    {
                         False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
-                                candidate, new[] { first, second }, 2),
-                            "third actor admitted after " + first + " and " + second);
+                                candidate, new[] { first, second }, 1),
+                            "checked limit admits a third actor after " + first + " and " + second);
+                        True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                                candidate, new[] { first, second }, 0),
+                            "unchecked limit blocks a third actor after " + first + " and " + second);
+                    }
         }
 
         private static void TestMiniBossDefaultCapacity()
@@ -75,9 +83,9 @@ namespace Gilomx.CupheadBossRoulette
                     False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
                             candidate, new[] { activeItem }, 1),
                         "default capacity must block a second actor");
-                False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
                         candidate, new[] { MiniBossItems[0] }, 0),
-                    "an unset capacity must also fall back to one");
+                    "zero explicitly allows another active mini-boss");
             }
         }
 
@@ -98,6 +106,10 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(string.Empty, active[2], "empty snapshot entry is preserved");
                 Equal(MiniBossItems[1], active[3], "second active actor is preserved");
             }
+            True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(
+                    MiniBossItems[2], active, 0),
+                "unlimited admission accepts a complete active snapshot");
+            Equal(4, active.Count, "unlimited admission does not mutate the snapshot");
         }
 
         private static void TestMiniBossSlotRelease()
@@ -106,16 +118,22 @@ namespace Gilomx.CupheadBossRoulette
                 foreach (var candidate in MiniBossItems)
                 {
                     var active = new List<string> { defeated };
-                    False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(candidate, active, 2),
+                    False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(candidate, active, 1),
                         "the single slot begins occupied");
+                    True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(candidate, active, 0),
+                        "the opt-out admits another actor while the first is alive");
                     active.Clear();
                     True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(candidate, active, 1),
                         "the released slot must admit " + candidate + " after " + defeated);
                     Equal(0, active.Count, "successful admission does not mutate the snapshot");
                     active.Add(candidate);
                     foreach (var next in MiniBossItems)
-                        False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(next, active, int.MaxValue),
-                            "refilling the slot blocks every following type");
+                    {
+                        False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(next, active, 1),
+                            "refilling the checked slot blocks every following type");
+                        True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(next, active, 0),
+                            "unchecked admission allows every following type");
+                    }
                 }
         }
 
@@ -139,6 +157,9 @@ namespace Gilomx.CupheadBossRoulette
             False(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0],
                     new[] { MiniBossItems[0].ToUpperInvariant() }, 2),
                 "every live type occupies the slot regardless of ID casing");
+            True(CreatorToolsMiniBossSpawnPolicy.CanSpawn(MiniBossItems[0],
+                    new[] { null, MiniBossItems[0], string.Empty }, 0),
+                "empty entries and duplicate types do not block unlimited admission");
         }
     }
 }

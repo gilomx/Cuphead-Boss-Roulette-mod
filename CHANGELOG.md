@@ -53,10 +53,16 @@
   ocupa un turno sucesivo del cooldown; por ejemplo, 30 rosas con una regla
   cada 1 producen 30 turnos, no un solo bloque. El editor muestra ambos valores,
   con `0` como desactivado, y la tabla resume los cooldowns activos.
-  El máximo de ataques de Interacciones también puede marcarse **Sin límite**;
-  no elimina el límite especial de minijefes, la capacidad de la cola ni las
-  compatibilidades. El ritmo global y los lotes quedan agrupados como
-  configuración avanzada. Si se usa **Usar en ambos modos**, el estado sin
+  El máximo de interacciones activas también puede marcarse **Sin límite**.
+  **Un minijefe a la vez** empieza marcado, pero ahora puede desmarcarse para
+  permitir varios sujetos al máximo general y la compatibilidad de arena. La
+  distribución global y los lotes quedan agrupados como **Configuración
+  avanzada de distribución de interacciones**. Ya no se contrae: al activarla,
+  sus campos aparecen con una transición y **Cantidad por aparición**,
+  **Mientras hay un minijefe** y el resumen se muestran completos, sin más
+  desplegables. Su descripción explica que distribuye las interacciones para
+  hacer el mod más jugable y cómo se combina con los cooldowns. Si se usa
+  **Usar en ambos modos**, el estado sin
   límite permanece exclusivo de Interacciones y no altera el máximo guardado
   de Modo Molestoso.
 
@@ -70,7 +76,7 @@
 - El balance actualmente aceptado de Modo Molestoso pasa a ser el preset
   predeterminado de ambos modos: intervalo 3–5.2 s, minijefes 12–18 s,
   cantidades leves 1–5, intensas 1–1, multiplicador 1.5, hasta ocho
-  acompañantes durante un minijefe y seis ataques máximos en pantalla. Los
+  acompañantes durante un minijefe y seis interacciones activas como máximo. Los
   archivos personales existentes siguen teniendo prioridad. Restaurar en
   Interacciones también devuelve ahora su máximo en pantalla a seis.
 
@@ -84,7 +90,7 @@
   Player 1, por lo que puede reproducir la transformación, la bomba animada y
   su explosión antes de volver al renderer normal del avión.
 
-- **Máximo de ataques en pantalla** se configura por separado en Interacciones
+- **Máximo de interacciones activas** se configura por separado en Interacciones
   y Modo Molestoso. Al actualizar, el modo hereda el límite que ambos usaban y
   después guarda el suyo; **Usar en ambos modos** sincroniza también este valor
   junto con tiempos y cantidades.
@@ -637,8 +643,9 @@
 - Debajo del catálogo se muestra una cola operativa amplia. La configuración y
   las pruebas forman una columna lateral ordenada; cada prueba permite indicar
   donador, cantidad y espera en segundos.
-- El máximo simultáneo es persistente y configurable de 1 a 20. La cola admite
-  hasta 200 entradas, lotes de 50 y esperas de hasta 3600 segundos; además
+- El máximo simultáneo es persistente y configurable de 1 a 30 para
+  Interacciones y de 1 a 20 para Modo Molestoso. La cola admite hasta 200
+  entradas, lotes de 50 y esperas de hasta 3600 segundos; además
   separa cada despacho por al menos 0.35 segundos para evitar apariciones
   exactamente simultáneas.
 - Se retiró la prueba aleatoria automática de Interacciones. `Simular evento` y

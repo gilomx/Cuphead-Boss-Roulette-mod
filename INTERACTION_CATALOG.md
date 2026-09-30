@@ -33,7 +33,8 @@ modo automático descarta sobrantes de una oportunidad sin crear backlog.
 El primer minijefe compatible está listo tras el margen seguro del nivel; la
 espera propia sólo empieza al desaparecer uno. Los ataques normales no consumen
 ni reinician ese reloj. Pausa congela los dos relojes y reintento los restablece.
-El límite físico de un minijefe y las reglas nativas de compatibilidad se mantienen.
+El límite compartido de un minijefe empieza activo y puede desmarcarse; las
+reglas nativas de compatibilidad se mantienen siempre.
 
 ## Ayudas, Vida extra y Ayuda fantasmal
 
@@ -247,14 +248,13 @@ provoca un knockout del nivel.
 
 ### Concurrencia de mini jefes
 
-Sólo puede haber **un mini jefe en pantalla**, sea del mismo tipo o de otro.
-Es un límite fijo compartido entre donaciones/pruebas, Modo Molestoso y
-Batalla Molestosa; también se respeta el máximo general de cada cola.
-Todas las nuevas entradas de mini jefes esperan mientras exista uno activo.
-El panel muestra esta regla sin ofrecer un límite editable.
-`MiniJefesMaximosEnPantalla` y `maxMiniBosses` se conservan por compatibilidad
-con configuraciones y clientes anteriores, pero siempre se normalizan a 1;
-ni enviar 2 por API ni editar la configuración permite otro mini jefe.
+**Un minijefe a la vez** empieza marcado. En ese estado comparte un solo lugar
+entre donaciones/pruebas, Modo Molestoso y Batalla Molestosa, sin importar si
+el siguiente es del mismo tipo o de otro. Las nuevas entradas esperan mientras
+exista uno activo. Al desmarcarlo, pueden convivir varios y cada uno sigue
+contando dentro del máximo general de su cola. `MiniJefesMaximosEnPantalla` y
+`maxMiniBosses` usan `1` para el límite compartido y `0` para permitir varios;
+cualquier otro valor heredado se normaliza al predeterminado seguro de `1`.
 
 El ejecutor implementa `ICreatorToolsExclusiveInteractionExecutor` y devuelve
 `interaction_type_active` como espera temporal si alguien intenta saltarse
@@ -269,9 +269,9 @@ mini jefes de la pelea original de la Baronesa, los del catálogo esperan hasta
 Así una convocatoria posterior del castillo no crea un duplicado inesperado.
 El mod no bloquea ni altera el avance de esa pelea original.
 
-`CreatorToolsMiniBossSpawnPolicy` y el harness prueban que las 25 parejas entre
-los cinco IDs quedan bloqueadas, incluso con valores antiguos mayores que 1,
-así como la liberación del único cupo y las entradas vacías.
+`CreatorToolsMiniBossSpawnPolicy` y el harness prueban las 25 parejas entre los
+cinco IDs con el límite marcado y desmarcado, la migración de valores antiguos,
+la liberación del único cupo y las entradas vacías.
 
 Se despachan en arenas terrestres con suelo visible, en niveles de avión,
 en Los Perritos Pilotos (`Levels.Airplane`) y en la arena inferior del Diablo.
@@ -647,10 +647,10 @@ antes de apagar los sprites originales; no congelan nombres huérfanos.
 - Si un reintento reutiliza la misma instancia de `Level`, el siguiente
   `_OnLevelStart` también limpia los actores del intento anterior antes de
   rearmar el margen. El polling no hace esa limpieza: sólo reconcilia IDs nuevos.
-- El máximo simultáneo es persistente y configurable de 1 a 20. Se aplica por
-  separado a la cola de Interacciones y a la de Modo Molestoso, por lo que con
-  valor 1 puede existir un ataque activo de cada origen. Cada cola retira un
-  registro activo cuando su handle termina.
+- El máximo simultáneo es persistente y se aplica por separado a cada origen:
+  Interacciones admite de 1 a 30 o **Sin límite**, mientras Modo Molestoso
+  conserva el rango de 1 a 20. Con valor 1 puede existir un ataque activo de
+  cada origen. Cada cola retira un registro activo cuando su handle termina.
 - Las pruebas manuales aceptan una espera de 0 a 3600 segundos. Incluso con
   espacio disponible, dos despachos se separan por un mínimo de 0.35 segundos.
 - Modo Molestoso conserva su estado aunque el panel se abra con el juego

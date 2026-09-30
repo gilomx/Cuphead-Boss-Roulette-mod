@@ -1718,7 +1718,7 @@ namespace Gilomx.CupheadBossRoulette
                 SetInteractionFeedback(value, error);
         }
 
-        internal const int MaximumActiveLimit = 20;
+        internal const int MaximumActiveLimit = 30;
         internal const int DefaultMaximumActive =
             CreatorToolsInteractionPacingSettings.DefaultMaximumActive;
 

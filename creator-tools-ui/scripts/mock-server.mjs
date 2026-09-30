@@ -22,7 +22,8 @@ let interactionNextId = 1;
 let interactionQueue = [];
 let interactionMaxActive = 6;
 let interactionMaxActiveUnlimited = false;
-const interactionMaxMiniBosses = 1;
+const interactionMaxActiveLimit = 30;
+let interactionMaxMiniBosses = 1;
 let interactionShowGiftImage = true;
 const spawnGroupDefaults = {
   miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
@@ -1496,7 +1497,7 @@ createServer((req, res) => {
       maxActiveUnlimited: interactionMaxActiveUnlimited,
       defaultMaxActive: 6,
       maxMiniBosses: interactionMaxMiniBosses,
-      maxActiveLimit: 20,
+      maxActiveLimit: interactionMaxActiveLimit,
       maxBatch: 50,
       maxDelay: 3600,
       queue: publicInteractionQueue(),
@@ -1634,11 +1635,14 @@ createServer((req, res) => {
     if (maxActiveValue !== null) {
       interactionMaxActive = Math.max(
         1,
-        Math.min(20, Number(maxActiveValue) || 1),
+        Math.min(interactionMaxActiveLimit, Number(maxActiveValue) || 1),
       );
     }
     if (maxActiveUnlimitedValue !== null) {
       interactionMaxActiveUnlimited = settingSwitch(maxActiveUnlimitedValue);
+    }
+    if (maxMiniBossesValue !== null) {
+      interactionMaxMiniBosses = Number(maxMiniBossesValue) === 0 ? 0 : 1;
     }
     if (showGiftImageValue !== null) {
       interactionShowGiftImage = settingSwitch(showGiftImageValue);

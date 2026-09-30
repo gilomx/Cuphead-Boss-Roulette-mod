@@ -15,6 +15,7 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
   const { t } = useLocalization();
   const [maxActiveDraft, setMaxActiveDraft] = useState(6);
   const [maxActiveUnlimitedDraft, setMaxActiveUnlimitedDraft] = useState(false);
+  const [singleMiniBossOnlyDraft, setSingleMiniBossOnlyDraft] = useState(true);
   const [showGiftImageDraft, setShowGiftImageDraft] = useState(true);
   const [enabledDraft, setEnabledDraft] = useState(false);
   const [draft, setDraft] = useState(() => pacingDraftFor());
@@ -25,6 +26,7 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
     if (!dirty && interaction?.pacing) {
       setMaxActiveDraft(interaction.maxActive);
       setMaxActiveUnlimitedDraft(interaction.maxActiveUnlimited ?? false);
+      setSingleMiniBossOnlyDraft(interaction.maxMiniBosses !== 0);
       setShowGiftImageDraft(interaction.showGiftImage !== false);
       setDraft(pacingDraftFor(interaction.pacing));
       setEnabledDraft(interaction.pacing.enabled);
@@ -34,6 +36,7 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
   const valid = validPacingDraft(draft);
   const hasChanges = Boolean(interaction) && (maxActiveDraft !== interaction?.maxActive ||
     maxActiveUnlimitedDraft !== interaction?.maxActiveUnlimited ||
+    singleMiniBossOnlyDraft !== (interaction?.maxMiniBosses !== 0) ||
     showGiftImageDraft !== (interaction?.showGiftImage !== false) || enabledDraft !== interaction?.pacing?.enabled ||
     !samePacing(values, interaction?.pacing));
   const visibleStatus = hasChanges ? "dirty" : interactionSettingsStatus;
@@ -57,18 +60,18 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
         event.preventDefault();
         if (!valid || !interaction?.ready || !hasChanges) return;
         applyInteractionSettings(maxActiveDraft, maxActiveUnlimitedDraft,
-          showGiftImageDraft, { ...values, enabled: enabledDraft });
+          singleMiniBossOnlyDraft, showGiftImageDraft, { ...values, enabled: enabledDraft });
         setAppliedBoth(false); setDirty(false);
       }}>
         <div className="interaction-settings__number interaction-settings__number--maximum">
           <div className="interaction-settings__number-main">
             <span><strong>{t("interactions.settings.maxActiveLabel")}</strong><small>{t("interactions.settings.maxActiveHint")}</small></span>
             <div className="interaction-settings__limit-controls">
-              <input type="number" min={1} max={interaction?.maxActiveLimit ?? 20}
+              <input type="number" min={1} max={interaction?.maxActiveLimit ?? 30}
                 value={maxActiveDraft} disabled={maxActiveUnlimitedDraft}
                 aria-label={t("interactions.settings.maxActiveLabel")}
                 onChange={(event) => {
-                  setMaxActiveDraft(Math.max(1, Math.min(interaction?.maxActiveLimit ?? 20, Number(event.target.value) || 1)));
+                  setMaxActiveDraft(Math.max(1, Math.min(interaction?.maxActiveLimit ?? 30, Number(event.target.value) || 1)));
                   setDirty(true);
                 }} />
               <label className="interaction-settings__unlimited">
@@ -87,9 +90,13 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
             </p>
           ) : null}
         </div>
-        <div className="interaction-settings__number"><span>
-          <strong>{t("interactions.settings.maxMiniBossesLabel")}</strong><small>{t("interactions.settings.maxMiniBossesHint")}</small>
-        </span></div>
+        <label className="interaction-settings__toggle">
+          <span><strong>{t("interactions.settings.maxMiniBossesLabel")}</strong><small>{t("interactions.settings.maxMiniBossesHint")}</small></span>
+          <input type="checkbox" checked={singleMiniBossOnlyDraft} onChange={(event) => {
+            setSingleMiniBossOnlyDraft(event.target.checked);
+            setDirty(true);
+          }} />
+        </label>
         <label className="interaction-settings__toggle">
           <span><strong>{t("interactions.settings.showGiftImage")}</strong><small>{t("interactions.settings.showGiftImageHint")}</small></span>
           <input type="checkbox" checked={showGiftImageDraft} onChange={(event) => {
@@ -97,37 +104,46 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
             setDirty(true);
           }} />
         </label>
-        <details className="interaction-settings__advanced">
-          <summary>{t("interactions.settings.advancedTitle")}</summary>
+        <section className="interaction-settings__advanced" aria-labelledby="interaction-settings-advanced-title">
+          <h3 id="interaction-settings-advanced-title" className="interaction-settings__advanced-title">
+            {t("interactions.settings.advancedTitle")}
+          </h3>
           <div className="interaction-settings__advanced-content">
-            <h3 className="pesky-interval-panel__section">{t("interactions.settings.pacingTitle")}</h3>
+            <h4 className="pesky-interval-panel__section">{t("interactions.settings.pacingTitle")}</h4>
             <p className="pesky-interval-panel__hint">{t("interactions.settings.pacingIndependent")}</p>
             <label className="interaction-settings__toggle">
               <span><strong>{t("interactions.settings.pacingEnable")}</strong><small>{t("interactions.settings.pacingEnableHint")}</small></span>
               <input type="checkbox" checked={enabledDraft} disabled={!interaction?.pacing}
                 onChange={(event) => { setEnabledDraft(event.target.checked); setDirty(true); }} />
             </label>
-            {!enabledDraft ? <p className="pesky-interval-panel__hint">{t("interactions.settings.pacingOffHint")}</p> : null}
-            <SpawnPacingFields draft={draft} disabled={!interaction?.pacing} mode="interactions"
-              onChange={(field, value) => { setDraft((current) => ({ ...current, [field]: value })); setDirty(true); }} />
-            {dirty && !valid ? <p role="alert" className="interaction-settings__status" data-status="error">{t("interactions.settings.pacingInvalid")}</p> : null}
-            <div className="pesky-interval-panel__actions">
-              <button type="button" disabled={!interaction?.defaultPacing} onClick={() => {
-                setDraft(pacingDraftFor(interaction?.defaultPacing)); setEnabledDraft(interaction?.defaultPacing.enabled ?? false);
-                setMaxActiveDraft(interaction?.defaultMaxActive ?? 6); setMaxActiveUnlimitedDraft(false); setDirty(true);
-              }}>{t("interactions.settings.pacingRestore")}</button>
-              <button type="button" disabled={!interaction?.ready || !pesky?.ready || !valid} onClick={() => {
-                applyPacingToBoth(maxActiveDraft, values, undefined, maxActiveUnlimitedDraft); setAppliedBoth(true);
-              }}>{t("pesky.intervals.applyBoth")}</button>
+            {!enabledDraft ? <p className="pesky-interval-panel__hint interaction-settings__distribution-off-hint">{t("interactions.settings.pacingOffHint")}</p> : null}
+            <div className="interaction-settings__distribution-reveal" data-visible={enabledDraft} aria-hidden={!enabledDraft}>
+              <div className="interaction-settings__distribution-clip">
+                <div className="interaction-settings__distribution-fields">
+                  <SpawnPacingFields draft={draft} disabled={!enabledDraft || !interaction?.pacing} mode="interactions"
+                    onChange={(field, value) => { setDraft((current) => ({ ...current, [field]: value })); setDirty(true); }} />
+                  {dirty && !valid ? <p role="alert" className="interaction-settings__status" data-status="error">{t("interactions.settings.pacingInvalid")}</p> : null}
+                  <div className="pesky-interval-panel__actions">
+                    <button type="button" disabled={!enabledDraft || !interaction?.defaultPacing} onClick={() => {
+                      setDraft(pacingDraftFor(interaction?.defaultPacing)); setEnabledDraft(interaction?.defaultPacing.enabled ?? false);
+                      setMaxActiveDraft(interaction?.defaultMaxActive ?? 6); setMaxActiveUnlimitedDraft(false);
+                      setSingleMiniBossOnlyDraft(true); setDirty(true);
+                    }}>{t("interactions.settings.pacingRestore")}</button>
+                    <button type="button" disabled={!enabledDraft || !interaction?.ready || !pesky?.ready || !valid} onClick={() => {
+                      applyPacingToBoth(maxActiveDraft, values, undefined, maxActiveUnlimitedDraft); setAppliedBoth(true);
+                    }}>{t("pesky.intervals.applyBoth")}</button>
+                  </div>
+                  <p className="pesky-interval-panel__hint">{t(maxActiveUnlimitedDraft
+                    ? "interactions.settings.applyBothUnlimitedHint"
+                    : "pesky.intervals.applyBothHint")}</p>
+                  {appliedBoth ? <p role="status" className="interaction-settings__status" data-status={pesky?.error ? "error" : status}>
+                    {t("pesky.title")}: {pesky?.error ? t(`pesky.feedback.${pesky.feedback}`) : t(`status.${status}`)}
+                  </p> : null}
+                </div>
+              </div>
             </div>
-            <p className="pesky-interval-panel__hint">{t(maxActiveUnlimitedDraft
-              ? "interactions.settings.applyBothUnlimitedHint"
-              : "pesky.intervals.applyBothHint")}</p>
-            {appliedBoth ? <p role="status" className="interaction-settings__status" data-status={pesky?.error ? "error" : status}>
-              {t("pesky.title")}: {pesky?.error ? t(`pesky.feedback.${pesky.feedback}`) : t(`status.${status}`)}
-            </p> : null}
           </div>
-        </details>
+        </section>
         {visibleStatus !== "idle" ? <p className="interaction-settings__status" data-status={visibleStatus} role="status" aria-live="polite">
           {t(`interactions.settings.status.${visibleStatus}`)}
         </p> : null}

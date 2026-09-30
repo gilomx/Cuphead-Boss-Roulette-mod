@@ -74,17 +74,17 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   cantidad y espera en segundos. Un lote o varios tipos se agregan al final sin
   alterar el orden existente.
 - El **Máximo de interacciones activas** es persistente y configurable de 1 a
-  20. Al marcar **Sin límite**, el aviso de posible impacto en el rendimiento
+  30. Al marcar **Sin límite**, el aviso de posible impacto en el rendimiento
   aparece dentro del mismo contenedor y permanece visible mientras la opción
   esté marcada. Se admiten 50 elementos por lote, esperas de hasta 3600
   segundos y 200 registros entre activos y pendientes. El canjeo activo
   permanece visible hasta que su actor termina o muere; entonces libera su
   cupo. Estos límites y el despacho pertenecen a C#, no a la vista.
-- Los mini jefes tienen además un máximo fijo de uno en pantalla, compartido
-  entre Interacciones, Modo Molestoso y Batalla Molestosa. Los siguientes esperan
-  a que desaparezca el actual, aunque sean distintos. La UI muestra esta regla
-  sin un control para editarla. También respetan el máximo general de elementos;
-  C# vuelve a comprobar ambos límites al despachar.
+- **Un minijefe a la vez** empieza marcado y reserva un solo lugar compartido
+  entre Interacciones, Modo Molestoso y Batalla Molestosa. Al desmarcarlo pueden
+  convivir varios, incluso del mismo tipo. También respetan el máximo general de
+  interacciones activas y la compatibilidad de la arena; C# vuelve a comprobar
+  esas reglas al despachar. La ronda nativa de la Baronesa conserva su bloqueo.
 - Todo artículo nuevo del catálogo se incorpora tanto a la tabla de prueba
   manual como al catálogo configurable de Modo Molestoso. La sección de
   Interacciones no contiene un generador aleatorio automático: ese uso pertenece
@@ -141,11 +141,15 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   donaciones continuarán junto con los del modo.
 - Modo Molestoso muestra la configuración a la derecha de Molestias pendientes
   en escritorio, apilada en pantallas estrechas (hasta 68rem). Cantidades por
-  aparición, ajustes durante minijefe y resumen usan desplegables. El botón superior
-  y `Ctrl+I` enfocan su primer campo. Interacciones usa el mismo componente de
-  controles, con su propio interruptor de espaciado y sus valores independientes.
-  Los campos se agrupan en Ataques normales y Minijefes; las ayudas y el resumen
-  explican tiempos y cantidades, sin exponer nombres de implementación.
+  aparición, ajustes durante minijefe y resumen permanecen expandidos, sin
+  desplegables. El botón superior y `Ctrl+I` enfocan su primer campo.
+  Interacciones usa el mismo componente de controles, con su propio interruptor
+  de distribución y valores independientes. Su sección avanzada no se contrae:
+  al activar el interruptor, todos los campos aparecen con una transición; al
+  apagarlo se ocultan y se conservan. La descripción presenta la distribución
+  como una ayuda para hacer el mod más jugable. Los campos se agrupan en Ataques
+  normales y Minijefes; las ayudas y el resumen explican tiempos y cantidades,
+  sin exponer nombres de implementación.
 - En la columna de herramientas, Configuración y Nombres aleatorios aparecen
   primero. Retos temporales y Molestias son las dos últimas secciones, en ese
   orden. Cada lista muestra su cantidad activa y un botón que alterna entre
@@ -256,9 +260,11 @@ feedback, revisiones, límites y la cola autoritativa con estados `scheduled`,
 principal y confirma el resultado incrementando la revisión. El endpoint
 `GET /api/config/interactions/set` cambia el máximo simultáneo (`maxActive`)
 y la imagen del regalo (`showGiftImage`). Cada parámetro es opcional y conserva
-los ajustes omitidos. El parámetro heredado `maxMiniBosses` se acepta por
-compatibilidad, pero siempre se normaliza a 1.
-`GET /api/config/interactions` incluye `maxMiniBosses: 1` y la revisión de ajustes
+los ajustes omitidos. `maxMiniBosses` funciona como interruptor compartido:
+`1` limita todos los orígenes a un minijefe y `0` permite varios, sujetos a los
+máximos generales y la compatibilidad de arena. Cualquier otro valor heredado
+se normaliza a `1`.
+`GET /api/config/interactions` incluye el `maxMiniBosses` efectivo y la revisión de ajustes
 para confirmar el guardado. Los códigos de feedback se traducen en React y nunca se usan como
 reglas de negocio.
 

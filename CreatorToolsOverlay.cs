@@ -145,7 +145,7 @@ namespace Gilomx.CupheadBossRoulette
                 "Muestra el regalo junto al nombre del donador en el juego.");
             creatorToolsMiniBossMaximumActiveSetting = Config.Bind(
                 "Creator Tools", "MiniJefesMaximosEnPantalla", 1,
-                "Limite fijo compartido: solo un mini jefe en pantalla. Cualquier otro espera. Los valores anteriores se normalizan a 1.");
+                "Usa 1 para limitar todos los origenes a un mini jefe activo. Usa 0 para permitir varios, sujetos a los limites generales y la compatibilidad de la arena.");
             creatorToolsInteractionsEnabledSetting = Config.Bind(
                 "Creator Tools",
                 "InteraccionesActivadas",

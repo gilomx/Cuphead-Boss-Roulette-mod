@@ -240,9 +240,14 @@ equipado impide encogerse.
 
 Los controles separan **Ataques normales** y **Minijefes**, con un resumen
 que muestra las esperas resultantes. Modo Molestoso e Interacciones conservan
-sus propios ajustes. En Interacciones hay que activar **Espaciar los ataques
-de los regalos** y guardar para usar estos tiempos y grupos; no crea ataques
-aleatorios ni aumenta la cantidad recibida por un regalo.
+sus propios ajustes. En **Configuración avanzada de distribución de
+interacciones** hay que activar **Aplicar distribución avanzada** y guardar para
+usar estos tiempos y grupos. La sección completa permanece visible y no se
+contrae; los campos se revelan con una transición al activarla y se ocultan
+mientras esté apagada. **Cantidad por aparición**, **Mientras hay un minijefe**
+y el resumen no tienen desplegables propios. Esta distribución ayuda a hacer el
+mod más jugable y actúa después de las esperas por usuario y regalo: no crea
+ataques aleatorios ni aumenta la cantidad recibida por un regalo.
 
 Los minijefes tienen su propio turno. El primero puede entrar en cuanto termina
 el margen seguro de inicio de la pelea (3 segundos) y hay un minijefe habilitado
@@ -252,13 +257,19 @@ Después de que desaparece uno, se elige una nueva espera entre los valores de
 durante ese descanso. La pausa no consume las esperas y reintentar empieza de
 nuevo. Los límites de espacio y la disponibilidad del nivel pueden retrasar una
 entrada; los tiempos no prometen una aparición exacta.
+**Un minijefe a la vez** empieza marcado y comparte un solo lugar entre
+Interacciones, Modo Molestoso y Batalla Molestosa. Al desmarcarlo pueden
+convivir varios; cada uno sigue contando dentro del máximo general de su origen
+y debe ser compatible con la arena. La ronda nativa de la Baronesa conserva su
+protección y no se mezcla con copias del mod.
 
 El catálogo añade grupos independientes de la dificultad de Cuphead:
 
 - **Molestias leves**: zepelín morado, zanahoria, semilla azul, luciérnaga y perrito rosa.
 - **Molestias intensas**: zepelín verde, bomba, cabeza de la Baronesa, bolas del
   dragón, aro de huesos, círculo de fuego y perrito globo aleatorio.
-- **Minijefes**: los cinco mini jefes de la Baronesa. Se conserva el límite de uno.
+- **Minijefes**: los cinco mini jefes de la Baronesa. El límite compartido de
+  uno está activo de forma predeterminada y puede desmarcarse en Interacciones.
 
 **Permitir varias molestias intensas a la vez** empieza desactivado en Modo
 Molestoso. Las intensas seleccionadas pueden aparecer siempre: sin marcar,

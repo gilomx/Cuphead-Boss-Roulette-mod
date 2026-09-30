@@ -614,7 +614,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 using (var ignored = GetJson(server,
                     "/api/config/interactions/set?maxActive=8" +
-                    "&maxActiveUnlimited=1&showGiftImage=0"))
+                    "&maxActiveUnlimited=1&maxMiniBosses=0&showGiftImage=0"))
                 {
                 }
 
@@ -629,7 +629,7 @@ namespace Gilomx.CupheadBossRoulette
                 True(server.TryTakeInteractionCommand(
                     out query, out backgroundApplied),
                     "latest settings snapshot was not retained");
-                Equal("maxActive=8&maxActiveUnlimited=1&showGiftImage=0",
+                Equal("maxActive=8&maxActiveUnlimited=1&maxMiniBosses=0&showGiftImage=0",
                     query, "latest settings snapshot");
 
                 False(server.TryTakeInteractionCommand(

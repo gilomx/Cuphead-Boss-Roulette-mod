@@ -115,7 +115,26 @@ test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
     assert.equal(initialInteractions.maxActiveUnlimited, false);
     assert.equal(initialInteractions.defaultMaxActive, 6);
     assert.equal(initialInteractions.maxMiniBosses, 1);
+    assert.equal(initialInteractions.maxActiveLimit, 30);
     assert.deepEqual(numericSettings(initialPesky), peskyDefaults);
+  });
+
+  await t.test("Interactions accepts 30 active items and clamps larger values", async () => {
+    accepted(await setInteractions(initialInteractions.pacing, { maxActive: 30 }));
+    assert.equal((await getInteractions()).maxActive, 30);
+    accepted(await setInteractions(initialInteractions.pacing, { maxActive: 31 }));
+    assert.equal((await getInteractions()).maxActive, 30);
+    accepted(await setInteractions(initialInteractions.pacing, {
+      maxActive: initialInteractions.maxActive,
+    }));
+  });
+
+  await t.test("one mini-boss is the default and zero enables coexistence", async () => {
+    accepted(await setInteractions(initialInteractions.pacing, { maxMiniBosses: 0 }));
+    assert.equal((await getInteractions()).maxMiniBosses, 0);
+    accepted(await setInteractions(initialInteractions.pacing, { maxMiniBosses: 2 }));
+    assert.equal((await getInteractions()).maxMiniBosses, 1);
+    accepted(await setInteractions(initialInteractions.pacing, { maxMiniBosses: 1 }));
   });
 
   await t.test("unlimited belongs only to Interactions", async () => {

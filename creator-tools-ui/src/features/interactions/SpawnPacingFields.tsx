@@ -56,54 +56,54 @@ export function SpawnPacingFields({ draft, onChange, disabled, mode,
           <input type="checkbox" checked={allowConcurrentStrongInteractions} disabled={disabled}
             onChange={(event) => onAllowConcurrentStrongChange?.(event.target.checked)} />
         </label> : null}
-        <details className="spawn-settings__details">
-          <summary>{text("batchTitle")}</summary>
-        <div className="spawn-settings__groups">
-          {(["light", "strong"] as const).map((group) => (
-            <div className="spawn-settings__group" key={group}>
-              <h4>{t(`interactions.groups.${group}`)}</h4>
-              {group === "strong" && !allowConcurrentStrongInteractions
-                ? <p className="pesky-interval-panel__hint">{text("singleStrongHint")}</p>
-                : range(text("batchTitle"), `${group}MinimumBatch`, `${group}MaximumBatch`, 1, 20)}
-            </div>
-          ))}
-        </div>
-        <p className="pesky-interval-panel__hint">{text(mode === "pesky" ? "batchHint" : "batchInteractionsHint")}</p>
-        <p className="pesky-interval-panel__hint">{text("batchLimitHint")}</p>
-        </details>
+        <section className="spawn-settings__section" aria-labelledby={`${mode}-batch-title`}>
+          <h3 id={`${mode}-batch-title`} className="spawn-settings__section-title">{text("batchTitle")}</h3>
+          <div className="spawn-settings__groups">
+            {(["light", "strong"] as const).map((group) => (
+              <div className="spawn-settings__group" key={group}>
+                <h4>{t(`interactions.groups.${group}`)}</h4>
+                {group === "strong" && !allowConcurrentStrongInteractions
+                  ? <p className="pesky-interval-panel__hint">{text("singleStrongHint")}</p>
+                  : range(text("batchTitle"), `${group}MinimumBatch`, `${group}MaximumBatch`, 1, 20)}
+              </div>
+            ))}
+          </div>
+          <p className="pesky-interval-panel__hint">{text(mode === "pesky" ? "batchHint" : "batchInteractionsHint")}</p>
+          <p className="pesky-interval-panel__hint">{text("batchLimitHint")}</p>
+        </section>
       </fieldset>
 
       <fieldset className="spawn-settings__block" disabled={disabled}>
         <legend>{t("interactions.groups.mini_boss")}</legend>
         {range(text("miniBossInterval"), "miniBossMinimumInterval", "miniBossMaximumInterval", 0, 300, text("seconds"))}
         <p className="pesky-interval-panel__hint">{text("firstMiniBossHint")}</p>
-        <details className="spawn-settings__details">
-          <summary>{text("duringMiniBoss")}</summary>
-        <label className="interaction-settings__number spawn-settings__multiplier">
-          <span><strong>{text("multiplier")}</strong></span>
-          <select value={draft.miniBossIntervalMultiplier} disabled={disabled}
-            onChange={(event) => onChange("miniBossIntervalMultiplier", event.target.value)}>
-            {draft.miniBossIntervalMultiplier === "" ? <option value="" /> : null}
-            {multiplierOptions.map((value) => (
-              <option key={value} value={value}>
-                {value === 1 ? text("multiplierOnce") : value === 2 ? text("multiplierTwice")
-                  : text("multiplierTimes").replace("{value}", String(value))}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="interaction-settings__number">
-          <span><strong>{text("companions")}</strong><small>{text("companionsHint")}</small></span>
-          <input id={`${mode}-maximumCompanionsDuringMiniBoss`} type="number" inputMode="numeric"
-            min={0} max={20} step={1} required value={draft.maximumCompanionsDuringMiniBoss} disabled={disabled}
-            onChange={(event) => onChange("maximumCompanionsDuringMiniBoss", event.target.value)} />
-        </label>
-        </details>
+        <section className="spawn-settings__section" aria-labelledby={`${mode}-during-mini-boss-title`}>
+          <h3 id={`${mode}-during-mini-boss-title`} className="spawn-settings__section-title">{text("duringMiniBoss")}</h3>
+          <label className="interaction-settings__number spawn-settings__multiplier">
+            <span><strong>{text("multiplier")}</strong></span>
+            <select value={draft.miniBossIntervalMultiplier} disabled={disabled}
+              onChange={(event) => onChange("miniBossIntervalMultiplier", event.target.value)}>
+              {draft.miniBossIntervalMultiplier === "" ? <option value="" /> : null}
+              {multiplierOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value === 1 ? text("multiplierOnce") : value === 2 ? text("multiplierTwice")
+                    : text("multiplierTimes").replace("{value}", String(value))}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="interaction-settings__number">
+            <span><strong>{text("companions")}</strong><small>{text("companionsHint")}</small></span>
+            <input id={`${mode}-maximumCompanionsDuringMiniBoss`} type="number" inputMode="numeric"
+              min={0} max={20} step={1} required value={draft.maximumCompanionsDuringMiniBoss} disabled={disabled}
+              onChange={(event) => onChange("maximumCompanionsDuringMiniBoss", event.target.value)} />
+          </label>
+        </section>
       </fieldset>
 
       {valid ? (
-        <details className="spawn-settings__summary spawn-settings__details">
-          <summary>{text("summaryTitle")}</summary>
+        <section className="spawn-settings__summary" aria-labelledby={`${mode}-summary-title`}>
+          <h3 id={`${mode}-summary-title`} className="spawn-settings__section-title">{text("summaryTitle")}</h3>
           <p>{values.minimumInterval === values.maximumInterval
             ? text("summaryNormalFixed").replace("{seconds}", format(values.minimumInterval))
             : text("summaryNormal").replace("{minimum}", format(values.minimumInterval)).replace("{maximum}", format(values.maximumInterval))}</p>
@@ -116,7 +116,7 @@ export function SpawnPacingFields({ draft, onChange, disabled, mode,
             : text("summaryCooldownRange").replace("{minimum}", format(values.miniBossMinimumInterval))
             .replace("{maximum}", format(values.miniBossMaximumInterval))}</p>
           <small>{text("summaryHint")}</small>
-        </details>
+        </section>
       ) : null}
     </div>
   );

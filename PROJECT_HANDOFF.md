@@ -2,6 +2,56 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Minijefes configurables y distribución progresiva (2026-09-29)
+
+**Un minijefe a la vez** dejó de ser una fila informativa y ahora es un check
+funcional, marcado de forma predeterminada. Marcado conserva el único cupo
+compartido entre Interacciones, Modo Molestoso y Batalla Molestosa; desmarcado
+permite que convivan varios, incluidos duplicados, sujetos al máximo general de
+cada cola y a la compatibilidad de la arena. La ronda nativa de la Baronesa
+sigue bloqueando copias del mod durante su secuencia. La clave existente
+`MiniJefesMaximosEnPantalla` y el API `maxMiniBosses` usan `1` para limitar y
+`0` para permitir varios; cualquier otro valor antiguo migra al seguro `1`.
+
+La sección se llama ahora **Configuración avanzada de distribución de
+interacciones**. Explica que los cooldowns —presentados al jugador como esperas
+por usuario y regalo— determinan cuándo se genera una activación, mientras la
+distribución decide cuántas pendientes entran juntas y la pausa antes del
+siguiente grupo. **Aplicar distribución avanzada** muestra los tiempos,
+cantidades y acciones únicamente al marcarse; desmarcarlo conserva los valores
+guardados, pero los oculta y no los aplica. La sección avanzada dejó de ser
+contraíble. Al activar su check, el contenido se revela mediante una transición;
+**Cantidad por aparición**, **Mientras hay un minijefe** y el resumen aparecen
+completos desde el inicio, sin desplegables internos. La descripción ya no
+menciona pruebas manuales y presenta esta distribución como una forma de hacer
+el mod más jugable.
+
+Aprobaron el build del panel, las 13 pruebas del contrato HTTP, toda la suite
+runtime y la compilación Release del mod con cero errores y cero advertencias.
+Falta probarlo dentro del juego: desmarcar la opción, guardar y lanzar dos
+minijefes para comprobar que conviven; volver a marcarla y confirmar que el
+segundo espera. También falta revisar visualmente el despliegue progresivo de
+los campos avanzados. El ZIP Dev vigente, SHA-256
+`811AA06EAAC7E61A09DA9499E35CDA9028034D9C1961ECA71A723086036D76C9`, ya
+incluye el check de minijefes, pero es anterior al último ajuste visual sin
+desplegables y deberá publicarse de nuevo antes de probarlo.
+
+## Máximo de 30 Interacciones activas (2026-09-29)
+
+El máximo numérico configurable de Interacciones aumentó de 20 a 30. El valor
+predeterminado continúa en 6 y **Sin límite** conserva su advertencia de posible
+impacto en el rendimiento. Modo Molestoso sigue limitado a 20; el cambio no
+amplía sus grupos, su máximo activo ni ninguna otra protección de colas,
+minijefes o retos. El runtime, el panel, el servidor simulado y su contrato de
+pruebas comparten ahora el nuevo límite.
+
+El contrato HTTP valida que 30 se acepta y 31 se recorta a 30, sin transferir
+el modo ilimitado a Modo Molestoso. Aprobaron sus 13 pruebas, el build del
+panel, toda la suite runtime y la compilación Release del mod con cero errores
+y cero advertencias. Falta comprobar manualmente el campo con 30 dentro del
+juego y observar el rendimiento bajo una carga real; 30 continúa siendo un
+tope avanzado, no una garantía de FPS.
+
 ## Guardado optimista de última escritura en Interacciones (2026-09-28)
 
 La configuración principal de Interacciones ya no bloquea sus campos ni el
@@ -3081,8 +3131,9 @@ previous attempt's active actors before rearming; pending queue entries survive.
 
 `CreatorToolsInteractionQueue` is the authoritative runtime queue. Test calls
 accept `item`, `donor`, `quantity`, and `delay`; mixed batches append in arrival
-order. Maximum-on-screen is persisted and configurable from 1–20, batches are
-capped at 50, delays at 3600 seconds, and active plus pending entries at 200.
+order. Maximum-on-screen is persisted and configurable from 1–30 for
+Interactions (or unlimited) and 1–20 for Pesky Mode; batches are capped at 50,
+delays at 3600 seconds, and active plus pending entries at 200.
 Dispatches remain at least 0.35 seconds apart. An active row remains in the API
 until its generic interaction handle completes, then the next pending row may
 dispatch. Modo Molestoso chooses registered and currently available IDs on its

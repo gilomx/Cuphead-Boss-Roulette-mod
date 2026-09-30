@@ -3,15 +3,18 @@ using System.Collections.Generic;
 namespace Gilomx.CupheadBossRoulette
 {
     // Accepts a snapshot of every live mini-boss, including native actors.
-    // All mini-boss types share one slot, regardless of their source queue.
+    // The shared one-at-a-time guard may be disabled explicitly; queue and
+    // arena admission rules remain authoritative in either mode.
     internal static class CreatorToolsMiniBossSpawnPolicy
     {
+        internal const int Unlimited = 0;
         internal const int MaximumActive = 1;
 
         internal static int ClampMaximum(int value)
         {
-            // Normalize settings from the former configurable implementation.
-            return MaximumActive;
+            // Zero is the explicit opt-out. Every legacy value, including the
+            // former capacity of two, migrates to the safe default of one.
+            return value == Unlimited ? Unlimited : MaximumActive;
         }
 
         internal static bool CanSpawn(
@@ -19,8 +22,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (string.IsNullOrEmpty(item))
                 return false;
-            // Keep the legacy parameter for existing callers, but no saved
-            // setting or old panel may admit a second mini-boss.
+            if (ClampMaximum(maximum) == Unlimited)
+                return true;
             if (activeItems != null)
                 foreach (var activeItem in activeItems)
                 {
