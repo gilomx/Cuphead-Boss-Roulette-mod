@@ -52,8 +52,6 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractionMaximumActiveUnlimitedSetting;
         private ConfigEntry<int> creatorToolsMiniBossMaximumActiveSetting;
         private ConfigEntry<bool>
-            creatorToolsInteractionShowGiftImageSetting;
-        private ConfigEntry<bool>
             creatorToolsInteractionsEnabledSetting;
 
         private CreatorToolsServer creatorToolsServer;
@@ -138,11 +136,6 @@ namespace Gilomx.CupheadBossRoulette
                 "InteraccionesSinLimiteEnPantalla",
                 false,
                 "Elimina el limite numerico de ataques comunes de Interacciones. No cambia el limite compartido de mini jefes ni Modo Molestoso.");
-            creatorToolsInteractionShowGiftImageSetting = Config.Bind(
-                "Creator Tools",
-                "MostrarImagenDelRegalo",
-                true,
-                "Muestra el regalo junto al nombre del donador en el juego.");
             creatorToolsMiniBossMaximumActiveSetting = Config.Bind(
                 "Creator Tools", "MiniJefesMaximosEnPantalla", 1,
                 "Usa 1 para limitar todos los origenes a un mini jefe activo. Usa 0 para permitir varios, sujetos a los limites generales y la compatibilidad de la arena.");
@@ -195,8 +188,6 @@ namespace Gilomx.CupheadBossRoulette
                 SetCreatorToolsInteractionMaximumActiveUnlimited,
                 GetCreatorToolsMiniBossMaximumActive,
                 SetCreatorToolsMiniBossMaximumActive,
-                GetCreatorToolsInteractionShowGiftImage,
-                SetCreatorToolsInteractionShowGiftImage,
                 GetCreatorToolsInteractionsEnabled,
                 SetCreatorToolsInteractionsEnabled,
                 GetCreatorToolsStreamBacklogCount,
@@ -1323,12 +1314,6 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsInteractionMaximumActiveUnlimitedSetting.Value = value;
         }
 
-        private bool GetCreatorToolsInteractionShowGiftImage()
-        {
-            return creatorToolsInteractionShowGiftImageSetting == null ||
-                creatorToolsInteractionShowGiftImageSetting.Value;
-        }
-
         private int GetCreatorToolsMiniBossMaximumActive()
         {
             return CreatorToolsMiniBossSpawnPolicy.ClampMaximum(
@@ -1342,13 +1327,6 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsMiniBossMaximumActiveSetting != null &&
                 creatorToolsMiniBossMaximumActiveSetting.Value != normalized)
                 creatorToolsMiniBossMaximumActiveSetting.Value = normalized;
-        }
-
-        private void SetCreatorToolsInteractionShowGiftImage(bool value)
-        {
-            if (creatorToolsInteractionShowGiftImageSetting != null &&
-                creatorToolsInteractionShowGiftImageSetting.Value != value)
-                creatorToolsInteractionShowGiftImageSetting.Value = value;
         }
 
         private bool StartCreatorToolsServer()

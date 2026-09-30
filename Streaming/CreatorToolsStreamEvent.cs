@@ -22,6 +22,7 @@ namespace Gilomx.CupheadBossRoulette
         internal string ItemId = string.Empty;
         internal string ItemName = string.Empty;
         internal string ItemImageUrl = string.Empty;
+        internal bool IsCommunityGift;
         internal int Count = 1;
         internal decimal UnitValue;
         internal decimal TotalValue;

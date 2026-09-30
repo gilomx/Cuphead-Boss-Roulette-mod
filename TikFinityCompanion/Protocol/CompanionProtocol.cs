@@ -73,6 +73,8 @@ internal sealed class CompanionEvent
 
     public string? ItemImageUrl { get; init; }
 
+    public bool IsCommunityGift { get; init; }
+
     public int Count { get; init; }
 
     public decimal? UnitValue { get; init; }

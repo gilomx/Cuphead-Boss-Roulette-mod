@@ -90,7 +90,7 @@ namespace Gilomx.CupheadBossRoulette
             "\"pendingClearProjected\":false," +
             "\"pendingCount\":0,\"backlogCount\":0," +
             "\"deferredTestCount\":0," +
-            "\"showGiftImage\":true,\"maxMiniBosses\":1,\"settingsRevision\":0}";
+            "\"maxMiniBosses\":1,\"settingsRevision\":0}";
         private long latestInteractionBacklogCount;
         private long pendingInteractionTestCount;
         private int inFlightInteractionTestCommands;
@@ -2360,6 +2360,9 @@ namespace Gilomx.CupheadBossRoulette
             return HasQueryParameter(query, "maxActive") ||
                 HasQueryParameter(query, "maxActiveUnlimited") ||
                 HasQueryParameter(query, "maxMiniBosses") ||
+                // Older panels may still send this retired setting. Treat
+                // it as a settings snapshot so it is ignored safely instead
+                // of being mistaken for a manual interaction request.
                 HasQueryParameter(query, "showGiftImage") ||
                 HasQueryParameterPrefix(query, "pacing.");
         }

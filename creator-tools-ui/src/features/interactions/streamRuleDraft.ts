@@ -33,3 +33,22 @@ export function draftForStreamRule(rule: StreamRule): StreamRuleDraft {
     countdownSeconds: rule.countdownSeconds ?? 3,
   };
 }
+
+export function sameStreamRuleDraft(
+  left: StreamRuleDraft | null,
+  right: StreamRuleDraft | null,
+) {
+  if (!left || !right) return left === right;
+  return left.id === right.id &&
+    left.name === right.name &&
+    left.enabled === right.enabled &&
+    left.eventType === right.eventType &&
+    left.giftId === right.giftId &&
+    left.every === right.every &&
+    left.interaction === right.interaction &&
+    left.quantity === right.quantity &&
+    left.userCooldownSeconds === right.userCooldownSeconds &&
+    left.globalCooldownSeconds === right.globalCooldownSeconds &&
+    left.durationSeconds === right.durationSeconds &&
+    left.countdownSeconds === right.countdownSeconds;
+}

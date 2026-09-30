@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Settings } from "lucide-react";
+import { ArrowLeft, Plus, Settings } from "lucide-react";
 import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { StreamRule, StreamRuleDraft } from "../../model";
-import { createStreamRuleDraft, draftForStreamRule } from "./streamRuleDraft";
+import {
+  createStreamRuleDraft,
+  draftForStreamRule,
+  sameStreamRuleDraft,
+} from "./streamRuleDraft";
 import { StreamRuleForm } from "./StreamRuleForm";
 import { StreamRulesTable } from "./StreamRulesTable";
 
@@ -25,6 +29,7 @@ interface VisibleRuleFeedback {
 
 interface StreamRulesViewProps {
   onOpenSettings: () => void;
+  onOpenAdvancedSettings: () => void;
   testSentNotice: boolean;
   onTestSentNoticeDismissed: () => void;
 }
@@ -33,6 +38,7 @@ const silentRuleFeedback = new Set(["created", "deleted", "enabled", "disabled"]
 
 export function StreamRulesView({
   onOpenSettings,
+  onOpenAdvancedSettings,
   testSentNotice,
   onTestSentNoticeDismissed,
 }: StreamRulesViewProps) {
@@ -60,6 +66,10 @@ export function StreamRulesView({
   const feedbackTimerRef = useRef<number | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const observedRulesStateRef = useRef(false);
+  const initialDraftRef = useRef<StreamRuleDraft | null>(null);
+  const editorOpen = draft !== null;
+  const draftChanged = editorOpen &&
+    !sameStreamRuleDraft(draft, initialDraftRef.current);
   const rules = streamRules?.rules ?? [];
   const canCreate = Boolean(
     catalog && streamRules?.ready && rules.length < (streamRules?.maxRules ?? 0),
@@ -95,6 +105,18 @@ export function StreamRulesView({
       window.cancelAnimationFrame(scrollFrameRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    const returnOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented ||
+          event.isComposing || savePending || draftChanged) return;
+      event.preventDefault();
+      setDraft(null);
+    };
+    window.addEventListener("keydown", returnOnEscape);
+    return () => window.removeEventListener("keydown", returnOnEscape);
+  }, [draftChanged, editorOpen, savePending]);
 
   useEffect(() => {
     if (!testSentNotice) return;
@@ -218,11 +240,15 @@ export function StreamRulesView({
 
   const beginCreate = () => {
     if (!canCreate) return;
-    setDraft(createStreamRuleDraft(catalog?.gifts[0]));
+    const nextDraft = createStreamRuleDraft(catalog?.gifts[0]);
+    initialDraftRef.current = nextDraft;
+    setDraft(nextDraft);
   };
 
   const beginEdit = (rule: StreamRule) => {
-    setDraft(draftForStreamRule(rule));
+    const nextDraft = draftForStreamRule(rule);
+    initialDraftRef.current = nextDraft;
+    setDraft(nextDraft);
   };
 
   const saveDraft = (nextDraft: StreamRuleDraft) => {
@@ -268,12 +294,13 @@ export function StreamRulesView({
           {draft ? (
             <button
               type="button"
-              className="stream-rule-back"
+              className="stream-rule-back stream-rule-back--icon"
               disabled={savePending}
               onClick={() => setDraft(null)}
+              aria-label={t("interactions.rules.actions.back")}
+              title={t("interactions.rules.actions.back")}
             >
-              <span aria-hidden="true">&larr;</span>
-              {t("interactions.rules.actions.back")}
+              <ArrowLeft aria-hidden="true" />
             </button>
           ) : (
             <div className="stream-rules-panel__tools">
@@ -315,6 +342,7 @@ export function StreamRulesView({
               maxQuantity={streamRules?.maxQuantity ?? 50}
               maxCooldownSeconds={streamRules?.maxCooldownSeconds ?? 3_600}
               saving={savePending}
+              onOpenAdvancedSettings={onOpenAdvancedSettings}
               onChange={setDraft}
               onCancel={() => setDraft(null)}
               onSave={saveDraft}

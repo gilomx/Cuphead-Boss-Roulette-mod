@@ -148,12 +148,13 @@ try {
     $ink = $mod.Types | Where-Object Name -eq 'InkRainChallengeRuntime'
     # Compiling for net35 can still introduce framework types stripped from
     # Cuphead's legacy Mono. Even an unexecuted throw can break JIT entry into
-    # an otherwise valid preparation iterator. Check its exception constructors
-    # against the actual game libraries, including generated iterator/closure IL.
-    $inkTypes = @(SelfAndNestedTypes $ink) + @($mod.Types | Where-Object Name -eq 'IncrementalAssetPreparation')
+    # a constructor, method or iterator. Check every exception constructor in
+    # the compiled plugin against the actual game libraries, including all
+    # generated iterator/closure IL.
+    $compiledTypes = @($mod.Types | ForEach-Object { SelfAndNestedTypes $_ })
     $runtimeModules = @{}
     try {
-        foreach ($type in $inkTypes) {
+        foreach ($type in $compiledTypes) {
             foreach ($method in $type.Methods | Where-Object HasBody) {
                 foreach ($instruction in $method.Body.Instructions) {
                     $constructor = $instruction.Operand
@@ -165,14 +166,14 @@ try {
                             (Join-Path $CupheadDir "Cuphead_Data/Managed/$scope.dll"))
                     }
                     $nativeType = $runtimeModules[$scope].GetType($constructor.DeclaringType.FullName)
-                    Require ($null -ne $nativeType) "Ink preparation references unavailable Cuphead runtime type $($constructor.DeclaringType.FullName) in $($method.FullName)"
-                    Require (@($nativeType.Methods | Where-Object FullName -eq $constructor.FullName).Count -eq 1) "Ink preparation references an unavailable native constructor: $($constructor.FullName)"
+                    Require ($null -ne $nativeType) "Plugin references unavailable Cuphead runtime type $($constructor.DeclaringType.FullName) in $($method.FullName)"
+                    Require (@($nativeType.Methods | Where-Object FullName -eq $constructor.FullName).Count -eq 1) "Plugin references an unavailable native constructor: $($constructor.FullName)"
                 }
             }
         }
     }
     finally { foreach ($runtimeModule in $runtimeModules.Values) { $runtimeModule.Dispose() } }
-    Write-Output 'Compiled ink compatibility contract passed: exception constructors, including iterator bodies, exist in Cuphead legacy Mono.'
+    Write-Output 'Compiled Mono compatibility contract passed: every exception constructor, including generated bodies, exists in Cuphead legacy Mono.'
     $ready = $ink.Methods | Where-Object Name -eq 'EnsureInkAssets'
     Require (@($ready.Body.Instructions | Where-Object {
         $_.Operand -is [Mono.Cecil.MethodReference]

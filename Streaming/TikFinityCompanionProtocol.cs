@@ -109,6 +109,8 @@ namespace Gilomx.CupheadBossRoulette
                         values, "itemName"), string.Empty, 160),
                     ItemImageUrl = Text(CreatorToolsFlatJson.Value(
                         values, "itemImageUrl"), string.Empty, 2048),
+                    IsCommunityGift = CreatorToolsFlatJson.Boolean(
+                        values, "isCommunityGift"),
                     Count = CreatorToolsFlatJson.Integer(
                         values, "count", 1, 1, 1000000),
                     UnitValue = CreatorToolsFlatJson.Decimal(

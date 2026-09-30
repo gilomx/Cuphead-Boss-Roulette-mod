@@ -21,8 +21,6 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<bool> setMaximumActiveUnlimited;
         private readonly Func<int> getMaximumMiniBosses;
         private readonly Action<int> setMaximumMiniBosses;
-        private readonly Func<bool> getShowGiftImage;
-        private readonly Action<bool> setShowGiftImage;
         private readonly Func<bool> getInteractionsEnabled;
         private readonly Action<bool> setInteractionsEnabled;
         private readonly Func<long> getStreamBacklogCount;
@@ -88,8 +86,6 @@ namespace Gilomx.CupheadBossRoulette
             Action<bool> setMaximumActiveUnlimited,
             Func<int> getMaximumMiniBosses,
             Action<int> setMaximumMiniBosses,
-            Func<bool> getShowGiftImage,
-            Action<bool> setShowGiftImage,
             Func<bool> getInteractionsEnabled,
             Action<bool> setInteractionsEnabled,
             Func<long> getStreamBacklogCount,
@@ -113,8 +109,6 @@ namespace Gilomx.CupheadBossRoulette
             this.setMaximumActiveUnlimited = setMaximumActiveUnlimited;
             this.getMaximumMiniBosses = getMaximumMiniBosses;
             this.setMaximumMiniBosses = setMaximumMiniBosses;
-            this.getShowGiftImage = getShowGiftImage;
-            this.setShowGiftImage = setShowGiftImage;
             this.getInteractionsEnabled = getInteractionsEnabled;
             this.setInteractionsEnabled = setInteractionsEnabled;
             this.getStreamBacklogCount = getStreamBacklogCount;
@@ -124,7 +118,7 @@ namespace Gilomx.CupheadBossRoulette
                 getPhaseTransitionProtectionEnabled;
             this.setPhaseTransitionProtectionEnabled =
                 setPhaseTransitionProtectionEnabled;
-            CreatorToolsDonorLabel.SetGiftImagesVisible(ShowGiftImage);
+            CreatorToolsDonorLabel.SetGiftImagesVisible(false);
             peskySettings = CreatorToolsPeskyModeSettings.Load(
                 pluginConfigPath, logWarning,
                 InteractionConfiguredMaximumActive);
@@ -1300,7 +1294,6 @@ namespace Gilomx.CupheadBossRoulette
             var maximumActive = InteractionConfiguredMaximumActive;
             var maximumActiveUnlimited = InteractionMaximumActiveUnlimited;
             var maximumMiniBosses = MaximumMiniBosses;
-            var showGiftImage = ShowGiftImage;
             if (values.TryGetValue("maxActive", out value))
             {
                 int requested;
@@ -1318,13 +1311,6 @@ namespace Gilomx.CupheadBossRoulette
                 SetInteractionFeedback("invalid_setting", true);
                 return;
             }
-            if (values.TryGetValue("showGiftImage", out value) &&
-                !TryParseSwitch(value, out showGiftImage))
-            {
-                SetInteractionFeedback("invalid_setting", true);
-                return;
-            }
-
             if (values.TryGetValue("maxMiniBosses", out value))
             {
                 int requested;
@@ -1353,9 +1339,6 @@ namespace Gilomx.CupheadBossRoulette
                 setMaximumActiveUnlimited(maximumActiveUnlimited);
             if (setMaximumMiniBosses != null)
                 setMaximumMiniBosses(maximumMiniBosses);
-            if (setShowGiftImage != null)
-                setShowGiftImage(showGiftImage);
-            CreatorToolsDonorLabel.SetGiftImagesVisible(showGiftImage);
             settingsRevision++;
             SetInteractionFeedback("settings_saved", false);
         }
@@ -1764,14 +1747,6 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private bool ShowGiftImage
-        {
-            get
-            {
-                return getShowGiftImage == null || getShowGiftImage();
-            }
-        }
-
         private int MaximumMiniBosses
         {
             get
@@ -1828,8 +1803,6 @@ namespace Gilomx.CupheadBossRoulette
                         : "false")
                 .Append(",\"phaseTransitionProtectionRevision\":")
                 .Append(phaseTransitionProtectionRevision)
-                .Append(",\"showGiftImage\":")
-                .Append(ShowGiftImage ? "true" : "false")
                 .Append(",\"settingsRevision\":")
                 .Append(settingsRevision)
                 .Append(",\"revision\":").Append(interactionRevision)

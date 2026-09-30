@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionTestSection } from "./InteractionTestSection";
@@ -6,28 +7,51 @@ import { SpawnPacingFields } from "./SpawnPacingFields";
 import { pacingDraftFor, pacingValuesFor, samePacing, validPacingDraft } from "./pacingValues";
 
 interface InteractionSettingsPanelProps {
+  focusAdvanced: boolean;
   onBack: () => void;
   onTestSent: () => void;
 }
 
-export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSettingsPanelProps) {
+export function InteractionSettingsPanel({
+  focusAdvanced,
+  onBack,
+  onTestSent,
+}: InteractionSettingsPanelProps) {
   const { interaction, interactionSettingsStatus, applyInteractionSettings, applyPacingToBoth, pesky, status } = useConfig();
   const { t } = useLocalization();
   const [maxActiveDraft, setMaxActiveDraft] = useState(6);
   const [maxActiveUnlimitedDraft, setMaxActiveUnlimitedDraft] = useState(false);
   const [singleMiniBossOnlyDraft, setSingleMiniBossOnlyDraft] = useState(true);
-  const [showGiftImageDraft, setShowGiftImageDraft] = useState(true);
   const [enabledDraft, setEnabledDraft] = useState(false);
   const [draft, setDraft] = useState(() => pacingDraftFor());
   const [dirty, setDirty] = useState(false);
   const [appliedBoth, setAppliedBoth] = useState(false);
 
   useEffect(() => {
+    if (!focusAdvanced) return;
+    const frame = window.requestAnimationFrame(() => {
+      const title = document.getElementById("interaction-settings-advanced-title");
+      title?.scrollIntoView({ block: "start" });
+      title?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusAdvanced]);
+
+  useEffect(() => {
+    const returnOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      event.preventDefault();
+      onBack();
+    };
+    window.addEventListener("keydown", returnOnEscape);
+    return () => window.removeEventListener("keydown", returnOnEscape);
+  }, [onBack]);
+
+  useEffect(() => {
     if (!dirty && interaction?.pacing) {
       setMaxActiveDraft(interaction.maxActive);
       setMaxActiveUnlimitedDraft(interaction.maxActiveUnlimited ?? false);
       setSingleMiniBossOnlyDraft(interaction.maxMiniBosses !== 0);
-      setShowGiftImageDraft(interaction.showGiftImage !== false);
       setDraft(pacingDraftFor(interaction.pacing));
       setEnabledDraft(interaction.pacing.enabled);
     }
@@ -37,7 +61,7 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
   const hasChanges = Boolean(interaction) && (maxActiveDraft !== interaction?.maxActive ||
     maxActiveUnlimitedDraft !== interaction?.maxActiveUnlimited ||
     singleMiniBossOnlyDraft !== (interaction?.maxMiniBosses !== 0) ||
-    showGiftImageDraft !== (interaction?.showGiftImage !== false) || enabledDraft !== interaction?.pacing?.enabled ||
+    enabledDraft !== interaction?.pacing?.enabled ||
     !samePacing(values, interaction?.pacing));
   const visibleStatus = hasChanges ? "dirty" : interactionSettingsStatus;
 
@@ -51,16 +75,17 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
           <h2 id="interaction-settings-title">{t("interactions.settings.title")}</h2>
           <p>{t("interactions.settings.description")}</p>
         </div>
-        <button type="button" className="stream-rule-back" onClick={onBack}>
-          <span aria-hidden="true">&larr;</span>
-          {t("interactions.workspace.back")}
+        <button type="button" className="stream-rule-back stream-rule-back--icon"
+          onClick={onBack} aria-label={t("interactions.workspace.back")}
+          title={t("interactions.workspace.back")}>
+          <ArrowLeft aria-hidden="true" />
         </button>
       </div>
       <form className="interaction-settings" onSubmit={(event) => {
         event.preventDefault();
         if (!valid || !interaction?.ready || !hasChanges) return;
         applyInteractionSettings(maxActiveDraft, maxActiveUnlimitedDraft,
-          singleMiniBossOnlyDraft, showGiftImageDraft, { ...values, enabled: enabledDraft });
+          singleMiniBossOnlyDraft, { ...values, enabled: enabledDraft });
         setAppliedBoth(false); setDirty(false);
       }}>
         <div className="interaction-settings__number interaction-settings__number--maximum">
@@ -97,15 +122,9 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
             setDirty(true);
           }} />
         </label>
-        <label className="interaction-settings__toggle">
-          <span><strong>{t("interactions.settings.showGiftImage")}</strong><small>{t("interactions.settings.showGiftImageHint")}</small></span>
-          <input type="checkbox" checked={showGiftImageDraft} onChange={(event) => {
-            setShowGiftImageDraft(event.target.checked);
-            setDirty(true);
-          }} />
-        </label>
         <section className="interaction-settings__advanced" aria-labelledby="interaction-settings-advanced-title">
-          <h3 id="interaction-settings-advanced-title" className="interaction-settings__advanced-title">
+          <h3 id="interaction-settings-advanced-title" className="interaction-settings__advanced-title"
+            tabIndex={-1}>
             {t("interactions.settings.advancedTitle")}
           </h3>
           <div className="interaction-settings__advanced-content">
@@ -131,11 +150,8 @@ export function InteractionSettingsPanel({ onBack, onTestSent }: InteractionSett
                     }}>{t("interactions.settings.pacingRestore")}</button>
                     <button type="button" disabled={!enabledDraft || !interaction?.ready || !pesky?.ready || !valid} onClick={() => {
                       applyPacingToBoth(maxActiveDraft, values, undefined, maxActiveUnlimitedDraft); setAppliedBoth(true);
-                    }}>{t("pesky.intervals.applyBoth")}</button>
+                    }}>{t("interactions.settings.copyToPesky")}</button>
                   </div>
-                  <p className="pesky-interval-panel__hint">{t(maxActiveUnlimitedDraft
-                    ? "interactions.settings.applyBothUnlimitedHint"
-                    : "pesky.intervals.applyBothHint")}</p>
                   {appliedBoth ? <p role="status" className="interaction-settings__status" data-status={pesky?.error ? "error" : status}>
                     {t("pesky.title")}: {pesky?.error ? t(`pesky.feedback.${pesky.feedback}`) : t(`status.${status}`)}
                   </p> : null}

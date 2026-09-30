@@ -209,6 +209,8 @@ internal sealed class TikFinityEventNormalizer
                 "extendedGiftInfo.picture",
                 "extendedGiftInfo.image"))
             : null;
+        var isCommunityGift = type == "gift" &&
+            ResolveCommunityGift(data, itemImageUrl);
 
         var count = ResolveCount(type, data);
         var streakState = type == "gift" ? ResolveStreakState(data) : null;
@@ -263,6 +265,7 @@ internal sealed class TikFinityEventNormalizer
             ItemId = itemId,
             ItemName = itemName,
             ItemImageUrl = itemImageUrl,
+            IsCommunityGift = isCommunityGift,
             Count = count,
             UnitValue = unitValue,
             TotalValue = totalValue,
@@ -274,6 +277,52 @@ internal sealed class TikFinityEventNormalizer
             Simulated = false,
             RawEventType = ProtocolText.Clean(rawEventType),
         });
+    }
+
+    private static bool ResolveCommunityGift(
+        JsonElement data,
+        string? imageUrl)
+    {
+        var explicitFlag = JsonFieldReader.Boolean(
+            data,
+            "ownCommunityGift",
+            "isCommunityGift",
+            "communityGift",
+            "isCustomGift",
+            "customGift",
+            "personalizedGift",
+            "gift.ownCommunityGift",
+            "gift.isCommunityGift",
+            "gift.isCustomGift",
+            "giftDetails.ownCommunityGift",
+            "giftDetails.isCommunityGift",
+            "giftDetails.isCustomGift",
+            "extendedGiftInfo.ownCommunityGift",
+            "extendedGiftInfo.isCommunityGift",
+            "extendedGiftInfo.isCustomGift");
+        if (explicitFlag == true)
+            return true;
+
+        var subtype = CleanOptional(JsonFieldReader.String(
+            data,
+            "giftSubtype",
+            "gift_subtype",
+            "gift.giftSubtype",
+            "gift.gift_subtype",
+            "giftDetails.giftSubtype",
+            "giftDetails.gift_subtype",
+            "extendedGiftInfo.giftSubtype",
+            "extendedGiftInfo.gift_subtype"));
+        if (subtype != null)
+        {
+            subtype = subtype.ToLowerInvariant();
+            if (subtype is "community_gift" or "custom_gift" or
+                "personalized_gift")
+                return true;
+        }
+
+        return !string.IsNullOrEmpty(imageUrl) &&
+            imageUrl.Contains("saliency_seg_", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int ResolveCount(string type, JsonElement data)

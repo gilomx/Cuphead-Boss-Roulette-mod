@@ -65,7 +65,6 @@ export interface InteractionConfigState {
   pendingClearProjected: boolean;
   phaseTransitionProtectionEnabled: boolean;
   phaseTransitionProtectionRevision: number;
-  showGiftImage?: boolean;
   settingsRevision?: number;
   item: string;
   items: string[];
@@ -282,6 +281,8 @@ export interface TikTokGift {
   coinsPerUnit: number;
   sourceGiftType: number;
   imagePath: string;
+  kind?: "community";
+  learned?: boolean;
 }
 
 export interface TikTokGiftCatalog {
@@ -341,6 +342,14 @@ export interface StreamRulesConfigState {
   maxEvery: number;
   maxQuantity: number;
   maxCooldownSeconds: number;
+  communityGift: {
+    learned: boolean;
+    giftId: string;
+    name: string;
+    imagePath: string;
+    placeholderImagePath: string;
+    coinsPerUnit: number;
+  };
   rules: StreamRule[];
 }
 
@@ -410,6 +419,7 @@ export interface DashboardEvent {
   itemName?: string;
   itemId?: string | null;
   itemImageUrl?: string | null;
+  isCommunityGift?: boolean;
   streakId?: string | null;
   streakState?: "none" | "progress" | "final";
   rawEventType?: string | null;

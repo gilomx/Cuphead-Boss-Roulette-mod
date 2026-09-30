@@ -24,13 +24,14 @@ export function PeskyIntervalPanel() {
   const hasChanges = maxActiveDraft !== pesky?.maxActive ||
     !samePacing(values, pesky ?? undefined) ||
     allowStrongDraft !== (pesky?.allowConcurrentStrongInteractions ?? false);
-  const saving = status === "saving" || status === "pending";
+  const saving = status === "saving";
   const unavailable = status === "error" || status === "connecting";
 
   return (
-    <section id="pesky-settings" className="interaction-panel pesky-interval-panel" aria-labelledby="pesky-interval-title">
-      <div className="interaction-panel__heading"><div>
-        <h2 id="pesky-interval-title">{t("pesky.intervals.title")}</h2>
+    <section id="pesky-settings" className="pesky-settings-card pesky-settings-card--distribution pesky-interval-panel"
+      aria-labelledby="pesky-interval-title">
+      <div className="pesky-settings-card__heading"><div>
+        <h3 id="pesky-interval-title">{t("pesky.settings.distributionTitle")}</h3>
         <p>{t("pesky.intervals.description")}</p>
       </div></div>
       <form className="interaction-settings pesky-interval-panel__form" onSubmit={(event) => {
@@ -79,10 +80,9 @@ export function PeskyIntervalPanel() {
           }}>{t("pesky.intervals.restore")}</button>
           <button type="button" disabled={!pesky?.ready || !interaction?.ready || !valid || saving} onClick={() => {
             applyPacingToBoth(maxActiveDraft, values, allowStrongDraft); setDirty(false); setAppliedBoth(true);
-          }}>{t("pesky.intervals.applyBoth")}</button>
+          }}>{t("pesky.settings.copyToInteractions")}</button>
           <button type="submit" disabled={!pesky?.ready || !valid || !hasChanges || saving}>{t("pesky.intervals.save")}</button>
         </div>
-        <p className="pesky-interval-panel__hint">{t("pesky.intervals.applyBothHint")}</p>
         {appliedBoth && interactionSettingsStatus !== "idle" ? <p role="status" className="interaction-settings__status" data-status={interactionSettingsStatus}>
           {t("interactions.title")}: {t(`interactions.settings.status.${interactionSettingsStatus}`)}
         </p> : null}

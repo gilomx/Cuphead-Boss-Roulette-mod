@@ -236,7 +236,7 @@
       capacity: 5,
       trigger: {
         giftName: COPY[activeLocale].previewGift,
-        giftImagePath: "/assets/creator-tools/gifts/images/6784.png",
+        giftImagePath: "/assets/creator-tools/gifts/images/6784.webp",
       },
       participants: [
         { slot: 1, userId: "preview-1", displayName: "La Pichi" },

@@ -73,6 +73,17 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   configuración sobre la tabla de pruebas. Cada fila de prueba acepta donador,
   cantidad y espera en segundos. Un lote o varios tipos se agregan al final sin
   alterar el orden existente.
+- La vista de Configuración vuelve al panel mediante un botón circular con el
+  icono `ArrowLeft` de Lucide. `Esc` ejecuta la misma acción; si un selector
+  abierto consume primero esa tecla para cerrar su lista, la vista permanece.
+- Los selectores de regalos usan el catálogo TikTok offline. Los regalos de
+  comunidad/personalizados no se enumeran por canal: existe un solo
+  `Community Gift` con placeholder e ID reservado `0`. El estado de reglas
+  reemplaza ese item por el ID, nombre e imagen observados cuando llega un
+  evento real marcado por TikFinity. El mismo ID no causa actualizaciones; si
+  cambia, el runtime migra al nuevo ID las reglas que dependían del anterior.
+  Las imágenes locales se sirven como WebP de hasta 96×96; ningún uso visible
+  supera 43×43 px y no se conserva una copia PNG dentro del paquete.
 - El **Máximo de interacciones activas** es persistente y configurable de 1 a
   30. Al marcar **Sin límite**, el aviso de posible impacto en el rendimiento
   aparece dentro del mismo contenedor y permanece visible mientras la opción
@@ -85,9 +96,10 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   convivir varios, incluso del mismo tipo. También respetan el máximo general de
   interacciones activas y la compatibilidad de la arena; C# vuelve a comprobar
   esas reglas al despachar. La ronda nativa de la Baronesa conserva su bloqueo.
-- Todo artículo nuevo del catálogo se incorpora tanto a la tabla de prueba
-  manual como al catálogo configurable de Modo Molestoso. La sección de
-  Interacciones no contiene un generador aleatorio automático: ese uso pertenece
+- Todo artículo nuevo del catálogo se incorpora tanto al selector de prueba
+  manual como al catálogo configurable de Modo Molestoso. Interacciones usa el
+  catálogo compartido dentro de sus selectores, pero ya no presenta una copia
+  informativa de todas las tarjetas: el catálogo visual activable pertenece
   exclusivamente a Modo Molestoso.
 - Los **Retos temporales** son Daño a la mitad, NO EX, NO DASH / NO MINIAVIÓN,
   MODO TIESO, BLANCO Y NEGRO, NO DISPARO BOMBAS, SIN PEASHOOTER, RGB, VOLTEADA
@@ -139,10 +151,11 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   porque al desactivarlo puede borrar pendientes y actores activos sin perder
   donaciones. Si ambos modos están activos, la vista informa que los ataques de
   donaciones continuarán junto con los del modo.
-- Modo Molestoso muestra la configuración a la derecha de Molestias pendientes
-  en escritorio, apilada en pantallas estrechas (hasta 68rem). Cantidades por
-  aparición, ajustes durante minijefe y resumen permanecen expandidos, sin
-  desplegables. El botón superior y `Ctrl+I` enfocan su primer campo.
+- Modo Molestoso abre su configuración desde el engrane situado dentro de
+  **Interacciones en espera**. La vista comparte la navegación de Interacciones:
+  usa regreso circular y `Esc`, y distribuye límites y ritmo, nombres aleatorios
+  y tiempos de retos en un solo panel. Cantidades por aparición, ajustes durante
+  minijefe y resumen permanecen expandidos, sin desplegables.
   Interacciones usa el mismo componente de controles, con su propio interruptor
   de distribución y valores independientes. Su sección avanzada no se contrae:
   al activar el interruptor, todos los campos aparecen con una transición; al
@@ -150,13 +163,12 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   como una ayuda para hacer el mod más jugable. Los campos se agrupan en Ataques
   normales y Minijefes; las ayudas y el resumen explican tiempos y cantidades,
   sin exponer nombres de implementación.
-- En la columna de herramientas, Configuración y Nombres aleatorios aparecen
-  primero. Retos temporales y Molestias son las dos últimas secciones, en ese
-  orden. Cada lista muestra su cantidad activa y un botón que alterna entre
-  activar y desactivar todos sus elementos disponibles. La operación conserva
-  el guardado optimista y no envía cambios para casillas que ya tienen el estado
-  solicitado; los retos ausentes del runtime permanecen bloqueados y no se
-  incluyen en la operación masiva.
+- El catálogo activable de Modo Molestoso reutiliza las tarjetas y el filtro por
+  grupo del catálogo antes mostrado en Interacciones. Pulsar una tarjeta cambia
+  su disponibilidad con el mismo lenguaje visual de los retos de Ruleta; las
+  inactivas se muestran atenuadas. La cabecera indica cuántas están habilitadas
+  y permite activar o desactivar todas las compatibles. Los artículos ausentes
+  del runtime permanecen bloqueados y no se incluyen en la operación masiva.
 - El intervalo de molestias normales admite 0.35–300 s y el descanso entre
   minijefes 0–300 s, con mínimo <= máximo. El primer mini compatible no consume
   ese descanso: puede entrar tras el margen seguro de inicio de 3 s. Los relojes
@@ -182,6 +194,9 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   modos copia tiempos y cantidades, conservando interruptores y otros ajustes.
   Volver a los ajustes originales prepara un borrador y requiere guardar.
   El estado de conexión/guardado siempre refleja la confirmación autoritativa.
+  Una configuración pendiente de aplicar no bloquea nuevas ediciones: cada
+  guardado reemplaza la fotografía anterior y la última será la que reciba el
+  juego al abrirse.
 - La configuración de Interacciones usa guardado optimista de última escritura:
   después de guardar, cualquier edición nueva vuelve a habilitar el botón aunque
   Unity aún no haya confirmado la anterior. Cada clic envía una fotografía
@@ -258,9 +273,11 @@ feedback, revisiones, límites y la cola autoritativa con estados `scheduled`,
 `queued` y `active`. `GET /api/config/interactions/test` recibe `item`, `donor`,
 `quantity` y `delay`; sólo encola la prueba. Unity la ejecuta después en su hilo
 principal y confirma el resultado incrementando la revisión. El endpoint
-`GET /api/config/interactions/set` cambia el máximo simultáneo (`maxActive`)
-y la imagen del regalo (`showGiftImage`). Cada parámetro es opcional y conserva
-los ajustes omitidos. `maxMiniBosses` funciona como interruptor compartido:
+`GET /api/config/interactions/set` cambia el máximo simultáneo (`maxActive`).
+Cada parámetro es opcional y conserva los ajustes omitidos. El parámetro
+heredado `showGiftImage` se acepta como no-op para que un panel antiguo no pueda
+reactivar imágenes; ya no aparece en el estado público. `maxMiniBosses` funciona
+como interruptor compartido:
 `1` limita todos los orígenes a un minijefe y `0` permite varios, sujetos a los
 máximos generales y la compatibilidad de arena. Cualquier otro valor heredado
 se normaliza a `1`.

@@ -24,7 +24,6 @@ let interactionMaxActive = 6;
 let interactionMaxActiveUnlimited = false;
 const interactionMaxActiveLimit = 30;
 let interactionMaxMiniBosses = 1;
-let interactionShowGiftImage = true;
 const spawnGroupDefaults = {
   miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
   lightMinimumBatch: 1, lightMaximumBatch: 5,
@@ -66,6 +65,14 @@ function streamRulesState() {
     maxEvery: 1000000,
     maxQuantity: 50,
     maxCooldownSeconds: 3600,
+    communityGift: {
+      learned: false,
+      giftId: "0",
+      name: "Community Gift",
+      imagePath: "/assets/creator-tools/gifts/images/0.webp",
+      placeholderImagePath: "/assets/creator-tools/gifts/images/0.webp",
+      coinsPerUnit: 1,
+    },
     rules: streamRules.map((rule) => {
       const gift = giftsById.get(rule.giftId);
       return {
@@ -1479,7 +1486,6 @@ createServer((req, res) => {
       queueControlRevision: interactionQueueControlRevision,
       phaseTransitionProtectionEnabled,
       phaseTransitionProtectionRevision,
-      showGiftImage: interactionShowGiftImage,
       pacing: interactionPacing,
       defaultPacing: interactionPacingDefaults,
       settingsRevision: interactionSettingsRevision,
@@ -1587,7 +1593,7 @@ createServer((req, res) => {
     const maxActiveValue = url.searchParams.get("maxActive");
     const maxActiveUnlimitedValue = url.searchParams.get("maxActiveUnlimited");
     const maxMiniBossesValue = url.searchParams.get("maxMiniBosses");
-    const showGiftImageValue = url.searchParams.get("showGiftImage");
+    const retiredShowGiftImageValue = url.searchParams.get("showGiftImage");
     const pacingRequested = [...url.searchParams.keys()].some((key) => key.startsWith("pacing."));
     const nextPacing = pacingRequested
       ? pacingCandidate(url.searchParams, interactionPacing, "pacing.")
@@ -1597,8 +1603,7 @@ createServer((req, res) => {
     if (!nextPacing ||
         (maxActiveValue !== null && !integerSetting(maxActiveValue)) ||
         (maxMiniBossesValue !== null && !integerSetting(maxMiniBossesValue)) ||
-        (maxActiveUnlimitedValue !== null && settingSwitch(maxActiveUnlimitedValue) === null) ||
-        (showGiftImageValue !== null && settingSwitch(showGiftImageValue) === null)) {
+        (maxActiveUnlimitedValue !== null && settingSwitch(maxActiveUnlimitedValue) === null)) {
       json(res, { ok: false, feedback: "invalid_setting" }, 400);
       return;
     }
@@ -1644,10 +1649,7 @@ createServer((req, res) => {
     if (maxMiniBossesValue !== null) {
       interactionMaxMiniBosses = Number(maxMiniBossesValue) === 0 ? 0 : 1;
     }
-    if (showGiftImageValue !== null) {
-      interactionShowGiftImage = settingSwitch(showGiftImageValue);
-    }
-    if (maxActiveValue !== null || maxActiveUnlimitedValue !== null || showGiftImageValue !== null || maxMiniBossesValue !== null || pacingRequested) {
+    if (maxActiveValue !== null || maxActiveUnlimitedValue !== null || retiredShowGiftImageValue !== null || maxMiniBossesValue !== null || pacingRequested) {
       interactionSettingsRevision += 1;
     }
     const phaseTransitionProtectionValue = url.searchParams.get(

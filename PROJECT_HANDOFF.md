@@ -2,6 +2,65 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Catálogo TikTok y Community Gift estable (2026-09-30)
+
+El catálogo offline se regeneró desde la instantánea `2026-09-23.1` de Gift
+Farmer. Contiene 984 regalos normales con su ID real y WebP local, más un único
+placeholder `Community Gift` con ID reservado `0`; los 26 registros
+personalizados/de comunidad del export no se publican como regalos separados.
+
+Las 985 imágenes locales se normalizan desde el importador mediante
+ImageMagick a un máximo de 96×96, WebP calidad 82, sin metadatos y conservando
+transparencia. Es suficiente para el máximo visible de 43×43 px (también en
+escala 2×) y reduce el conjunto de 42.56 MiB a 4.16 MiB. El importador falla de
+forma explícita si `magick` no está disponible; puede indicarse otra ruta con
+`MAGICK_PATH`. El validador exige firma WebP, máximo de 96 px y correspondencia
+exacta entre catálogo y directorio, por lo que no admite PNG o imágenes
+huérfanas.
+
+El companion propaga `isCommunityGift` cuando TikFinity entrega una bandera de
+community/custom/personalized, un subtipo equivalente o su patrón de imagen de
+respaldo. Al primer evento real, el runtime guarda el ID, nombre, URL de imagen,
+precio y fecha junto a la configuración. El mismo ID es idempotente: no cambia
+metadatos ni vuelve a escribir el archivo. Sólo un ID distinto sustituye al
+anterior. Las reglas que apuntaban a `0` o al ID previo se migran de forma
+atómica al ID nuevo y el panel reemplaza el placeholder con esa identidad.
+
+El archivo generado del usuario es
+`mx.gilomx.cuphead.bossroulette.community-gift.json`; no forma parte del ZIP ni
+debe copiarse entre instalaciones. Conserva el ID anterior únicamente para
+recuperar una migración interrumpida. Las pruebas cubren detección, no reescribir
+el mismo ID, cambio de ID, migración de reglas y recarga.
+
+Aprobaron las 21 pruebas del companion, toda la suite runtime, las 13 pruebas
+HTTP del panel, la validación de 985 regalos y el build Release con cero errores
+y cero advertencias. El ZIP Dev físico publicado contiene 1,481 archivos y
+tiene SHA-256
+`1C5E2C82778732D47DEFB4E19513A9A89C93C497E3725330DF48A06B81C5BAB3`.
+
+## Regreso compacto desde Configuración (2026-09-30)
+
+La vista de Configuración de Interacciones usa ahora un botón circular con
+`ArrowLeft` de Lucide, accesible mediante nombre y tooltip. `Esc` vuelve al panel
+de reglas; un selector abierto consume primero esa tecla para cerrarse sin
+abandonar la configuración.
+
+## Etiquetas de donador sólo con nombre (2026-09-30)
+
+Se retiró **Mostrar imagen del regalo** del panel, del estado público y de la
+configuración persistente. `CreatorToolsDonorLabel` parte con las imágenes
+desactivadas y retorna antes de cargar el PNG, por lo que los actores, vidas
+extra y ayudas muestran únicamente el nombre. `showGiftImage` se conserva sólo
+como parámetro heredado ignorado para que paneles anteriores no lo confundan con
+una prueba manual ni puedan reactivar la presentación retirada.
+
+Pasaron las 13 pruebas del contrato HTTP, toda la suite runtime, el build del
+panel y la compilación Release del mod con cero errores y cero advertencias. El
+ZIP Dev publicado contiene 539 archivos y tiene SHA-256
+`F305B66EC0E74D7F95644780B03CD583095C05B3FBEDA535DA23A22D383C2B2A`.
+Falta la comprobación visual dentro de Cuphead de una interacción recibida con
+imagen disponible para confirmar que se ve exclusivamente el nombre.
+
 ## Minijefes configurables y distribución progresiva (2026-09-29)
 
 **Un minijefe a la vez** dejó de ser una fila informativa y ahora es un check

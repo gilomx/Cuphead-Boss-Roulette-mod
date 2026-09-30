@@ -153,6 +153,10 @@ try {
     Invoke-Checked 'dotnet' @('build', (Join-Path $repoRoot 'CupheadBossRoulette.csproj'),
         '-c', 'Release', '-o', $modOutput, "-p:CupheadDir=$CupheadDir",
         "-p:BepInExCoreDir=$(Join-Path $stage 'BepInEx/core')")
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_loading_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
     $pluginRoot = Join-Path $stage 'BepInEx/plugins/GilomxBossRoulette'
     $companion = Join-Path $pluginRoot 'companion'
     $null = [IO.Directory]::CreateDirectory($companion)

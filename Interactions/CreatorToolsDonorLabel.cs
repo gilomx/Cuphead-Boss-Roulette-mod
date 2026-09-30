@@ -34,7 +34,7 @@ namespace Gilomx.CupheadBossRoulette
         // approved. An empty set deliberately preserves today's presentation.
         private static readonly HashSet<Levels> AlternateTextColorLevels =
             new HashSet<Levels>();
-        private static bool giftImagesVisible = true;
+        private static bool giftImagesVisible;
         private CreatorToolsDonorLabelFollower follower;
         private TextMeshPro labelText;
         private Renderer labelRenderer;
@@ -120,7 +120,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void SetGiftImage(string imagePath)
         {
-            if (labelText == null || labelRenderer == null ||
+            if (!giftImagesVisible || labelText == null || labelRenderer == null ||
                 string.IsNullOrEmpty(imagePath))
                 return;
             string loadError;

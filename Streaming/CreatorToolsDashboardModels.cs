@@ -106,6 +106,8 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append(",\"itemImageUrl\":");
             CreatorToolsJson.AppendNullableString(
                 builder, entry.ItemImageUrl);
+            builder.Append(",\"isCommunityGift\":")
+                .Append(entry.IsCommunityGift ? "true" : "false");
             builder.Append(",\"count\":").Append(entry.Count)
                 .Append(",\"unitValue\":");
             CreatorToolsJson.AppendDecimal(builder, entry.UnitValue);

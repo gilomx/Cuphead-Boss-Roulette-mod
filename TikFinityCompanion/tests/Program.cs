@@ -21,6 +21,7 @@ internal static class Program
             ("unsafe avatar URLs", UnsafeAvatarUrls),
             ("long avatar URL", LongAvatarUrl),
             ("non-streak gift", NonStreakGift),
+            ("community gift detection", CommunityGiftDetection),
             ("unknown streak end is provisional", UnknownStreakEnd),
             ("streak idempotency", StreakIdempotency),
             ("total coin fallback", TotalCoinFallback),
@@ -173,6 +174,29 @@ internal static class Program
         Equal(25m, streamEvent.TotalValue);
     }
 
+    private static void CommunityGiftDetection()
+    {
+        var flagged = One("""
+            {"event":"gift","data":{"msgId":"community-1","giftId":"7001","ownCommunityGift":true}}
+            """);
+        Equal(true, flagged.IsCommunityGift);
+
+        var subtype = One("""
+            {"event":"gift","data":{"msgId":"community-2","giftId":"7002","giftDetails":{"giftSubtype":"personalized_gift"}}}
+            """);
+        Equal(true, subtype.IsCommunityGift);
+
+        var saliency = One("""
+            {"event":"gift","data":{"msgId":"community-3","giftId":"7003","giftPictureUrl":"https://example.invalid/saliency_seg_custom.png"}}
+            """);
+        Equal(true, saliency.IsCommunityGift);
+
+        var ordinary = One("""
+            {"event":"gift","data":{"msgId":"ordinary-1","giftId":"5655","ownCommunityGift":false}}
+            """);
+        Equal(false, ordinary.IsCommunityGift);
+    }
+
     private static void StreakIdempotency()
     {
         var progress = One(Fixture("gift-progress-flat.json"));
@@ -269,7 +293,8 @@ internal static class Program
                  {
                      "eventId", "idempotencyKey", "connectionId", "platform", "connector",
                      "type", "userName", "userDisplayName", "userId", "userAvatarUrl",
-                     "itemId", "itemName", "itemImageUrl", "count", "unitValue",
+                     "itemId", "itemName", "itemImageUrl", "isCommunityGift",
+                     "count", "unitValue",
                      "totalValue", "unit", "currency", "streakId", "streakState",
                      "receivedAt", "simulated", "rawEventType",
                  })

@@ -184,12 +184,12 @@ test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
       ...mandatoryPacing, miniBossMinimumInterval: 12, miniBossMaximumInterval: 18,
       lightMinimumBatch: 3, lightMaximumBatch: 6,
       strongMinimumBatch: 2, strongMaximumBatch: 4,
-    }, { maxActive: 8, showGiftImage: 0 }));
+    }, { maxActive: 8 }));
     const saved = await getInteractions();
     assert.equal(saved.pacing.miniBossCooldownSeconds, 12);
     assert.equal(saved.pacing.lightMaximumBatch, 6);
     assert.equal(saved.maxActive, 8);
-    assert.equal(saved.showGiftImage, false);
+    assert.equal(Object.hasOwn(saved, "showGiftImage"), false);
     assert.deepEqual(numericSettings(await getPesky()), { ...peskyValues, miniBossCooldownSeconds: 5 });
     assert.equal((await getPesky()).maxActive, 4);
   });
@@ -261,13 +261,13 @@ test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
       assert.deepEqual(numericSettings(await getPesky()), numericSettings(beforePesky));
       assert.deepEqual((await getInteractions()).pacing, beforeInteractions.pacing);
       const interactionResponse = await setInteractions({ ...mandatoryPacing, minimumInterval: 3, ...invalid }, {
-        maxActive: 18, showGiftImage: 1,
+        maxActive: 18,
       });
       assert.equal(interactionResponse.status, 400, JSON.stringify(invalid));
       assert.equal(interactionResponse.body.feedback, "invalid_setting");
       const afterInteractions = await getInteractions();
-      assert.deepEqual(select(afterInteractions, ["pacing", "maxActive", "showGiftImage", "settingsRevision"]),
-        select(beforeInteractions, ["pacing", "maxActive", "showGiftImage", "settingsRevision"]));
+      assert.deepEqual(select(afterInteractions, ["pacing", "maxActive", "settingsRevision"]),
+        select(beforeInteractions, ["pacing", "maxActive", "settingsRevision"]));
       assert.deepEqual(numericSettings(await getPesky()), numericSettings(beforePesky));
     }
     for (const maxActive of [0, 21, 1.5]) {
@@ -281,10 +281,12 @@ test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
       assert.equal((await getPesky()).maxActive, beforePesky.maxActive);
     }
     const before = await getInteractions();
-    for (const other of [{ maxActive: "invalid" }, { maxActive: 1.5 }, { maxMiniBosses: "bad" }, { showGiftImage: "bad" }]) {
+    for (const other of [{ maxActive: "invalid" }, { maxActive: 1.5 }, { maxMiniBosses: "bad" }]) {
       assert.equal((await setInteractions({ ...mandatoryPacing, minimumInterval: 3 }, other)).status, 400);
       assert.deepEqual((await getInteractions()).pacing, before.pacing);
     }
+    accepted(await request("/api/config/interactions/set", { showGiftImage: 1 }));
+    assert.equal(Object.hasOwn(await getInteractions(), "showGiftImage"), false);
     assert.equal((await setInteractions({ miniBossMinimumInterval: 1, miniBossMaximumInterval: 2 })).status, 400);
     assert.equal((await setInteractions({ ...mandatoryPacing, enabled: "bad" })).status, 400);
     for (const missing of Object.keys(mandatoryPacing)) {
@@ -370,8 +372,8 @@ test("HTTP interaction settings and scheduling contract (mock)", async (t) => {
     assert.deepEqual(afterInteractions.pacing, initialInteractions.defaultPacing);
     assert.deepEqual(select(afterPesky, ["enabled", "names", "disabledItems"]),
       select(beforePesky, ["enabled", "names", "disabledItems"]));
-    assert.deepEqual(select(afterInteractions, ["interactionsEnabled", "queuePaused", "queue", "showGiftImage", "maxMiniBosses"]),
-      select(beforeInteractions, ["interactionsEnabled", "queuePaused", "queue", "showGiftImage", "maxMiniBosses"]));
+    assert.deepEqual(select(afterInteractions, ["interactionsEnabled", "queuePaused", "queue", "maxMiniBosses"]),
+      select(beforeInteractions, ["interactionsEnabled", "queuePaused", "queue", "maxMiniBosses"]));
     assert.equal(afterInteractions.maxActive, 6);
   });
 

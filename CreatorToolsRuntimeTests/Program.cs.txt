@@ -42,6 +42,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestRuleCooldownBatchScheduling);
             Run("Rule cooldowns persist and reject invalid updates atomically",
                 TestRuleCooldownPersistence);
+            Run("Community Gift learns an ID once and migrates on ID change",
+                TestCommunityGiftIdentityPersistence);
             Run("Dashboard retains exactly 30 newest events",
                 TestDashboardRetainsThirtyEvents);
             Run("Server projects the worker backlog into interaction JSON",
@@ -201,6 +203,83 @@ namespace Gilomx.CupheadBossRoulette
                     "action=toggle&id=1&enabled=1");
                 True(after.Contains("\"userCooldownSeconds\":17"),
                     "invalid update preserved stored cooldowns");
+            }
+        }
+
+        private static void TestCommunityGiftIdentityPersistence()
+        {
+            using (var scope = new TestScope("community-gift-identity"))
+            {
+                var rules = scope.CreateRules(1, 0, 0, null, "0");
+                var first = NewEvent(7001, "gift", 1, "7001");
+                first.ItemName = "Channel Gift";
+                first.ItemImageUrl =
+                    "https://example.invalid/community-7001.png";
+                first.UnitValue = 5m;
+                first.IsCommunityGift = true;
+
+                var firstResult = rules.Evaluate(first, true);
+                Equal(1, firstResult.MatchedRules,
+                    "placeholder rule matched learned ID");
+                var firstState = SnapshotRules(rules);
+                True(firstState.Contains(
+                    "\"communityGift\":{\"learned\":true," +
+                    "\"giftId\":\"7001\""),
+                    "learned community ID is published");
+                True(firstState.Contains("\"giftId\":\"7001\"," +
+                    "\"giftName\":\"Channel Gift\""),
+                    "placeholder rule migrated to learned ID");
+                var learnedSimulation = NewEvent(
+                    7004, "gift", 1, "7001");
+                True(rules.TryResolveSimulationGift(learnedSimulation),
+                    "learned community gift resolves for simulation");
+                Equal("https://example.invalid/community-7001.png",
+                    learnedSimulation.ItemImageUrl,
+                    "learned community gift keeps its remote image");
+
+                var communityPath = (string)typeof(
+                    CreatorToolsStreamRulesController).GetField(
+                        "communityGiftPath",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(rules);
+                var firstSaved = File.ReadAllText(communityPath);
+
+                var repeated = NewEvent(7002, "gift", 1, "7001");
+                repeated.ItemName = "Changed metadata ignored";
+                repeated.ItemImageUrl =
+                    "https://example.invalid/changed.png";
+                repeated.UnitValue = 99m;
+                repeated.IsCommunityGift = true;
+                rules.Evaluate(repeated, true);
+                Equal(firstSaved, File.ReadAllText(communityPath),
+                    "same ID does not rewrite saved metadata");
+
+                var changed = NewEvent(7003, "gift", 1, "7002");
+                changed.ItemName = "New Channel Gift";
+                changed.ItemImageUrl =
+                    "https://example.invalid/community-7002.png";
+                changed.UnitValue = 7m;
+                changed.IsCommunityGift = true;
+                var changedResult = rules.Evaluate(changed, true);
+                Equal(1, changedResult.MatchedRules,
+                    "changed community ID keeps rule active");
+                var changedState = SnapshotRules(rules);
+                True(changedState.Contains("\"giftId\":\"7002\"," +
+                    "\"giftName\":\"New Channel Gift\""),
+                    "rule migrated when community ID changed");
+                True(File.ReadAllText(communityPath).Contains(
+                    "\"previousGiftId\": \"7001\""),
+                    "previous ID retained for crash-safe migration");
+
+                var reloaded = scope.ReloadRules(rules);
+                var reloadedState = SnapshotRules(reloaded);
+                True(reloadedState.Contains(
+                    "\"communityGift\":{\"learned\":true," +
+                    "\"giftId\":\"7002\""),
+                    "learned ID survives restart");
+                True(reloadedState.Contains("\"giftId\":\"7002\"," +
+                    "\"giftName\":\"New Channel Gift\""),
+                    "migrated rule survives restart");
             }
         }
 
@@ -614,7 +693,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 using (var ignored = GetJson(server,
                     "/api/config/interactions/set?maxActive=8" +
-                    "&maxActiveUnlimited=1&maxMiniBosses=0&showGiftImage=0"))
+                    "&maxActiveUnlimited=1&maxMiniBosses=0"))
                 {
                 }
 
@@ -629,7 +708,7 @@ namespace Gilomx.CupheadBossRoulette
                 True(server.TryTakeInteractionCommand(
                     out query, out backgroundApplied),
                     "latest settings snapshot was not retained");
-                Equal("maxActive=8&maxActiveUnlimited=1&maxMiniBosses=0&showGiftImage=0",
+                Equal("maxActive=8&maxActiveUnlimited=1&maxMiniBosses=0",
                     query, "latest settings snapshot");
 
                 False(server.TryTakeInteractionCommand(
@@ -1788,6 +1867,15 @@ namespace Gilomx.CupheadBossRoulette
             return NewEvent(sequence, "gift", count, "1");
         }
 
+        private static string SnapshotRules(
+            CreatorToolsStreamRulesController rules)
+        {
+            return (string)typeof(CreatorToolsStreamRulesController)
+                .GetMethod("BuildState",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(rules, null);
+        }
+
         private static CreatorToolsStreamEvent NewLikeEvent(int sequence)
         {
             return NewEvent(sequence, "like", 1, string.Empty);
@@ -1976,7 +2064,9 @@ namespace Gilomx.CupheadBossRoulette
                     Path.Combine(giftsDirectory, "catalog.json"),
                     "{\"catalogVersion\":\"runtime-test\"," +
                     "\"gifts\":[{\"giftId\":\"1\"," +
-                    "\"name\":\"Rose\",\"coinsPerUnit\":1}]}");
+                    "\"name\":\"Rose\",\"coinsPerUnit\":1}," +
+                    "{\"giftId\":\"0\",\"name\":\"Community Gift\"," +
+                    "\"coinsPerUnit\":1}]}");
                 File.WriteAllText(Path.Combine(
                     assetsDirectory, "creator-tools", "live-overlay.html"),
                     "<!doctype html><title>Live overlay</title>");
@@ -1989,7 +2079,8 @@ namespace Gilomx.CupheadBossRoulette
                 int quantity,
                 int userCooldownSeconds = 0,
                 int globalCooldownSeconds = 0,
-                Func<DateTime> utcNow = null)
+                Func<DateTime> utcNow = null,
+                string giftId = "1")
             {
                 var uniqueConfigDirectory = Path.Combine(
                     configDirectory, Guid.NewGuid().ToString("N"));
@@ -2002,7 +2093,8 @@ namespace Gilomx.CupheadBossRoulette
                     utcNow);
                 var state = rules.ProcessServerCommand(
                     "action=create&name=Runtime+rule&eventType=gift" +
-                    "&giftId=1&every=1&interaction=test_attack" +
+                    "&giftId=" + giftId +
+                    "&every=1&interaction=test_attack" +
                     "&quantity=" + quantity.ToString(
                         CultureInfo.InvariantCulture) +
                     "&userCooldownSeconds=" + userCooldownSeconds.ToString(

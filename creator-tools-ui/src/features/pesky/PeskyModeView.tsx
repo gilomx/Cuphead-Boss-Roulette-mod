@@ -1,70 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
+import { Settings } from "lucide-react";
 import { useConfig } from "../../config/ConfigContext";
-import { interactionItemFor, interactionItems } from "../interactions/interactionCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import { PeskyIntervalPanel } from "./PeskyIntervalPanel";
-import { PeskyHelpsPanel } from "./PeskyHelpsPanel";
-import { PeskyChallengesPanel } from "./PeskyChallengesPanel";
+import { interactionItemFor, interactionItems } from "../interactions/interactionCatalog";
+import { PeskyInteractionCatalog } from "./PeskyInteractionCatalog";
+import { PeskySettingsPanel } from "./PeskySettingsPanel";
 
-function validNames(value: string) {
-  const seen = new Set<string>();
-  return value
-    .split(/\r?\n|\r/)
-    .map((name) => name.trim().slice(0, 32))
-    .filter((name) => {
-      const key = name.toLocaleLowerCase();
-      if (!name || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 200);
-}
+type PeskyWorkspaceView = "queue" | "settings";
 
 export function PeskyModeView() {
-  const {
-    interaction,
-    pesky,
-    applyPeskyEnabled,
-    applyPeskyNames,
-    applyPeskyItem,
-    // applyInteractionPhaseTransitionProtection,
-  } = useConfig();
+  const { interaction, pesky, applyPeskyEnabled } = useConfig();
   const { t } = useLocalization();
-  const [namesDraft, setNamesDraft] = useState("");
-  const [namesDirty, setNamesDirty] = useState(false);
-  // Preserved for a future diagnostics build. Transition protection remains
-  // enabled by default, but its public panel control is intentionally hidden.
-  // const phaseTransitionProtectionEnabled =
-  //   interaction?.phaseTransitionProtectionEnabled ?? true;
-
-  useEffect(() => {
-    if (!namesDirty && pesky?.names) {
-      setNamesDraft(pesky.names.join("\n"));
-    }
-  }, [namesDirty, pesky?.names]);
-
-  useEffect(() => {
-    const toggleIntervals = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey || event.shiftKey || event.metaKey ||
-          event.isComposing || event.key.toLowerCase() !== "i") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (!event.repeat) document.getElementById("pesky-minimum-interval")?.focus();
-    };
-    window.addEventListener("keydown", toggleIntervals, true);
-    return () => window.removeEventListener("keydown", toggleIntervals, true);
-  }, []);
-
-  const normalizedNames = useMemo(() => validNames(namesDraft), [namesDraft]);
+  const [workspaceView, setWorkspaceView] = useState<PeskyWorkspaceView>("queue");
   const disabledItems = new Set(pesky?.disabledItems ?? []);
-  const nuisanceItems = interactionItems.filter(
-    (item) => item.group !== "challenge" && item.group !== "help",
-  );
-  const enabledNuisanceItems = nuisanceItems.filter(
-    (item) => !disabledItems.has(item.id),
-  );
-  const allNuisancesEnabled = nuisanceItems.length > 0 &&
-    enabledNuisanceItems.length === nuisanceItems.length;
   const enabledItemCount = interactionItems.filter(
     (item) => (pesky?.items ?? []).includes(item.id) && !disabledItems.has(item.id),
   ).length;
@@ -76,19 +24,11 @@ export function PeskyModeView() {
     ? "running"
     : pesky?.enabled && pesky?.startingBattle
       ? "startingBattle"
-    : pesky?.enabled
-      ? "waitingGame"
-      : "disabled";
+      : pesky?.enabled
+        ? "waitingGame"
+        : "disabled";
   const showInteractionsNotice = (pesky?.enabled ?? false) &&
     (interaction?.interactionsEnabled ?? false);
-
-  const toggleAllNuisances = () => {
-    const enable = !allNuisancesEnabled;
-    nuisanceItems.forEach((item) => {
-      const enabled = !disabledItems.has(item.id);
-      if (enabled !== enable) applyPeskyItem(item.id, enable);
-    });
-  };
 
   return (
     <div className="page page--pesky">
@@ -97,50 +37,28 @@ export function PeskyModeView() {
           <h1>{t("pesky.title")}</h1>
           <p>{t("pesky.description")}</p>
         </div>
-        <button
-          className="pesky-settings-button"
-          type="button"
-          onClick={() => document.getElementById("pesky-minimum-interval")?.focus()}
-        >
-          {t("pesky.intervals.open")}
-        </button>
       </header>
 
-      <section
-        className="pesky-hero mode-switch-shell"
-        data-active={pesky?.enabled ?? false}
-        data-step="control"
-      >
+      <section className="pesky-hero mode-switch-shell"
+        data-active={pesky?.enabled ?? false} data-step="control">
         <div className="mode-switch-stage">
-          <div
-            className="mode-switch-pane mode-switch-pane--primary pesky-hero__pane"
-          >
+          <div className="mode-switch-pane mode-switch-pane--primary pesky-hero__pane">
             <div className="pesky-hero__copy">
               <span className="pesky-status" data-status={statusKey}>
                 {t(`pesky.status.${statusKey}`)}
               </span>
               <h2>{t("pesky.control.title")}</h2>
-              <p className="pesky-feedback" data-error={pesky?.error ?? false} role="status" aria-live="polite">
+              <p className="pesky-feedback" data-error={pesky?.error ?? false}
+                role="status" aria-live="polite">
                 {t(`pesky.feedback.${pesky?.feedback ?? "ready"}`)}
               </p>
             </div>
-            <button
-              className="pesky-toggle"
-              type="button"
+            <button className="pesky-toggle" type="button"
               aria-pressed={pesky?.enabled ?? false}
-              aria-describedby={blockedByPeskyBattle
-                ? "pesky-battle-block-notice"
-                : undefined}
+              aria-describedby={blockedByPeskyBattle ? "pesky-battle-block-notice" : undefined}
               data-active={pesky?.enabled ?? false}
               disabled={!pesky?.ready || (!(pesky?.enabled ?? false) && !canEnable)}
-              onClick={() => {
-                if (pesky?.enabled) {
-                  applyPeskyEnabled(false);
-                } else {
-                  applyPeskyEnabled(true);
-                }
-              }}
-            >
+              onClick={() => applyPeskyEnabled(!(pesky?.enabled ?? false))}>
               {t(`pesky.control.${pesky?.enabled ? "disable" : "enable"}`)}
             </button>
           </div>
@@ -148,11 +66,7 @@ export function PeskyModeView() {
       </section>
 
       {blockedByPeskyBattle ? (
-        <p
-          className="pesky-interactions-notice"
-          id="pesky-battle-block-notice"
-          role="status"
-        >
+        <p className="pesky-interactions-notice" id="pesky-battle-block-notice" role="status">
           {t("pesky.battleBlocked")}
         </p>
       ) : null}
@@ -163,196 +77,88 @@ export function PeskyModeView() {
         </p>
       ) : null}
 
-      {/* Preserved for future transition-protection diagnostics.
-      <section
-        className="interaction-phase-protection"
-        data-active={phaseTransitionProtectionEnabled}
-        aria-labelledby="pesky-phase-protection-title"
-      >
-        <div className="interaction-phase-protection__copy">
-          <div className="interaction-phase-protection__title">
-            <strong id="pesky-phase-protection-title">
-              {t("pesky.phaseProtection.title")}
-            </strong>
-            <span data-active={phaseTransitionProtectionEnabled}>
-              {t(`pesky.phaseProtection.${
-                phaseTransitionProtectionEnabled ? "active" : "inactive"
-              }`)}
-            </span>
-          </div>
-          <p>{t("pesky.phaseProtection.description")}</p>
-        </div>
-        <button
-          type="button"
-          aria-pressed={phaseTransitionProtectionEnabled}
-          data-active={phaseTransitionProtectionEnabled}
-          disabled={!interaction?.ready}
-          onClick={() => applyInteractionPhaseTransitionProtection(
-            !phaseTransitionProtectionEnabled,
-          )}
-        >
-          {t(`pesky.phaseProtection.${
-            phaseTransitionProtectionEnabled ? "disable" : "enable"
-          }`)}
-        </button>
-      </section>
-      */}
-
       <div className="interaction-workspace pesky-workspace">
-        <section className="interaction-panel interaction-queue" aria-labelledby="pesky-queue-title">
-          <div className="interaction-panel__heading">
-            <div>
-              <h2 id="pesky-queue-title">{t("pesky.queue.title")}</h2>
-              <p>{t("pesky.queue.description")}</p>
-            </div>
-            <span className="interaction-count" aria-label={t("pesky.queue.countLabel")}>
-              {queue.length}
-            </span>
-          </div>
-
-          {queue.length === 0 ? (
-            <div className="interaction-queue__empty">
-              <strong>{t("pesky.queue.emptyTitle")}</strong>
-              <span>{t("pesky.queue.emptyDescription")}</span>
-            </div>
+        <div className="interaction-workspace__view" data-view={workspaceView}
+          key={workspaceView}>
+          {workspaceView === "settings" ? (
+            <PeskySettingsPanel onBack={() => setWorkspaceView("queue")} />
           ) : (
-            <div className="interaction-table-wrap">
-              <table className="interaction-table queue-table">
-                <thead>
-                  <tr>
-                    <th scope="col">{t("pesky.queue.position")}</th>
-                    <th scope="col">{t("pesky.queue.item")}</th>
-                    <th scope="col">{t("pesky.queue.name")}</th>
-                    <th scope="col">{t("pesky.queue.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {queue.map((entry, index) => {
-                    const item = interactionItemFor(entry.item);
-                    const displayStatus = entry.countingDown ? "countdown" : entry.status === "queued" && !pesky?.available
-                      ? "waiting_game"
-                      : entry.status;
-                    return (
-                      <tr key={entry.id}>
-                        <td className="queue-table__position">{index + 1}</td>
-                        <td>
-                          <div className="interaction-item-label">
-                            {item ? <img src={item.image} alt="" /> : null}
-                            <span>{item ? t(item.titleKey) : entry.item}</span>
-                          </div>
-                        </td>
-                        <td className="queue-table__donor">{entry.donor}</td>
-                        <td>
-                          <span className="queue-status" data-status={displayStatus}>
-                            {t(`pesky.queue.${displayStatus}`)}
-                            {entry.countingDown ? ` · ${entry.countdownRemaining ?? 0} s` : entry.remainingSeconds !== undefined ? ` · ${entry.remainingSeconds} s` : ""}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <section className="interaction-panel interaction-queue"
+                aria-labelledby="pesky-queue-title">
+                <div className="interaction-panel__heading">
+                  <div>
+                    <h2 id="pesky-queue-title">{t("pesky.queue.title")}</h2>
+                    <p>{t("pesky.queue.description")}</p>
+                  </div>
+                  <div className="stream-rules-panel__tools">
+                    <span className="interaction-count"
+                      aria-label={t("pesky.queue.countLabel")}>{queue.length}</span>
+                    <button type="button" className="stream-rule-tool stream-rule-settings"
+                      onClick={() => setWorkspaceView("settings")}
+                      aria-label={t("pesky.intervals.open")}
+                      title={t("pesky.intervals.open")}>
+                      <Settings aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+
+                {queue.length === 0 ? (
+                  <div className="interaction-queue__empty">
+                    <strong>{t("pesky.queue.emptyTitle")}</strong>
+                    <span>{t("pesky.queue.emptyDescription")}</span>
+                  </div>
+                ) : (
+                  <div className="interaction-table-wrap">
+                    <table className="interaction-table queue-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">{t("pesky.queue.position")}</th>
+                          <th scope="col">{t("pesky.queue.item")}</th>
+                          <th scope="col">{t("pesky.queue.name")}</th>
+                          <th scope="col">{t("pesky.queue.status")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {queue.map((entry, index) => {
+                          const item = interactionItemFor(entry.item);
+                          const displayStatus = entry.countingDown
+                            ? "countdown"
+                            : entry.status === "queued" && !pesky?.available
+                              ? "waiting_game"
+                              : entry.status;
+                          return (
+                            <tr key={entry.id}>
+                              <td className="queue-table__position">{index + 1}</td>
+                              <td>
+                                <div className="interaction-item-label">
+                                  {item ? <img src={item.image} alt="" /> : null}
+                                  <span>{item ? t(item.titleKey) : entry.item}</span>
+                                </div>
+                              </td>
+                              <td className="queue-table__donor">{entry.donor}</td>
+                              <td>
+                                <span className="queue-status" data-status={displayStatus}>
+                                  {t(`pesky.queue.${displayStatus}`)}
+                                  {entry.countingDown
+                                    ? ` · ${entry.countdownRemaining ?? 0} s`
+                                    : entry.remainingSeconds !== undefined
+                                      ? ` · ${entry.remainingSeconds} s`
+                                      : ""}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              <PeskyInteractionCatalog />
+            </>
           )}
-        </section>
-
-        <div className="interaction-workspace__tools">
-        <PeskyIntervalPanel />
-        <section className="interaction-panel pesky-names" aria-labelledby="pesky-names-title">
-          <div className="interaction-panel__heading">
-            <div>
-              <h2 id="pesky-names-title">{t("pesky.names.title")}</h2>
-              <p>{t("pesky.names.description")}</p>
-            </div>
-            <span className="interaction-count">{normalizedNames.length}</span>
-          </div>
-          <div className="pesky-names__body">
-            <textarea
-              value={namesDraft}
-              rows={9}
-              maxLength={7000}
-              placeholder={t("pesky.names.placeholder")}
-              onChange={(event) => {
-                const nextDraft = event.target.value;
-                const savedNames = (pesky?.names ?? []).join("\n");
-                setNamesDraft(nextDraft);
-                setNamesDirty(validNames(nextDraft).join("\n") !== savedNames);
-              }}
-            />
-            <div className="pesky-names__footer">
-              <span>
-                {t(normalizedNames.length === 0
-                  ? "pesky.names.emptyHint"
-                  : "pesky.names.hint")}
-              </span>
-              <div
-                className="pesky-names__save-slot"
-                data-visible={namesDirty}
-                aria-hidden={!namesDirty}
-              >
-                <button
-                  type="button"
-                  tabIndex={namesDirty ? 0 : -1}
-                  disabled={!pesky?.ready}
-                  onClick={() => {
-                    applyPeskyNames(normalizedNames.join("\n"));
-                    setNamesDirty(false);
-                  }}
-                >
-                  {t("pesky.names.save")}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <PeskyHelpsPanel />
-
-        <PeskyChallengesPanel />
-
-        <section className="interaction-panel pesky-attacks" aria-labelledby="pesky-attacks-title">
-          <div className="interaction-panel__heading">
-            <div>
-              <h2 id="pesky-attacks-title">{t("pesky.attacks.title")}</h2>
-              <p>{t("pesky.attacks.description")}</p>
-            </div>
-            <div className="pesky-attacks__heading-actions">
-              <span className="interaction-count">{enabledNuisanceItems.length}</span>
-              <button
-                className="pesky-bulk-toggle"
-                type="button"
-                disabled={!pesky?.ready || nuisanceItems.length === 0}
-                onClick={toggleAllNuisances}
-              >
-                {t(`pesky.items.${allNuisancesEnabled ? "disableAll" : "enableAll"}`)}
-              </button>
-            </div>
-          </div>
-          <div className="pesky-attack-list">
-            {nuisanceItems.map((item) => {
-              const enabled = !disabledItems.has(item.id);
-              return (
-                <label className="pesky-attack" data-enabled={enabled} key={item.id}>
-                  <img src={item.image} alt="" />
-                  <span>
-                    <strong>{t(item.titleKey)}</strong>
-                    <small>{t(`interactions.groups.${item.group}`)}</small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    disabled={!pesky?.ready}
-                    onChange={(event) => applyPeskyItem(item.id, event.target.checked)}
-                  />
-                </label>
-              );
-            })}
-          </div>
-          {enabledItemCount === 0 ? (
-            <p className="pesky-attacks__required">{t("pesky.attacks.required")}</p>
-          ) : null}
-        </section>
         </div>
       </div>
     </div>

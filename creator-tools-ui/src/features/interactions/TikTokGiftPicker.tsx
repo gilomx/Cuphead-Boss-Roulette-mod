@@ -17,6 +17,13 @@ interface TikTokGiftPickerProps {
   onSelect: (gift: TikTokGift) => void;
 }
 
+function normalizeGiftSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es");
+}
+
 export function TikTokGiftPicker({
   gifts,
   selectedId,
@@ -27,16 +34,16 @@ export function TikTokGiftPicker({
   const reactId = useId().replace(/:/g, "");
   const gridId = `stream-gift-picker-${reactId}`;
   const gridRef = useRef<HTMLDivElement>(null);
+  const shouldScrollActiveRef = useRef(false);
   const [search, setSearch] = useState("");
   const [activeGiftId, setActiveGiftId] = useState<string | null>(null);
   const filteredGifts = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
+    const query = normalizeGiftSearch(search.trim());
     if (!query) return gifts;
+    const cost = /^\d+$/.test(query) ? Number(query) : null;
     return gifts.filter((gift) =>
-      gift.name.toLocaleLowerCase().includes(query) ||
-      gift.giftId.toLocaleLowerCase().includes(query) ||
-      String(gift.coinsPerUnit).includes(query) ||
-      gift.aliases.some((alias) => alias.toLocaleLowerCase().includes(query)));
+      normalizeGiftSearch(gift.name).includes(query) ||
+      (cost !== null && gift.coinsPerUnit === cost));
   }, [gifts, search]);
   const activeIndex = activeGiftId === null
     ? -1
@@ -51,19 +58,18 @@ export function TikTokGiftPicker({
   }, [filteredGifts, selectedId]);
 
   useEffect(() => {
-    if (activeIndex < 0) return;
+    if (activeIndex < 0 || !shouldScrollActiveRef.current) return;
+    shouldScrollActiveRef.current = false;
     const grid = gridRef.current;
     const option = grid?.querySelector<HTMLElement>(`[data-gift-index="${activeIndex}"]`);
     if (!grid || !option) return;
 
-    const optionTop = option.offsetTop;
-    const optionBottom = optionTop + option.offsetHeight;
-    const viewportTop = grid.scrollTop;
-    const viewportBottom = viewportTop + grid.clientHeight;
-    if (optionTop < viewportTop) {
-      grid.scrollTop = optionTop;
-    } else if (optionBottom > viewportBottom) {
-      grid.scrollTop = optionBottom - grid.clientHeight;
+    const gridBounds = grid.getBoundingClientRect();
+    const optionBounds = option.getBoundingClientRect();
+    if (optionBounds.top < gridBounds.top) {
+      grid.scrollTop -= gridBounds.top - optionBounds.top;
+    } else if (optionBounds.bottom > gridBounds.bottom) {
+      grid.scrollTop += optionBounds.bottom - gridBounds.bottom;
     }
   }, [activeIndex]);
 
@@ -84,6 +90,7 @@ export function TikTokGiftPicker({
           ? -columns
           : columns;
     const nextIndex = (currentIndex + delta + filteredGifts.length) % filteredGifts.length;
+    shouldScrollActiveRef.current = true;
     setActiveGiftId(filteredGifts[nextIndex].giftId);
     return nextIndex;
   };
@@ -97,11 +104,13 @@ export function TikTokGiftPicker({
     }
     if (event.key === "Home" && filteredGifts.length > 0) {
       event.preventDefault();
+      shouldScrollActiveRef.current = true;
       setActiveGiftId(filteredGifts[0].giftId);
       return;
     }
     if (event.key === "End" && filteredGifts.length > 0) {
       event.preventDefault();
+      shouldScrollActiveRef.current = true;
       setActiveGiftId(filteredGifts[filteredGifts.length - 1].giftId);
       return;
     }
@@ -176,7 +185,6 @@ export function TikTokGiftPicker({
               data-gift-index={index}
               key={gift.giftId}
               onFocus={() => setActiveGiftId(gift.giftId)}
-              onPointerMove={() => setActiveGiftId(gift.giftId)}
               onKeyDown={handleGiftKeyDown}
               onClick={() => onSelect(gift)}
             >

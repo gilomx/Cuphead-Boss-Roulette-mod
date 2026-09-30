@@ -439,12 +439,11 @@ no sustituyen esta comprobación dentro de Unity.
 única para los nombres de donadores. Todo enemigo o elemento visual futuro debe
 reutilizarlos mediante `PrepareActor`.
 
-Las reglas de stream pueden añadir de forma opcional el PNG local del regalo
-con `CreatorToolsInteractionPresentation.SetGiftImage`. El dato debe viajar de
-forma explícita por backlog, cola y executor; no se deben usar contextos globales
-temporales ni descargar la URL remota durante gameplay. El label comparte con el
-icono seguimiento, alpha, snapshot y prioridad de render. Las rutas manuales que
-no tienen regalo conservan únicamente el nombre.
+La etiqueta muestra únicamente el nombre del donador. Las rutas de imagen que
+lleguen desde TikFinity pueden seguir viajando como metadato por compatibilidad
+con el backlog, las colas y los executors, pero `CreatorToolsDonorLabel` no las
+carga ni las renderiza. El parámetro heredado `showGiftImage` se ignora y ya no
+forma parte del estado público ni del panel.
 
 ### Creación y renderizado
 

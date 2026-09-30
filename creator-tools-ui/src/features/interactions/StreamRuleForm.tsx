@@ -12,6 +12,7 @@ interface StreamRuleFormProps {
   maxQuantity: number;
   maxCooldownSeconds: number;
   saving: boolean;
+  onOpenAdvancedSettings: () => void;
   onChange: (draft: StreamRuleDraft) => void;
   onCancel: () => void;
   onSave: (draft: StreamRuleDraft) => void;
@@ -26,6 +27,16 @@ function boundedCooldown(value: string, maximum: number) {
   return Number.isFinite(parsed) ? Math.max(0, Math.min(maximum, parsed)) : 0;
 }
 
+function fillTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 export function StreamRuleForm({
   draft,
   gifts,
@@ -33,6 +44,7 @@ export function StreamRuleForm({
   maxQuantity,
   maxCooldownSeconds,
   saving,
+  onOpenAdvancedSettings,
   onChange,
   onCancel,
   onSave,
@@ -63,6 +75,33 @@ export function StreamRuleForm({
   const triggerName = draft.eventType === "gift"
     ? selectedGift?.name ?? ""
     : t(`interactions.rules.editor.${draft.eventType}Name`);
+  const interactionName = selectedInteraction
+    ? t(selectedInteraction.titleKey)
+    : t("interactions.rules.editor.interactionPlaceholder");
+  const executionSummaryKey = draft.eventType === "gift"
+    ? draft.every === 1
+      ? "interactions.rules.editor.executionGiftSummaryOne"
+      : "interactions.rules.editor.executionGiftSummaryMany"
+    : draft.eventType === "like"
+      ? "interactions.rules.editor.executionLikeSummary"
+      : "interactions.rules.editor.executionFollowSummary";
+  const executionSummary = fillTemplate(t(executionSummaryKey), {
+    every: draft.every,
+    trigger: triggerName,
+    quantity: draft.quantity,
+    interaction: interactionName,
+  });
+  const cooldownSummaryKey = draft.userCooldownSeconds > 0
+    ? draft.globalCooldownSeconds > 0
+      ? "interactions.rules.editor.cooldownSummaryBoth"
+      : "interactions.rules.editor.cooldownSummaryUser"
+    : draft.globalCooldownSeconds > 0
+      ? "interactions.rules.editor.cooldownSummaryGlobal"
+      : "interactions.rules.editor.cooldownSummaryNone";
+  const cooldownSummary = fillTemplate(t(cooldownSummaryKey), {
+    user: draft.userCooldownSeconds,
+    global: draft.globalCooldownSeconds,
+  });
 
   return (
     <form
@@ -79,19 +118,6 @@ export function StreamRuleForm({
         }
       }}
     >
-      <label className="stream-rule-form__enabled stream-rule-form__wide">
-        <span>
-          <strong>{t("interactions.rules.editor.enabled")}</strong>
-          <small>{t("interactions.rules.editor.enabledHint")}</small>
-        </span>
-        <input
-          type="checkbox"
-          disabled={saving}
-          checked={draft.enabled}
-          onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
-        />
-      </label>
-
       <label className="stream-rule-form__wide">
         <span>{t("interactions.rules.editor.triggerType")}</span>
         <select
@@ -152,9 +178,6 @@ export function StreamRuleForm({
                   every: boundedInteger(event.target.value, maxEvery),
                 })}
               />
-              <small>{t(draft.eventType === "like"
-                ? "interactions.rules.editor.likeEveryHint"
-                : "interactions.rules.editor.everyHint")}</small>
             </label>
           ) : null}
 
@@ -184,14 +207,11 @@ export function StreamRuleForm({
                 quantity: boundedInteger(event.target.value, maxQuantity),
               })}
             />
-            <small>{t("interactions.rules.editor.quantityHint")}</small>
           </label>
         </div>
-        {draft.eventType === "follow" ? (
-          <p className="stream-rule-execution__notice">
-            {t("interactions.rules.editor.followOnceHint")}
-          </p>
-        ) : null}
+        <p className="stream-rule-execution__notice stream-rule-execution__summary">
+          {executionSummary}
+        </p>
         {selectedInteraction?.category === "mini_boss" ? (
           <p className="stream-rule-execution__notice">
             {t("interactions.miniBoss.description")}{" "}
@@ -210,7 +230,6 @@ export function StreamRuleForm({
               onChange={(event) => onChange({ ...draft,
                 userCooldownSeconds: boundedCooldown(event.target.value, maxCooldownSeconds),
               })} />
-            <small>{t("interactions.rules.editor.userCooldownHint")}</small>
           </label>
           <label>
             <span>{t(draft.eventType === "gift"
@@ -221,13 +240,17 @@ export function StreamRuleForm({
               onChange={(event) => onChange({ ...draft,
                 globalCooldownSeconds: boundedCooldown(event.target.value, maxCooldownSeconds),
               })} />
-            <small>{t(draft.eventType === "gift"
-              ? "interactions.rules.editor.giftCooldownHint"
-              : "interactions.rules.editor.globalCooldownHint")}</small>
           </label>
         </div>
-        <p className="stream-rule-execution__notice">
-          {t("interactions.rules.editor.cooldownQueueHint")}
+        <p className="stream-rule-execution__notice stream-rule-execution__summary">
+          {cooldownSummary}
+        </p>
+        <p className="stream-rule-execution__advanced-note">
+          {t("interactions.rules.editor.cooldownAdvancedPrefix")}{" "}
+          <button type="button" onClick={onOpenAdvancedSettings} disabled={saving}>
+            {t("interactions.rules.editor.cooldownAdvancedLink")}
+          </button>{" "}
+          {t("interactions.rules.editor.cooldownAdvancedSuffix")}
         </p>
       </fieldset>
 

@@ -596,7 +596,7 @@
         "emptyTitle": "Select or create a redeem",
         "emptyDescription": "The editor will appear here without leaving the page.",
         "selectGift": "Gift or donation",
-        "searchGift": "Search by name or value",
+        "searchGift": "Search by name or cost",
         "giftResults": "{count} results",
         "noGiftResults": "No gifts match this search.",
         "triggerType": "Triggered by",
@@ -620,6 +620,10 @@
         "noInteractionResults": "No matching interactions.",
         "quantity": "Quantity to send",
         "quantityHint": "Number of items produced by each rule activation.",
+        "executionGiftSummaryOne": "1 {trigger} will send {quantity} {interaction} to the game.",
+        "executionGiftSummaryMany": "{every} units of {trigger} will send {quantity} {interaction} to the game.",
+        "executionLikeSummary": "{every} taps from one person will send {quantity} {interaction} to the game.",
+        "executionFollowSummary": "A person's first follow will send {quantity} {interaction} to the game.",
         "cooldownTitle": "Wait between attacks",
         "userCooldown": "From the same person (seconds)",
         "userCooldownHint": "Applies the wait separately to each person.",
@@ -628,8 +632,13 @@
         "globalCooldown": "For everyone (seconds)",
         "globalCooldownHint": "Applies the same wait to everyone, no matter who triggers this rule.",
         "cooldownQueueHint": "If several arrive during the wait, none are lost: they are saved and activated one at a time. Setting a wait to 0 disables it; activations still respect the maximum active interactions and all other settings.",
-        "enabled": "Active redeem",
-        "enabledHint": "It will accept events as soon as the connection is ready."
+        "cooldownSummaryNone": "No wait: the interaction will be sent as soon as capacity is available.",
+        "cooldownSummaryUser": "Each person will wait {user} s before triggering it again; there is no shared wait.",
+        "cooldownSummaryGlobal": "There is no per-person wait; everyone will share a {global} s wait.",
+        "cooldownSummaryBoth": "Each person will wait {user} s and everyone will share a {global} s wait.",
+        "cooldownAdvancedPrefix": "These times also respect the",
+        "cooldownAdvancedLink": "advanced settings and distribution",
+        "cooldownAdvancedSuffix": "when enabled."
       },
       "actions": {
         "label": "Redeem actions",
@@ -678,14 +687,13 @@
     },
     "settings": {
       "title": "Settings",
-      "description": "Adjust active redeems and how the donor appears in the game.",
+      "description": "Adjust how active redeems behave in the game.",
       "maxActiveLabel": "Maximum active interactions",
       "maxActiveHint": "When this many interactions are active, the next ones wait their turn.",
       "maxActiveUnlimited": "Unlimited",
       "unlimitedWarning": "Using Unlimited may affect your PC's performance if too many interactions are active at the same time.",
       "maxMiniBossesLabel": "One mini-boss at a time",
       "maxMiniBossesHint": "When checked, Interactions, Pesky Mode and Pesky Battle share one mini-boss slot. Uncheck it to let several coexist; they still count toward the general maximum and must remain compatible with the arena.",
-      "showGiftImage": "Show gift image",
       "advancedTitle": "Advanced interaction distribution settings",
       "pacingTitle": "In-game distribution",
       "pacingIndependent": "Controls how many pending interactions appear together and how long the game waits before the next group. It works alongside per-user and per-gift waits: those waits decide when each activation is created, while this distribution decides how waiting activations enter the game. Pesky Mode has its own settings.",
@@ -694,8 +702,7 @@
       "pacingHint": "The wait may be longer if too many interactions are already active or the game cannot allow another yet. Interactions already on screen finish normally.",
       "pacingInvalid": "Check the times: 0.35 to 300 seconds for regular interactions and 0 to 300 for mini-bosses, always lowest first. Group sizes must be whole numbers from 1 to 20.",
       "pacingRestore": "Restore original settings",
-      "applyBothUnlimitedHint": "Copies timing and quantities. Unlimited remains exclusive to Interactions and does not change Pesky Mode's maximum.",
-      "showGiftImageHint": "It will appear next to the donor name.",
+      "copyToPesky": "Copy to Pesky Mode",
       "save": "Save changes",
       "status": {
         "dirty": "You have unsaved changes.",
@@ -934,6 +941,25 @@
   "pesky": {
     "title": "Pesky Mode",
     "description": "Adds random attacks from the interaction catalog during any fight, whether entered normally or through the roulette. You can also configure names to appear randomly with the attacks.",
+    "settings": {
+      "description": "Configure the mode's limits, distribution, names and challenge timing.",
+      "back": "Back to waiting interactions",
+      "distributionTitle": "Limits and distribution",
+      "copyToInteractions": "Copy to Interactions"
+    },
+    "catalog": {
+      "title": "Available interactions",
+      "description": "Enable or disable the interactions that may appear in Pesky Mode.",
+      "enable": "Enable",
+      "disable": "Disable",
+      "unavailable": "This interaction is unavailable in the connected mod version.",
+      "enabledCount": "{count} active interactions"
+    },
+    "challengeSettings": {
+      "title": "Timed challenge timing",
+      "description": "Set the wait, countdown and duration shared by challenges enabled in the catalog.",
+      "invalid": "Use a wait from 0 to 300 seconds, a countdown from 0 to 30, and a duration from 1 to 120."
+    },
     "interactionsNotice": "Interactions are enabled, so donation attacks will continue arriving in addition to this mode's attacks.",
     "battleBlocked": "Pesky Battle has exclusive control. Finish or cancel that battle before enabling the free mode again.",
     "intervals": {

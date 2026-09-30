@@ -2,6 +2,71 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Modo Molestoso reorganiza su superficie principal alrededor de
+  **Interacciones en espera**. El engrane de su encabezado abre una configuración
+  dedicada con regreso circular y `Esc`; allí se distribuyen límites y ritmo,
+  nombres aleatorios y tiempos de retos. El catálogo visual que antes ocupaba
+  la parte superior de Interacciones vive ahora en Modo Molestoso y permite
+  activar o desactivar ayudas, ataques, minijefes y retos pulsando sus tarjetas,
+  con filtro por grupo, estado atenuado y operación global. Las tarjetas se
+  distribuyen por todo el ancho disponible. La configuración puede editarse y
+  guardarse de nuevo aunque exista otra versión pendiente para el próximo
+  arranque; siempre prevalece el último guardado. Interacciones queda enfocada
+  en sus reglas, configuración y pruebas, sin duplicar el catálogo.
+
+- El selector de regalos de una interacción ya no persigue con scroll la
+  tarjeta situada bajo el puntero. Hover y navegación activa quedan separados:
+  sólo el teclado o el foco desplazan la cuadrícula. La búsqueda se limita al
+  nombre visible o al costo exacto, sin consultar ID ni alias; `Community Gift`
+  permanece primero y el resto se ordena de menor a mayor costo, con nombre e
+  ID como desempates estables. La etiqueta **Aparece en el juego** usa ahora el
+  mismo tamaño que **Cada cuántas unidades** y **Cantidad a enviar**. El editor
+  de una interacción comparte además el botón circular `ArrowLeft` de
+  Configuración. `Esc` permite volver sólo mientras el formulario conserve sus
+  valores iniciales; después de cualquier cambio deja de cerrarlo para evitar
+  perder trabajo. La búsqueda ignora acentos y la cuadrícula muestra seis
+  regalos por fila en pantallas amplias. Resultado y Espera retiraron las
+  ayudas repetidas bajo cada campo y presentan una sola frase dinámica debajo
+  del bloque con el efecto exacto de los valores elegidos. Esos resúmenes ahora
+  tienen mayor contraste y Espera enlaza la configuración y distribución
+  avanzada que también limita la entrada cuando está activa. Seleccionar un
+  regalo con clic ya no desplaza la cuadrícula; el ajuste automático queda
+  reservado al teclado. El editor ya no repite el control **Interacción
+  activa**: las reglas nuevas nacen activas y su estado se cambia desde la lista.
+  En Configuración, **Usar en ambos modos** pasa a llamarse **Copiar a Modo
+  Molestoso** y se retira la explicación redundante bajo el botón.
+
+- Se corrigió un fallo de arranque introducido por el registro persistente del
+  Community Gift. `InvalidDataException` compila para .NET 3.5 pero no existe
+  en el Mono reducido de Cuphead, por lo que el controlador de reglas fallaba
+  durante `Plugin.Awake()` y el juego abría sin inicializar la ruleta. Ahora se
+  usa una excepción compatible de `mscorlib` y la verificación de IL comprueba
+  todos los constructores de excepciones del plugin contra las bibliotecas
+  reales del juego, incluidos iteradores y cierres generados.
+
+- El catálogo de regalos de TikTok se actualizó desde Gift Farmer a la
+  instantánea `2026-09-23.1`: conserva 984 regalos normales y sustituye los 26
+  regalos personalizados/de comunidad por un único `Community Gift`. Ese item
+  empieza con ID reservado `0` y un placeholder de corazón morado rodeado por
+  una línea de recorte, dejando claro que su imagen será reemplazada. Cuando
+  TikFinity identifica un regalo de comunidad real, el mod guarda su ID,
+  nombre, imagen y precio;
+  eventos posteriores con el mismo ID no reescriben el registro. Si TikTok
+  cambia el ID, se actualiza una sola vez y las reglas que usaban el placeholder
+  o el ID anterior migran automáticamente al nuevo.
+  Sus 985 imágenes locales ahora se generan como WebP de hasta 96×96, calidad
+  82 y transparencia conservada. El conjunto baja de 42.56 MiB a 4.16 MiB sin
+  una diferencia visible en el panel, donde el uso máximo es de 43×43 px.
+
+- Configuración de Interacciones reemplaza el botón textual de regreso por un
+  botón circular con `ArrowLeft` de Lucide. `Esc` vuelve al panel de reglas;
+  los selectores abiertos conservan prioridad para cerrar primero su lista.
+
+- Las etiquetas dentro del juego muestran únicamente el nombre del donador.
+  Se retiró **Mostrar imagen del regalo** del panel y del estado público; el mod
+  ignora el parámetro heredado `showGiftImage` y no carga ni renderiza esos PNG,
+  aunque una configuración o un panel antiguo intenten activarlos.
+
 - La cola de **Modo Molestoso** muestra ahora las vidas extra y ayudas
   fantasmales que ya fueron entregadas a sus reservas internas, distinguiendo
   la ayuda activa de las siguientes en espera. Cada crédito conserva su origen

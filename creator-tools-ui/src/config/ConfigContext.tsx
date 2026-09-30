@@ -40,7 +40,7 @@ interface ConfigValue {
   status: ConnectionStatus;
   applyDraft: (draft: ForceDraft) => void;
   applyChallenge: (id: number, enabled: boolean) => void;
-  applyInteractionSettings: (maxActive: number, maxActiveUnlimited: boolean, singleMiniBossOnly: boolean, showGiftImage: boolean, pacing: InteractionPacingConfig) => void;
+  applyInteractionSettings: (maxActive: number, maxActiveUnlimited: boolean, singleMiniBossOnly: boolean, pacing: InteractionPacingConfig) => void;
   applyInteractionsEnabled: (enabled: boolean) => void;
   applyInteractionQueuePaused: (paused: boolean) => void;
   clearPendingInteractions: () => void;
@@ -105,7 +105,6 @@ interface DesiredInteractionSettings {
   maxActive: number;
   maxActiveUnlimited: boolean;
   maxMiniBosses: number;
-  showGiftImage: boolean;
   baselineRevision: number;
   requestRevision: number;
   accepted: boolean;
@@ -306,7 +305,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         ),
         backlogCount: nextInteraction.backlogCount ?? 0,
         deferredTestCount: nextInteraction.deferredTestCount ?? 0,
-        showGiftImage: nextInteraction.showGiftImage !== false,
         maxMiniBosses: nextInteraction.maxMiniBosses === 0 ? 0 : 1,
         settingsRevision: nextInteraction.settingsRevision ?? 0,
       };
@@ -412,8 +410,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             desiredInteractionSettings.maxActiveUnlimited &&
           (nextInteraction.maxMiniBosses === 0 ? 0 : 1) ===
             desiredInteractionSettings.maxMiniBosses &&
-          (nextInteraction.showGiftImage !== false) ===
-            desiredInteractionSettings.showGiftImage &&
           Object.keys(desiredInteractionSettings.pacing).every((key) =>
             nextInteraction.pacing?.[key as keyof InteractionPacingConfig] ===
               desiredInteractionSettings.pacing[key as keyof InteractionPacingConfig]);
@@ -447,7 +443,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             maxActiveUnlimited:
               desiredInteractionSettings.maxActiveUnlimited,
             maxMiniBosses: desiredInteractionSettings.maxMiniBosses,
-            showGiftImage: desiredInteractionSettings.showGiftImage,
             pacing: desiredInteractionSettings.pacing,
           };
         }
@@ -621,7 +616,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyInteractionSettings = useCallback(
-    (value: number, maxActiveUnlimited: boolean, singleMiniBossOnly: boolean, showGiftImage: boolean, pacing: InteractionPacingConfig) => {
+    (value: number, maxActiveUnlimited: boolean, singleMiniBossOnly: boolean, pacing: InteractionPacingConfig) => {
       if (!interaction?.ready || !validPacing(pacing)) return;
       const normalized = Math.max(
         1,
@@ -634,7 +629,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         maxActive: normalized,
         maxActiveUnlimited,
         maxMiniBosses: singleMiniBossOnly ? 1 : 0,
-        showGiftImage,
         baselineRevision: interaction.settingsRevision ?? 0,
         requestRevision,
         accepted: false,
@@ -650,7 +644,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             maxActiveUnlimited,
             pacing: { ...pacing },
             maxMiniBosses: singleMiniBossOnly ? 1 : 0,
-            showGiftImage,
             feedback: "settings_saved",
             error: false,
           }
@@ -662,7 +655,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         maxActive: String(normalized),
         maxActiveUnlimited: maxActiveUnlimited ? "1" : "0",
         maxMiniBosses: singleMiniBossOnly ? "1" : "0",
-        showGiftImage: showGiftImage ? "1" : "0",
         "pacing.enabled": pacing.enabled ? "1" : "0",
         "pacing.minimumInterval": String(pacing.minimumInterval),
         "pacing.maximumInterval": String(pacing.maximumInterval),
@@ -1018,7 +1010,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         pacing, allowConcurrentStrongInteractions);
       applyInteractionSettings(maxActive, interactionUnlimited,
         interaction.maxMiniBosses !== 0,
-        interaction.showGiftImage !== false,
         { ...pacing, enabled: interaction.pacing.enabled });
     },
     [pesky?.ready, pesky?.maxActive, interaction,

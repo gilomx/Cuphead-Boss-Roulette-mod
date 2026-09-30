@@ -14,6 +14,10 @@ namespace Gilomx.CupheadBossRoulette
         private const string GiftEventType = "gift";
         private const string LikeEventType = "like";
         private const string FollowEventType = "follow";
+        private const string CommunityGiftPlaceholderId = "0";
+        private const string CommunityGiftPlaceholderName = "Community Gift";
+        private const string CommunityGiftPlaceholderImagePath =
+            "/assets/creator-tools/gifts/images/0.webp";
         private const int MaximumRules = 100;
         private const int MaximumCommandsPerUpdate = 64;
         private const int MaximumRuleNameLength = 64;
@@ -23,6 +27,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumRuntimeViewerKeys = 100000;
 
         private readonly string settingsPath;
+        private readonly string communityGiftPath;
         private readonly Func<bool> getInteractionsEnabled;
         private readonly Func<DateTime> utcNow;
         private readonly Action<string> logWarning;
@@ -49,6 +54,8 @@ namespace Gilomx.CupheadBossRoulette
         private bool error;
         private string lastPublishedState;
         private bool stateDirty = true;
+        private CommunityGiftState communityGift =
+            CommunityGiftState.Placeholder();
 
         internal CreatorToolsStreamRulesController(
             string assetsDirectory,
@@ -68,6 +75,8 @@ namespace Gilomx.CupheadBossRoulette
                 configDirectory = Environment.CurrentDirectory;
             settingsPath = Path.Combine(configDirectory,
                 "mx.gilomx.cuphead.bossroulette.stream-rules.json");
+            communityGiftPath = Path.Combine(configDirectory,
+                "mx.gilomx.cuphead.bossroulette.community-gift.json");
 
             var catalogPath = Path.Combine(
                 Path.Combine(
@@ -82,7 +91,9 @@ namespace Gilomx.CupheadBossRoulette
                 feedback = "catalog_unavailable";
                 error = true;
             }
+            LoadCommunityGift();
             LoadSettings();
+            MigrateLoadedCommunityGiftRules();
         }
 
         internal int Update(
@@ -194,6 +205,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             lock (ruleStateLock)
             {
+                ObserveCommunityGift(streamEvent);
                 // Read the volatile master mirror while holding the same lock
                 // used by ResetRuntimeState. A stale snapshot taken before
                 // this lock could otherwise recreate backlog just after the
@@ -233,9 +245,11 @@ namespace Gilomx.CupheadBossRoulette
 
                 streamEvent.ItemId = gift.Id;
                 streamEvent.ItemName = gift.Name;
-                streamEvent.ItemImageUrl =
-                    "/assets/creator-tools/gifts/images/" +
-                    gift.Id + ".png";
+                streamEvent.ItemImageUrl = communityGift.Learned &&
+                    gift.Id == communityGift.GiftId
+                    ? communityGift.ImagePath
+                    : "/assets/creator-tools/gifts/images/" +
+                      gift.Id + ".webp";
                 streamEvent.Count = Math.Max(
                     1, Math.Min(1000000, streamEvent.Count));
                 streamEvent.UnitValue = gift.CoinsPerUnit;
@@ -834,6 +848,20 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(MaximumQuantity)
                 .Append(",\"maxCooldownSeconds\":")
                 .Append(MaximumCooldownSeconds)
+                .Append(",\"communityGift\":{")
+                .Append("\"learned\":")
+                .Append(communityGift.Learned ? "true" : "false")
+                .Append(",\"giftId\":\"");
+            AppendJson(builder, communityGift.GiftId);
+            builder.Append("\",\"name\":\"");
+            AppendJson(builder, communityGift.Name);
+            builder.Append("\",\"imagePath\":\"");
+            AppendJson(builder, communityGift.ImagePath);
+            builder.Append("\",\"placeholderImagePath\":\"");
+            AppendJson(builder, CommunityGiftPlaceholderImagePath);
+            builder.Append("\",\"coinsPerUnit\":")
+                .Append(communityGift.CoinsPerUnit)
+                .Append('}')
                 .Append(",\"rules\":[");
             for (var i = 0; i < rules.Count; i++)
             {
@@ -932,7 +960,7 @@ namespace Gilomx.CupheadBossRoulette
                             UnescapeJson(matches[i].Groups["name"].Value),
                             coins,
                             Path.GetFullPath(Path.Combine(
-                                imageDirectory, id + ".png"))));
+                                imageDirectory, id + ".webp"))));
                 }
                 return catalogVersion.Length > 0 && gifts.Count > 0;
             }
@@ -942,6 +970,223 @@ namespace Gilomx.CupheadBossRoulette
                     exception.Message);
                 return false;
             }
+        }
+
+        private void LoadCommunityGift()
+        {
+            if (!File.Exists(communityGiftPath))
+                return;
+            try
+            {
+                var json = File.ReadAllText(communityGiftPath, Encoding.UTF8);
+                int version;
+                int coins;
+                var giftId = ReadStringProperty(
+                    json, "giftId", 0, json.Length);
+                var previousGiftId = ReadStringProperty(
+                    json, "previousGiftId", 0, json.Length);
+                var name = ReadStringProperty(
+                    json, "name", 0, json.Length);
+                var imagePath = ReadStringProperty(
+                    json, "imagePath", 0, json.Length);
+                var observedAt = ReadStringProperty(
+                    json, "observedAt", 0, json.Length);
+                if (!TryReadIntProperty(json, "version", out version) ||
+                    version != 1 || !IsPositiveNumericId(giftId) ||
+                    !TryReadIntProperty(json, "coinsPerUnit", out coins) ||
+                    coins < 1)
+                    // Cuphead's legacy Mono omits InvalidDataException. A
+                    // reference to it prevents the controller constructor
+                    // from being JIT-compiled even when this branch is not
+                    // reached, so keep the failure type in mscorlib.
+                    throw new InvalidOperationException(
+                        "El registro del Community Gift no es valido.");
+
+                communityGift = new CommunityGiftState(
+                    giftId,
+                    IsPositiveNumericId(previousGiftId)
+                        ? previousGiftId
+                        : CommunityGiftPlaceholderId,
+                    string.IsNullOrEmpty(name)
+                        ? CommunityGiftPlaceholderName
+                        : name,
+                    NormalizeCommunityImagePath(imagePath),
+                    coins,
+                    observedAt);
+                RegisterCommunityGift(communityGift.GiftId);
+                if (communityGift.PreviousGiftId !=
+                    CommunityGiftPlaceholderId)
+                    RegisterCommunityGift(communityGift.PreviousGiftId);
+            }
+            catch (Exception exception)
+            {
+                Warn("No se pudo leer el Community Gift guardado: " +
+                    exception.Message);
+                communityGift = CommunityGiftState.Placeholder();
+            }
+        }
+
+        private void ObserveCommunityGift(CreatorToolsStreamEvent streamEvent)
+        {
+            if (streamEvent == null || !streamEvent.IsCommunityGift ||
+                streamEvent.Platform != "tiktok" ||
+                streamEvent.Type != GiftEventType)
+                return;
+
+            var giftId = (streamEvent.ItemId ?? string.Empty).Trim();
+            if (!IsPositiveNumericId(giftId) ||
+                giftId == communityGift.GiftId)
+                return;
+
+            var name = (streamEvent.ItemName ?? string.Empty).Trim();
+            if (name.Length == 0)
+                name = CommunityGiftPlaceholderName;
+            if (name.Length > 160)
+                name = name.Substring(0, 160);
+            var coins = streamEvent.UnitValue >= 1m
+                ? (int)Math.Min(int.MaxValue, streamEvent.UnitValue)
+                : 1;
+            var candidate = new CommunityGiftState(
+                giftId,
+                communityGift.GiftId,
+                name,
+                NormalizeCommunityImagePath(streamEvent.ItemImageUrl),
+                coins,
+                UtcNow().ToString(
+                    "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                    CultureInfo.InvariantCulture));
+            if (!SaveCommunityGift(candidate))
+                return;
+
+            var candidateRules = CloneRules();
+            var migratedRuleIds = new List<long>();
+            for (var i = 0; i < candidateRules.Count; i++)
+            {
+                var rule = candidateRules[i];
+                if (rule.EventType != GiftEventType ||
+                    (rule.GiftId != CommunityGiftPlaceholderId &&
+                     rule.GiftId != communityGift.GiftId))
+                    continue;
+                rule.GiftId = candidate.GiftId;
+                rule.GiftName = candidate.Name;
+                migratedRuleIds.Add(rule.Id);
+            }
+            if (migratedRuleIds.Count > 0 &&
+                !SaveSettings(candidateRules, nextId))
+                return;
+
+            communityGift = candidate;
+            RegisterCommunityGift(candidate.GiftId);
+            rules.Clear();
+            rules.AddRange(candidateRules);
+            for (var i = 0; i < migratedRuleIds.Count; i++)
+                ResetRuleRuntimeState(migratedRuleIds[i]);
+            revision++;
+            stateDirty = true;
+        }
+
+        private void MigrateLoadedCommunityGiftRules()
+        {
+            if (!communityGift.Learned)
+                return;
+            var migrated = false;
+            var candidateRules = CloneRules();
+            for (var i = 0; i < candidateRules.Count; i++)
+            {
+                var rule = candidateRules[i];
+                if (rule.EventType != GiftEventType ||
+                    (rule.GiftId != CommunityGiftPlaceholderId &&
+                     rule.GiftId != communityGift.PreviousGiftId))
+                    continue;
+                rule.GiftId = communityGift.GiftId;
+                rule.GiftName = communityGift.Name;
+                migrated = true;
+            }
+            if (!migrated || !SaveSettings(candidateRules, nextId))
+                return;
+            rules.Clear();
+            rules.AddRange(candidateRules);
+        }
+
+        private void RegisterCommunityGift(string giftId)
+        {
+            gifts[giftId] = new GiftEntry(
+                giftId,
+                communityGift.Name,
+                communityGift.CoinsPerUnit,
+                communityGift.ImagePath);
+        }
+
+        private bool SaveCommunityGift(CommunityGiftState value)
+        {
+            try
+            {
+                var directory = Path.GetDirectoryName(communityGiftPath);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+                var builder = new StringBuilder(512);
+                builder.Append("{\n  \"version\": 1,\n  \"giftId\": \"");
+                AppendJson(builder, value.GiftId);
+                builder.Append("\",\n  \"previousGiftId\": \"");
+                AppendJson(builder, value.PreviousGiftId);
+                builder.Append("\",\n  \"name\": \"");
+                AppendJson(builder, value.Name);
+                builder.Append("\",\n  \"imagePath\": \"");
+                AppendJson(builder, value.ImagePath);
+                builder.Append("\",\n  \"coinsPerUnit\": ")
+                    .Append(value.CoinsPerUnit)
+                    .Append(",\n  \"observedAt\": \"");
+                AppendJson(builder, value.ObservedAt);
+                builder.Append("\"\n}\n");
+
+                var temporaryPath = communityGiftPath + ".tmp";
+                File.WriteAllText(temporaryPath, builder.ToString(),
+                    new UTF8Encoding(false));
+                if (File.Exists(communityGiftPath))
+                {
+                    try
+                    {
+                        File.Replace(temporaryPath, communityGiftPath,
+                            communityGiftPath + ".bak", true);
+                        return true;
+                    }
+                    catch
+                    {
+                        File.Copy(communityGiftPath,
+                            communityGiftPath + ".bak", true);
+                        File.Delete(communityGiftPath);
+                    }
+                }
+                File.Move(temporaryPath, communityGiftPath);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Warn("No se pudo guardar el Community Gift: " +
+                    exception.Message);
+                return false;
+            }
+        }
+
+        private static bool IsPositiveNumericId(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value == "0")
+                return false;
+            for (var i = 0; i < value.Length; i++)
+                if (value[i] < '0' || value[i] > '9')
+                    return false;
+            return true;
+        }
+
+        private static string NormalizeCommunityImagePath(string value)
+        {
+            Uri uri;
+            value = (value ?? string.Empty).Trim();
+            return value.Length <= 2048 &&
+                   Uri.TryCreate(value, UriKind.Absolute, out uri) &&
+                   uri.Scheme == Uri.UriSchemeHttps
+                ? value
+                : CommunityGiftPlaceholderImagePath;
         }
 
         private void LoadSettings()
@@ -1473,6 +1718,48 @@ namespace Gilomx.CupheadBossRoulette
                 Name = name;
                 CoinsPerUnit = coinsPerUnit;
                 ImagePath = imagePath ?? string.Empty;
+            }
+        }
+
+        private sealed class CommunityGiftState
+        {
+            internal readonly string GiftId;
+            internal readonly string PreviousGiftId;
+            internal readonly string Name;
+            internal readonly string ImagePath;
+            internal readonly int CoinsPerUnit;
+            internal readonly string ObservedAt;
+
+            internal CommunityGiftState(
+                string giftId,
+                string previousGiftId,
+                string name,
+                string imagePath,
+                int coinsPerUnit,
+                string observedAt)
+            {
+                GiftId = giftId;
+                PreviousGiftId = previousGiftId;
+                Name = name;
+                ImagePath = imagePath;
+                CoinsPerUnit = coinsPerUnit;
+                ObservedAt = observedAt ?? string.Empty;
+            }
+
+            internal bool Learned
+            {
+                get { return GiftId != CommunityGiftPlaceholderId; }
+            }
+
+            internal static CommunityGiftState Placeholder()
+            {
+                return new CommunityGiftState(
+                    CommunityGiftPlaceholderId,
+                    CommunityGiftPlaceholderId,
+                    CommunityGiftPlaceholderName,
+                    CommunityGiftPlaceholderImagePath,
+                    1,
+                    string.Empty);
             }
         }
 
