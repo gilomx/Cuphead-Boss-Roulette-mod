@@ -36,8 +36,8 @@
   max-width: 54rem;
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.88rem;
-  line-height: 1.4;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .overlay-designer-header__back,
@@ -47,12 +47,12 @@
 .overlay-designer-callout button,
 .overlay-designer-canvas__toolbar button,
 .overlay-designer-simulation button {
-  min-height: 2.35rem;
-  padding: 0.48rem 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   color: var(--color-text-soft);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 900;
   background: var(--color-control);
   cursor: pointer;
@@ -68,7 +68,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.38rem;
+  gap: 0.48rem;
 }
 
 .overlay-designer-header__back:hover,
@@ -86,26 +86,26 @@
 .overlay-designer-callout button svg,
 .overlay-designer-canvas__toolbar svg,
 .overlay-designer-simulation button svg {
-  width: 0.85rem;
-  height: 0.85rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 .overlay-designer-header__status {
   display: grid;
   justify-items: end;
-  gap: 0.35rem;
+  gap: 0.45rem;
   padding-top: 0.15rem;
 }
 
 .overlay-designer-header__status > span {
   display: inline-flex;
-  min-height: 2rem;
+  min-height: 2.3rem;
   align-items: center;
-  padding: 0.38rem 0.7rem;
+  padding: 0.45rem 0.8rem;
   border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   font-weight: 900;
   background: rgb(255 255 255 / 3%);
 }
@@ -132,7 +132,7 @@
   justify-content: space-between;
   gap: 1rem;
   margin-top: 1rem;
-  padding: 0.65rem;
+  padding: 0.8rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
   background: var(--color-background-raised);
@@ -142,11 +142,11 @@
 .overlay-designer-toolbar__actions {
   display: flex;
   align-items: stretch;
-  gap: 0.35rem;
+  gap: 0.45rem;
 }
 
 .overlay-designer-tabs > button {
-  min-width: 9.2rem;
+  min-width: 11rem;
   justify-content: flex-start;
   border-color: transparent;
   background: rgb(255 255 255 / 3%);
@@ -159,8 +159,8 @@
 }
 
 .overlay-designer-tabs > button > svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.15rem;
+  height: 1.15rem;
   color: var(--color-focus);
 }
 
@@ -172,7 +172,7 @@
 
 .overlay-designer-tabs small {
   color: var(--color-text-muted);
-  font-size: 0.48rem;
+  font-size: 0.72rem;
 }
 
 .overlay-designer-toolbar button:disabled,
@@ -193,7 +193,7 @@
   justify-content: space-between;
   gap: 1rem;
   margin-top: 0.65rem;
-  padding: 0.75rem 0.9rem;
+  padding: 0.9rem 1rem;
   border: 1px solid rgb(244 199 111 / 32%);
   border-radius: var(--radius-medium);
   background: rgb(244 199 111 / 7%);
@@ -205,12 +205,12 @@
 }
 
 .overlay-designer-confirmation strong {
-  font-size: 0.78rem;
+  font-size: 0.92rem;
 }
 
 .overlay-designer-confirmation span {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: 0.86rem;
 }
 
 .overlay-designer-confirmation > div:last-child {
@@ -225,7 +225,7 @@
 
 .overlay-designer-workspace {
   display: grid;
-  grid-template-columns: minmax(12rem, 14rem) minmax(25rem, 1fr) minmax(17rem, 20rem);
+  grid-template-columns: minmax(15rem, 17rem) minmax(25rem, 1fr) minmax(21rem, 24rem);
   align-items: start;
   gap: 0.75rem;
   min-height: max(44rem, calc(100vh - 11.75rem));
@@ -243,21 +243,21 @@
 }
 
 .overlay-designer-panel > header {
-  padding: 0.85rem 0.9rem;
+  padding: 1rem 1.05rem;
   border-bottom: 1px solid rgb(255 255 255 / 7%);
 }
 
 .overlay-designer-panel > header > span {
   color: var(--color-focus);
-  font-size: 0.49rem;
+  font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.09em;
 }
 
 .overlay-designer-panel > header h2 {
-  margin: 0.18rem 0 0;
-  font-size: 0.9rem;
+  margin: 0.25rem 0 0;
+  font-size: 1.08rem;
 }
 
 .overlay-designer-layers {
@@ -288,8 +288,8 @@
   width: 100%;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.7rem 0.75rem 0.4rem;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem 0.5rem;
   border: 0;
   color: var(--color-text);
   text-align: left;
@@ -299,12 +299,12 @@
 
 .overlay-designer-layer__select > i {
   display: grid;
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.8rem;
+  height: 1.8rem;
   place-items: center;
   border-radius: 0.36rem;
   color: var(--color-focus);
-  font-size: 0.55rem;
+  font-size: 0.68rem;
   font-style: normal;
   font-weight: 900;
   background: var(--color-control);
@@ -324,24 +324,24 @@
 }
 
 .overlay-designer-layer__select strong {
-  font-size: 0.68rem;
+  font-size: 0.84rem;
 }
 
 .overlay-designer-layer__select small {
   color: var(--color-text-muted);
-  font-size: 0.51rem;
+  font-size: 0.72rem;
 }
 
 .overlay-designer-layer__actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.2rem;
-  padding: 0 0.55rem 0.55rem;
+  gap: 0.3rem;
+  padding: 0 0.7rem 0.7rem;
 }
 
 .overlay-designer-layer__actions button {
   display: grid;
-  min-height: 1.8rem;
+  min-height: 2.2rem;
   place-items: center;
   padding: 0;
   border: 1px solid transparent;
@@ -362,31 +362,34 @@
 }
 
 .overlay-designer-layer__actions svg {
-  width: 0.72rem;
-  height: 0.72rem;
+  width: 0.92rem;
+  height: 0.92rem;
 }
 
 .overlay-designer-layers > p {
   margin: 0;
-  padding: 0.8rem;
+  padding: 0.9rem 1rem;
   color: var(--color-text-muted);
-  font-size: 0.55rem;
-  line-height: 1.45;
+  font-size: 0.72rem;
+  line-height: 1.5;
 }
 
 .overlay-designer-canvas {
+  position: sticky;
+  top: 0.75rem;
   display: grid;
   height: max(44rem, calc(100vh - 11.75rem));
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
+  align-self: start;
 }
 
 .overlay-designer-canvas__toolbar {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.5rem 0.65rem;
+  gap: 0.7rem;
+  padding: 0.65rem 0.75rem;
   border-bottom: 1px solid rgb(255 255 255 / 7%);
   background: rgb(255 255 255 / 2%);
 }
@@ -394,14 +397,14 @@
 .overlay-designer-canvas__zoom,
 .overlay-designer-canvas__background {
   display: flex;
-  gap: 0.2rem;
+  gap: 0.3rem;
 }
 
 .overlay-designer-canvas__toolbar button {
-  min-height: 1.85rem;
-  padding: 0.3rem 0.46rem;
+  min-height: 2.2rem;
+  padding: 0.4rem 0.58rem;
   border-color: transparent;
-  font-size: 0.52rem;
+  font-size: 0.78rem;
   background: rgb(255 255 255 / 4%);
 }
 
@@ -414,7 +417,7 @@
 .overlay-designer-canvas__toolbar > span {
   margin-left: auto;
   color: var(--color-text-muted);
-  font-size: 0.52rem;
+  font-size: 0.76rem;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -426,10 +429,13 @@
   place-items: start;
   overflow: auto;
   padding: 1.25rem;
-  background: #10151b;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(31 38 48 / 52%), transparent 42rem),
+    #06080c;
+  box-shadow: inset 0 0 4rem rgb(0 0 0 / 52%);
 }
 
-.overlay-designer-canvas__viewport[data-background="alpha"] {
+.overlay-designer-canvas__viewport[data-background="alpha"] .overlay-designer-canvas__scaled-space {
   background-color: #c6c9cf;
   background-image:
     linear-gradient(45deg, #e2e4e8 25%, transparent 25%),
@@ -440,11 +446,11 @@
   background-size: 24px 24px;
 }
 
-.overlay-designer-canvas__viewport[data-background="light"] {
+.overlay-designer-canvas__viewport[data-background="light"] .overlay-designer-canvas__scaled-space {
   background: linear-gradient(135deg, #f9edd7, #d9ecf0);
 }
 
-.overlay-designer-canvas__viewport[data-background="dark"] {
+.overlay-designer-canvas__viewport[data-background="dark"] .overlay-designer-canvas__scaled-space {
   background:
     radial-gradient(circle at 72% 18%, #24364d, transparent 32%),
     linear-gradient(145deg, #091116, #111d29);
@@ -454,7 +460,10 @@
   position: relative;
   flex: 0 0 auto;
   margin: auto;
-  box-shadow: 0 1rem 3rem rgb(0 0 0 / 35%);
+  outline: 1px solid rgb(255 255 255 / 14%);
+  box-shadow:
+    0 1.5rem 4rem rgb(0 0 0 / 72%),
+    0 0 0 0.35rem rgb(0 0 0 / 22%);
 }
 
 .overlay-designer-canvas__surface {
@@ -580,22 +589,22 @@
 .overlay-designer-properties__geometry {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-  padding: 0.75rem 0.85rem;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
 }
 
 .overlay-designer-properties label,
 .overlay-designer-simulation label {
   display: grid;
   min-width: 0;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .overlay-designer-properties label > span,
 .overlay-designer-simulation label > span,
 .overlay-designer-simulation legend {
   color: var(--color-text-muted);
-  font-size: 0.52rem;
+  font-size: 0.76rem;
   font-weight: 900;
 }
 
@@ -604,14 +613,14 @@
 .overlay-designer-simulation input,
 .overlay-designer-simulation select {
   width: 100%;
-  min-height: 2.15rem;
+  min-height: 2.6rem;
   min-width: 0;
-  padding: 0.4rem 0.52rem;
+  padding: 0.52rem 0.65rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   color: var(--color-text);
   background: var(--color-control);
-  font-size: 0.65rem;
+  font-size: 0.84rem;
 }
 
 .overlay-designer-properties input:disabled {
@@ -622,30 +631,30 @@
 .overlay-designer-properties__alignment {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.42rem;
-  padding: 0 0.85rem 0.8rem;
+  gap: 0.55rem;
+  padding: 0 1rem 0.95rem;
 }
 
 .overlay-designer-properties__alignment > strong {
   grid-column: 1 / -1;
   color: var(--color-text-muted);
-  font-size: 0.52rem;
+  font-size: 0.76rem;
   font-weight: 900;
 }
 
 .overlay-designer-properties__alignment button {
   display: flex;
   min-width: 0;
-  min-height: 2rem;
+  min-height: 2.5rem;
   align-items: center;
   justify-content: center;
-  gap: 0.32rem;
-  padding: 0.42rem 0.5rem;
+  gap: 0.42rem;
+  padding: 0.5rem 0.6rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   color: var(--color-text);
   background: var(--color-control);
-  font-size: 0.55rem;
+  font-size: 0.76rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -662,17 +671,17 @@
 
 .overlay-designer-properties__alignment button > span {
   color: var(--color-focus);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
 .overlay-designer-properties__opacity {
-  padding: 0 0.85rem 0.8rem;
+  padding: 0 1rem 0.95rem;
 }
 
 .overlay-designer-properties__opacity-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.5rem;
+  grid-template-columns: minmax(0, 1fr) 3rem;
   align-items: center;
   gap: 0.6rem;
 }
@@ -686,27 +695,27 @@
 
 .overlay-designer-properties__opacity-control output {
   color: var(--color-text);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
   font-weight: 900;
   text-align: right;
 }
 
 .overlay-designer-properties__select {
-  padding: 0 0.85rem 0.75rem;
+  padding: 0 1rem 0.9rem;
 }
 
 .overlay-designer-properties__colors {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-  padding: 0 0.85rem 0.8rem;
+  gap: 0.7rem;
+  padding: 0 1rem 0.95rem;
 }
 
 .overlay-designer-properties__colors > strong {
   grid-column: 1 / -1;
   color: var(--color-text);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
 }
 
 .overlay-designer-properties__color-control {
@@ -714,12 +723,12 @@
   grid-template-columns: auto minmax(0, 1fr);
   min-width: 0;
   align-items: center;
-  gap: 0.38rem;
+  gap: 0.5rem;
 }
 
 .overlay-designer-properties__color-control input[type="color"] {
-  width: 2.2rem;
-  height: 2.15rem;
+  width: 2.6rem;
+  height: 2.55rem;
   min-height: 0;
   flex: 0 0 auto;
   padding: 0.16rem;
@@ -732,15 +741,15 @@
   overflow: hidden;
   color: var(--color-text-muted);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.5rem;
+  font-size: 0.72rem;
   text-overflow: ellipsis;
 }
 
 .overlay-designer-properties__color-alpha {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.1rem;
+  grid-template-columns: minmax(0, 1fr) 2.7rem;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .overlay-designer-properties__color-alpha input[type="range"] {
@@ -752,7 +761,7 @@
 
 .overlay-designer-properties__color-alpha output {
   color: var(--color-text-soft);
-  font-size: 0.5rem;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   font-weight: 900;
   text-align: right;
@@ -769,8 +778,8 @@
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  gap: 0.65rem;
-  padding: 0.58rem 0.8rem;
+  gap: 0.8rem;
+  padding: 0.78rem 1rem;
   border: 0;
   border-bottom: 1px solid rgb(255 255 255 / 6%);
   color: var(--color-text);
@@ -792,21 +801,21 @@
 
 .overlay-designer-properties__switches strong,
 .overlay-designer-preview-control strong {
-  font-size: 0.78rem;
+  font-size: 0.88rem;
 }
 
 .overlay-designer-properties__switches small,
 .overlay-designer-preview-control small {
   color: var(--color-text-muted);
-  font-size: 0.49rem;
-  line-height: 1.3;
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .overlay-designer-properties__switches button > i,
 .overlay-designer-preview-control button > i {
   position: relative;
-  width: 1.9rem;
-  height: 1rem;
+  width: 2.35rem;
+  height: 1.25rem;
   flex: 0 0 auto;
   border-radius: 999px;
   background: rgb(255 255 255 / 15%);
@@ -815,10 +824,10 @@
 .overlay-designer-properties__switches button > i b,
 .overlay-designer-preview-control button > i b {
   position: absolute;
-  top: 0.15rem;
-  left: 0.16rem;
-  width: 0.7rem;
-  height: 0.7rem;
+  top: 0.17rem;
+  left: 0.18rem;
+  width: 0.9rem;
+  height: 0.9rem;
   border-radius: 50%;
   background: var(--color-text-muted);
   transition: transform var(--transition-fast), background var(--transition-fast);
@@ -832,37 +841,37 @@
 .overlay-designer-properties__switches button[data-enabled="true"] > i b,
 .overlay-designer-preview-control[data-active="true"] button > i b {
   background: var(--color-success);
-  transform: translateX(0.88rem);
+  transform: translateX(1.08rem);
 }
 
 .overlay-designer-simulation__body {
   display: grid;
-  gap: 0.65rem;
-  padding: 0.75rem 0.85rem;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
 }
 
 .overlay-designer-simulation__summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .overlay-designer-simulation__summary > span {
   display: inline-flex;
-  min-height: 1.75rem;
+  min-height: 2rem;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.3rem 0.45rem;
+  gap: 0.35rem;
+  padding: 0.38rem 0.55rem;
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.55rem;
+  font-size: 0.74rem;
   font-weight: 900;
   background: rgb(255 255 255 / 5%);
 }
 
 .overlay-designer-simulation__summary svg {
-  width: 0.7rem;
-  height: 0.7rem;
+  width: 0.85rem;
+  height: 0.85rem;
   color: var(--color-focus);
 }
 
@@ -877,14 +886,14 @@
 .overlay-designer-simulation__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.3rem;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
 }
 
 .overlay-designer-simulation button {
-  min-height: 1.95rem;
-  padding: 0.34rem 0.48rem;
-  font-size: 0.52rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.76rem;
 }
 
 .overlay-designer-simulation__reset {
@@ -903,7 +912,7 @@
 
 .overlay-designer-simulation output {
   color: var(--color-focus);
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   font-weight: 900;
 }
 
@@ -924,10 +933,10 @@
 
 .overlay-designer-preview-control > p {
   margin: 0;
-  padding: 0.55rem 0.8rem;
+  padding: 0.7rem 1rem;
   color: var(--color-danger);
-  font-size: 0.55rem;
-  line-height: 1.4;
+  font-size: 0.76rem;
+  line-height: 1.5;
 }
 
 .overlay-designer-empty {
@@ -951,7 +960,7 @@
 .overlay-designer-empty p {
   max-width: 30rem;
   margin: 0;
-  font-size: 0.68rem;
+  font-size: 0.82rem;
 }
 
 .overlay-designer-callout {
@@ -992,8 +1001,8 @@
 .overlay-designer-callout div > p:last-child {
   margin: 0.28rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.65rem;
-  line-height: 1.4;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .overlay-designer-callout > button {
@@ -1004,7 +1013,7 @@
 
 @media (max-width: 78rem) {
   .overlay-designer-workspace {
-    grid-template-columns: 11rem minmax(22rem, 1fr) 17rem;
+    grid-template-columns: 14rem minmax(22rem, 1fr) 20rem;
   }
 
   .overlay-designer-toolbar {
@@ -1025,6 +1034,7 @@
   }
 
   .overlay-designer-canvas {
+    position: static;
     height: 42rem;
     min-height: 42rem;
   }

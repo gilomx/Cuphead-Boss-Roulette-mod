@@ -2,6 +2,17 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El diseñador de overlays aumenta la escala de toda su interfaz configurable:
+  navegación, pestañas, capas, botones, campos, etiquetas, selectores,
+  interruptores, simulación y barra del lienzo usan ahora tamaños cómodos de
+  lectura y columnas laterales más amplias. El contenido del preview, sus cajas
+  de selección y sus controles de arrastre conservan exactamente su escala para
+  no alterar la composición que verá OBS.
+  El panel central del lienzo permanece ahora visible al recorrer configuraciones
+  largas en escritorio. El área exterior al preview se oscurece y separa del
+  fondo de prueba seleccionado, que sólo se dibuja dentro del tamaño real del
+  lienzo; en pantallas estrechas el panel vuelve al flujo normal.
+
 - Modo Molestoso reorganiza su superficie principal alrededor de
   **Interacciones en espera**. El engrane de su encabezado abre una configuración
   dedicada con regreso circular y `Esc`; allí se distribuyen límites y ritmo,
