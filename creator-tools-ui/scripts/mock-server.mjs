@@ -1013,12 +1013,25 @@ function applyOverlayComposerCommand(command, res) {
     const copied = profile.components.map((target) => {
       const sourceComponent = source.components.find((entry) => entry.id === target.id);
       if (!sourceComponent) return target;
+      const scaleX = profile.canvas.width / source.canvas.width;
+      const scaleY = profile.canvas.height / source.canvas.height;
+      const sizeScale = Math.min(
+        1,
+        profile.canvas.width / Math.max(1, sourceComponent.width),
+        profile.canvas.height / Math.max(1, sourceComponent.height),
+      );
+      const width = Math.round(sourceComponent.width * sizeScale);
+      const height = Math.round(sourceComponent.height * sizeScale);
       const next = {
         ...sourceComponent,
-        x: Math.round(sourceComponent.x * profile.canvas.width / source.canvas.width),
-        y: Math.round(sourceComponent.y * profile.canvas.height / source.canvas.height),
-        width: Math.round(sourceComponent.width * profile.canvas.width / source.canvas.width),
-        height: Math.round(sourceComponent.height * profile.canvas.height / source.canvas.height),
+        x: Math.round(
+          (sourceComponent.x + sourceComponent.width / 2) * scaleX - width / 2,
+        ),
+        y: Math.round(
+          (sourceComponent.y + sourceComponent.height / 2) * scaleY - height / 2,
+        ),
+        width,
+        height,
       };
       normalizeOverlayComponent(next, profile.canvas);
       return next;

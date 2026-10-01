@@ -168,7 +168,7 @@ namespace Gilomx.CupheadBossRoulette
             var source = defaults.FindComponent(componentId);
             if (target == null || source == null)
                 return false;
-            CopyComponentValues(source, target, 1d, 1d);
+            CopyComponentValues(source, target, 1d, 1d, 1d);
             return true;
         }
 
@@ -192,7 +192,8 @@ namespace Gilomx.CupheadBossRoulette
                 var to = destination.FindComponent(componentId);
                 if (from == null || to == null)
                     return false;
-                CopyComponentValues(from, to, scaleX, scaleY);
+                CopyComponentValues(from, to, scaleX, scaleY,
+                    ComponentFitScale(destination, from));
                 NormalizeComponent(destination, to);
                 return true;
             }
@@ -202,7 +203,8 @@ namespace Gilomx.CupheadBossRoulette
                 var from = source.FindComponent(to.Id);
                 if (from == null)
                     return false;
-                CopyComponentValues(from, to, scaleX, scaleY);
+                CopyComponentValues(from, to, scaleX, scaleY,
+                    ComponentFitScale(destination, from));
                 NormalizeComponent(destination, to);
             }
             return true;
@@ -573,12 +575,17 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsOverlayComposerComponent source,
             CreatorToolsOverlayComposerComponent destination,
             double scaleX,
-            double scaleY)
+            double scaleY,
+            double sizeScale)
         {
-            destination.X = (int)Math.Round(source.X * scaleX);
-            destination.Y = (int)Math.Round(source.Y * scaleY);
-            destination.Width = (int)Math.Round(source.Width * scaleX);
-            destination.Height = (int)Math.Round(source.Height * scaleY);
+            destination.Width = (int)Math.Round(source.Width * sizeScale);
+            destination.Height = (int)Math.Round(source.Height * sizeScale);
+            destination.X = (int)Math.Round(
+                (source.X + source.Width / 2d) * scaleX -
+                destination.Width / 2d);
+            destination.Y = (int)Math.Round(
+                (source.Y + source.Height / 2d) * scaleY -
+                destination.Height / 2d);
             destination.Enabled = source.Enabled;
             destination.Locked = source.Locked;
             destination.Layer = source.Layer;
@@ -591,6 +598,17 @@ namespace Gilomx.CupheadBossRoulette
             destination.CollectingColor = source.CollectingColor;
             destination.TextColor = source.TextColor;
             destination.OutlineColor = source.OutlineColor;
+        }
+
+        private static double ComponentFitScale(
+            CreatorToolsOverlayComposerProfile destination,
+            CreatorToolsOverlayComposerComponent component)
+        {
+            return Math.Min(1d, Math.Min(
+                destination.CanvasWidth /
+                    (double)Math.Max(1, component.Width),
+                destination.CanvasHeight /
+                    (double)Math.Max(1, component.Height)));
         }
 
         private static bool TryLoadFile(
@@ -623,7 +641,7 @@ namespace Gilomx.CupheadBossRoulette
                     : candidatePath;
                 var candidate = CreateDefaults(path, logWarning);
                 candidate.Revision = revision;
-                var migratedLegacyBounds = false;
+                var migratedBounds = false;
                 var seenProfiles = new HashSet<string>(
                     StringComparer.OrdinalIgnoreCase);
                 for (var i = 0; i < profiles.ArrayValue.Count; i++)
@@ -653,9 +671,13 @@ namespace Gilomx.CupheadBossRoulette
                             !seenComponents.Add(componentId) ||
                             !TryLoadComponent(componentNode, component))
                             return false;
-                        migratedLegacyBounds =
+                        migratedBounds =
                             MigrateLegacyTapFarmingBounds(target, component) ||
-                            migratedLegacyBounds;
+                            migratedBounds;
+                        migratedBounds =
+                            MigrateAnisotropicTapFarmingCopyBounds(
+                                target, component) ||
+                            migratedBounds;
                         NormalizeComponent(target, component);
                     }
                     if (seenComponents.Count != target.Components.Count)
@@ -664,7 +686,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (seenProfiles.Count != candidate.Profiles.Count)
                     return false;
                 loaded = candidate;
-                if (migratedLegacyBounds && !candidatePath.EndsWith(
+                if (migratedBounds && !candidatePath.EndsWith(
                         ".bak", StringComparison.OrdinalIgnoreCase))
                     candidate.TrySave();
                 return true;
@@ -693,6 +715,30 @@ namespace Gilomx.CupheadBossRoulette
             component.Y += (legacyHeight - 300) / 2;
             component.Width = 360;
             component.Height = 300;
+            return true;
+        }
+
+        private static bool MigrateAnisotropicTapFarmingCopyBounds(
+            CreatorToolsOverlayComposerProfile profile,
+            CreatorToolsOverlayComposerComponent component)
+        {
+            if (profile == null || component == null ||
+                component.Id != TapFarmingComponentId)
+                return false;
+            var horizontalCopy =
+                profile.Id == HorizontalProfileId &&
+                component.Width == 640 && component.Height == 220;
+            var verticalCopy =
+                profile.Id == VerticalProfileId &&
+                component.Width == 220 && component.Height == 533;
+            if (!horizontalCopy && !verticalCopy)
+                return false;
+            var centerX = component.X + component.Width / 2d;
+            var centerY = component.Y + component.Height / 2d;
+            component.Width = 360;
+            component.Height = 300;
+            component.X = (int)Math.Round(centerX - component.Width / 2d);
+            component.Y = (int)Math.Round(centerY - component.Height / 2d);
             return true;
         }
 

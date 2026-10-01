@@ -74,6 +74,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestOverlayComposerPersistenceAndRevision);
             Run("Overlay composer compacts legacy Tap Farming bounds",
                 TestOverlayComposerCompactsLegacyTapBounds);
+            Run("Overlay composer preserves component proportions across profiles",
+                TestOverlayComposerPreservesProportionsAcrossProfiles);
             Run("Overlay composer serves POST config and preview routes",
                 TestOverlayComposerHttpRoutes);
             Run("Overlay preview expires and stops without gameplay state",
@@ -1347,6 +1349,45 @@ namespace Gilomx.CupheadBossRoulette
                         "migrated Tap Farming width");
                     Equal(300, component.GetProperty("height").GetInt32(),
                         "migrated Tap Farming height");
+                }
+            }
+        }
+
+        private static void
+            TestOverlayComposerPreservesProportionsAcrossProfiles()
+        {
+            using (var scope = new TestScope("overlay-composer-copy-ratio"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                var resized = controller.ProcessConfigCommand(
+                    "{\"operation\":\"update\"," +
+                    "\"expectedRevision\":0," +
+                    "\"profileId\":\"vertical\"," +
+                    "\"componentId\":\"tap_farming\"," +
+                    "\"x\":120,\"y\":480," +
+                    "\"width\":540,\"height\":450}");
+                Equal(200, resized.StatusCode,
+                    "source component update status");
+
+                var copied = controller.ProcessConfigCommand(
+                    "{\"operation\":\"copy\"," +
+                    "\"expectedRevision\":1," +
+                    "\"profileId\":\"horizontal\"," +
+                    "\"sourceProfileId\":\"vertical\"}");
+                Equal(200, copied.StatusCode,
+                    "profile copy status");
+                using (var json = JsonDocument.Parse(copied.Json))
+                {
+                    var component = FindComposerComponent(
+                        json.RootElement, "horizontal", "tap_farming");
+                    Equal(540, component.GetProperty("width").GetInt32(),
+                        "copied component width");
+                    Equal(450, component.GetProperty("height").GetInt32(),
+                        "copied component height");
+                    Equal(
+                        540 * 5,
+                        component.GetProperty("height").GetInt32() * 6,
+                        "copied component aspect ratio");
                 }
             }
         }
