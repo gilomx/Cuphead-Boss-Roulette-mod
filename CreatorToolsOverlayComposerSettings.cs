@@ -406,9 +406,9 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsOverlayComposerComponent component)
         {
             var minimumWidth = component.Id == PeskyBattleComponentId
-                ? 320 : 220;
+                ? 320 : 120;
             var minimumHeight = component.Id == PeskyBattleComponentId
-                ? 180 : 220;
+                ? 180 : 100;
             component.Width = Math.Max(minimumWidth,
                 Math.Min(profile.CanvasWidth, component.Width));
             component.Height = Math.Max(minimumHeight,

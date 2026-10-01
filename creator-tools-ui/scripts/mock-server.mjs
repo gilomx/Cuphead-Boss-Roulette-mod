@@ -939,8 +939,8 @@ function readJsonBody(req, res, callback) {
 }
 
 function normalizeOverlayComponent(component, canvas) {
-  const minimumWidth = component.id === "pesky_battle" ? 320 : 220;
-  const minimumHeight = component.id === "pesky_battle" ? 180 : 220;
+  const minimumWidth = component.id === "pesky_battle" ? 320 : 120;
+  const minimumHeight = component.id === "pesky_battle" ? 180 : 100;
   component.width = Math.max(
     minimumWidth,
     Math.min(canvas.width, Math.round(Number(component.width) || minimumWidth)),

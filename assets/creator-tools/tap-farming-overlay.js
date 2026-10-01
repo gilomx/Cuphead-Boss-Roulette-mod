@@ -497,13 +497,13 @@
     root.setAttribute("aria-hidden", String(!visible));
     motionEnabled = presentation.motion;
     applyColors(presentation);
-    root.style.setProperty("--metric-font-size", "34px");
+    root.style.setProperty("--metric-font-size", "46px");
 
     liquidLevel.style.transform = `translateY(${258 - healthRatio * 245}px)`;
     const hasBossImage = updateBossImage(snapshot);
-    percent.setAttribute("y", hasBossImage ? "178" : "148");
+    percent.setAttribute("y", hasBossImage ? "191" : "161");
     percent.textContent = metricValue;
-    healthRemaining.setAttribute("y", hasBossImage ? "206" : "176");
+    healthRemaining.setAttribute("y", hasBossImage ? "217" : "187");
     healthRemaining.textContent = pendingBossHealth
       ? ""
       : `${format(snapshot.currentHealth)} ${text.healthPointsShort}`;

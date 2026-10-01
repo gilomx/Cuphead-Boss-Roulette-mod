@@ -202,7 +202,7 @@ export function minimumComponentSize(
 ): OverlayCanvasSize {
   return componentId === "pesky_battle"
     ? { width: 320, height: 180 }
-    : { width: 220, height: 220 };
+    : { width: 120, height: 100 };
 }
 
 export function proportionalComponentSize(

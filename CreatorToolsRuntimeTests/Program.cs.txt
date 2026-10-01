@@ -1389,6 +1389,21 @@ namespace Gilomx.CupheadBossRoulette
                         component.GetProperty("height").GetInt32() * 6,
                         "copied component aspect ratio");
                 }
+
+                var defaults =
+                    CreatorToolsOverlayComposerSettings.CreateDefaults(
+                        Path.Combine(scope.ConfigDirectory, "minimum.json"),
+                        null);
+                var compact = defaults.FindProfile("horizontal")
+                    .FindComponent("tap_farming");
+                compact.Width = 1;
+                compact.Height = 1;
+                CreatorToolsOverlayComposerSettings.NormalizeComponent(
+                    defaults.FindProfile("horizontal"), compact);
+                Equal(120, compact.Width,
+                    "minimum Tap Farming width");
+                Equal(100, compact.Height,
+                    "minimum Tap Farming height");
             }
         }
 

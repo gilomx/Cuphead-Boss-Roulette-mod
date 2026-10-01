@@ -498,7 +498,6 @@
         "phases": {
           "collecting": "Accumulating health",
           "active": "Boss active",
-          "transition": "Phase transition",
           "completed": "Victory"
         },
         "addTaps": "Add taps",

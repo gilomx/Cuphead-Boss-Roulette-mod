@@ -498,7 +498,6 @@
         "phases": {
           "collecting": "Acumulando vida",
           "active": "Jefe activo",
-          "transition": "Cambio de fase",
           "completed": "Victoria"
         },
         "addTaps": "Agregar taps",

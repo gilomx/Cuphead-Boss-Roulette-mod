@@ -91,7 +91,6 @@ export function OverlayDesignerInspector({
   > = component.id === "tap_farming"
     ? ["enabled", "locked", "motion"]
     : ["enabled", "locked", "showTitle", "showDetails", "motion"];
-
   const updateGeometry = (
     key: typeof geometry[number][0],
     value: number,
@@ -275,13 +274,13 @@ export function OverlayDesignerInspector({
             <label>
               <span>{t("overlayDesigner.simulation.scenario")}</span>
               <select
-                value={tapState.phase}
+                value={tapState.phase === "transition" ? "active" : tapState.phase}
                 onChange={(event) => dispatchTap({
                   type: "scenario",
                   scenario: event.target.value as TapFarmingPreviewSnapshot["phase"],
                 })}
               >
-                {(["collecting", "active", "transition", "completed"] as const).map((phase) => (
+                {(["collecting", "active", "completed"] as const).map((phase) => (
                   <option value={phase} key={phase}>
                     {t(`overlayDesigner.simulation.tap.phases.${phase}`)}
                   </option>
