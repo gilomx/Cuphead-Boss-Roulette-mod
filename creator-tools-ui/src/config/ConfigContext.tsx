@@ -52,6 +52,7 @@ interface ConfigValue {
   applyPeskyIntervals: (maxActive: number, pacing: PacingValues, allowConcurrentStrongInteractions?: boolean) => void;
   applyPacingToBoth: (maxActive: number, pacing: Omit<InteractionPacingConfig, "enabled">, allowConcurrentStrongInteractions?: boolean, interactionUnlimited?: boolean) => void;
   applyPeskyBattleGift: (giftId: string) => void;
+  applyPeskyBattleCapacity: (capacity: number) => void;
   applyPeskyBattleStreamAttacks: (enabled: boolean) => void;
   applyPeskyBattleItem: (item: string, enabled: boolean) => void;
   armPeskyBattle: (giftId: string) => void;
@@ -1087,6 +1088,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [peskyBattle, sendPeskyBattleUpdate],
   );
 
+  const applyPeskyBattleCapacity = useCallback(
+    (capacity: number) => {
+      if (!peskyBattle?.ready || peskyBattle.phase !== "off" ||
+          !Number.isInteger(capacity) || capacity < 2 || capacity > 5) return;
+      sendPeskyBattleUpdate(
+        new URLSearchParams({ capacity: String(capacity) }),
+        (state) => ({ ...state, capacity, feedback: "capacity_saved", error: false }),
+      );
+    },
+    [peskyBattle, sendPeskyBattleUpdate],
+  );
+
   const applyPeskyBattleStreamAttacks = useCallback(
     (enabled: boolean) => {
       if (!peskyBattle?.ready) return;
@@ -1148,7 +1161,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           }
         : current);
       sendPeskyBattleUpdate(
-        new URLSearchParams({ action: "arm", giftId }),
+        new URLSearchParams({ action: "arm", giftId, capacity: String(peskyBattle.capacity) }),
         (state) => ({
           ...state,
           phase: "recruiting",
@@ -1500,6 +1513,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyIntervals,
       applyPacingToBoth,
       applyPeskyBattleGift,
+      applyPeskyBattleCapacity,
       applyPeskyBattleStreamAttacks,
       applyPeskyBattleItem,
       armPeskyBattle,
@@ -1544,6 +1558,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       applyPeskyIntervals,
       applyPacingToBoth,
       applyPeskyBattleGift,
+      applyPeskyBattleCapacity,
       applyPeskyBattleStreamAttacks,
       applyPeskyBattleItem,
       armPeskyBattle,

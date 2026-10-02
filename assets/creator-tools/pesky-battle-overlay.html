@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Batalla Molestosa</title>
-  <link rel="stylesheet" href="/pesky-battle-overlay.css?v=composer-2">
+  <link rel="stylesheet" href="/pesky-battle-overlay.css?v=minimal-roster-1">
 </head>
 <body>
   <main
@@ -18,15 +18,7 @@
     data-motion="true"
   >
     <header class="battle__header">
-      <div class="battle__heading">
-        <span id="battle-eyebrow" class="battle__eyebrow">BATALLA MOLESTOSA</span>
-        <strong id="battle-status" class="battle__status">Esperando reclutamiento</strong>
-      </div>
-      <div id="battle-trigger" class="battle__trigger" hidden>
-        <img id="battle-gift-image" alt="" hidden>
-        <span id="battle-gift-name"></span>
-        <b id="battle-progress">0/5</b>
-      </div>
+      <strong id="battle-status" class="battle__status" role="status" aria-live="polite">Esperando jugadores</strong>
     </header>
 
     <ol id="battle-roster" class="battle__roster" aria-label="Participantes de Batalla Molestosa"></ol>
@@ -36,14 +28,21 @@
     <li class="battle-slot" data-filled="false">
       <div class="battle-slot__portrait">
         <img class="battle-slot__avatar" alt="" referrerpolicy="no-referrer" hidden>
-        <span class="battle-slot__initial" aria-hidden="true">?</span>
-        <span class="battle-slot__number"></span>
+        <img class="battle-slot__gift" alt="" hidden>
+        <span class="battle-slot__coin" aria-hidden="true">
+        <svg viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="17" fill="#f4c76f" stroke="#c39032" stroke-width="2" />
+          <circle cx="20" cy="20" r="12" fill="none" stroke="#ffe8a8" stroke-width="2" />
+          <path d="m20 11 6 9-6 9-6-9z" fill="#c39032" />
+        </svg>
+        </span>
+        <span class="battle-slot__initial" aria-hidden="true" hidden></span>
+        <span class="battle-slot__name" hidden></span>
       </div>
-      <span class="battle-slot__name"></span>
     </li>
   </template>
 
   <script src="/assets/creator-tools/live-event-overlay-runtime.js?v=composer-1"></script>
-  <script src="/pesky-battle-overlay.js?v=composer-2"></script>
+  <script src="/pesky-battle-overlay.js?v=minimal-roster-1"></script>
 </body>
 </html>

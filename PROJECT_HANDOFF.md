@@ -2,6 +2,67 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Reclutamiento minimalista de Batalla (2026-10-02)
+
+La cantidad de participantes usa un select nativo de 2 a 5, con el mismo
+bloqueo al armar la batalla. El catálogo ocupa ahora un panel independiente
+de todo el ancho, debajo de la configuración y los cupos.
+
+El overlay reemplaza la composición ornamental por un encabezado sencillo y
+circulos con borde discontinuo, regalo de entrada y moneda SVG de respaldo.
+De 2 a 4 participantes usa una fila; con 5 muestra 3 arriba y 2 centrados
+abajo, tanto en el widget vertical como en el horizontal. Cada donación llena
+su círculo con la foto de perfil y se conservan los nodos de los cupos ya
+ocupados. Si falla la foto, usa iniciales sin signo de interrogación. La fase
+ready muestra «Jugadores listos»; en combate, los nombres se colocan en la
+esquina superior izquierda. Aún no hay animación de ataques por participante.
+
+`npm run test:pesky-battle-overlay` valida los cuatro cupos posibles, el
+relleno incremental, imágenes ausentes/inseguras, slots duplicados, idioma y
+controles del compositor. Se verificó visualmente con fotos de prueba el
+reclutamiento, la lista completa y los nombres durante combate.
+
+Aprobaron las cinco pruebas del renderer y la prueba runtime de Batalla. El
+build completo Release terminó sin errores ni advertencias y publicó 1,481
+archivos en el ZIP Dev. Una lectura independiente confirmó la ruta física y
+SHA-256 `7DCB6B7DA8D7FA68E4743E69BEB55A4E49A24FD9209AD2A152FAA93E25423CCD`.
+
+## Batalla configurable y tipografía del panel (2026-10-01)
+
+Batalla Molestosa incluye ahora los 12 retos temporales del catálogo compartido.
+El scheduler consulta la disponibilidad del executor, respeta los retos de avión
+y usa sus tiempos por omisión (15 s y aviso de 3 s). Los retos mantienen el nombre
+del participante y la fuente `pesky_battle`; cancelarlos libera su lease sin
+borrar donaciones. El catálogo puede contener únicamente un reto temporal y
+siempre exige al menos un artículo habilitado.
+
+`capacity` se configura de 2 a 5 mediante la página y el endpoint existente.
+Reclutamiento, inicio, scheduler y snapshot usan esa cantidad. Se bloquea al
+armar la sesión y se conserva en reintentos. El archivo `.pesky-battle.json`
+usa esquema 2, lee esquema 1 como cinco cupos sin perder ajustes y recupera
+desde `.bak` cuando el esquema 2 trae una cantidad inválida.
+
+Toda la interfaz usa cinco tokens tipográficos en `index.css`: caption 14 px,
+body 16 px, section 20 px, title 32 px y display 40 px (con raíz estándar de
+16 px). `overlay-designer.css` utiliza la misma escala para sus controles;
+los assets de los overlays y su diseño no se modificaron. La adaptación del
+overlay de Batalla a 2–5 participantes sigue pendiente de diseño.
+
+La prueba dedicada se ejecuta con
+`dotnet run --project CreatorToolsRuntimeTests/PeskyBattle/PeskyBattle.csproj`.
+Enlaza settings, controller, queue y executor reales; cubre migración,
+persistencia, recuperación, las cuatro capacidades, duplicados, bloqueos,
+reintentos, validación atómica al armar y ejecución/cancelación de los 12 retos.
+
+Aprobaron esa prueba, la suite runtime general, el build del panel y la
+compilación Release del mod (cero errores y advertencias), incluidos sus
+contratos de carga nativa. Se revisaron siete páginas en escritorio y móvil.
+El publicador canónico generó el ZIP Dev completo de 1,481 archivos; un proceso
+independiente del mismo usuario confirmó su ruta física y SHA-256
+`AABABE3DAC0C6907FA90EFB2793F30E7C23DA903CEAA2856746C38286AAEAAC1`.
+Queda disponible en el launcher para el siguiente arranque, sin iniciar ni
+detener el juego.
+
 ## Catálogo TikTok y Community Gift estable (2026-09-30)
 
 El catálogo offline se regeneró desde la instantánea `2026-09-23.1` de Gift

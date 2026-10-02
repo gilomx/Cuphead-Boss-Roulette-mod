@@ -1,0 +1,196 @@
+using System;
+using System.IO;
+using System.Text.Json;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+
+internal static class Program
+{
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new Exception(message);
+    }
+
+    private static void Main()
+    {
+        TestSettings();
+        foreach (var capacity in new[] { 2, 3, 4, 5 }) TestRecruitment(capacity);
+        TestInvalidSettings();
+        foreach (var item in CreatorToolsTimedChallenge.Items) TestChallenge(item);
+        Console.WriteLine("All Pesky Battle tests passed (migration, persistence, 2–5 slots, retries, locks and 12 timed challenges).");
+    }
+
+    private static void TestSettings()
+    {
+        using (var scope = new Scope())
+        {
+            File.WriteAllText(scope.SettingsPath,
+                "{\"version\":1,\"giftId\":\"5655\",\"allowStreamAttacks\":false,\"disabledItems\":[\"challenge_no_ex\"]}");
+            var settings = CreatorToolsPeskyBattleSettings.Load(scope.ConfigPath, null);
+            Check(settings.Capacity == 5 && settings.GiftId == "5655" && !settings.AllowStreamAttacks,
+                "legacy settings preserve the gift, stream toggle and five slots");
+            Check(!settings.IsItemEnabled(CreatorToolsTimedChallenge.NoEx), "disabled challenge remains disabled");
+            Check(settings.IsItemEnabled(CreatorToolsTimedChallenge.HalfDamage), "timed challenge is eligible by default");
+            settings.Capacity = 3;
+            settings.Save();
+            var loaded = CreatorToolsPeskyBattleSettings.Load(scope.ConfigPath, null);
+            Check(loaded.Capacity == 3 && loaded.DisabledItems.Contains(CreatorToolsTimedChallenge.NoEx),
+                "capacity and catalog round trip together");
+            settings.Capacity = 2;
+            settings.Save();
+            foreach (var invalidCapacity in new[] { "1", "6", "2.5", "-2" })
+            {
+                File.WriteAllText(scope.SettingsPath,
+                    "{\"version\":2,\"giftId\":\"5655\",\"capacity\":" + invalidCapacity + ",\"allowStreamAttacks\":true,\"disabledItems\":[]}");
+                loaded = CreatorToolsPeskyBattleSettings.Load(scope.ConfigPath, null);
+                Check(loaded.Capacity == 3 && !loaded.AllowStreamAttacks,
+                    "invalid capacity recovers valid settings from the backup");
+                loaded.Save();
+            }
+        }
+    }
+
+    private static void TestRecruitment(int capacity)
+    {
+        using (var scope = new Scope())
+        {
+            var battle = scope.CreateBattle();
+            battle.ProcessBackgroundCommand("capacity=" + capacity);
+            Check(scope.State(battle).GetProperty("capacity").GetInt32() == capacity, "capacity projected before arming");
+            battle.ProcessBackgroundCommand("action=arm&giftId=5655&capacity=" + capacity);
+            battle.ProcessCommands(null);
+            battle.ProcessBackgroundCommand("capacity=2");
+            Check(scope.State(battle).GetProperty("feedback").GetString() == "battle_active_setting_locked", "recruitment locks the configured capacity");
+            battle.ProcessBackgroundCommand("item=challenge_no_ex&itemEnabled=0");
+            Check(scope.State(battle).GetProperty("disabledItems").GetArrayLength() == 0, "catalog is locked during recruitment");
+            for (var i = 1; i < capacity; i++)
+            {
+                battle.ObserveStreamEvent(Gift(i));
+                battle.ObserveStreamEvent(Gift(i));
+                Check(battle.Phase == "recruiting", "duplicates cannot complete recruitment");
+            }
+            battle.ProcessBackgroundCommand("action=start");
+            Check(battle.Phase == "recruiting", "cannot start before all configured slots are full");
+            battle.ObserveStreamEvent(Gift(capacity));
+            Check(battle.Phase == "ready", "recruitment completes at the configured capacity");
+            battle.ObserveStreamEvent(Gift(capacity + 1));
+            Check(scope.State(battle).GetProperty("participants").GetArrayLength() == capacity, "extra gifts cannot add a slot");
+            battle.ProcessBackgroundCommand("action=start");
+            var firstLevel = new Level { CurrentLevel = Levels.Ground, Id = 1 };
+            battle.OnLevelStarted(firstLevel);
+            Check(battle.Active, "configured roster enters combat");
+            battle.OnLevelDefeated(firstLevel);
+            Check(battle.Phase == "waiting_level", "defeat waits for a retry");
+            battle.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 2 });
+            var state = scope.State(battle);
+            Check(battle.Active && state.GetProperty("attempt").GetInt32() == 2, "retry starts a second attempt");
+            Check(state.GetProperty("capacity").GetInt32() == capacity && state.GetProperty("participants").GetArrayLength() == capacity,
+                "retry retains the configured capacity and full roster");
+            battle.ProcessBackgroundCommand("action=off");
+            battle.ProcessCommands(null);
+            Check(battle.Phase == "off", "cancellation completes on the main thread");
+            Check(CreatorToolsPeskyBattleSettings.Load(scope.ConfigPath, null).Capacity == capacity, "capacity persists after cancellation");
+            battle.Dispose();
+        }
+    }
+
+    private static void TestInvalidSettings()
+    {
+        using (var scope = new Scope())
+        {
+            var battle = scope.CreateBattle();
+            foreach (var value in new[] { "1", "6", "0", "-2", "2.5", "nope", "" })
+            {
+                battle.ProcessBackgroundCommand("capacity=" + value);
+                var state = scope.State(battle);
+                Check(state.GetProperty("error").GetBoolean() && state.GetProperty("capacity").GetInt32() == 5,
+                    "invalid capacities are rejected without replacing the existing value");
+            }
+            battle.ProcessBackgroundCommand("action=arm&giftId=5655&capacity=6");
+            Check(battle.Phase == "off" && scope.Coordinator.Snapshot.ActiveEvent == "", "invalid arm settings release the live-event lease");
+            Check(scope.State(battle).GetProperty("trigger").GetProperty("giftId").GetString() == "", "invalid arm is atomic");
+            battle.Dispose();
+        }
+    }
+
+    private static void TestChallenge(string item)
+    {
+        using (var scope = new Scope())
+        {
+            var plane = false;
+            var timer = new TimedChallengeInteractionExecutor(() => true, _ => false, () => plane, _ => true, _ => { });
+            var battle = scope.CreateBattle(timer.IsAvailable);
+            foreach (var candidate in CreatorToolsInteractionIds.All)
+                if (candidate != item) battle.ProcessBackgroundCommand("item=" + candidate + "&itemEnabled=0");
+            Check(scope.State(battle).GetProperty("disabledItems").GetArrayLength() == CreatorToolsInteractionIds.All.Length - 1,
+                "a timed challenge alone is enough to arm a battle");
+            battle.ProcessBackgroundCommand("item=" + item + "&itemEnabled=0");
+            Check(scope.State(battle).GetProperty("feedback").GetString() == "items_required", "cannot disable the last timed challenge");
+            battle.ProcessBackgroundCommand("action=arm&giftId=5655&capacity=2");
+            battle.ProcessCommands(null);
+            battle.ObserveStreamEvent(Gift(1));
+            battle.ObserveStreamEvent(Gift(2));
+            battle.ProcessBackgroundCommand("action=start");
+            battle.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 1 });
+            Time.realtimeSinceStartup = 0;
+            battle.Update(null, true, true);
+            Time.realtimeSinceStartup = 10;
+            battle.Update(null, true, true);
+            if (CreatorToolsTimedChallenge.RequiresPlane(item))
+            {
+                Check(scope.Queue.PendingCount == 0, "plane-only challenge is not generated on a ground level");
+                plane = true;
+                Time.realtimeSinceStartup = 20;
+                battle.Update(null, true, true);
+            }
+            var entry = scope.Queue.Peek();
+            Check(entry != null && entry.Item == item && entry.Source == CreatorToolsInteractionSource.PeskyBattle, "scheduler queues the selected timed challenge");
+            Check(entry.Donor == "Viewer 1" && entry.DurationSeconds == 15 && entry.CountdownSeconds == 3, "challenge keeps its participant and existing timing");
+            Check(timer.TrySpawn(entry.Item, entry.Donor, entry.GiftImagePath, entry.DurationSeconds, entry.CountdownSeconds,
+                out var handle, out var feedback, out var error), "queued battle challenge runs through the timed executor");
+            scope.Queue.Activate(entry, handle);
+            Time.realtimeSinceStartup += 10;
+            battle.Update(null, true, true);
+            Check(scope.Queue.PendingCount == 0, "a busy timed executor cannot receive an overlapping battle challenge");
+            scope.Queue.Enqueue("hilda_purple_zeppelin", "Stream viewer", "", 1, 0, CreatorToolsInteractionSource.Stream);
+            battle.ProcessBackgroundCommand("action=off");
+            battle.ProcessCommands(null);
+            Check(!timer.Busy && scope.Queue.CountFor(CreatorToolsInteractionSource.PeskyBattle) == 0, "cancellation disposes the timed challenge lease");
+            Check(scope.Queue.CountFor(CreatorToolsInteractionSource.Stream) == 1, "cancellation preserves unrelated stream entries");
+            battle.Dispose();
+            timer.Dispose();
+        }
+    }
+
+    private static CreatorToolsStreamEvent Gift(int id)
+    {
+        return new CreatorToolsStreamEvent { Platform = "tiktok", Type = "gift", ItemId = "5655",
+            UserId = id.ToString(), UserName = "viewer" + id, UserDisplayName = "Viewer " + id, StreakState = "complete" };
+    }
+
+    private sealed class Scope : IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "pichi-battle-tests-" + Guid.NewGuid().ToString("N"));
+        internal string ConfigPath { get { return Path.Combine(directory, "plugin.cfg"); } }
+        internal string SettingsPath { get { return Path.Combine(directory, "mx.gilomx.cuphead.bossroulette.pesky-battle.json"); } }
+        internal readonly CreatorToolsInteractionQueue Queue = new CreatorToolsInteractionQueue();
+        internal readonly CreatorToolsLiveEventsCoordinator Coordinator = new CreatorToolsLiveEventsCoordinator();
+        private readonly CreatorToolsServer server = new CreatorToolsServer();
+        internal Scope() { Directory.CreateDirectory(directory); }
+        internal CreatorToolsPeskyBattleController CreateBattle(Func<string, bool> available = null)
+        {
+            return new CreatorToolsPeskyBattleController(ConfigPath, Queue, Coordinator, ResolveGift, available, null, null, null);
+        }
+        private static bool ResolveGift(string id, out CreatorToolsGiftCatalogEntry gift)
+        {
+            gift = id == "5655" ? new CreatorToolsGiftCatalogEntry(id, "Rose", "", 1) : null;
+            return gift != null;
+        }
+        internal JsonElement State(CreatorToolsPeskyBattleController battle)
+        {
+            battle.PublishState(server);
+            using (var json = JsonDocument.Parse(server.State)) return json.RootElement.Clone();
+        }
+        public void Dispose() { Queue.Dispose(); Directory.Delete(directory, true); }
+    }
+}

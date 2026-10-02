@@ -7,7 +7,7 @@ import { useLocalization } from "../../i18n/LocalizationContext";
 import type { PeskyBattleParticipant } from "../../model";
 import { interactionItems as allInteractionItems } from "../interactions/interactionCatalog";
 
-const BATTLE_CAPACITY = 5;
+const PARTICIPANT_COUNTS = [2, 3, 4, 5] as const;
 
 function participantName(participant: PeskyBattleParticipant | null) {
   if (!participant) return "";
@@ -20,13 +20,13 @@ function initials(value: string) {
   return parts.slice(0, 2).map((part) => part[0]).join("").toLocaleUpperCase();
 }
 
-function participantsBySlot(participants: PeskyBattleParticipant[]) {
+function participantsBySlot(participants: PeskyBattleParticipant[], capacity: number) {
   const slots: Array<PeskyBattleParticipant | null> = Array.from(
-    { length: BATTLE_CAPACITY },
+    { length: capacity },
     () => null,
   );
   for (const participant of participants) {
-    const preferred = participant.slot >= 1 && participant.slot <= BATTLE_CAPACITY
+    const preferred = participant.slot >= 1 && participant.slot <= capacity
       ? participant.slot - 1
       : -1;
     const index = preferred >= 0 && slots[preferred] === null
@@ -37,7 +37,11 @@ function participantsBySlot(participants: PeskyBattleParticipant[]) {
   return slots;
 }
 
-const interactionItems = allInteractionItems.filter((item) => item.group !== "challenge");
+const interactionItems = allInteractionItems;
+const catalogGroups = [
+  { key: "interactions", items: interactionItems.filter((item) => item.group !== "challenge") },
+  { key: "challenges", items: interactionItems.filter((item) => item.group === "challenge") },
+] as const;
 
 export function PeskyBattlePanel() {
   const {
@@ -45,6 +49,7 @@ export function PeskyBattlePanel() {
     liveEvents,
     peskyBattle,
     applyPeskyBattleGift,
+    applyPeskyBattleCapacity,
     applyPeskyBattleStreamAttacks,
     applyPeskyBattleItem,
     armPeskyBattle,
@@ -58,6 +63,7 @@ export function PeskyBattlePanel() {
   const [giftDraft, setGiftDraft] = useState("");
 
   const phase = peskyBattle?.phase ?? "off";
+  const capacity = peskyBattle?.capacity ?? 5;
   const configurationLocked = phase !== "off";
   const gifts = catalog?.gifts ?? [];
 
@@ -76,9 +82,9 @@ export function PeskyBattlePanel() {
   const enabledItemCount = interactionItems.filter(
     (item) => !disabledItems.has(item.id),
   ).length;
-  const slots = participantsBySlot(peskyBattle?.participants ?? []);
+  const slots = participantsBySlot(peskyBattle?.participants ?? [], capacity);
   const participantCount = slots.filter(Boolean).length;
-  const rosterReady = participantCount === BATTLE_CAPACITY;
+  const rosterReady = participantCount === capacity;
   const blockedByTapFarming = liveEvents?.activeEvent === "tap_farming";
   const canArm = Boolean(
     peskyBattle?.ready && phase === "off" && giftDraft && selectedGift &&
@@ -99,112 +105,275 @@ export function PeskyBattlePanel() {
       : t(`dashboard.peskyBattle.phaseDescription.${phase}`);
 
   return (
-    <section
-      className="dashboard-pesky-battle"
-      data-phase={phase}
-      aria-labelledby="dashboard-pesky-battle-title"
-    >
-      <div className="dashboard-pesky-battle__heading">
-        <div>
-          <p className="dashboard-eyebrow">{t("dashboard.peskyBattle.eyebrow")}</p>
-          <h1 id="dashboard-pesky-battle-title">
-            <Swords aria-hidden="true" />
-            {t("dashboard.peskyBattle.title")}
-          </h1>
-          <p>{t("dashboard.peskyBattle.description")}</p>
-        </div>
-        <div className="dashboard-pesky-battle__heading-actions">
-          <span className="dashboard-pesky-battle__status" data-phase={phase}>
-            {t(`dashboard.peskyBattle.phase.${phase}`)}
-          </span>
-        </div>
-      </div>
-
-      <div className="dashboard-pesky-battle__state" role="status" aria-live="polite">
-        <strong>{t(`dashboard.peskyBattle.phase.${phase}`)}</strong>
-        <span>{phaseDescription}</span>
-      </div>
-
-      {blockedByTapFarming ? (
-        <div className="dashboard-live-event-conflict" role="status">
-          <AlertTriangle aria-hidden="true" />
+    <>
+      <section
+        className="dashboard-pesky-battle"
+        data-phase={phase}
+        aria-labelledby="dashboard-pesky-battle-title"
+      >
+        <div className="dashboard-pesky-battle__heading">
           <div>
-            <strong>{t("dashboard.liveEvents.conflict.title")}</strong>
-            <span>{t("dashboard.liveEvents.conflict.tapFarmingActive")}</span>
+            <p className="dashboard-eyebrow">{t("dashboard.peskyBattle.eyebrow")}</p>
+            <h1 id="dashboard-pesky-battle-title">
+              <Swords aria-hidden="true" />
+              {t("dashboard.peskyBattle.title")}
+            </h1>
+            <p>{t("dashboard.peskyBattle.description")}</p>
+          </div>
+          <div className="dashboard-pesky-battle__heading-actions">
+            <span className="dashboard-pesky-battle__status" data-phase={phase}>
+              {t(`dashboard.peskyBattle.phase.${phase}`)}
+            </span>
           </div>
         </div>
-      ) : null}
 
-      <div className="dashboard-pesky-battle__layout">
-        <div className="dashboard-pesky-battle__configuration">
-          <div className="dashboard-pesky-battle__trigger">
-            <SearchableSelectField
-              id="dashboard-pesky-battle-gift"
-              label={t("dashboard.peskyBattle.trigger.label")}
-              options={gifts}
-              selectedKey={giftDraft || null}
-              placeholder={giftPlaceholder}
-              noResults={t("dashboard.peskyBattle.trigger.noResults")}
-              disabled={configurationLocked || !peskyBattle?.ready ||
-                !catalog || catalogError}
-              getKey={(gift) => gift.giftId}
-              getLabel={(gift) => gift.name}
-              getImage={(gift) => gift.imagePath}
-              getMeta={(gift) => t("dashboard.peskyBattle.trigger.coins")
-                .replace("{coins}", gift.coinsPerUnit.toLocaleString(
-                  locale === "es" ? "es-MX" : "en-US",
+        <div className="dashboard-pesky-battle__state" role="status" aria-live="polite">
+          <strong>{t(`dashboard.peskyBattle.phase.${phase}`)}</strong>
+          <span>{phaseDescription.replace("{count}", String(capacity))}</span>
+        </div>
+
+        {blockedByTapFarming ? (
+          <div className="dashboard-live-event-conflict" role="status">
+            <AlertTriangle aria-hidden="true" />
+            <div>
+              <strong>{t("dashboard.liveEvents.conflict.title")}</strong>
+              <span>{t("dashboard.liveEvents.conflict.tapFarmingActive")}</span>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="dashboard-pesky-battle__layout">
+          <div className="dashboard-pesky-battle__configuration">
+            <div className="dashboard-pesky-battle__trigger">
+              <SearchableSelectField
+                id="dashboard-pesky-battle-gift"
+                label={t("dashboard.peskyBattle.trigger.label")}
+                options={gifts}
+                selectedKey={giftDraft || null}
+                placeholder={giftPlaceholder}
+                noResults={t("dashboard.peskyBattle.trigger.noResults")}
+                disabled={configurationLocked || !peskyBattle?.ready ||
+                  !catalog || catalogError}
+                getKey={(gift) => gift.giftId}
+                getLabel={(gift) => gift.name}
+                getImage={(gift) => gift.imagePath}
+                getMeta={(gift) => t("dashboard.peskyBattle.trigger.coins")
+                  .replace("{coins}", gift.coinsPerUnit.toLocaleString(
+                    locale === "es" ? "es-MX" : "en-US",
+                  ))}
+                getSearchTerms={(gift) => gift.aliases}
+                onSelect={(gift) => {
+                  setGiftDraft(gift.giftId);
+                  applyPeskyBattleGift(gift.giftId);
+                }}
+              />
+              <small>
+                {configurationLocked
+                  ? t("dashboard.peskyBattle.trigger.locked")
+                  : t("dashboard.peskyBattle.trigger.hint")}
+              </small>
+            </div>
+
+            <div className="dashboard-pesky-battle__capacity">
+              <label htmlFor="dashboard-pesky-battle-capacity">
+                {t("dashboard.peskyBattle.capacity.label")}
+              </label>
+              <select
+                id="dashboard-pesky-battle-capacity"
+                value={capacity}
+                disabled={configurationLocked || !peskyBattle?.ready}
+                aria-describedby="dashboard-pesky-battle-capacity-hint"
+                onChange={(event) => applyPeskyBattleCapacity(Number(event.target.value))}
+              >
+                {PARTICIPANT_COUNTS.map((count) => (
+                  <option key={count} value={count}>{count}</option>
                 ))}
-              getSearchTerms={(gift) => gift.aliases}
-              onSelect={(gift) => {
-                setGiftDraft(gift.giftId);
-                applyPeskyBattleGift(gift.giftId);
-              }}
-            />
-            <small>
-              {configurationLocked
-                ? t("dashboard.peskyBattle.trigger.locked")
-                : t("dashboard.peskyBattle.trigger.hint")}
-            </small>
+              </select>
+              <p id="dashboard-pesky-battle-capacity-hint">{t(configurationLocked
+                ? "dashboard.peskyBattle.capacity.locked"
+                : "dashboard.peskyBattle.capacity.hint")}</p>
+            </div>
+
+            <button
+              className="dashboard-pesky-battle__stream-toggle"
+              type="button"
+              role="switch"
+              aria-checked={peskyBattle?.allowStreamAttacks ?? true}
+              data-enabled={peskyBattle?.allowStreamAttacks ?? true}
+              disabled={!peskyBattle?.ready}
+              onClick={() => applyPeskyBattleStreamAttacks(
+                !(peskyBattle?.allowStreamAttacks ?? true),
+              )}
+            >
+              <span>
+                <strong>{t("dashboard.peskyBattle.streamAttacks.title")}</strong>
+                <small>{t(peskyBattle?.allowStreamAttacks
+                  ? "dashboard.peskyBattle.streamAttacks.enabled"
+                  : "dashboard.peskyBattle.streamAttacks.disabled")}</small>
+              </span>
+              <i aria-hidden="true"><b /></i>
+            </button>
+
           </div>
 
-          <button
-            className="dashboard-pesky-battle__stream-toggle"
-            type="button"
-            role="switch"
-            aria-checked={peskyBattle?.allowStreamAttacks ?? true}
-            data-enabled={peskyBattle?.allowStreamAttacks ?? true}
-            disabled={!peskyBattle?.ready}
-            onClick={() => applyPeskyBattleStreamAttacks(
-              !(peskyBattle?.allowStreamAttacks ?? true),
-            )}
-          >
-            <span>
-              <strong>{t("dashboard.peskyBattle.streamAttacks.title")}</strong>
-              <small>{t(peskyBattle?.allowStreamAttacks
-                ? "dashboard.peskyBattle.streamAttacks.enabled"
-                : "dashboard.peskyBattle.streamAttacks.disabled")}</small>
-            </span>
-            <i aria-hidden="true"><b /></i>
-          </button>
-
-          <div className="dashboard-pesky-battle__attacks">
-            <div className="dashboard-pesky-battle__attacks-heading">
+          <div className="dashboard-pesky-battle__roster">
+            <div className="dashboard-pesky-battle__roster-heading">
               <div>
-                <strong>{t("dashboard.peskyBattle.attacks.title")}</strong>
-                <small>{t(configurationLocked
-                  ? "dashboard.peskyBattle.attacks.locked"
-                  : "dashboard.peskyBattle.attacks.description")}</small>
+                <strong><Users aria-hidden="true" />{t("dashboard.peskyBattle.roster.title")}</strong>
+                <small>{t("dashboard.peskyBattle.roster.description")
+                  .replace("{count}", String(capacity))}</small>
               </div>
-              <span>{enabledItemCount}/{interactionItems.length}</span>
+              <span>{participantCount}/{capacity}</span>
             </div>
+
+            <div
+              className="dashboard-pesky-battle__progress"
+              role="progressbar"
+              aria-label={t("dashboard.peskyBattle.roster.progress")}
+              aria-valuemin={0}
+              aria-valuemax={capacity}
+              aria-valuenow={participantCount}
+            >
+              <i style={{ width: `${participantCount / capacity * 100}%` }} />
+            </div>
+
+            <div className="dashboard-pesky-battle__slots" data-capacity={capacity}>
+              {slots.map((participant, index) => {
+                const name = participantName(participant) ||
+                  t("dashboard.peskyBattle.roster.participantFallback")
+                    .replace("{slot}", String(index + 1));
+                return (
+                  <article
+                    className="dashboard-pesky-battle__slot"
+                    data-filled={Boolean(participant)}
+                    key={participant?.userId || participant?.userName || index}
+                  >
+                    <span className="dashboard-pesky-battle__slot-number">
+                      {index + 1}
+                    </span>
+                    <div className="dashboard-pesky-battle__avatar">
+                      <span aria-hidden="true">{participant ? initials(name) : "?"}</span>
+                      {participant?.avatarUrl ? (
+                        <img
+                          src={participant.avatarUrl}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          onError={(event) => {
+                            event.currentTarget.hidden = true;
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                    <strong>{participant
+                      ? name
+                      : t("dashboard.peskyBattle.roster.emptySlot")
+                        .replace("{slot}", String(index + 1))}</strong>
+                  </article>
+                );
+              })}
+            </div>
+
+            <p className="dashboard-pesky-battle__simulation-hint">
+              {t("dashboard.peskyBattle.roster.simulationHint")}
+            </p>
+          </div>
+        </div>
+
+        <div className="dashboard-pesky-battle__footer">
+          <div>
+            <p data-error={peskyBattle?.error ?? false} role="status" aria-live="polite">
+              {t(
+                `dashboard.peskyBattle.feedback.${peskyBattle?.feedback || "ready"}`,
+                t("dashboard.peskyBattle.feedback.generic"),
+              )}
+            </p>
+            <small>{t(!interaction?.interactionsEnabled
+              ? "dashboard.peskyBattle.master.off"
+              : peskyBattle?.allowStreamAttacks
+                ? "dashboard.peskyBattle.master.streamAllowed"
+                : "dashboard.peskyBattle.master.streamBlocked")}</small>
+          </div>
+          <div className="dashboard-pesky-battle__actions">
+            {phase === "off" ? (
+              <button
+                className="dashboard-pesky-battle__primary"
+                type="button"
+                disabled={!canArm}
+                onClick={() => armPeskyBattle(giftDraft)}
+              >
+                {t("dashboard.peskyBattle.actions.arm")}
+              </button>
+            ) : null}
+            {phase === "recruiting" || phase === "ready" ? (
+              <button
+                className="dashboard-pesky-battle__secondary"
+                type="button"
+                onClick={cancelPeskyBattle}
+              >
+                {t("dashboard.peskyBattle.actions.cancel")}
+              </button>
+            ) : null}
+            {phase === "ready" ? (
+              <button
+                className="dashboard-pesky-battle__primary"
+                type="button"
+                disabled={!rosterReady}
+                onClick={startPeskyBattle}
+              >
+                {t("dashboard.peskyBattle.actions.start")}
+              </button>
+            ) : null}
+            {phase === "waiting_level" || phase === "active" ? (
+              <button
+                className="dashboard-pesky-battle__danger"
+                type="button"
+                onClick={disablePeskyBattle}
+              >
+                {t("dashboard.peskyBattle.actions.disable")}
+              </button>
+            ) : null}
+            {phase === "won" ? (
+              <button
+                className="dashboard-pesky-battle__primary"
+                type="button"
+                onClick={resetPeskyBattle}
+              >
+                {t("dashboard.peskyBattle.actions.reset")}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+      <section
+        className="dashboard-pesky-battle__catalog-panel"
+        aria-labelledby="dashboard-pesky-battle-catalog-title"
+      >
+        <div className="dashboard-pesky-battle__attacks-heading">
+          <div>
+            <h2 id="dashboard-pesky-battle-catalog-title">
+              {t("dashboard.peskyBattle.attacks.title")}
+            </h2>
+            <small>{t(configurationLocked
+              ? "dashboard.peskyBattle.attacks.locked"
+              : "dashboard.peskyBattle.attacks.description")}</small>
+          </div>
+          <span>{enabledItemCount}/{interactionItems.length}</span>
+        </div>
+        {catalogGroups.map((group) => (
+          <div className="dashboard-pesky-battle__catalog-group" key={group.key}>
+            <h3>{t(`dashboard.peskyBattle.attacks.${group.key}`)}</h3>
+            {group.key === "challenges" ? (
+              <p>{t("dashboard.peskyBattle.attacks.challengeTiming")}</p>
+            ) : null}
             <div className="dashboard-pesky-battle__attack-grid">
-              {interactionItems.map((item) => {
+              {group.items.map((item) => {
                 const itemEnabled = !disabledItems.has(item.id);
                 const lastEnabled = itemEnabled && enabledItemCount === 1;
                 return (
                   <label
                     className="dashboard-pesky-battle__attack"
                     data-enabled={itemEnabled}
+                    title={t(item.titleKey)}
                     key={item.id}
                   >
                     <img src={item.image} alt="" />
@@ -213,10 +382,7 @@ export function PeskyBattlePanel() {
                       type="checkbox"
                       checked={itemEnabled}
                       disabled={configurationLocked || !peskyBattle?.ready || lastEnabled}
-                      onChange={(event) => applyPeskyBattleItem(
-                        item.id,
-                        event.target.checked,
-                      )}
+                      onChange={(event) => applyPeskyBattleItem(item.id, event.target.checked)}
                     />
                     <Check aria-hidden="true" />
                   </label>
@@ -224,134 +390,8 @@ export function PeskyBattlePanel() {
               })}
             </div>
           </div>
-        </div>
-
-        <div className="dashboard-pesky-battle__roster">
-          <div className="dashboard-pesky-battle__roster-heading">
-            <div>
-              <strong><Users aria-hidden="true" />{t("dashboard.peskyBattle.roster.title")}</strong>
-              <small>{t("dashboard.peskyBattle.roster.description")}</small>
-            </div>
-            <span>{participantCount}/{BATTLE_CAPACITY}</span>
-          </div>
-
-          <div
-            className="dashboard-pesky-battle__progress"
-            role="progressbar"
-            aria-label={t("dashboard.peskyBattle.roster.progress")}
-            aria-valuemin={0}
-            aria-valuemax={BATTLE_CAPACITY}
-            aria-valuenow={participantCount}
-          >
-            <i style={{ width: `${participantCount / BATTLE_CAPACITY * 100}%` }} />
-          </div>
-
-          <div className="dashboard-pesky-battle__slots">
-            {slots.map((participant, index) => {
-              const name = participantName(participant) ||
-                t("dashboard.peskyBattle.roster.participantFallback")
-                  .replace("{slot}", String(index + 1));
-              return (
-                <article
-                  className="dashboard-pesky-battle__slot"
-                  data-filled={Boolean(participant)}
-                  key={participant?.userId || participant?.userName || index}
-                >
-                  <span className="dashboard-pesky-battle__slot-number">
-                    {index + 1}
-                  </span>
-                  <div className="dashboard-pesky-battle__avatar">
-                    <span aria-hidden="true">{participant ? initials(name) : "?"}</span>
-                    {participant?.avatarUrl ? (
-                      <img
-                        src={participant.avatarUrl}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        onError={(event) => {
-                          event.currentTarget.hidden = true;
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                  <strong>{participant
-                    ? name
-                    : t("dashboard.peskyBattle.roster.emptySlot")
-                      .replace("{slot}", String(index + 1))}</strong>
-                </article>
-              );
-            })}
-          </div>
-
-          <p className="dashboard-pesky-battle__simulation-hint">
-            {t("dashboard.peskyBattle.roster.simulationHint")}
-          </p>
-        </div>
-      </div>
-
-      <div className="dashboard-pesky-battle__footer">
-        <div>
-          <p data-error={peskyBattle?.error ?? false} role="status" aria-live="polite">
-            {t(
-              `dashboard.peskyBattle.feedback.${peskyBattle?.feedback || "ready"}`,
-              t("dashboard.peskyBattle.feedback.generic"),
-            )}
-          </p>
-          <small>{t(!interaction?.interactionsEnabled
-            ? "dashboard.peskyBattle.master.off"
-            : peskyBattle?.allowStreamAttacks
-              ? "dashboard.peskyBattle.master.streamAllowed"
-              : "dashboard.peskyBattle.master.streamBlocked")}</small>
-        </div>
-        <div className="dashboard-pesky-battle__actions">
-          {phase === "off" ? (
-            <button
-              className="dashboard-pesky-battle__primary"
-              type="button"
-              disabled={!canArm}
-              onClick={() => armPeskyBattle(giftDraft)}
-            >
-              {t("dashboard.peskyBattle.actions.arm")}
-            </button>
-          ) : null}
-          {phase === "recruiting" || phase === "ready" ? (
-            <button
-              className="dashboard-pesky-battle__secondary"
-              type="button"
-              onClick={cancelPeskyBattle}
-            >
-              {t("dashboard.peskyBattle.actions.cancel")}
-            </button>
-          ) : null}
-          {phase === "ready" ? (
-            <button
-              className="dashboard-pesky-battle__primary"
-              type="button"
-              disabled={!rosterReady}
-              onClick={startPeskyBattle}
-            >
-              {t("dashboard.peskyBattle.actions.start")}
-            </button>
-          ) : null}
-          {phase === "waiting_level" || phase === "active" ? (
-            <button
-              className="dashboard-pesky-battle__danger"
-              type="button"
-              onClick={disablePeskyBattle}
-            >
-              {t("dashboard.peskyBattle.actions.disable")}
-            </button>
-          ) : null}
-          {phase === "won" ? (
-            <button
-              className="dashboard-pesky-battle__primary"
-              type="button"
-              onClick={resetPeskyBattle}
-            >
-              {t("dashboard.peskyBattle.actions.reset")}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </section>
+        ))}
+      </section>
+    </>
   );
 }

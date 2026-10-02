@@ -189,6 +189,7 @@ let peskyBattlePhase = "off";
 let peskyBattleSessionId = 0;
 let peskyBattleAttempt = 0;
 let peskyBattleGiftId = "";
+let peskyBattleCapacity = 5;
 let peskyBattleAllowStreamAttacks = true;
 let peskyBattleParticipants = [];
 let peskyBattleDisabledItems = [];
@@ -440,7 +441,7 @@ function peskyBattleState() {
     phase: peskyBattlePhase,
     sessionId: peskyBattleSessionId,
     attempt: peskyBattleAttempt,
-    capacity: 5,
+    capacity: peskyBattleCapacity,
     exclusive: peskyBattleIsExclusive(),
     gameplayAvailable: true,
     targetLevel: peskyBattleTargetLevel,
@@ -453,7 +454,7 @@ function peskyBattleState() {
     allowStreamAttacks: peskyBattleAllowStreamAttacks,
     participants: peskyBattleParticipants.map(({ identity: _identity, ...participant }) =>
       participant),
-    items: automaticInteractionItems,
+    items: interactionItems,
     disabledItems: peskyBattleDisabledItems,
     feedback: peskyBattleFeedback,
     error: peskyBattleError,
@@ -510,7 +511,7 @@ function recruitPeskyBattleParticipant(command) {
     joinedAt: new Date().toISOString(),
     identity,
   });
-  if (peskyBattleParticipants.length >= 5) {
+  if (peskyBattleParticipants.length >= peskyBattleCapacity) {
     peskyBattlePhase = "ready";
     peskyBattleFeedback = "lobby_ready";
   } else {
@@ -1772,10 +1773,11 @@ createServer((req, res) => {
         : "");
     const giftIdValue = url.searchParams.get("giftId");
     const streamAttacksValue = url.searchParams.get("allowStreamAttacks");
+    const capacityValue = url.searchParams.get("capacity");
     const itemValue = url.searchParams.get("item");
     const itemEnabledValue = url.searchParams.get("itemEnabled");
     const hasSetting = giftIdValue !== null || streamAttacksValue !== null ||
-      itemValue !== null;
+      itemValue !== null || capacityValue !== null;
 
     peskyBattleError = false;
     if (enabledValue !== null && !["0", "1"].includes(enabledValue)) {
@@ -1824,6 +1826,20 @@ createServer((req, res) => {
       }
     }
 
+    if (!peskyBattleError && capacityValue !== null) {
+      const capacity = Number(capacityValue);
+      if (peskyBattlePhase !== "off") {
+        peskyBattleFeedback = "battle_active_setting_locked";
+        peskyBattleError = true;
+      } else if (!Number.isInteger(capacity) || capacity < 2 || capacity > 5) {
+        peskyBattleFeedback = "invalid_setting";
+        peskyBattleError = true;
+      } else {
+        peskyBattleCapacity = capacity;
+        peskyBattleFeedback = "capacity_saved";
+      }
+    }
+
     if (!peskyBattleError && streamAttacksValue !== null) {
       if (!["0", "1"].includes(streamAttacksValue)) {
         peskyBattleFeedback = "invalid_setting";
@@ -1860,7 +1876,7 @@ createServer((req, res) => {
         }
       }
     } else if (!peskyBattleError && action === "start") {
-      if (peskyBattlePhase !== "ready" || peskyBattleParticipants.length < 5) {
+      if (peskyBattlePhase !== "ready" || peskyBattleParticipants.length < peskyBattleCapacity) {
         peskyBattleFeedback = peskyBattlePhase === "ready" ||
           peskyBattlePhase === "recruiting"
           ? "lobby_not_ready"

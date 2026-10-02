@@ -25,7 +25,6 @@ namespace Gilomx.CupheadBossRoulette
     internal sealed class CreatorToolsPeskyBattleController
     {
         private const int SchemaVersion = 1;
-        private const int Capacity = 5;
         private const int MaximumCommandsPerUpdate = 64;
         private const float MinimumIntervalSeconds = 1.25f;
         private const float MaximumIntervalSeconds = 3.25f;
@@ -39,7 +38,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logInfo;
         private readonly object stateLock = new object();
         private readonly List<Participant> participants =
-            new List<Participant>(Capacity);
+            new List<Participant>(CreatorToolsPeskyBattleSettings.MaximumCapacity);
 
         private string phase = "off";
         private int sessionId;
@@ -238,7 +237,7 @@ namespace Gilomx.CupheadBossRoulette
             var existing = FindParticipant(identity, entry);
             if (existing != null)
             {
-                // Once the fight has been requested, the five visible
+                // Once the fight has been requested, the visible
                 // opponents are immutable across retries. A late duplicate
                 // gift must not replace a portrait/name during combat.
                 if (phase == "recruiting" || phase == "ready")
@@ -255,12 +254,12 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             if (phase != "recruiting" ||
-                participants.Count >= Capacity)
+                participants.Count >= settings.Capacity)
                 return string.Empty;
             participants.Add(Participant.From(
                 participants.Count + 1, identity, entry));
             SetFeedbackLocked("participant_joined", false);
-            if (participants.Count == Capacity)
+            if (participants.Count == settings.Capacity)
             {
                 phase = "ready";
                 SetFeedbackLocked("lobby_ready", false);
@@ -475,6 +474,11 @@ namespace Gilomx.CupheadBossRoulette
                 SetGift(value);
                 return;
             }
+            if (values.TryGetValue("capacity", out value))
+            {
+                SetCapacity(value);
+                return;
+            }
             if (values.TryGetValue("allowStreamAttacks", out value))
             {
                 bool enabled;
@@ -605,15 +609,19 @@ namespace Gilomx.CupheadBossRoulette
         {
             string giftValue;
             string allowValue;
+            string capacityValue;
             var hasGift = values.TryGetValue("giftId", out giftValue);
             var hasAllow = values.TryGetValue(
                 "allowStreamAttacks", out allowValue);
+            var hasCapacity = values.TryGetValue("capacity", out capacityValue);
             string giftId;
             bool allowStreamAttacks;
+            int capacity;
             lock (stateLock)
             {
                 giftId = settings.GiftId;
                 allowStreamAttacks = settings.AllowStreamAttacks;
+                capacity = settings.Capacity;
             }
 
             if (hasGift)
@@ -635,6 +643,11 @@ namespace Gilomx.CupheadBossRoulette
                 SetFeedback("invalid_setting", true);
                 return false;
             }
+            if (hasCapacity && !TryParseCapacity(capacityValue, out capacity))
+            {
+                SetFeedback("invalid_setting", true);
+                return false;
+            }
 
             CreatorToolsGiftCatalogEntry finalGift;
             if (giftId.Length == 0 || resolveGift == null ||
@@ -645,16 +658,22 @@ namespace Gilomx.CupheadBossRoulette
             }
             lock (stateLock)
             {
+                if (phase != "off")
+                {
+                    SetFeedbackLocked("battle_active_setting_locked", true);
+                    return false;
+                }
                 if (settings.EnabledItemCount == 0)
                 {
                     SetFeedbackLocked("items_required", true);
                     return false;
                 }
-                if (!hasGift && !hasAllow)
+                if (!hasGift && !hasAllow && !hasCapacity)
                     return true;
 
                 settings.GiftId = finalGift.Id;
                 settings.AllowStreamAttacks = allowStreamAttacks;
+                settings.Capacity = capacity;
             }
             settings.Save();
             return true;
@@ -674,7 +693,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 lock (stateLock)
                 {
-                    if (phase != "ready")
+                    if (phase != "ready" || participants.Count != settings.Capacity)
                     {
                         SetFeedbackLocked("lobby_not_ready", true);
                         return;
@@ -717,6 +736,27 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 settings.GiftId = gift.Id;
                 SetFeedbackLocked("gift_saved", false);
+            }
+            settings.Save();
+        }
+
+        private void SetCapacity(string value)
+        {
+            int capacity;
+            if (!TryParseCapacity(value, out capacity))
+            {
+                SetFeedback("invalid_setting", true);
+                return;
+            }
+            lock (stateLock)
+            {
+                if (phase != "off")
+                {
+                    SetFeedbackLocked("battle_active_setting_locked", true);
+                    return;
+                }
+                settings.Capacity = capacity;
+                SetFeedbackLocked("capacity_saved", false);
             }
             settings.Save();
         }
@@ -778,7 +818,7 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 ScheduleNextAttackLocked(now);
 
-                if (queue == null || participants.Count != Capacity ||
+                if (queue == null || participants.Count != settings.Capacity ||
                     queue.PendingCountFor(
                         CreatorToolsInteractionSource.PeskyBattle) > 0)
                     return;
@@ -1006,7 +1046,7 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJson.AppendEscaped(builder, phase);
             builder.Append("\",\"sessionId\":").Append(sessionId)
                 .Append(",\"attempt\":").Append(attempt)
-                .Append(",\"capacity\":").Append(Capacity)
+                .Append(",\"capacity\":").Append(settings.Capacity)
                 .Append(",\"exclusive\":")
                 .Append(IsExclusiveLocked() ? "true" : "false")
                 .Append(",\"gameplayAvailable\":")
@@ -1095,6 +1135,14 @@ namespace Gilomx.CupheadBossRoulette
                     StringComparison.OrdinalIgnoreCase))
                     return true;
             return false;
+        }
+
+        private static bool TryParseCapacity(string value, out int capacity)
+        {
+            return int.TryParse(value, NumberStyles.Integer,
+                CultureInfo.InvariantCulture, out capacity) &&
+                capacity >= CreatorToolsPeskyBattleSettings.MinimumCapacity &&
+                capacity <= CreatorToolsPeskyBattleSettings.MaximumCapacity;
         }
 
         private static bool TryParseSwitch(string value, out bool enabled)

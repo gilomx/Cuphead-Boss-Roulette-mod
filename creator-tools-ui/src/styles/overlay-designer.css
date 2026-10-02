@@ -28,7 +28,7 @@
 
 .overlay-designer-header h1 {
   margin: 0.1rem 0 0;
-  font-size: clamp(1.55rem, 2.2vw, 2.25rem);
+  font-size: var(--font-size-title);
   line-height: 1;
 }
 
@@ -36,7 +36,7 @@
   max-width: 54rem;
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
   line-height: 1.5;
 }
 
@@ -52,7 +52,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   color: var(--color-text-soft);
-  font-size: 0.9rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control);
   cursor: pointer;
@@ -105,7 +105,7 @@
   border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   background: rgb(255 255 255 / 3%);
 }
@@ -172,7 +172,7 @@
 
 .overlay-designer-tabs small {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
 }
 
 .overlay-designer-toolbar button:disabled,
@@ -205,12 +205,12 @@
 }
 
 .overlay-designer-confirmation strong {
-  font-size: 0.92rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-confirmation span {
   color: var(--color-text-muted);
-  font-size: 0.86rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-confirmation > div:last-child {
@@ -249,7 +249,7 @@
 
 .overlay-designer-panel > header > span {
   color: var(--color-focus);
-  font-size: 0.72rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -257,7 +257,7 @@
 
 .overlay-designer-panel > header h2 {
   margin: 0.25rem 0 0;
-  font-size: 1.08rem;
+  font-size: var(--font-size-section);
 }
 
 .overlay-designer-layers {
@@ -304,7 +304,7 @@
   place-items: center;
   border-radius: 0.36rem;
   color: var(--color-focus);
-  font-size: 0.68rem;
+  font-size: var(--font-size-body);
   font-style: normal;
   font-weight: 900;
   background: var(--color-control);
@@ -324,12 +324,12 @@
 }
 
 .overlay-designer-layer__select strong {
-  font-size: 0.84rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-layer__select small {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
 }
 
 .overlay-designer-layer__actions {
@@ -370,7 +370,7 @@
   margin: 0;
   padding: 0.9rem 1rem;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-body);
   line-height: 1.5;
 }
 
@@ -404,7 +404,7 @@
   min-height: 2.2rem;
   padding: 0.4rem 0.58rem;
   border-color: transparent;
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   background: rgb(255 255 255 / 4%);
 }
 
@@ -417,7 +417,7 @@
 .overlay-designer-canvas__toolbar > span {
   margin-left: auto;
   color: var(--color-text-muted);
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   white-space: nowrap;
 }
@@ -525,7 +525,7 @@
   padding: 4px 7px;
   border-radius: 4px;
   color: #1c0828;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   line-height: 1;
   white-space: nowrap;
@@ -604,7 +604,7 @@
 .overlay-designer-simulation label > span,
 .overlay-designer-simulation legend {
   color: var(--color-text-muted);
-  font-size: 0.76rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
 }
 
@@ -620,7 +620,7 @@
   border-radius: var(--radius-small);
   color: var(--color-text);
   background: var(--color-control);
-  font-size: 0.84rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-properties input:disabled {
@@ -638,7 +638,7 @@
 .overlay-designer-properties__alignment > strong {
   grid-column: 1 / -1;
   color: var(--color-text-muted);
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
 }
 
@@ -654,7 +654,7 @@
   border-radius: var(--radius-small);
   color: var(--color-text);
   background: var(--color-control);
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
   cursor: pointer;
 }
@@ -671,7 +671,7 @@
 
 .overlay-designer-properties__alignment button > span {
   color: var(--color-focus);
-  font-size: 0.95rem;
+  font-size: var(--font-size-body);
   line-height: 1;
 }
 
@@ -695,7 +695,7 @@
 
 .overlay-designer-properties__opacity-control output {
   color: var(--color-text);
-  font-size: 0.9rem;
+  font-size: var(--font-size-body);
   font-variant-numeric: tabular-nums;
   font-weight: 900;
   text-align: right;
@@ -715,7 +715,7 @@
 .overlay-designer-properties__colors > strong {
   grid-column: 1 / -1;
   color: var(--color-text);
-  font-size: 0.9rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-properties__color-control {
@@ -741,7 +741,7 @@
   overflow: hidden;
   color: var(--color-text-muted);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.72rem;
+  font-size: var(--font-size-body);
   text-overflow: ellipsis;
 }
 
@@ -761,7 +761,7 @@
 
 .overlay-designer-properties__color-alpha output {
   color: var(--color-text-soft);
-  font-size: 0.72rem;
+  font-size: var(--font-size-body);
   font-variant-numeric: tabular-nums;
   font-weight: 900;
   text-align: right;
@@ -801,13 +801,13 @@
 
 .overlay-designer-properties__switches strong,
 .overlay-designer-preview-control strong {
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-properties__switches small,
 .overlay-designer-preview-control small {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -864,7 +864,7 @@
   padding: 0.38rem 0.55rem;
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.74rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   background: rgb(255 255 255 / 5%);
 }
@@ -893,7 +893,7 @@
 .overlay-designer-simulation button {
   min-height: 2.35rem;
   padding: 0.45rem 0.6rem;
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-simulation__reset {
@@ -912,7 +912,7 @@
 
 .overlay-designer-simulation output {
   color: var(--color-focus);
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
 }
 
@@ -935,7 +935,7 @@
   margin: 0;
   padding: 0.7rem 1rem;
   color: var(--color-danger);
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
   line-height: 1.5;
 }
 
@@ -960,7 +960,7 @@
 .overlay-designer-empty p {
   max-width: 30rem;
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
 }
 
 .overlay-designer-callout {
@@ -995,13 +995,13 @@
 
 .overlay-designer-callout h2 {
   margin: 0.15rem 0 0;
-  font-size: 1rem;
+  font-size: var(--font-size-section);
 }
 
 .overlay-designer-callout div > p:last-child {
   margin: 0.28rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   line-height: 1.5;
 }
 

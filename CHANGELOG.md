@@ -2,6 +2,26 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Batalla Molestosa usa un dropdown para elegir 2–5 participantes y separa el
+  catálogo en un panel de ancho completo. Su overlay de reclutamiento es
+  minimalista: «Esperando jugadores», círculos discontinuos con el regalo de
+  entrada (moneda si no está disponible) y sustitución progresiva por fotos de
+  perfil. De 2 a 4 cupos caben en una fila; 5 usa 3 + 2 centrados. Las fotos
+  existentes no se recargan al entrar otra persona. En combate, los nombres se
+  muestran discretamente en la esquina superior izquierda; las animaciones de
+  ataques quedan para otra etapa.
+
+- Batalla Molestosa permite configurar de 2 a 5 participantes y conserva esa
+  cantidad entre sesiones y reintentos. El catálogo incorpora los 12 retos
+  temporales, con 15 segundos de duración y 3 segundos de aviso; respeta la
+  compatibilidad del nivel y el límite compartido de un reto activo. Regalo,
+  cantidad y catálogo se bloquean al abrir el reclutamiento.
+- La tipografía de todo el panel usa una escala común: auxiliares de 14 px,
+  texto y controles de 16 px, títulos de sección de 20 px, títulos de página
+  de 32 px y métricas destacadas de 40 px. Se eliminan los tamaños diminutos y
+  las variantes por página. Las tarjetas del catálogo de Batalla permiten
+  nombres en varias líneas y los cupos se adaptan a la cantidad configurada.
+
 - El diseñador de overlays aumenta la escala de toda su interfaz configurable:
   navegación, pestañas, capas, botones, campos, etiquetas, selectores,
   interruptores, simulación y barra del lienzo usan ahora tamaños cómodos de

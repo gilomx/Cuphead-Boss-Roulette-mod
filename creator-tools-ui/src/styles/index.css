@@ -20,6 +20,13 @@
   --color-warning: #f4c76f;
   --color-danger: #d14457;
 
+  /* Shared hierarchy: auxiliary text, body/controls, sections, pages, metrics. */
+  --font-size-caption: 0.875rem;
+  --font-size-body: 1rem;
+  --font-size-section: 1.25rem;
+  --font-size-title: 2rem;
+  --font-size-display: 2.5rem;
+
   --sidebar-width: 19.75rem;
   --content-width: 62rem;
   --radius-small: 0.45rem;
@@ -48,11 +55,18 @@ body {
   min-width: 20rem;
   min-height: 100vh;
   margin: 0;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
   color: var(--color-text);
   background:
     radial-gradient(circle at 64% 12%, rgb(74 24 93 / 12%), transparent 35rem),
     var(--color-background);
 }
+
+h1 { font-size: var(--font-size-title); }
+h2 { font-size: var(--font-size-section); }
+h3, h4 { font-size: var(--font-size-body); }
+small { font-size: var(--font-size-caption); }
 
 button,
 input,
@@ -157,7 +171,7 @@ textarea:focus-visible {
   background:
     linear-gradient(90deg, rgb(120 217 171 / 10%), transparent 72%),
     rgb(255 255 255 / 1.8%);
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -167,7 +181,7 @@ textarea:focus-visible {
 
 .pesky-hero h2 {
   margin: 0.55rem 0 0;
-  font-size: 1.55rem;
+  font-size: var(--font-size-section);
 }
 
 .pesky-hero .pesky-feedback {
@@ -180,23 +194,23 @@ textarea:focus-visible {
 
 .mode-switch-confirmation__copy strong {
   display: block;
-  font-size: 1rem;
+  font-size: var(--font-size-body);
   line-height: 1.2;
 }
 
 .pesky-hero .mode-switch-confirmation__copy strong {
-  font-size: 1.2rem;
+  font-size: var(--font-size-body);
 }
 
 .mode-switch-confirmation__copy p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.74rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
 .pesky-hero .mode-switch-confirmation__copy p {
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
 }
 
 .mode-switch-confirmation__actions {
@@ -212,7 +226,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: var(--color-text);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   white-space: nowrap;
   cursor: pointer;
@@ -251,7 +265,7 @@ textarea:focus-visible {
   padding: 0.34rem 0.58rem;
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.63rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -342,7 +356,7 @@ textarea:focus-visible {
   margin: var(--space-2) 0 0;
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
 }
 
 .pesky-interval-panel__preview {
@@ -374,7 +388,7 @@ textarea:focus-visible {
 .pesky-interval-panel__hint {
   margin: var(--space-1) 0;
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -415,14 +429,14 @@ textarea:focus-visible {
 .spawn-settings__block legend {
   padding: 0 var(--space-2);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
 .spawn-settings__block h4 {
   margin: 0 0 var(--space-2);
   color: var(--color-text-soft);
-  font-size: 0.9rem;
+  font-size: var(--font-size-body);
 }
 
 .spawn-settings__range {
@@ -430,7 +444,7 @@ textarea:focus-visible {
   gap: var(--space-2);
   min-width: 0;
   color: var(--color-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
 }
 
 .spawn-settings__range-inputs,
@@ -461,7 +475,7 @@ textarea:focus-visible {
 .spawn-settings__section-title {
   margin: 0;
   color: var(--color-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
@@ -496,7 +510,7 @@ textarea:focus-visible {
   border-radius: var(--radius-small);
   color: var(--color-text-soft);
   background: var(--color-control);
-  font-size: 0.86rem;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -535,7 +549,7 @@ textarea:focus-visible {
 
 .pesky-names__footer span {
   color: var(--color-text-muted);
-  font-size: 0.88rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -585,7 +599,7 @@ textarea:focus-visible {
   border-radius: var(--radius-small);
   color: var(--color-text);
   background: var(--color-control);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   white-space: nowrap;
   cursor: pointer;
@@ -637,12 +651,12 @@ textarea:focus-visible {
 }
 
 .pesky-attack strong {
-  font-size: 0.86rem;
+  font-size: var(--font-size-body);
 }
 
 .pesky-attack small {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -657,14 +671,14 @@ textarea:focus-visible {
 .pesky-attacks__required {
   margin: 0;
   padding: 0.75rem 0.85rem;
-  font-size: 0.88rem;
+  font-size: var(--font-size-caption);
 }
 
 .pesky-feedback {
   min-height: 1.2rem;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-caption);
 }
 
 .app-shell {
@@ -716,7 +730,7 @@ textarea:focus-visible {
   padding: 0.28rem 0;
   border: 0;
   color: var(--color-text-soft);
-  font-size: 1.12rem;
+  font-size: var(--font-size-body);
   font-weight: 700;
   text-align: left;
   background: transparent;
@@ -738,7 +752,7 @@ textarea:focus-visible {
 
 .sidebar__item--active {
   color: var(--color-text);
-  font-size: 1.48rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
   letter-spacing: 0.01em;
 }
@@ -747,7 +761,7 @@ textarea:focus-visible {
   margin-top: auto;
   padding-top: var(--space-6);
   color: rgb(251 248 252 / 63%);
-  font-size: 0.57rem;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   line-height: 1.55;
   text-align: center;
@@ -759,7 +773,7 @@ textarea:focus-visible {
 }
 
 .sidebar__footer p:first-child {
-  font-size: 0.68rem;
+  font-size: var(--font-size-caption);
 }
 
 .sidebar__footer p:first-child span {
@@ -809,7 +823,7 @@ textarea:focus-visible {
   border: 0;
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.74rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
   background: transparent;
   cursor: pointer;
@@ -841,7 +855,7 @@ textarea:focus-visible {
 
 .page-header h1 {
   margin: 0;
-  font-size: clamp(2.55rem, 4vw, 3.4rem);
+  font-size: var(--font-size-title);
   font-weight: 900;
   line-height: 0.95;
   letter-spacing: 0.005em;
@@ -852,7 +866,7 @@ textarea:focus-visible {
   max-width: 59rem;
   margin: 0.35rem 0 0;
   color: var(--color-text);
-  font-size: 1.08rem;
+  font-size: var(--font-size-body);
   line-height: 1.38;
   letter-spacing: 0.015em;
 }
@@ -871,7 +885,7 @@ textarea:focus-visible {
   border: 1px solid rgb(255 255 255 / 13%);
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -921,7 +935,7 @@ textarea:focus-visible {
 .section__heading h2 {
   margin: 0;
   color: var(--color-text-soft);
-  font-size: 1.65rem;
+  font-size: var(--font-size-section);
   font-weight: 900;
   line-height: 1.05;
   letter-spacing: 0.01em;
@@ -930,7 +944,7 @@ textarea:focus-visible {
 .section__heading p {
   max-width: 53rem;
   color: var(--color-text-soft);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
 }
 
 .challenge-groups {
@@ -940,7 +954,7 @@ textarea:focus-visible {
 
 .challenge-group h3 {
   margin: 0 0 0.42rem 0.15rem;
-  font-size: 1rem;
+  font-size: var(--font-size-body);
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -1013,7 +1027,7 @@ textarea:focus-visible {
   display: block;
   margin-bottom: 0.28rem;
   color: var(--color-text-muted);
-  font-size: 0.58rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.055em;
@@ -1172,12 +1186,12 @@ textarea:focus-visible {
 }
 
 .searchable-select-option strong {
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
 }
 
 .searchable-select-option small {
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
 }
 
 .searchable-select-option__check {
@@ -1191,7 +1205,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 0.8rem;
   color: var(--color-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
   text-align: center;
 }
@@ -1202,7 +1216,7 @@ textarea:focus-visible {
   gap: 0.65rem;
   margin-top: 2rem;
   color: var(--color-text-soft);
-  font-size: 1.2rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   cursor: pointer;
 }
@@ -1270,7 +1284,7 @@ textarea:focus-visible {
 .stream-rule-form label > span,
 .stream-rule-execution legend {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.065em;
@@ -1293,7 +1307,7 @@ textarea:focus-visible {
   display: block;
   margin-bottom: 0.35rem;
   color: var(--color-focus);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1320,7 +1334,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: white;
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   white-space: nowrap;
   background: var(--color-control-active);
@@ -1361,7 +1375,7 @@ textarea:focus-visible {
 }
 
 .stream-rule-back > span {
-  font-size: 1rem;
+  font-size: var(--font-size-body);
 }
 
 .stream-rule-back--icon {
@@ -1424,19 +1438,19 @@ textarea:focus-visible {
   border: 1px dashed rgb(196 138 233 / 45%);
   border-radius: 50%;
   color: var(--color-focus);
-  font-size: 1.8rem;
+  font-size: var(--font-size-display);
   background: rgb(196 138 233 / 7%);
 }
 
 .stream-rules-table__empty strong {
   color: var(--color-text-soft);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
 }
 
 .stream-rules-table__empty p {
   max-width: 28rem;
   margin: 0.15rem 0 var(--space-2);
-  font-size: 0.8rem;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -1509,7 +1523,7 @@ textarea:focus-visible {
   max-width: 13rem;
   overflow: hidden;
   color: var(--color-text);
-  font-size: 0.86rem;
+  font-size: var(--font-size-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1517,7 +1531,7 @@ textarea:focus-visible {
 .stream-rule-table__gift small,
 .stream-rule-table__interaction small {
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
 }
 
@@ -1611,7 +1625,7 @@ textarea:focus-visible {
 .stream-rule-switch small {
   grid-column: 1 / -1;
   color: var(--color-text-muted);
-  font-size: 0.68rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-align: center;
 }
@@ -1717,7 +1731,7 @@ textarea:focus-visible {
 
 .stream-rule-form label small {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -1741,7 +1755,7 @@ textarea:focus-visible {
 .stream-gift-picker__heading strong,
 .stream-rule-execution legend {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.065em;
@@ -1749,7 +1763,7 @@ textarea:focus-visible {
 
 .stream-gift-picker__heading span {
   color: var(--color-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
 }
 
@@ -1827,7 +1841,7 @@ textarea:focus-visible {
 .stream-gift-picker__grid span {
   min-width: 0;
   overflow: hidden;
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1835,7 +1849,7 @@ textarea:focus-visible {
 
 .stream-gift-picker__grid small {
   color: var(--color-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--font-size-caption);
 }
 
 .stream-gift-picker__check {
@@ -1869,7 +1883,7 @@ textarea:focus-visible {
   border: 1px dashed rgb(255 255 255 / 12%);
   border-radius: var(--radius-small);
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-body);
   text-align: center;
 }
 
@@ -1902,7 +1916,7 @@ textarea:focus-visible {
 .stream-rule-execution__notice {
   margin: var(--space-2) 0 0;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -1919,14 +1933,14 @@ textarea:focus-visible {
   border-radius: 0.3rem;
   color: #f3ddff;
   background: rgb(196 138 233 / 10%);
-  font-size: 0.82rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
 .stream-rule-execution__advanced-note {
   margin: var(--space-2) 0 0;
   color: var(--color-text-soft);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -1950,7 +1964,7 @@ textarea:focus-visible {
 
 .stream-rule-form .searchable-select-field > label {
   margin-bottom: 0.35rem;
-  font-size: 0.72rem;
+  font-size: var(--font-size-caption);
   letter-spacing: 0.065em;
 }
 
@@ -1977,7 +1991,7 @@ textarea:focus-visible {
   padding: 0.75rem var(--space-4);
   border-top: 1px solid rgb(255 255 255 / 7%);
   color: var(--color-success);
-  font-size: 0.8rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
@@ -2054,7 +2068,7 @@ textarea:focus-visible {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-muted);
-  font-size: 0.84rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-category-filter select {
@@ -2088,13 +2102,13 @@ textarea:focus-visible {
 
 .interaction-settings-tests__heading h3 {
   margin: 0;
-  font-size: 1.08rem;
+  font-size: var(--font-size-section);
 }
 
 .interaction-settings-tests__heading p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.86rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -2112,7 +2126,7 @@ textarea:focus-visible {
   max-width: 60rem;
   margin: 0 0 var(--space-3);
   color: var(--color-text-muted);
-  font-size: 0.88rem;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -2166,7 +2180,7 @@ textarea:focus-visible {
 .interaction-card__eyebrow {
   margin: 0 0 0.15rem;
   color: var(--color-focus);
-  font-size: 0.68rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -2174,7 +2188,7 @@ textarea:focus-visible {
 
 .interaction-card h3 {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: var(--font-size-body);
   line-height: 1.12;
 }
 
@@ -2298,13 +2312,13 @@ textarea:focus-visible {
 .pesky-settings-card__heading h3 {
   margin: 0;
   color: var(--color-text-soft);
-  font-size: 1.05rem;
+  font-size: var(--font-size-section);
 }
 
 .pesky-settings-card__heading p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -2383,12 +2397,12 @@ textarea:focus-visible {
 
 .interaction-settings__number strong {
   color: var(--color-text-soft);
-  font-size: 0.95rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-settings__number small {
   color: var(--color-text-muted);
-  font-size: 0.86rem;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
 }
 
@@ -2405,7 +2419,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.4rem;
   color: var(--color-text-soft);
-  font-size: 0.84rem;
+  font-size: var(--font-size-body);
   font-weight: 850;
   white-space: nowrap;
 }
@@ -2421,7 +2435,7 @@ textarea:focus-visible {
   border-radius: var(--radius-small);
   color: var(--color-warning);
   background: rgb(246 196 85 / 7%);
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -2448,7 +2462,7 @@ textarea:focus-visible {
 .interaction-settings__advanced-title {
   margin: 0;
   color: var(--color-text-soft);
-  font-size: 0.92rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
 }
 
@@ -2510,7 +2524,7 @@ textarea:focus-visible {
   justify-self: end;
   padding: 0.55rem 1rem;
   color: var(--color-text);
-  font-size: 0.86rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control-active);
   cursor: pointer;
@@ -2525,7 +2539,7 @@ textarea:focus-visible {
   align-self: center;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   line-height: 1.35;
 }
@@ -2570,14 +2584,14 @@ textarea:focus-visible {
 
 .interaction-panel__heading h2 {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: var(--font-size-section);
   line-height: 1.1;
 }
 
 .interaction-panel__heading p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   line-height: 1.35;
 }
 
@@ -2589,7 +2603,7 @@ textarea:focus-visible {
   padding: 0.3rem;
   border-radius: 999px;
   color: var(--color-text);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control-active);
 }
@@ -2612,7 +2626,7 @@ textarea:focus-visible {
   padding: 0.42rem 0.62rem;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.58rem;
+  font-size: var(--font-size-caption);
   font-weight: 850;
   text-transform: uppercase;
   letter-spacing: 0.045em;
@@ -2621,7 +2635,7 @@ textarea:focus-visible {
 
 .interaction-queue__totals strong {
   color: var(--color-text);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
 }
 
 .interaction-queue__totals i {
@@ -2721,12 +2735,12 @@ textarea:focus-visible {
 }
 
 .interaction-queue__clear-confirmation strong {
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-queue__clear-confirmation span {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   line-height: 1.3;
 }
 
@@ -2751,7 +2765,7 @@ textarea:focus-visible {
   padding: 0.62rem var(--space-4);
   border-bottom: 1px solid rgb(244 199 111 / 15%);
   color: var(--color-warning);
-  font-size: 0.7rem;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   line-height: 1.35;
   background: rgb(244 199 111 / 6%);
@@ -2788,11 +2802,11 @@ textarea:focus-visible {
 }
 
 .interaction-queue__master-control .dashboard-interaction-control__copy > strong {
-  font-size: 1rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-queue__master-control .dashboard-interaction-control__copy > p:last-child {
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-queue__configure {
@@ -2801,7 +2815,7 @@ textarea:focus-visible {
   gap: 0.35rem;
   margin-left: 0.45rem;
   color: var(--color-focus);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
@@ -2829,12 +2843,12 @@ textarea:focus-visible {
 
 .interaction-queue__empty strong {
   color: var(--color-text-soft);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-queue__empty span {
   max-width: 25rem;
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -2860,7 +2874,7 @@ textarea:focus-visible {
   padding: 1rem var(--space-3);
   border-top: 1px solid rgb(255 255 255 / 9%);
   color: var(--color-focus);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-align: center;
   background: rgb(151 117 250 / 8%);
@@ -2869,13 +2883,13 @@ textarea:focus-visible {
 .interaction-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-table th {
   padding: 0.68rem var(--space-3);
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-align: left;
   text-transform: uppercase;
@@ -2924,7 +2938,7 @@ textarea:focus-visible {
   padding: 0.35rem 0.55rem;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.68rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   white-space: nowrap;
   background: var(--color-control);
@@ -2964,7 +2978,7 @@ textarea:focus-visible {
 }
 
 .interaction-phase-protection__title strong {
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-phase-protection__title span {
@@ -2973,7 +2987,7 @@ textarea:focus-visible {
   padding: 0.22rem 0.45rem;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.6rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2988,7 +3002,7 @@ textarea:focus-visible {
 .interaction-phase-protection__copy p {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   line-height: 1.35;
 }
 
@@ -2998,7 +3012,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: var(--color-text);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control-active);
   cursor: pointer;
@@ -3037,7 +3051,7 @@ textarea:focus-visible {
 
 .interaction-test-fields label > span {
   color: var(--color-text-muted);
-  font-size: 0.74rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3074,7 +3088,7 @@ textarea:focus-visible {
 .interaction-test-fields button {
   padding: 0.55rem 0.7rem;
   color: var(--color-text);
-  font-size: 0.86rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control-active);
   cursor: pointer;
@@ -3099,7 +3113,7 @@ textarea:focus-visible {
   padding: 0.75rem var(--space-3);
   border-top: 1px solid rgb(255 255 255 / 7%);
   color: var(--color-text-muted);
-  font-size: 0.84rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -3111,7 +3125,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 0 var(--space-4) var(--space-4);
   color: var(--color-warning);
-  font-size: 0.86rem;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -3207,14 +3221,14 @@ textarea:focus-visible {
 .dashboard-interaction-control__copy > strong {
   display: block;
   margin: 0.1rem 0 0;
-  font-size: 1.18rem;
+  font-size: var(--font-size-section);
 }
 
 .dashboard-interaction-control__copy > p:last-child {
   max-width: 50rem;
   margin: 0.28rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -3229,7 +3243,7 @@ textarea:focus-visible {
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.65rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.055em;
@@ -3295,7 +3309,7 @@ textarea:focus-visible {
 .dashboard-live-events__heading > div > p:last-child {
   margin: 0.35rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -3386,13 +3400,13 @@ textarea:focus-visible {
 }
 
 .dashboard-live-event-card__copy strong {
-  font-size: 0.94rem;
+  font-size: var(--font-size-body);
   line-height: 1.2;
 }
 
 .dashboard-live-event-card__copy small {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -3414,7 +3428,7 @@ textarea:focus-visible {
   padding: 0.26rem 0.42rem;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.55rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   letter-spacing: 0.035em;
   background: rgb(255 255 255 / 5%);
@@ -3467,7 +3481,7 @@ textarea:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.66rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control);
   cursor: pointer;
@@ -3537,7 +3551,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.55rem;
   margin: 0.12rem 0 0;
-  font-size: 1.42rem;
+  font-size: var(--font-size-title);
 }
 
 .dashboard-pesky-battle__heading h1 svg {
@@ -3550,7 +3564,7 @@ textarea:focus-visible {
   max-width: 52rem;
   margin: 0.38rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.73rem;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -3571,7 +3585,7 @@ textarea:focus-visible {
   gap: 0.38rem;
   padding: 0.42rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.6rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.055em;
@@ -3624,18 +3638,18 @@ textarea:focus-visible {
 .dashboard-pesky-battle__state strong {
   flex: 0 0 auto;
   color: var(--color-text-soft);
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
 }
 
 .dashboard-pesky-battle__state span {
   color: var(--color-text-muted);
-  font-size: 0.68rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
 .dashboard-pesky-battle__layout {
   display: grid;
-  grid-template-columns: minmax(22rem, 0.9fr) minmax(30rem, 1.25fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -3655,8 +3669,58 @@ textarea:focus-visible {
   display: block;
   margin-top: 0.35rem;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
+}
+
+.dashboard-pesky-battle__capacity {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dashboard-pesky-battle__capacity label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-body);
+  font-weight: 800;
+}
+
+.dashboard-pesky-battle__capacity select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  font-weight: 800;
+  background: var(--color-control);
+  cursor: pointer;
+}
+
+.dashboard-pesky-battle__capacity select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.dashboard-pesky-battle__capacity p,
+.dashboard-pesky-battle__catalog-group > p {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}
+
+.dashboard-pesky-battle__catalog-group h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-size: var(--font-size-body);
+}
+
+.dashboard-pesky-battle__catalog-group > p {
+  margin: 0 0 0.75rem;
 }
 
 .dashboard-pesky-battle__stream-toggle {
@@ -3682,12 +3746,12 @@ textarea:focus-visible {
 }
 
 .dashboard-pesky-battle__stream-toggle strong {
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
 }
 
 .dashboard-pesky-battle__stream-toggle small {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
 }
 
@@ -3729,9 +3793,21 @@ textarea:focus-visible {
   opacity: 0.55;
 }
 
-.dashboard-pesky-battle__attacks {
+.dashboard-pesky-battle__catalog-panel {
   display: grid;
-  gap: 0.65rem;
+  min-width: 0;
+  gap: var(--space-3);
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-background-raised);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 13%);
+}
+
+.dashboard-pesky-battle__attacks-heading h2 {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-section);
 }
 
 .dashboard-pesky-battle__attacks-heading,
@@ -3752,7 +3828,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__attacks-heading strong,
 .dashboard-pesky-battle__roster-heading strong {
   color: var(--color-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
 }
 
 .dashboard-pesky-battle__roster-heading strong {
@@ -3770,7 +3846,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__attacks-heading small,
 .dashboard-pesky-battle__roster-heading small {
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -3780,14 +3856,14 @@ textarea:focus-visible {
   padding: 0.28rem 0.45rem;
   border-radius: 999px;
   color: var(--color-text-soft);
-  font-size: 0.61rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: rgb(255 255 255 / 6%);
 }
 
 .dashboard-pesky-battle__attack-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   gap: 0.38rem;
 }
 
@@ -3795,11 +3871,11 @@ textarea:focus-visible {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 5rem;
+  min-height: 7rem;
   justify-items: center;
   align-content: center;
   gap: 0.3rem;
-  padding: 0.45rem 0.3rem;
+  padding: 0.75rem 0.5rem;
   border: 1px solid rgb(255 255 255 / 7%);
   border-radius: var(--radius-small);
   color: var(--color-text-muted);
@@ -3832,11 +3908,10 @@ textarea:focus-visible {
 
 .dashboard-pesky-battle__attack > span {
   width: 100%;
-  overflow: hidden;
-  font-size: 0.56rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-pesky-battle__attack > input {
@@ -3885,8 +3960,13 @@ textarea:focus-visible {
 
 .dashboard-pesky-battle__slots {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
+}
+
+.dashboard-pesky-battle__slots[data-capacity="2"],
+.dashboard-pesky-battle__slots[data-capacity="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dashboard-pesky-battle__slot {
@@ -3916,7 +3996,7 @@ textarea:focus-visible {
   top: 0.34rem;
   left: 0.42rem;
   color: var(--color-text-muted);
-  font-size: 0.52rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
 }
 
@@ -3930,7 +4010,7 @@ textarea:focus-visible {
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 50%;
   color: var(--color-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control-active);
 }
@@ -3946,7 +4026,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__slot > strong {
   width: 100%;
   overflow: hidden;
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   line-height: 1.25;
   text-align: center;
   text-overflow: ellipsis;
@@ -3956,7 +4036,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__simulation-hint {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -3976,7 +4056,7 @@ textarea:focus-visible {
 .dashboard-pesky-battle__footer p {
   margin: 0;
   color: var(--color-text-soft);
-  font-size: 0.68rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-pesky-battle__footer p[data-error="true"] {
@@ -3987,7 +4067,7 @@ textarea:focus-visible {
   display: block;
   margin-top: 0.22rem;
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -4005,7 +4085,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   color: var(--color-text);
-  font-size: 0.66rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   cursor: pointer;
 }
@@ -4119,11 +4199,11 @@ textarea:focus-visible {
   gap: 0.15rem;
 }
 
-.dashboard-live-event-conflict strong { font-size: 0.68rem; }
+.dashboard-live-event-conflict strong { font-size: var(--font-size-body); }
 
 .dashboard-live-event-conflict span {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   line-height: 1.35;
 }
 
@@ -4166,7 +4246,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.55rem;
   margin: 0.12rem 0 0;
-  font-size: 1.42rem;
+  font-size: var(--font-size-title);
 }
 
 .dashboard-tap-farming__heading h1 svg {
@@ -4179,7 +4259,7 @@ textarea:focus-visible {
   max-width: 52rem;
   margin: 0.38rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -4223,7 +4303,7 @@ textarea:focus-visible {
 .dashboard-tap-farming__configuration > small {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -4233,7 +4313,7 @@ textarea:focus-visible {
   justify-content: space-between;
   gap: 0.65rem;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
 }
 
 .dashboard-tap-farming__custom-rate input {
@@ -4257,7 +4337,7 @@ textarea:focus-visible {
   border: 1px solid rgb(116 222 196 / 25%);
   border-radius: var(--radius-small);
   color: var(--color-text-soft);
-  font-size: 0.67rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: rgb(116 222 196 / 6%);
 }
@@ -4318,7 +4398,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.4rem;
   color: var(--color-text-soft);
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
 }
 
 .dashboard-tap-farming__boss-heading strong svg {
@@ -4329,12 +4409,12 @@ textarea:focus-visible {
 
 .dashboard-tap-farming__boss-heading small {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-tap-farming__boss-heading > span {
   color: #73dec4;
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
 }
 
@@ -4386,14 +4466,14 @@ textarea:focus-visible {
 .dashboard-tap-farming__counter-grid span {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dashboard-tap-farming__counter-grid strong {
   overflow: hidden;
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
   text-overflow: ellipsis;
 }
 
@@ -4402,7 +4482,7 @@ textarea:focus-visible {
   padding: 0.55rem 0.65rem;
   border-left: 0.18rem solid #73dec4;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
   background: rgb(116 222 196 / 4%);
 }
@@ -4410,12 +4490,12 @@ textarea:focus-visible {
 .dashboard-tap-farming .dashboard-pesky-battle__state span,
 .dashboard-tap-farming .dashboard-live-event-conflict strong,
 .dashboard-tap-farming .dashboard-pesky-battle__footer p {
-  font-size: 0.88rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-tap-farming .dashboard-eyebrow,
 .dashboard-tap-farming .dashboard-pesky-battle__footer small {
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
 }
 
 .live-overlay-preview {
@@ -4441,7 +4521,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.48rem;
   margin: 0.12rem 0 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-section);
 }
 
 .live-overlay-preview__heading h2 svg {
@@ -4454,7 +4534,7 @@ textarea:focus-visible {
   max-width: 48rem;
   margin: 0.3rem 0 0;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -4465,7 +4545,7 @@ textarea:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   color: var(--color-text-soft);
-  font-size: 0.6rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control);
   cursor: pointer;
@@ -4499,7 +4579,7 @@ textarea:focus-visible {
 
 .live-overlay-preview__control > span {
   color: var(--color-text-muted);
-  font-size: 0.56rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4517,7 +4597,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.56rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
   background: rgb(255 255 255 / 4%);
   cursor: pointer;
@@ -4587,7 +4667,7 @@ textarea:focus-visible {
   gap: 0.35rem;
   margin-right: 0.2rem;
   color: var(--color-text-muted);
-  font-size: 0.6rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
 }
 
@@ -4627,7 +4707,7 @@ textarea:focus-visible {
 .dashboard-section-heading h2,
 .dashboard-panel__heading h2 {
   margin: 0.12rem 0 0;
-  font-size: 1.32rem;
+  font-size: var(--font-size-section);
   line-height: 1.15;
 }
 
@@ -4635,7 +4715,7 @@ textarea:focus-visible {
   padding: 0.32rem 0.52rem;
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -4645,7 +4725,7 @@ textarea:focus-visible {
 .dashboard-eyebrow {
   margin: 0;
   color: var(--color-focus);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.095em;
@@ -4671,7 +4751,7 @@ textarea:focus-visible {
 
 .dashboard-counter strong {
   overflow: hidden;
-  font-size: 1.28rem;
+  font-size: var(--font-size-display);
   line-height: 1;
   text-overflow: ellipsis;
 }
@@ -4679,7 +4759,7 @@ textarea:focus-visible {
 .dashboard-counter span {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 0.58rem;
+  font-size: var(--font-size-body);
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4717,12 +4797,12 @@ textarea:focus-visible {
 
 .interaction-settings__toggle strong {
   color: var(--color-text-soft);
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
 }
 
 .interaction-settings__toggle small {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
 }
 
@@ -4732,16 +4812,16 @@ textarea:focus-visible {
 }
 
 .page--interactions .interaction-panel__heading p {
-  font-size: 0.9rem;
+  font-size: var(--font-size-body);
 }
 
 .page--interactions .interaction-settings__toggle strong {
-  font-size: 0.95rem;
+  font-size: var(--font-size-body);
 }
 
 .page--interactions .interaction-settings__toggle small,
 .page--interactions .pesky-interval-panel__hint {
-  font-size: 0.86rem;
+  font-size: var(--font-size-caption);
 }
 
 .page--interactions .interaction-settings .spawn-settings {
@@ -4800,7 +4880,7 @@ textarea:focus-visible {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font-size: 1rem;
+  font-size: var(--font-size-section);
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4809,7 +4889,7 @@ textarea:focus-visible {
 .dashboard-connection-state {
   padding: 0.3rem 0.48rem;
   color: var(--color-text-muted);
-  font-size: 0.56rem;
+  font-size: var(--font-size-body);
   background: rgb(255 255 255 / 5%);
 }
 
@@ -4845,7 +4925,7 @@ textarea:focus-visible {
   display: block;
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4856,12 +4936,12 @@ textarea:focus-visible {
   padding-top: 0.4rem;
   border-top: 1px solid rgb(255 255 255 / 7%);
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-connection-card__footer strong {
   color: var(--color-text-soft);
-  font-size: 0.78rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-activity-grid {
@@ -4921,7 +5001,7 @@ textarea:focus-visible {
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: var(--radius-small);
   color: var(--color-text-soft);
-  font-size: 0.68rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   white-space: nowrap;
   background: var(--color-control);
@@ -4931,7 +5011,7 @@ textarea:focus-visible {
 
 .dashboard-event-panel__switch > span {
   color: var(--color-focus);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
   line-height: 0;
 }
 
@@ -4973,20 +5053,20 @@ textarea:focus-visible {
   place-items: center;
   border-radius: 50%;
   color: #153424;
-  font-size: 0.75rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-success);
 }
 
 .dashboard-event-panel__confirmation strong {
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   line-height: 1.35;
 }
 
 .dashboard-live-indicator {
   padding: 0.3rem 0.5rem;
   color: var(--color-text-muted);
-  font-size: 0.55rem;
+  font-size: var(--font-size-body);
   background: rgb(255 255 255 / 5%);
 }
 
@@ -5016,7 +5096,7 @@ textarea:focus-visible {
 
 .dashboard-events-empty span {
   max-width: 26rem;
-  font-size: 0.88rem;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -5055,12 +5135,12 @@ textarea:focus-visible {
   display: grid;
   gap: 0.24rem;
   color: var(--color-text-muted);
-  font-size: 0.57rem;
+  font-size: var(--font-size-caption);
 }
 
 .dashboard-event__time strong {
   color: var(--color-text-soft);
-  font-size: 0.59rem;
+  font-size: var(--font-size-caption);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -5078,7 +5158,7 @@ textarea:focus-visible {
 
 .dashboard-event__content > div > strong {
   overflow: hidden;
-  font-size: 0.76rem;
+  font-size: var(--font-size-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -5088,7 +5168,7 @@ textarea:focus-visible {
   padding: 0.2rem 0.38rem;
   border-radius: 999px;
   color: var(--color-focus);
-  font-size: 0.52rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.045em;
@@ -5099,7 +5179,7 @@ textarea:focus-visible {
   margin: 0.26rem 0 0;
   overflow-wrap: anywhere;
   color: var(--color-text-soft);
-  font-size: 0.7rem;
+  font-size: var(--font-size-body);
   line-height: 1.4;
 }
 
@@ -5107,7 +5187,7 @@ textarea:focus-visible {
   display: block;
   margin-top: 0.3rem;
   color: var(--color-text-muted);
-  font-size: 0.58rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -5115,7 +5195,7 @@ textarea:focus-visible {
   padding: 0.27rem 0.42rem;
   border-radius: 999px;
   color: var(--color-warning);
-  font-size: 0.53rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.045em;
@@ -5140,7 +5220,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 0.85rem var(--space-3) 0;
   color: var(--color-text-muted);
-  font-size: 0.69rem;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -5164,7 +5244,7 @@ textarea:focus-visible {
 
 .dashboard-simulator-form label > span {
   color: var(--color-text-muted);
-  font-size: 0.58rem;
+  font-size: var(--font-size-caption);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.055em;
@@ -5217,7 +5297,7 @@ textarea:focus-visible {
   margin-top: 0.2rem;
   padding: 0.55rem 0.8rem;
   color: var(--color-text);
-  font-size: 0.74rem;
+  font-size: var(--font-size-body);
   font-weight: 900;
   background: var(--color-control-active);
   cursor: pointer;
@@ -5242,7 +5322,7 @@ textarea:focus-visible {
   min-height: 1rem;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-body);
   line-height: 1.35;
 }
 
@@ -5253,7 +5333,7 @@ textarea:focus-visible {
   display: block;
   margin-top: 0.3rem;
   color: var(--color-text-muted);
-  font-size: 0.61rem;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
 }
 
@@ -5347,13 +5427,13 @@ textarea:focus-visible {
   .status-badge {
     min-height: 1.45rem;
     padding: 0.25rem 0.4rem;
-    font-size: 0.55rem;
+    font-size: var(--font-size-caption);
     letter-spacing: 0.035em;
   }
   .sidebar__nav { display: flex; align-items: baseline; gap: 0.65rem; margin: 0; }
-  .sidebar__item { width: auto; font-size: 0.88rem; }
-  .sidebar__item--active { font-size: 1rem; }
-  .sidebar__footer { max-width: 19rem; margin: 0 0 0 auto; padding: 0 5.5rem 0 0; font-size: 0.5rem; }
+  .sidebar__item { width: auto; font-size: var(--font-size-body); }
+  .sidebar__item--active { font-size: var(--font-size-body); }
+  .sidebar__footer { max-width: 19rem; margin: 0 0 0 auto; padding: 0 5.5rem 0 0; font-size: var(--font-size-caption); }
   .locale-switch--floating { top: 0.85rem; right: 1.2rem; }
   .main-content { margin-left: 0; padding: 3.5rem 1.5rem 4rem; }
   .page-header { flex-direction: column; margin-bottom: 2.5rem; }
@@ -5381,11 +5461,12 @@ textarea:focus-visible {
 
 @media (max-width: 39rem) {
   .sidebar { flex-wrap: wrap; }
+  .sidebar__nav { width: 100%; flex-wrap: wrap; gap: 0.35rem 0.75rem; }
   .sidebar__footer { width: 100%; max-width: none; margin: 0; padding: 0; }
-  .sidebar__footer p:first-child { font-size: 0.62rem; }
+  .sidebar__footer p:first-child { font-size: var(--font-size-caption); }
   .main-content { padding: 2.5rem 1rem 3rem; }
-  .page-header h1 { font-size: 2.45rem; }
-  .page-header p { font-size: 0.98rem; }
+  .page-header h1 { font-size: var(--font-size-title); }
+  .page-header p { font-size: var(--font-size-body); }
   .dashboard-counter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-events-list li { grid-template-columns: 4.2rem minmax(0, 1fr); gap: var(--space-2); }
   .dashboard-event-status { grid-column: 2; justify-self: start; }
@@ -5469,7 +5550,7 @@ textarea:focus-visible {
   .dashboard-pesky-battle__slots {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .dashboard-pesky-battle__slot:last-child { grid-column: 1 / -1; }
+  .dashboard-pesky-battle__slot:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .dashboard-pesky-battle__actions,
   .dashboard-pesky-battle__actions button { width: 100%; }
   .dashboard-live-event-conflict { margin-inline: 1rem; }

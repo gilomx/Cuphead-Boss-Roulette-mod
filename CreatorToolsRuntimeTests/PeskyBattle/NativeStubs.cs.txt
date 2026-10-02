@@ -1,0 +1,41 @@
+using System;
+
+// Only Unity time/lifecycle and the server projection are faked. Battle
+// settings, recruitment, scheduler, queue and timed executor are production code.
+namespace UnityEngine
+{
+    public class Object { public static void Destroy(Object value) { } }
+    public class GameObject : Object { public void SetActive(bool value) { } }
+    public class Component : Object { public GameObject gameObject = new GameObject(); }
+    public static class Time { public static float deltaTime; public static float realtimeSinceStartup; }
+    public static class Mathf
+    {
+        public static int CeilToInt(float value) { return (int)Math.Ceiling(value); }
+        public static int Max(int a, int b) { return Math.Max(a, b); }
+    }
+    public static class Random
+    {
+        public static int Range(int minimum, int maximum) { return minimum; }
+        public static float Range(float minimum, float maximum) { return minimum; }
+    }
+}
+
+internal enum Levels { Ground, Plane, DicePalaceMain, DicePalaceBooze }
+internal sealed class Level
+{
+    internal Levels CurrentLevel;
+    internal int Id;
+    internal int GetInstanceID() { return Id; }
+}
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal sealed class CreatorToolsServer
+    {
+        internal bool IsRunning { get { return true; } }
+        internal string State;
+        internal void SetPeskyBattleState(string state) { State = state; }
+        internal void ApplyPeskyBattleMainThreadActions(Action apply) { apply(); }
+        internal bool TryTakePeskyBattleCommand(out string query) { query = null; return false; }
+    }
+}

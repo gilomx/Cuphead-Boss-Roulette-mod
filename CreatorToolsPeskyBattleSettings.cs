@@ -26,11 +26,14 @@ namespace Gilomx.CupheadBossRoulette
 
     internal sealed class CreatorToolsPeskyBattleSettings
     {
-        private const int CurrentVersion = 1;
+        private const int CurrentVersion = 2;
+        internal const int MinimumCapacity = 2;
+        internal const int MaximumCapacity = 5;
         private readonly string path;
         private readonly Action<string> logWarning;
 
         internal string GiftId = string.Empty;
+        internal int Capacity = MaximumCapacity;
         internal bool AllowStreamAttacks = true;
         internal readonly HashSet<string> DisabledItems =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -87,8 +90,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal bool IsItemEnabled(string item)
         {
-            return IsKnownItem(item) && !DisabledItems.Contains(item) &&
-                CreatorToolsInteractionGroups.ForItem(item) != CreatorToolsInteractionGroups.Challenge;
+            return IsKnownItem(item) && !DisabledItems.Contains(item);
         }
 
         internal void Save()
@@ -136,7 +138,7 @@ namespace Gilomx.CupheadBossRoulette
                 string giftId;
                 List<string> disabledItems;
                 if (!TryReadInt(json, "version", out version) ||
-                    version != CurrentVersion ||
+                    (version != 1 && version != CurrentVersion) ||
                     !TryReadString(json, "giftId", out giftId) ||
                     !TryReadBoolean(json, "allowStreamAttacks",
                         out allowStreamAttacks) ||
@@ -144,7 +146,13 @@ namespace Gilomx.CupheadBossRoulette
                         out disabledItems))
                     return false;
 
+                var capacity = MaximumCapacity;
+                if (version >= 2 && (!TryReadInt(json, "capacity", out capacity) ||
+                    capacity < MinimumCapacity || capacity > MaximumCapacity))
+                    return false;
+
                 GiftId = NormalizeGiftId(giftId);
+                Capacity = capacity;
                 AllowStreamAttacks = allowStreamAttacks;
                 DisabledItems.Clear();
                 for (var i = 0; i < disabledItems.Count; i++)
@@ -165,7 +173,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(CurrentVersion.ToString(CultureInfo.InvariantCulture))
                 .Append(",\n  \"giftId\": \"");
             AppendJson(builder, GiftId);
-            builder.Append("\",\n  \"allowStreamAttacks\": ")
+            builder.Append("\",\n  \"capacity\": ")
+                .Append(Capacity.ToString(CultureInfo.InvariantCulture))
+                .Append(",\n  \"allowStreamAttacks\": ")
                 .Append(AllowStreamAttacks ? "true" : "false")
                 .Append(",\n  \"disabledItems\": [");
             var first = true;
@@ -211,7 +221,7 @@ namespace Gilomx.CupheadBossRoulette
             value = 0;
             var match = Regex.Match(json,
                 "\\\"" + Regex.Escape(property) +
-                "\\\"\\s*:\\s*(?<value>\\d+)",
+                "\\\"\\s*:\\s*(?<value>\\d+)(?=\\s*[,}])",
                 RegexOptions.CultureInvariant);
             return match.Success && int.TryParse(
                 match.Groups["value"].Value, NumberStyles.Integer,

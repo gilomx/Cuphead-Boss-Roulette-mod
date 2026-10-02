@@ -63,9 +63,13 @@ en `PROJECT_HANDOFF.md`.
   sus entradas como `pesky_battle`; manual/LIVE usan fuentes distintas. El
   master, Pausar y Vaciar no controlan Batalla, y cancelar Batalla no elimina
   donaciones. Al armarla se desactiva el modo libre y no puede reactivarse hasta
-  terminar. El Dashboard recluta cinco donadores únicos por regalo exacto,
-  mantiene el roster entre reintentos y publica un overlay OBS independiente en
-  `/pesky-battle-overlay`.
+  terminar. La página permite reclutar de 2 a 5 donadores únicos por regalo
+  exacto, mantiene el roster entre reintentos y permite ayudas, ataques y los
+  12 retos temporales (15 s, aviso de 3 s) en un catálogo de ancho completo.
+  La cantidad usa un dropdown. El overlay OBS independiente sigue en
+  `/pesky-battle-overlay` y muestra círculos discontinuos con el regalo de
+  entrada, sustituidos por fotos al reclutar. Con 2–4 usa una fila y con 5 usa
+  3 + 2 centrados. Las animaciones de ataques por participante siguen pendientes.
 - La antigua cola de `Canjeos pendientes` es ahora el componente compartido
   `InteractionQueuePanel`, se llama `Canjeos en curso` y vive en el Dashboard
   justo antes de `Tiempo real`. Mantiene la cola confirmada y la optimista.

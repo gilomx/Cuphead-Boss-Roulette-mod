@@ -39,7 +39,7 @@
       "title": "Live Events",
       "description": "Choose an activity to configure it and follow its status during the live stream.",
       "back": "Back to Live Events",
-      "peskyBattleDescription": "Recruit five participants and face their attacks for a full level.",
+      "peskyBattleDescription": "Recruit 2 to 5 participants and face their attacks and temporary challenges for a full level.",
       "tapFarmingDescription": "Turn the whole community's taps into extra resistance that makes the boss last longer.",
       "participants": "{count}/{capacity} participants",
       "taps": "{count} taps",
@@ -52,7 +52,7 @@
     "peskyBattle": {
       "eyebrow": "Live game",
       "title": "Pesky Battle",
-      "description": "Recruit five participants with a specific gift and face their attacks for a full level. The roster stays intact if you lose and retry.",
+      "description": "Recruit 2 to 5 participants with a specific gift and face their attacks and temporary challenges for a full level. The roster stays intact if you lose and retry.",
       "phase": {
         "off": "Not armed",
         "recruiting": "Recruiting",
@@ -62,12 +62,12 @@
         "won": "Victory"
       },
       "phaseDescription": {
-        "off": "Configure the gift and attacks before opening the five slots.",
+        "off": "Configure the gift, participants and catalog before opening the {count} slots.",
         "recruiting": "Each unique user who sends the gift will fill one slot.",
-        "ready": "All five slots are ready. The battle will start in the next level.",
+        "ready": "All {count} slots are ready. Start the battle to begin in the next level.",
         "waiting_level": "Enter the next level to start the battle.",
         "waitingTarget": "The battle is armed for the next level: {level}.",
-        "active": "Attempt {attempt}. If you lose, the same five participants will remain for the retry.",
+        "active": "Attempt {attempt}. If you lose, the same {count} participants will remain for the retry.",
         "won": "You won the level. Attacks stopped and the roster remains visible until you start another battle."
       },
       "overlay": {
@@ -85,19 +85,27 @@
         "hint": "A user can fill only one slot, even if they send the gift more than once.",
         "locked": "The gift is locked until you cancel or finish this battle."
       },
+      "capacity": {
+        "label": "Number of participants",
+        "hint": "Choose 2 to 5 participants before opening recruitment.",
+        "locked": "The participant count stays fixed until you cancel or finish this battle."
+      },
       "streamAttacks": {
         "title": "Allow live interaction attacks",
         "enabled": "Live rules may continue launching attacks during this battle.",
         "disabled": "All live rules are blocked while the battle is exclusive."
       },
       "attacks": {
-        "title": "Battle attacks",
-        "description": "Choose the independent pool used by the five participants.",
-        "locked": "The pool is locked while the battle is armed."
+        "title": "Battle catalog",
+        "description": "Choose the attacks, helps and temporary challenges used by the participants.",
+        "interactions": "Attacks and helps",
+        "challenges": "Temporary challenges",
+        "challengeTiming": "Last 15 seconds with a 3-second warning. One challenge runs at a time, only when compatible with the level.",
+        "locked": "The catalog is locked while the battle is armed."
       },
       "roster": {
         "title": "Participants",
-        "description": "The first five unique users who send the gift enter the battle.",
+        "description": "The first {count} unique users who send the gift enter the battle.",
         "progress": "Filled slots",
         "emptySlot": "Slot {slot}",
         "participantFallback": "Participant {slot}",
@@ -120,15 +128,16 @@
         "ready": "Configure the battle whenever you are ready.",
         "settings_saved": "The battle configuration was saved.",
         "gift_saved": "The required gift was saved.",
-        "items_saved": "The attack pool was saved.",
+        "capacity_saved": "The participant count was saved.",
+        "items_saved": "The battle catalog was saved.",
         "recruiting": "Recruitment is open.",
         "battle_armed": "Recruitment is open.",
         "participant_joined": "A participant filled a slot.",
         "participant_already_joined": "This user already occupies a slot.",
         "participant_identity_missing": "The event does not include a valid user identity.",
-        "roster_ready": "The five-participant roster is complete.",
-        "lobby_ready": "The five-participant roster is complete.",
-        "lobby_not_ready": "The roster still needs five participants.",
+        "roster_ready": "The participant roster is complete.",
+        "lobby_ready": "The participant roster is complete.",
+        "lobby_not_ready": "More participants are needed to fill the configured slots.",
         "waiting_level": "The battle is waiting for the next level.",
         "waiting_for_level": "The battle is waiting for the next level.",
         "waiting_target_level": "The battle is waiting for the target level.",
@@ -144,8 +153,8 @@
         "reset": "The battle is ready to configure again.",
         "gift_required": "Select a gift before arming recruitment.",
         "unknown_gift": "The mod does not recognize the selected gift.",
-        "items_required": "Enable at least one attack before arming the battle.",
-        "roster_incomplete": "Five participants are required to start.",
+        "items_required": "Enable at least one catalog item before arming the battle.",
+        "roster_incomplete": "Fill the configured slots before starting.",
         "stream_attacks_allowed": "Live-rule attacks are allowed.",
         "stream_attacks_blocked": "Live rules will be blocked during the battle.",
         "battle_active_setting_locked": "This setting is locked during the active battle.",

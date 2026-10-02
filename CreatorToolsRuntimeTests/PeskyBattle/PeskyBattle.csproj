@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NuGetAudit>false</NuGetAudit>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs.txt" />
+    <Compile Include="../../CreatorToolsPeskyBattleSettings.cs" />
+    <Compile Include="../../CreatorToolsPeskyBattleController.cs" />
+    <Compile Include="../../CreatorToolsLiveEventsCoordinator.cs" />
+    <Compile Include="../../Interactions/CreatorToolsInteractionContracts.cs" />
+    <Compile Include="../../Interactions/CreatorToolsInteractionQueue.cs" />
+    <Compile Include="../../Interactions/CreatorToolsHelp.cs" />
+    <Compile Include="../../Interactions/CreatorToolsTimedChallenge.cs" />
+    <Compile Include="../../Interactions/TimedChallengeInteractionExecutor.cs" />
+    <Compile Include="../../Streaming/CreatorToolsJson.cs" />
+    <Compile Include="../../Streaming/CreatorToolsStreamEvent.cs" />
+  </ItemGroup>
+</Project>

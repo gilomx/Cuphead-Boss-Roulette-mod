@@ -280,7 +280,7 @@ export function createBattleSimulation(
     phase: scenario,
     capacity: 5,
     attempt: scenario === "active" || scenario === "won" ? 2 : 1,
-    trigger: { giftId: "preview-gift", giftName: "Rosa", giftImagePath: "" },
+    trigger: { giftId: "preview-gift", giftName: "Rosa", giftImagePath: "/assets/creator-tools/gifts/images/5655.webp" },
     participants: BATTLE_NAMES.slice(0, count).map((displayName, index) => ({
       slot: index + 1,
       userId: `preview-${index + 1}`,
