@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Batalla Molestosa</title>
-  <link rel="stylesheet" href="/pesky-battle-overlay.css?v=minimal-roster-1">
+  <link rel="stylesheet" href="/pesky-battle-overlay.css?v=battle-icons-10">
 </head>
 <body>
   <main
     id="battle"
     class="battle"
     data-visible="false"
+    aria-hidden="true"
     data-phase="off"
     data-variant="default"
     data-show-title="true"
@@ -18,10 +19,12 @@
     data-motion="true"
   >
     <header class="battle__header">
-      <strong id="battle-status" class="battle__status" role="status" aria-live="polite">Esperando jugadores</strong>
+      <strong id="battle-status" class="battle__status" role="status" aria-live="polite"></strong>
     </header>
 
-    <ol id="battle-roster" class="battle__roster" aria-label="Participantes de Batalla Molestosa"></ol>
+    <div class="battle__roster-area">
+      <ol id="battle-roster" class="battle__roster" aria-label="Participantes de Batalla Molestosa"></ol>
+    </div>
   </main>
 
   <template id="battle-slot-template">
@@ -37,12 +40,20 @@
         </svg>
         </span>
         <span class="battle-slot__initial" aria-hidden="true" hidden></span>
-        <span class="battle-slot__name" hidden></span>
       </div>
+      <span class="battle-slot__name" hidden></span>
+      <span class="battle-slot__attack" role="status">
+        <img class="battle-slot__attack-image" alt="">
+      </span>
+      <span class="battle-slot__challenge" role="status" aria-hidden="true">
+        <img class="battle-slot__challenge-image" alt="">
+        <small class="battle-slot__challenge-time"></small>
+      </span>
     </li>
   </template>
 
   <script src="/assets/creator-tools/live-event-overlay-runtime.js?v=composer-1"></script>
-  <script src="/pesky-battle-overlay.js?v=minimal-roster-1"></script>
+  <script src="/assets/creator-tools/overlay-interactions.js?v=game-signals-9"></script>
+  <script src="/pesky-battle-overlay.js?v=battle-slider-9"></script>
 </body>
 </html>

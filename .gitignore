@@ -28,6 +28,7 @@ Thumbs.db
 
 # Portable launcher Dev deployment: generated files and per-PC configuration
 .deployment-cache/
+__pycache__/
 launcher-dev.local.json
 /dist/
 

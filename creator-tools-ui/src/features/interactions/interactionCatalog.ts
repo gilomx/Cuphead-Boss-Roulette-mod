@@ -206,7 +206,7 @@ export const interactionItems = [
     titleKey: "interactions.baroness.headToss.title",
     imageAltKey: "interactions.baroness.headToss.imageAlt",
     typeKey: "interactions.baroness.type",
-    image: "/assets/creator-tools/interactions/baroness-head-toss.png",
+    image: "/assets/creator-tools/interactions/baroness-head-toss-v2.png",
   },
   {
     id: "dragon_fireballs",
@@ -215,7 +215,7 @@ export const interactionItems = [
     titleKey: "interactions.dragon.fireballs.title",
     imageAltKey: "interactions.dragon.fireballs.imageAlt",
     typeKey: "interactions.dragon.type",
-    image: "/assets/creator-tools/interactions/dragon-fireballs.png",
+    image: "/assets/creator-tools/interactions/dragon-fireballs-v2.png",
   },
   {
     id: "train_bone_ring",
@@ -233,7 +233,7 @@ export const interactionItems = [
     titleKey: "interactions.devil.fireCircle.title",
     imageAltKey: "interactions.devil.fireCircle.imageAlt",
     typeKey: "interactions.devil.type",
-    image: "/assets/creator-tools/interactions/devil-fire-circle.png",
+    image: "/assets/creator-tools/interactions/devil-fire-circle-v2.png",
   },
   {
     id: "beppi_balloon_dog",

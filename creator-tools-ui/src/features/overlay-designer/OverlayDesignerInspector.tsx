@@ -1,6 +1,7 @@
-import { Activity, HeartPulse, MousePointerClick, RotateCcw, Users } from "lucide-react";
-import type { Dispatch } from "react";
+import { Activity, HeartPulse, MousePointerClick, RotateCcw, Swords, Users } from "lucide-react";
+import { useState, type Dispatch } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { interactionItems } from "../interactions/interactionCatalog";
 import type {
   OverlayComposerComponent,
   OverlayComposerProfile,
@@ -9,6 +10,8 @@ import type {
 } from "./model";
 import { proportionalComponentSize } from "./model";
 import type { BattleSimulationAction, TapSimulationAction } from "./simulation";
+
+const battleAttacks = interactionItems.filter(item => item.category === "attack" || item.category === "mini_boss");
 
 interface OverlayDesignerInspectorProps {
   profile: OverlayComposerProfile;
@@ -68,8 +71,12 @@ export function OverlayDesignerInspector({
   dispatchBattle,
 }: OverlayDesignerInspectorProps) {
   const { locale, t } = useLocalization();
+  const [attackPlayer, setAttackPlayer] = useState(0);
+  const targetSlot = battleState.participants.some(player => player.slot === attackPlayer) ? attackPlayer : 0;
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
   const geometryDisabled = disabled || component.locked;
+  const colorLabel = (key: "liquidColor" | "collectingColor" | "textColor" | "outlineColor") =>
+    t(`overlayDesigner.inspector.${component.id === "pesky_battle" ? "battleColors" : "colors"}.${key}`);
   const maximumSize = {
     width: profile.canvas.width - component.x,
     height: profile.canvas.height - component.y,
@@ -192,18 +199,18 @@ export function OverlayDesignerInspector({
           </span>
         </label>
 
-        {component.id === "tap_farming" && (
+        {(
           <div className="overlay-designer-properties__colors">
-            <strong>{t("overlayDesigner.inspector.colors.title")}</strong>
+            <strong>{t(`overlayDesigner.inspector.${component.id === "pesky_battle" ? "battleColors" : "colors"}.title`)}</strong>
             {(["liquidColor", "collectingColor", "textColor", "outlineColor"] as const).map((key) => (
               <label key={key}>
-                <span>{t(`overlayDesigner.inspector.colors.${key}`)}</span>
+                <span>{colorLabel(key)}</span>
                 <span className="overlay-designer-properties__color-control">
                   <input
                     type="color"
                     value={colorBase(component[key])}
                     disabled={disabled}
-                    aria-label={t(`overlayDesigner.inspector.colors.${key}`)}
+                    aria-label={colorLabel(key)}
                     onInput={(event) => onChange({
                       [key]: colorWithBase(
                         component[key],
@@ -222,7 +229,7 @@ export function OverlayDesignerInspector({
                       step="1"
                       value={colorOpacity(component[key])}
                       disabled={disabled}
-                      aria-label={`${t(`overlayDesigner.inspector.colors.${key}`)} · ${t("overlayDesigner.inspector.colors.alpha")}`}
+                      aria-label={`${colorLabel(key)} · ${t("overlayDesigner.inspector.colors.alpha")}`}
                       onInput={(event) => onChange({
                         [key]: colorWithOpacity(
                           component[key],
@@ -335,10 +342,24 @@ export function OverlayDesignerInspector({
                   scenario: event.target.value as PeskyBattlePreviewSnapshot["phase"],
                 })}
               >
-                {(["recruiting", "ready", "waiting_level", "active", "won"] as const).map((phase) => (
+                {(["off", "recruiting", "ready", "waiting_level", "active", "won"] as const).map((phase) => (
                   <option value={phase} key={phase}>
                     {t(`overlayDesigner.simulation.battle.phases.${phase}`)}
                   </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>{t("overlayDesigner.simulation.battle.capacity")}</span>
+              <select
+                value={battleState.capacity}
+                onChange={(event) => dispatchBattle({
+                  type: "capacity",
+                  capacity: Number(event.target.value),
+                })}
+              >
+                {[2, 3, 4, 5].map((capacity) => (
+                  <option value={capacity} key={capacity}>{capacity}</option>
                 ))}
               </select>
             </label>
@@ -354,6 +375,7 @@ export function OverlayDesignerInspector({
                 max={battleState.capacity}
                 step="1"
                 value={battleState.participants.length}
+                disabled={battleState.phase === "off"}
                 onChange={(event) => dispatchBattle({
                   type: "participants",
                   count: Number(event.target.value),
@@ -374,6 +396,47 @@ export function OverlayDesignerInspector({
                 })}
               />
             </label>
+            <label>
+              <span>{t("overlayDesigner.simulation.battle.attackPlayer")}</span>
+              <select value={targetSlot} onChange={event => setAttackPlayer(Number(event.target.value))}>
+                <option value="0">{t("overlayDesigner.simulation.battle.alternatePlayers")}</option>
+                {battleState.participants.map(player => <option key={player.slot} value={player.slot}>{player.displayName}</option>)}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={battleState.phase !== "active" || battleState.participants.length === 0}
+              onClick={() => {
+                const item = battleAttacks[(battleState.attack?.sequence ?? 0) % battleAttacks.length];
+                dispatchBattle({ type: "attack", name: t(item.titleKey), imagePath: item.image, startedAt: Date.now(), slot: targetSlot || undefined });
+              }}
+            >
+              <Swords aria-hidden="true" />{t("overlayDesigner.simulation.battle.simulateAttack")}
+            </button>
+            <button type="button"
+              disabled={battleState.phase !== "active" || battleState.participants.length === 0}
+              onClick={() => {
+                const startedAt = Date.now();
+                for (let index = 0; index < 3; index++) {
+                  const item = battleAttacks[((battleState.attack?.sequence ?? 0) + index) % battleAttacks.length];
+                  dispatchBattle({ type: "attack", name: t(item.titleKey), imagePath: item.image, startedAt,
+                    slot: targetSlot || battleState.participants[0].slot });
+                }
+              }}>
+              <Swords aria-hidden="true" />{t("overlayDesigner.simulation.battle.simulateBurst")}
+            </button>
+            <button type="button"
+              disabled={battleState.phase !== "active" || battleState.participants.length === 0}
+              onClick={() => {
+                if (battleState.challenges?.length) { dispatchBattle({ type: "clear_challenge" }); return; }
+                const item = interactionItems.find(item => item.id === "challenge_no_dash")!;
+                dispatchBattle({ type: "challenge", name: t(item.titleKey), imagePath: item.image,
+                  startedAt: Date.now(), slot: targetSlot || battleState.participants[0].slot });
+              }}>
+              <Activity aria-hidden="true" />{t(battleState.challenges?.length
+                ? "overlayDesigner.simulation.battle.stopChallenge" : "overlayDesigner.simulation.battle.simulateChallenge")}
+            </button>
+            <small>{t("overlayDesigner.simulation.battle.attackHint")}</small>
             <button
               className="overlay-designer-simulation__reset"
               type="button"

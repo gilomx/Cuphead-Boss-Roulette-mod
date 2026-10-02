@@ -109,7 +109,7 @@
         "progress": "Filled slots",
         "emptySlot": "Slot {slot}",
         "participantFallback": "Participant {slot}",
-        "simulationHint": "Gifts sent from Simulate event can also fill these slots; initials are shown when no photo is provided."
+        "simulationHint": "Use the photo profiles in Simulate event and send the entry gift to fill one slot per distinct ID, without going live."
       },
       "actions": {
         "arm": "Arm recruitment",
@@ -373,6 +373,11 @@
       "type": "Event type",
       "user": "User",
       "userPlaceholder": "Test donor",
+      "profile": "Test profile",
+      "noPhoto": "No photo",
+      "profileHint": "Each profile has its own photo, name and ID. Use a different ID for each player; repeating it keeps the same participant. You can edit their details below.",
+      "displayName": "Display name",
+      "userId": "User ID",
       "item": "TikTok gift",
       "itemPlaceholder": "Search by name…",
       "itemLoading": "Loading gifts…",
@@ -485,6 +490,13 @@
         "outlineColor": "Outline",
         "alpha": "Opacity"
       },
+      "battleColors": {
+        "title": "Battle colors",
+        "liquidColor": "Occupied player border",
+        "collectingColor": "Attack flash",
+        "textColor": "Text",
+        "outlineColor": "Empty slot border"
+      },
       "options": {
         "enabled": "Visible",
         "enabledHint": "Appears in this profile.",
@@ -516,14 +528,23 @@
       },
       "battle": {
         "phases": {
+          "off": "Not activated (empty overlay)",
           "recruiting": "Recruiting",
           "ready": "Team ready",
           "waiting_level": "Waiting for level",
           "active": "Battle active",
           "won": "Victory"
         },
-        "participants": "Participants",
-        "attempt": "Attempt"
+        "capacity": "Number of players",
+        "participants": "Filled slots",
+        "attempt": "Attempt",
+        "simulateAttack": "Simulate attack",
+        "attackPlayer": "Player for testing",
+        "alternatePlayers": "Cycle players",
+        "simulateBurst": "Simulate 3 attacks for one player",
+        "simulateChallenge": "Simulate challenge",
+        "stopChallenge": "Remove challenge",
+        "attackHint": "Select Battle active. Attacks appear one after another for each player. The challenge shows a 3 s warning and stays active for 15 s. These tests only affect the preview."
       }
     },
     "preview": {

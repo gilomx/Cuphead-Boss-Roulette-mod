@@ -147,7 +147,9 @@ mock y traducciones ES/EN; todos consumen las listas comunes de artículos.
 
 El preview se extrae de `devil_ph1_fire_dance_0001` y
 `devil_ph1_fire_dance_pink_0001` en `atlas_devillevelp1` con
-`tools/extract_native_devil_fire_circle_preview.py`. El contrato IL
+`tools/extract_native_devil_fire_circle_preview.py`. El PNG del catálogo
+agrupa las cinco llamas en 296 × 352 para hacerlas más legibles. Esta composición
+visual no cambia el radio del ataque en el juego. El contrato IL
 `tools/verify_native_devil_fire_circle_contract.ps1` verifica prefabs,
 cantidad, fábricas, parry, relojes, homing, constantes adaptadas y destrucción.
 
@@ -889,7 +891,8 @@ escena temporal y también reconoce copias marcadas de la interacción. Esto
 evita que la jerarquía invisible inicie fases, daño o corrutinas del jefe. El
 proyectil no lleva esa marca, por lo que ejecuta normalmente su `Awake`,
 `Start`, movimiento y colisiones. El preview usa
-`baroness_head_toss_0009` de `atlas_baronesslevel` y se puede regenerar con
+la cabeza de `top_baroness_head_toss_0018` de `atlas_baronesslevel`, elegida
+como opción 8, sin cuerpo, brazos ni cono. Se puede regenerar con
 `tools/extract_native_baroness_head_toss_preview.py`.
 
 ## Bolas de fuego de Fósforo Sombrío
@@ -947,7 +950,9 @@ dragón conserva su comportamiento. Si no se puede adaptar el IL esperado,
 el artículo queda pendiente y se registra el error.
 `tools/verify_native_dragon_fireballs_contract.ps1` comprueba ese contrato IL y
 el giro de la DLL compilada con distintas tasas de frames y escalas de cámara. El
-preview usa `dragon_meteor_forward_0007` de `atlas_dragonlevel_nobg` y se
+preview usa `dragon_meteor_forward_0009` y `meteor_0001` de
+`atlas_dragonlevel_nobg`: cabeza con cuello redondeado después de la primera
+espina y bola ya fuera de la boca. Se
 regenera con `tools/extract_native_dragon_fireballs_preview.py`.
 
 ## Pasos para añadir un artículo

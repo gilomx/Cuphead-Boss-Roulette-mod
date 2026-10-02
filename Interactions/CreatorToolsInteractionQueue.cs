@@ -77,7 +77,8 @@ namespace Gilomx.CupheadBossRoulette
             float delaySeconds,
             CreatorToolsInteractionSource source,
             int durationSeconds = CreatorToolsTimedChallenge.DefaultDuration,
-            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown)
+            int countdownSeconds = CreatorToolsTimedChallenge.DefaultCountdown,
+            int battleSessionId = 0, int battleAttempt = 0, int battleSlot = 0)
         {
             // Battle work shares this physical queue, but owns one reserved
             // pending slot. A paused stream backlog may therefore contain the
@@ -102,6 +103,9 @@ namespace Gilomx.CupheadBossRoulette
                     Donor = donor,
                     GiftImagePath = giftImagePath ?? string.Empty,
                     Source = source,
+                    BattleSessionId = battleSessionId,
+                    BattleAttempt = battleAttempt,
+                    BattleSlot = battleSlot,
                     DurationSeconds = durationSeconds,
                     CountdownSeconds = countdownSeconds,
                     DelaySeconds = delaySeconds,
@@ -209,6 +213,14 @@ namespace Gilomx.CupheadBossRoulette
                     !CreatorToolsHelp.Supports(pending[i].Item))
                     count++;
             return count;
+        }
+
+        // Unity-thread only. The battle copies handle state into a pure-data
+        // projection; HTTP/stream workers must never enumerate these handles.
+        internal void VisitActive(Action<Entry> visit)
+        {
+            for (var i = 0; i < active.Count; i++)
+                visit(active[i]);
         }
 
         private int CountMatchingHelp()
@@ -516,6 +528,9 @@ namespace Gilomx.CupheadBossRoulette
             internal string GiftImagePath;
             internal CreatorToolsInteractionSource Source;
             internal float DelaySeconds;
+            internal int BattleSessionId;
+            internal int BattleAttempt;
+            internal int BattleSlot;
             internal int DurationSeconds;
             internal int CountdownSeconds;
             internal float ReadyAt;

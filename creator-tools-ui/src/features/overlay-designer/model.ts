@@ -94,6 +94,13 @@ export interface OverlayPreviewCommand {
   attempt: number;
   participantCount: number;
   capacity: number;
+  attackId: string;
+  attackSlot: number;
+  attackName: string;
+  attackImagePath: string;
+  attackStartedAt: number;
+  eventEpoch: number;
+  battleSignalsJson: string;
 }
 
 export interface OverlayPreviewState {
@@ -161,8 +168,19 @@ export interface PeskyBattlePreviewParticipant {
 }
 
 export interface PeskyBattlePreviewSnapshot {
+  eventEpoch: number;
+  attacks?: NonNullable<PeskyBattlePreviewSnapshot["attack"]>[];
+  challenges?: Array<{
+    id: string;
+    slot: number;
+    name: string;
+    imagePath: string;
+    phase: "countdown" | "active";
+    secondsRemaining: number;
+    startedAt: number;
+  }>;
   revision: number;
-  phase: "recruiting" | "ready" | "waiting_level" | "active" | "won";
+  phase: "off" | "recruiting" | "ready" | "waiting_level" | "active" | "won";
   capacity: number;
   attempt: number;
   trigger: {
@@ -171,6 +189,14 @@ export interface PeskyBattlePreviewSnapshot {
     giftImagePath: string;
   };
   participants: PeskyBattlePreviewParticipant[];
+  attack?: {
+    id: string;
+    slot: number;
+    name: string;
+    imagePath: string;
+    startedAt: number;
+    sequence: number;
+  };
 }
 
 export interface OverlayComposerDesignMessage {

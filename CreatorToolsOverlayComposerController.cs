@@ -457,6 +457,13 @@ namespace Gilomx.CupheadBossRoulette
         private static bool ApplyPreviewValues(
             PreviewSlot slot, Dictionary<string, string> values)
         {
+            if (values.ContainsKey("battleSignalsJson"))
+            {
+                string signals;
+                if (!CreatorToolsOverlayComposerSettings.TryParseBattleSignalsJson(
+                        Value(values, "battleSignalsJson"), out signals)) return false;
+                slot.BattleSignals = signals;
+            }
             bool boolean;
             if (values.ContainsKey("simulationActive"))
             {
@@ -492,7 +499,13 @@ namespace Gilomx.CupheadBossRoulette
             if (!ApplyOptionalText(values, "bossName",
                     ref slot.BossName, 120) ||
                 !ApplyOptionalText(values, "levelId",
-                    ref slot.LevelId, 96))
+                    ref slot.LevelId, 96) ||
+                !ApplyOptionalText(values, "attackId",
+                    ref slot.AttackId, 96) ||
+                !ApplyOptionalText(values, "attackName",
+                    ref slot.AttackName, 120) ||
+                !ApplyOptionalText(values, "attackImagePath",
+                    ref slot.AttackImagePath, 512))
                 return false;
             long integer64;
             double number;
@@ -508,6 +521,12 @@ namespace Gilomx.CupheadBossRoulette
                 if (!TryReadLong(values, "tapDelta", out integer64))
                     return false;
                 slot.TapDelta = ClampLong(integer64, 0L, 1000000000L);
+            }
+            if (values.ContainsKey("attackStartedAt"))
+            {
+                if (!TryReadLong(values, "attackStartedAt", out integer64))
+                    return false;
+                slot.AttackStartedAt = ClampLong(integer64, 0L, 4102444800000L);
             }
             if (values.ContainsKey("damageDelta"))
             {
@@ -540,7 +559,11 @@ namespace Gilomx.CupheadBossRoulette
                 !ApplyOptionalInt(values, "participantCount",
                     ref slot.ParticipantCount, 0, 100) ||
                 !ApplyOptionalInt(values, "capacity",
-                    ref slot.Capacity, 0, 100))
+                    ref slot.Capacity, 0, 100) ||
+                !ApplyOptionalInt(values, "attackSlot",
+                    ref slot.AttackSlot, 0, 5) ||
+                !ApplyOptionalInt(values, "eventEpoch",
+                    ref slot.EventEpoch, 0, int.MaxValue))
                 return false;
             if (slot.TotalHealth > 0d)
                 slot.CurrentHealth = Math.Min(
@@ -717,6 +740,16 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"participantCount\":")
                 .Append(slot.ParticipantCount)
                 .Append(",\"capacity\":").Append(slot.Capacity)
+                .Append(",\"attackStartedAt\":").Append(slot.AttackStartedAt)
+                .Append(",\"attackSlot\":").Append(slot.AttackSlot)
+                .Append(",\"attackId\":\"");
+            CreatorToolsJson.AppendEscaped(builder, slot.AttackId);
+            builder.Append("\",\"attackName\":\"");
+            CreatorToolsJson.AppendEscaped(builder, slot.AttackName);
+            builder.Append("\",\"attackImagePath\":\"");
+            CreatorToolsJson.AppendEscaped(builder, slot.AttackImagePath);
+            builder.Append("\",\"eventEpoch\":").Append(slot.EventEpoch)
+                .Append(",\"battleSignals\":").Append(slot.BattleSignals)
                 .Append(",\"feedback\":\"");
             CreatorToolsJson.AppendEscaped(builder, feedback ?? string.Empty);
             builder.Append("\",\"error\":")
@@ -837,6 +870,13 @@ namespace Gilomx.CupheadBossRoulette
             internal int Attempt;
             internal int ParticipantCount;
             internal int Capacity;
+            internal string AttackId = string.Empty;
+            internal string AttackName = string.Empty;
+            internal string AttackImagePath = string.Empty;
+            internal int AttackSlot;
+            internal long AttackStartedAt;
+            internal int EventEpoch;
+            internal string BattleSignals = "null";
             internal string Feedback = "ready";
 
             internal PreviewSlot(string profileId)

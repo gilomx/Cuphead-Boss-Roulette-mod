@@ -826,6 +826,64 @@ namespace Gilomx.CupheadBossRoulette
                 warning(message);
         }
 
+        internal static bool TryParseBattleSignalsJson(string json, out string normalized)
+        {
+            normalized = null;
+            JsonValue root;
+            if (!JsonParser.TryParse(json, out root) || root.ObjectValue == null) return false;
+            var builder = new StringBuilder("{");
+            foreach (var key in new[] { "attacks", "challenges" })
+            {
+                var list = root.Property(key);
+                if (list == null || list.ArrayValue == null ||
+                    list.ArrayValue.Count > (key == "attacks" ? 32 : 5)) return false;
+                if (key == "challenges") builder.Append(',');
+                builder.Append('"').Append(key).Append("\":[");
+                var ids = new HashSet<string>();
+                for (var i = 0; i < list.ArrayValue.Count; i++)
+                {
+                    var entry = list.ArrayValue[i];
+                    int slot;
+                    if (entry.ObjectValue == null || !entry.TryInteger("slot", out slot) ||
+                        slot < 1 || slot > 5 || entry.String("id").Length == 0 ||
+                        !ids.Add(entry.String("id"))) return false;
+                    if (i > 0) builder.Append(',');
+                    builder.Append("{\"slot\":").Append(slot);
+                    foreach (var field in new[] { "id", "name", "imagePath" })
+                    {
+                        var value = entry.Property(field);
+                        if (value == null || value.StringValue == null ||
+                            value.StringValue.Length > (field == "imagePath" ? 512 : field == "id" ? 96 : 120)) return false;
+                        builder.Append(",\"").Append(field).Append("\":\"");
+                        CreatorToolsJson.AppendEscaped(builder, value.StringValue);
+                        builder.Append('"');
+                    }
+                    if (key == "attacks")
+                    {
+                        var timestamp = entry.Property("startedAt");
+                        if (timestamp == null || !timestamp.NumberValue.HasValue ||
+                            timestamp.NumberValue.Value != decimal.Truncate(timestamp.NumberValue.Value) ||
+                            timestamp.NumberValue.Value < 0 || timestamp.NumberValue.Value > 4102444800000L) return false;
+                        builder.Append(",\"startedAt\":")
+                            .Append(timestamp.NumberValue.Value.ToString(CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        int seconds;
+                        var phase = entry.String("phase");
+                        if ((phase != "countdown" && phase != "active") ||
+                            !entry.TryInteger("secondsRemaining", out seconds) || seconds < 0 || seconds > 120) return false;
+                        builder.Append(",\"phase\":\"").Append(phase)
+                            .Append("\",\"secondsRemaining\":").Append(seconds);
+                    }
+                    builder.Append('}');
+                }
+                builder.Append(']');
+            }
+            normalized = builder.Append('}').ToString();
+            return true;
+        }
+
         private sealed class JsonValue
         {
             internal Dictionary<string, JsonValue> ObjectValue;

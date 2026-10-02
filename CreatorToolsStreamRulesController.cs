@@ -274,7 +274,13 @@ namespace Gilomx.CupheadBossRoulette
                     return false;
                 resolved = new CreatorToolsGiftCatalogEntry(
                     gift.Id, gift.Name, gift.ImagePath,
-                    gift.CoinsPerUnit);
+                    gift.CoinsPerUnit,
+                    communityGift.Learned &&
+                        (gift.Id == communityGift.GiftId ||
+                         gift.Id == communityGift.PreviousGiftId)
+                        ? communityGift.ImagePath
+                        : "/assets/creator-tools/gifts/images/" +
+                          gift.Id + ".webp");
                 return true;
             }
         }

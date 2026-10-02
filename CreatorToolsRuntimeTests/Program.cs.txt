@@ -44,8 +44,12 @@ namespace Gilomx.CupheadBossRoulette
                 TestRuleCooldownPersistence);
             Run("Community Gift learns an ID once and migrates on ID change",
                 TestCommunityGiftIdentityPersistence);
+            Run("Gift resolution separates browser URLs from native disk paths",
+                TestGiftBrowserImageUrl);
             Run("Dashboard retains exactly 30 newest events",
                 TestDashboardRetainsThirtyEvents);
+            Run("Dashboard simulation preserves profile data without a live connection",
+                TestDashboardSimulationProfiles);
             Run("Server projects the worker backlog into interaction JSON",
                 TestServerBacklogProjection);
             Run("Server marks controls applied before Unity consumes them",
@@ -208,6 +212,28 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private static void TestGiftBrowserImageUrl()
+        {
+            using (var scope = new TestScope("gift-browser-url"))
+            {
+                var rules = scope.CreateRules(1);
+                CreatorToolsGiftCatalogEntry gift;
+                True(rules.TryResolveGift("1", out gift), "catalog gift resolves");
+                True(Path.IsPathRooted(gift.ImagePath), "native gift keeps its disk path");
+                Equal("/assets/creator-tools/gifts/images/1.webp", gift.ImageUrl,
+                    "browser uses the served asset URL");
+                True(gift.ImagePath != gift.ImageUrl, "native and browser paths stay distinct");
+                var community = NewEvent(7001, "gift", 1, "7001");
+                community.ItemName = "Channel Gift";
+                community.ItemImageUrl = "https://example.invalid/community.png";
+                community.UnitValue = 5m;
+                community.IsCommunityGift = true;
+                rules.Evaluate(community, true);
+                True(rules.TryResolveGift("7001", out gift), "learned community gift resolves");
+                Equal(community.ItemImageUrl, gift.ImageUrl, "community gift keeps its HTTPS image");
+            }
+        }
+
         private static void TestCommunityGiftIdentityPersistence()
         {
             using (var scope = new TestScope("community-gift-identity"))
@@ -358,6 +384,54 @@ namespace Gilomx.CupheadBossRoulette
                             .GetProperty("received").GetInt64(),
                         "received counter");
                 }
+            }
+        }
+
+        private static void TestDashboardSimulationProfiles()
+        {
+            using (var scope = new TestScope("simulation-profile"))
+            using (var server = scope.StartServer())
+            {
+                var dashboard = new CreatorToolsDashboardController(null);
+                var avatar = "/assets/creator-tools/simulator/avatars/mugman.jpg";
+                Equal(string.Empty, dashboard.ScheduleSimulation(
+                    "platform=tiktok&type=like&user=mugman_test" +
+                    "&userDisplayName=" + Uri.EscapeDataString("Mugman de prueba") +
+                    "&userId=sim-mugman&userAvatarUrl=" + Uri.EscapeDataString(avatar)),
+                    "profile simulation accepted without a connector");
+                var evaluated = new List<CreatorToolsStreamEvent>();
+                dashboard.Update(server, delegate(CreatorToolsStreamEvent entry)
+                {
+                    evaluated.Add(entry);
+                    return CreatorToolsStreamEvaluation.None;
+                });
+                Equal(1, evaluated.Count, "simulation reaches the normal evaluator");
+                var profile = evaluated[0];
+                Equal("mugman_test", profile.UserName, "username preserved");
+                Equal("Mugman de prueba", profile.UserDisplayName, "display name preserved");
+                Equal("sim-mugman", profile.UserId, "stable participant identity preserved");
+                Equal(avatar, profile.UserAvatarUrl, "local photo preserved");
+                True(profile.Simulated, "simulation marker preserved");
+                using (var json = GetJson(server, "/api/dashboard"))
+                {
+                    var entry = json.RootElement.GetProperty("events")[0];
+                    Equal(avatar, entry.GetProperty("userAvatarUrl").GetString(),
+                        "photo published in the dashboard event");
+                    Equal("Mugman de prueba", entry.GetProperty("userDisplayName").GetString(),
+                        "display name published separately");
+                }
+                Equal(string.Empty, dashboard.ScheduleSimulation(
+                    "platform=tiktok&type=like&user=legacy_viewer&userDisplayName="),
+                    "old simulations remain accepted");
+                dashboard.Update(server, delegate(CreatorToolsStreamEvent entry)
+                {
+                    evaluated.Add(entry);
+                    return CreatorToolsStreamEvaluation.None;
+                });
+                Equal("legacy_viewer", evaluated[1].UserDisplayName,
+                    "missing display name falls back to username");
+                Equal(string.Empty, evaluated[1].UserAvatarUrl,
+                    "missing photo retains the initials fallback");
             }
         }
 
@@ -1661,11 +1735,27 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(200, stoppedLegacyLayout.StatusCode,
                     "legacy layout preview stop status");
 
+                var battleSignalsJson = JsonSerializer.Serialize(new {
+                    attacks = new[] {
+                        new { id = "a1", slot = 2, name = "Uno", imagePath = "/one.png", startedAt = 1790985600000L },
+                        new { id = "a2", slot = 2, name = "Dos", imagePath = "/two.png", startedAt = 1790985600000L },
+                        new { id = "a3", slot = 2, name = "Tres", imagePath = "/three.png", startedAt = 1790985600000L }
+                    },
+                    challenges = new[] { new { id = "c1", slot = 2, name = "Sin dash", imagePath = "/dash.png", phase = "countdown", secondsRemaining = 3 } }
+                });
                 var firstBattlePreview = controller.ProcessPreviewCommand(
                     "{\"operation\":\"start\"," +
                     "\"profileId\":\"horizontal\"," +
                     "\"sessionId\":\"battle-editor-a\"," +
-                    "\"componentId\":\"pesky_battle\"}");
+                    "\"componentId\":\"pesky_battle\"," +
+                    "\"capacity\":3,\"participantCount\":3," +
+                    "\"attackId\":\"preview-attack-1\",\"attackSlot\":2," +
+                    "\"attackName\":\"Bomba\"," +
+                    "\"attackImagePath\":\"/assets/bomb.png\"," +
+                    "\"attackStartedAt\":1790985600000,\"eventEpoch\":7," +
+                    "\"battleSignalsJson\":" + JsonSerializer.Serialize(battleSignalsJson) + "}");
+                Equal(200, firstBattlePreview.StatusCode,
+                    "battle attack preview start status");
                 int firstBattleRevision;
                 int firstBattleRunId;
                 using (var json = JsonDocument.Parse(
@@ -1675,6 +1765,43 @@ namespace Gilomx.CupheadBossRoulette
                         .GetProperty("revision").GetInt32();
                     firstBattleRunId = json.RootElement
                         .GetProperty("runId").GetInt32();
+                    Equal(3, json.RootElement.GetProperty("capacity").GetInt32(),
+                        "battle preview capacity");
+                    Equal("preview-attack-1", json.RootElement.GetProperty("attackId").GetString(),
+                        "attack preview event identity");
+                    Equal(2, json.RootElement.GetProperty("attackSlot").GetInt32(),
+                        "attack preview participant slot");
+                    Equal("Bomba", json.RootElement.GetProperty("attackName").GetString(),
+                        "attack preview display name");
+                    Equal("/assets/bomb.png", json.RootElement.GetProperty("attackImagePath").GetString(),
+                        "attack preview image path");
+                    Equal(1790985600000L, json.RootElement.GetProperty("attackStartedAt").GetInt64(),
+                        "attack timestamp survives native serialization");
+                    Equal(3, json.RootElement.GetProperty("battleSignals").GetProperty("attacks").GetArrayLength(),
+                        "OBS transport preserves a whole burst between polls");
+                    Equal("countdown", json.RootElement.GetProperty("battleSignals").GetProperty("challenges")[0].GetProperty("phase").GetString(),
+                        "OBS transport includes persistent challenge state");
+                    Equal(7, json.RootElement.GetProperty("eventEpoch").GetInt32(), "preview event reset generation");
+                }
+                foreach (var invalidSignals in new[] {
+                    "{\"attacks\":[],\"challenges\":{}}",
+                    battleSignalsJson.Replace("\"slot\":2", "\"slot\":6"),
+                    battleSignalsJson.Replace("\"slot\":2", "\"slot\":2.5"),
+                    battleSignalsJson.Replace("\"id\":\"a2\"", "\"id\":\"a1\""),
+                    battleSignalsJson.Replace("\"secondsRemaining\":3", "\"secondsRemaining\":121"),
+                    battleSignalsJson.Replace("\"phase\":\"countdown\"", "\"phase\":\"off\"")
+                })
+                {
+                    var rejected = controller.ProcessPreviewCommand(JsonSerializer.Serialize(new {
+                        operation = "update", profileId = "horizontal", sessionId = "battle-editor-a",
+                        attackName = "Must not replace", battleSignalsJson = invalidSignals
+                    }));
+                    Equal(400, rejected.StatusCode, "malformed preview signals are rejected");
+                    using (var json = JsonDocument.Parse(controller.GetPreviewState("horizontal").Json))
+                    {
+                        Equal(firstBattleRevision, json.RootElement.GetProperty("revision").GetInt32(), "invalid signals leave preview revision unchanged");
+                        Equal("Bomba", json.RootElement.GetProperty("attackName").GetString(), "invalid signals leave the whole preview unchanged");
+                    }
                 }
                 var replacementPreview = controller.ProcessPreviewCommand(
                     "{\"operation\":\"start\"," +
@@ -1690,6 +1817,8 @@ namespace Gilomx.CupheadBossRoulette
                         .GetProperty("revision").GetInt32();
                     replacementRunId = json.RootElement
                         .GetProperty("runId").GetInt32();
+                    Equal("", json.RootElement.GetProperty("attackId").GetString(),
+                        "replacement preview cannot inherit an old attack");
                 }
                 True(replacementRunId > firstBattleRunId,
                     "replacement preview receives a new run id");

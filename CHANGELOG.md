@@ -2,6 +2,81 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Ataques y retos de Batalla crecen a 1.7×. Amplía también la cuenta del reto,
+  reserva espacio para los iconos y separa sus centros para mostrarlos juntos.
+  Ajusta los cinco cupos sin deformar los círculos en tamaños pequeños.
+
+- Batalla amplía los nombres a 14 caracteres completos más punto si se recortan,
+  sube un poco el tamaño y añade sombra paralela. Los nombres largos se ajustan
+  al ancho de cada cupo, también con cinco participantes. El estado usa una
+  única línea de altura fija: el anterior sale por la izquierda y el siguiente
+  entra desde la derecha, después de que termine la salida. Acorta las esperas
+  a «Esperando nivel» y «Esperando intento», sin desplazar el equipo.
+  Renueva la caché del compositor, del iframe de Batalla y de sus scripts para
+  que OBS cargue los avisos nativos al refrescar la fuente del navegador.
+
+- Batalla muestra la imagen del regalo elegido al reclutar en el overlay real,
+  el diseñador y la simulación de OBS. Corrige el envío de una ruta de Windows
+  al navegador, conserva el archivo local para los efectos del juego y evita
+  que la preview vuelva a Rosa al cambiar de escenario o reiniciarse.
+
+- Batalla escalona su primera aparición como Farmeando taps: texto de estado
+  y después los cupos, con 290 ms entre elementos. Acerca el estado al equipo,
+  aumenta los iconos de ataques y retos y coloca cada nombre debajo del círculo.
+  Reserva espacio para los nombres en la fila horizontal y en las dos filas
+  de cinco jugadores; la llegada posterior de un jugador conserva su animación.
+
+- Batalla Molestosa conecta el overlay con los ataques que aparecen realmente
+  en el juego. Sus iconos se muestran en cola por participante, sin nombres
+  visibles y sin sustituir el aviso anterior; diferentes jugadores pueden
+  animarse a la vez. Los retos tienen un indicador pequeño en el borde superior
+  derecho con cuenta regresiva y tiempo restante, siguiendo la pausa y el fin
+  del efecto nativo. Reintentar, cancelar o cambiar de arena limpia los avisos.
+  El diseñador permite elegir jugador, simular tres ataques seguidos y probar
+  un reto, también en la fuente de OBS, sin live ni efectos sobre el juego.
+
+- Las imágenes de ataques usan los diseños aprobados: Fósforo con la bola ya
+  fuera de la boca y el cuello recortado y redondeado después de la primera
+  espina; Baronesa sólo con la cabeza del frame elegido (opción 8); Diablo con
+  sus cinco llamas más grandes y próximas. Conservan transparencia y usan
+  archivos nuevos para renovar la caché del catálogo y los overlays.
+
+- Batalla muestra los nombres también al reclutar: más grandes, centrados y
+  más bajos, con ocho caracteres y un punto sólo si se recortaron. Conserva
+  acentos, emojis y la identidad completa. Los ataques crecen 1.2× y aparecen
+  sobre el borde superior izquierdo del retrato con un rebote más marcado,
+  asentamiento suave y salida con desvanecimiento.
+
+- «Simular evento» incluye cinco perfiles con foto, nombre e ID, usando imágenes
+  aportadas por el usuario y reducidas a JPEG de 256 × 256 (84 KB en total).
+  Mugman queda sobre blanco. Usuario, nombre visible e ID son editables y cada
+  ID distinto puede ocupar un cupo de Batalla sin iniciar un live. El diseñador
+  y la simulación en OBS también muestran estas fotos.
+
+- Batalla reserva espacio alrededor de los retratos, entre cupos y sobre el
+  borde para los iconos. La entrada crece suavemente desde el centro, sin giro
+  ni desplazamientos. Los ataques se muestran sólo como imagen, centrada sobre
+  el borde superior y parcialmente fuera del círculo. Los nombres se sitúan
+  dentro del retrato, abajo. Estado y nombres salen antes de mostrar su
+  reemplazo, conservando sólo el mensaje más reciente si cambia rápidamente;
+  la cancelación limpia los efectos y respeta movimiento reducido.
+
+- Batalla aumenta el texto de estado y su separación de los jugadores. Los
+  retratos crecen con el contenedor, sin límite fijo; cinco cupos usan una fila
+  en formatos anchos y 3 + 2 en formatos más altos. El encabezado puede ocupar
+  varias líneas sin recortar cupos. Bordes más gruesos pasan de discontinuos a
+  sólidos con transición; el diseñador permite cambiar texto, ambos bordes y
+  el destello. La entrada del jugador tiene un rebote y brillo más notorios.
+  «Simular ataque» alterna participantes y ataques del catálogo con icono,
+  nombre y pulso de 1.8 s, también en la simulación de OBS; no envía ataques al
+  juego. Los textos habituales sobre las fotos siguen siendo sus nombres.
+
+- El diseñador permite simular Batalla Molestosa con 2–5 jugadores y comprobar
+  «Sin activar» con el overlay vacío. La cantidad elegida se conserva entre
+  escenarios y en OBS. El overlay aparece al abrir reclutamiento, sin rellenos
+  oscuros, con entradas escalonadas de cupos y una animación breve al reclutar;
+  respeta el interruptor de animaciones y movimiento reducido.
+
 - Batalla Molestosa usa un dropdown para elegir 2–5 participantes y separa el
   catálogo en un panel de ancho completo. Su overlay de reclutamiento es
   minimalista: «Esperando jugadores», círculos discontinuos con el regalo de

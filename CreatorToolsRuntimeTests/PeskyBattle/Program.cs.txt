@@ -16,8 +16,9 @@ internal static class Program
         TestSettings();
         foreach (var capacity in new[] { 2, 3, 4, 5 }) TestRecruitment(capacity);
         TestInvalidSettings();
+        TestOverlaySignals();
         foreach (var item in CreatorToolsTimedChallenge.Items) TestChallenge(item);
-        Console.WriteLine("All Pesky Battle tests passed (migration, persistence, 2–5 slots, retries, locks and 12 timed challenges).");
+        Console.WriteLine("All Pesky Battle tests passed (2–5 slots, real activation notices, owner identity, bounded history, pure worker snapshots, cleanup and 12 timed challenges).");
     }
 
     private static void TestSettings()
@@ -59,6 +60,8 @@ internal static class Program
             Check(scope.State(battle).GetProperty("capacity").GetInt32() == capacity, "capacity projected before arming");
             battle.ProcessBackgroundCommand("action=arm&giftId=5655&capacity=" + capacity);
             battle.ProcessCommands(null);
+            Check(scope.State(battle).GetProperty("trigger").GetProperty("giftImagePath").GetString() ==
+                "/assets/creator-tools/gifts/images/5655.webp", "overlay publishes the browser URL instead of the native disk path");
             battle.ProcessBackgroundCommand("capacity=2");
             Check(scope.State(battle).GetProperty("feedback").GetString() == "battle_active_setting_locked", "recruitment locks the configured capacity");
             battle.ProcessBackgroundCommand("item=challenge_no_ex&itemEnabled=0");
@@ -149,6 +152,14 @@ internal static class Program
             Check(timer.TrySpawn(entry.Item, entry.Donor, entry.GiftImagePath, entry.DurationSeconds, entry.CountdownSeconds,
                 out var handle, out var feedback, out var error), "queued battle challenge runs through the timed executor");
             scope.Queue.Activate(entry, handle);
+            battle.ObserveActivation(entry);
+            battle.Update(null, true, true);
+            var signals = scope.State(battle);
+            Check(signals.GetProperty("attacks").GetArrayLength() == 0, "challenges are persistent markers instead of transient attacks");
+            var marker = signals.GetProperty("challenges")[0];
+            Check(marker.GetProperty("slot").GetInt32() == entry.BattleSlot &&
+                marker.GetProperty("item").GetString() == item &&
+                marker.GetProperty("phase").GetString() == "countdown", "native challenge warning keeps exact owner and item");
             Time.realtimeSinceStartup += 10;
             battle.Update(null, true, true);
             Check(scope.Queue.PendingCount == 0, "a busy timed executor cannot receive an overlapping battle challenge");
@@ -156,10 +167,112 @@ internal static class Program
             battle.ProcessBackgroundCommand("action=off");
             battle.ProcessCommands(null);
             Check(!timer.Busy && scope.Queue.CountFor(CreatorToolsInteractionSource.PeskyBattle) == 0, "cancellation disposes the timed challenge lease");
+            Check(scope.State(battle).GetProperty("challenges").GetArrayLength() == 0, "cancellation immediately clears overlay markers");
             Check(scope.Queue.CountFor(CreatorToolsInteractionSource.Stream) == 1, "cancellation preserves unrelated stream entries");
             battle.Dispose();
             timer.Dispose();
         }
+    }
+
+    private static void TestOverlaySignals()
+    {
+        using (var scope = new Scope())
+        {
+            var battle = scope.CreateBattle(item => item == CreatorToolsInteractionIds.PurpleZeppelin);
+            battle.ProcessBackgroundCommand("action=arm&giftId=5655&capacity=2");
+            battle.ProcessCommands(null);
+            var one = Gift(1); var two = Gift(2);
+            one.UserDisplayName = two.UserDisplayName = "Same name";
+            battle.ObserveStreamEvent(one); battle.ObserveStreamEvent(two);
+            battle.ProcessBackgroundCommand("action=start");
+            var level = new Level { CurrentLevel = Levels.Ground, Id = 7 };
+            battle.OnLevelStarted(level);
+            Time.realtimeSinceStartup = 0;
+            battle.Update(null, true, true);
+            Time.realtimeSinceStartup = 2;
+            battle.Update(null, true, true);
+            var entry = scope.Queue.Peek();
+            var state = scope.State(battle);
+            var session = state.GetProperty("sessionId").GetInt32();
+            var attempt = state.GetProperty("attempt").GetInt32();
+            Check(entry != null && entry.BattleSessionId == session && entry.BattleAttempt == attempt && entry.BattleSlot == 1,
+                "scheduler attaches stable participant ownership before dispatch");
+            Check(state.GetProperty("attacks").GetArrayLength() == 0, "queued work cannot announce a spawn");
+            battle.ObserveActivation(entry);
+            Check(scope.State(battle).GetProperty("attacks").GetArrayLength() == 0, "failed/unspawned entry cannot announce an attack");
+            scope.Queue.Reject(entry);
+            for (var i = 0; i < 3; i++)
+            {
+                scope.Queue.Enqueue(CreatorToolsInteractionIds.PurpleZeppelin, "Same name", "", 1, 0,
+                    CreatorToolsInteractionSource.PeskyBattle, battleSessionId: session, battleAttempt: attempt, battleSlot: i == 2 ? 2 : 1);
+                entry = scope.Queue.Peek();
+                scope.Queue.Activate(entry, new OverlayHandle());
+                battle.ObserveActivation(entry);
+            }
+            var attacks = scope.State(battle).GetProperty("attacks");
+            Check(attacks.GetArrayLength() == 3 && attacks[0].GetProperty("id").GetString() != attacks[1].GetProperty("id").GetString(),
+                "all successful activations survive between HTTP polls");
+            Check(attacks[0].GetProperty("slot").GetInt32() == 1 && attacks[2].GetProperty("slot").GetInt32() == 2,
+                "duplicate display names never determine ownership");
+            scope.Queue.Enqueue(CreatorToolsTimedChallenge.NoDash, "Same name", "", 1, 0,
+                CreatorToolsInteractionSource.PeskyBattle, battleSessionId: session, battleAttempt: attempt, battleSlot: 2);
+            entry = scope.Queue.Peek();
+            var timed = new OverlayHandle { Countdown = true, Seconds = 3 };
+            scope.Queue.Activate(entry, timed);
+            battle.Update(null, true, false);
+            Check(scope.State(battle).GetProperty("challenges")[0].GetProperty("secondsRemaining").GetInt32() == 3,
+                "challenge projection uses handle countdown");
+            var fixturePath = Environment.GetEnvironmentVariable("PICHI_BATTLE_OVERLAY_FIXTURE");
+            if (!string.IsNullOrEmpty(fixturePath))
+                File.WriteAllText(fixturePath, scope.State(battle).GetRawText());
+            var reads = timed.Reads;
+            Exception workerFailure = null;
+            var worker = new System.Threading.Thread(() => { try { scope.State(battle); } catch (Exception e) { workerFailure = e; } });
+            worker.Start(); worker.Join();
+            Check(workerFailure == null && timed.Reads == reads, "worker publication never touches Unity handles");
+            Time.realtimeSinceStartup = 8;
+            battle.Update(null, true, false);
+            Check(scope.State(battle).GetProperty("attacks")[0].GetProperty("ageMs").GetInt32() == 6000,
+                "cached projections retain native event age for reconnects and different PC clocks");
+            Check(scope.State(battle).GetProperty("challenges")[0].GetProperty("secondsRemaining").GetInt32() == 3,
+                "wall-clock passage cannot expire a paused native challenge");
+            timed.Countdown = false; timed.Seconds = 15;
+            battle.Update(null, true, false);
+            Check(scope.State(battle).GetProperty("challenges")[0].GetProperty("phase").GetString() == "active",
+                "native countdown becomes an active marker");
+            timed.Complete = true;
+            battle.Update(null, true, false);
+            Check(scope.State(battle).GetProperty("challenges").GetArrayLength() == 0, "completed handle removes its marker");
+            scope.Queue.ClearSource(CreatorToolsInteractionSource.PeskyBattle);
+            for (var i = 0; i < 40; i++)
+            {
+                scope.Queue.Enqueue(CreatorToolsInteractionIds.PurpleZeppelin, "Same name", "", 1, 0,
+                    CreatorToolsInteractionSource.PeskyBattle, battleSessionId: session, battleAttempt: attempt, battleSlot: 1);
+                entry = scope.Queue.Peek(); scope.Queue.Activate(entry, new OverlayHandle()); battle.ObserveActivation(entry);
+            }
+            Check(scope.State(battle).GetProperty("attacks").GetArrayLength() == 32, "activation history is bounded");
+            Time.realtimeSinceStartup = 30;
+            battle.Update(null, true, false);
+            Check(scope.State(battle).GetProperty("attacks").GetArrayLength() == 0, "stale events are pruned on Unity thread");
+            var epoch = scope.State(battle).GetProperty("eventEpoch").GetInt32();
+            battle.OnLevelDefeated(level);
+            Check(scope.State(battle).GetProperty("eventEpoch").GetInt32() > epoch, "defeat invalidates browser queues");
+            battle.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 8 });
+            battle.ObserveActivation(entry);
+            Check(scope.State(battle).GetProperty("attacks").GetArrayLength() == 0, "previous attempt activation cannot enter the retry");
+            battle.Dispose();
+        }
+    }
+
+    private sealed class OverlayHandle : ICreatorToolsInteractionHandle, ICreatorToolsTimedInteractionHandle
+    {
+        internal bool Countdown, Complete;
+        internal int Seconds, Reads;
+        public bool IsComplete { get { return Complete; } }
+        public bool CountingDown { get { Reads++; return Countdown; } }
+        public int CountdownSecondsRemaining { get { Reads++; return Seconds; } }
+        public int SecondsRemaining { get { Reads++; return Seconds; } }
+        public void Dispose() { Complete = true; }
     }
 
     private static CreatorToolsStreamEvent Gift(int id)
@@ -183,7 +296,9 @@ internal static class Program
         }
         private static bool ResolveGift(string id, out CreatorToolsGiftCatalogEntry gift)
         {
-            gift = id == "5655" ? new CreatorToolsGiftCatalogEntry(id, "Rose", "", 1) : null;
+            gift = id == "5655" ? new CreatorToolsGiftCatalogEntry(id, "Rose",
+                Path.Combine(Path.GetTempPath(), "pichi-test-gifts", id + ".webp"), 1,
+                "/assets/creator-tools/gifts/images/5655.webp") : null;
             return gift != null;
         }
         internal JsonElement State(CreatorToolsPeskyBattleController battle)

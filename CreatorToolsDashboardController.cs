@@ -324,16 +324,18 @@ namespace Gilomx.CupheadBossRoulette
             if (giftId.Length == 0)
                 giftId = NormalizeText(
                     Value(values, "itemId"), string.Empty, 160);
+            var userName = NormalizeText(
+                Value(values, "user"), string.Empty, 80);
 
             entry = new CreatorToolsStreamEvent
             {
                 Platform = platform,
                 Type = type,
-                UserName = NormalizeText(
-                    Value(values, "user"), string.Empty, 80),
+                UserName = userName,
                 UserDisplayName = NormalizeText(
-                    Value(values, "user"), string.Empty, 80),
-                UserAvatarUrl = string.Empty,
+                    Value(values, "userDisplayName"), userName, 80),
+                UserAvatarUrl = NormalizeText(
+                    Value(values, "userAvatarUrl"), string.Empty, 2048),
                 UserId = NormalizeText(
                     Value(values, "userId"), string.Empty, 160),
                 ItemId = giftId,

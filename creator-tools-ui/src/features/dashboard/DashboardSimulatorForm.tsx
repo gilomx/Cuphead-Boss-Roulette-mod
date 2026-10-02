@@ -16,11 +16,21 @@ const EVENT_TYPES: StreamEventType[] = [
 const MAXIMUM_COUNT = 1_000;
 const MAXIMUM_AMOUNT = 1_000_000_000;
 const MAXIMUM_DELAY_SECONDS = 3_600;
+const SIMULATION_PROFILES = [
+  { id: "cuphead", name: "Cuphead", user: "cuphead_test" },
+  { id: "cuphead-coins", name: "Cuphead Coins", user: "cuphead_coins" },
+  { id: "knight", name: "Hollow Knight", user: "knight_test" },
+  { id: "cup-trio", name: "Cuphead Trio", user: "cup_trio" },
+  { id: "mugman", name: "Mugman", user: "mugman_test" },
+];
 
 interface SimulationDraft {
   platform: StreamPlatform;
   type: StreamEventType;
   user: string;
+  userDisplayName: string;
+  userId: string;
+  profileId: string;
   amount: number;
   count: number;
   selectedItemId: string;
@@ -40,6 +50,9 @@ const INITIAL_SIMULATION: SimulationDraft = {
   platform: "tiktok",
   type: "gift",
   user: "",
+  userDisplayName: "",
+  userId: "",
+  profileId: "",
   amount: 1,
   count: 1,
   selectedItemId: "",
@@ -91,6 +104,11 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
       platform: simulation.platform,
       type: simulation.type,
       user: simulation.user.trim(),
+      userDisplayName: simulation.userDisplayName.trim(),
+      userId: simulation.userId.trim(),
+      userAvatarUrl: simulation.profileId
+        ? `/assets/creator-tools/simulator/avatars/${simulation.profileId}.jpg`
+        : "",
       count: String(count),
       delaySeconds: String(delaySeconds),
     });
@@ -172,16 +190,70 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
           </label>
         </div>
 
+        <fieldset className="dashboard-simulator-form__profiles" disabled={simulationStatus === "sending"}>
+          <legend>{t("dashboard.simulator.profile")}</legend>
+          <div role="group" aria-label={t("dashboard.simulator.profile")}>
+            {SIMULATION_PROFILES.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                aria-pressed={simulation.profileId === profile.id}
+                onClick={() => setSimulation((current) => ({
+                  ...current,
+                  profileId: profile.id,
+                  user: profile.user,
+                  userDisplayName: profile.name,
+                  userId: `sim-${profile.id}`,
+                }))}
+              >
+                <img src={`/assets/creator-tools/simulator/avatars/${profile.id}.jpg`} alt="" width={48} height={48} />
+                <span>{profile.name}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={!simulation.profileId}
+              onClick={() => setSimulation((current) => ({ ...current, profileId: "" }))}
+            >
+              <span className="dashboard-simulator-form__no-photo" aria-hidden="true">?</span>
+              <span>{t("dashboard.simulator.noPhoto")}</span>
+            </button>
+          </div>
+          <small className="dashboard-simulator-form__hint">{t("dashboard.simulator.profileHint")}</small>
+        </fieldset>
+
         <label>
           <span>{t("dashboard.simulator.user")}</span>
           <input
             type="text"
-            maxLength={64}
+            maxLength={80}
             value={simulation.user}
             placeholder={t("dashboard.simulator.userPlaceholder")}
             onChange={(event) => setSimulation((current) => ({ ...current, user: event.target.value }))}
           />
         </label>
+
+        <div className="dashboard-simulator-form__row">
+          <label>
+            <span>{t("dashboard.simulator.displayName")}</span>
+            <input
+              type="text"
+              maxLength={80}
+              value={simulation.userDisplayName}
+              placeholder={simulation.user || t("dashboard.simulator.userPlaceholder")}
+              onChange={(event) => setSimulation((current) => ({ ...current, userDisplayName: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>{t("dashboard.simulator.userId")}</span>
+            <input
+              type="text"
+              maxLength={160}
+              value={simulation.userId}
+              onChange={(event) => setSimulation((current) => ({ ...current, userId: event.target.value }))}
+            />
+          </label>
+        </div>
 
         {isCatalogGift ? (
           <div>

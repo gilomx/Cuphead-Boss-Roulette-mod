@@ -22,8 +22,14 @@ export type TapSimulationAction =
 
 export type BattleSimulationAction =
   | { type: "scenario"; scenario: PeskyBattlePreviewSnapshot["phase"] }
+  | { type: "gift"; trigger: PeskyBattlePreviewSnapshot["trigger"] }
+  | { type: "capacity"; capacity: number }
   | { type: "participants"; count: number }
   | { type: "attempt"; attempt: number }
+  | { type: "attack"; name: string; imagePath: string; startedAt: number; slot?: number }
+  | { type: "challenge"; name: string; imagePath: string; startedAt: number; slot: number }
+  | { type: "challenge_tick"; now: number }
+  | { type: "clear_challenge" }
   | { type: "reset" };
 
 const BATTLE_NAMES = [
@@ -33,6 +39,7 @@ const BATTLE_NAMES = [
   "Mugman MX",
   "CupFan",
 ];
+const BATTLE_AVATARS = ["cuphead", "cuphead-coins", "knight", "cup-trio", "mugman"];
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -271,22 +278,28 @@ export function tapSimulationReducer(
 export function createBattleSimulation(
   scenario: PeskyBattlePreviewSnapshot["phase"] = "recruiting",
   participantCount?: number,
+  requestedCapacity = 5,
+  trigger: PeskyBattlePreviewSnapshot["trigger"] = {
+    giftId: "preview-gift", giftName: "Rosa", giftImagePath: "/assets/creator-tools/gifts/images/5655.webp",
+  },
 ): PeskyBattlePreviewSnapshot {
-  const defaultCount = scenario === "recruiting" ? 3 : scenario === "won" ||
-    scenario === "ready" || scenario === "waiting_level" || scenario === "active" ? 5 : 0;
-  const count = clamp(Math.floor(participantCount ?? defaultCount), 0, 5);
+  const capacity = Number.isInteger(requestedCapacity) && requestedCapacity >= 2 && requestedCapacity <= 5
+    ? requestedCapacity : 5;
+  const defaultCount = scenario === "recruiting" ? Math.min(3, capacity - 1) : scenario === "off" ? 0 : capacity;
+  const count = scenario === "off" ? 0 : clamp(Math.floor(participantCount ?? defaultCount), 0, capacity);
   return {
     revision: 1,
     phase: scenario,
-    capacity: 5,
+    capacity,
+    eventEpoch: 1,
     attempt: scenario === "active" || scenario === "won" ? 2 : 1,
-    trigger: { giftId: "preview-gift", giftName: "Rosa", giftImagePath: "/assets/creator-tools/gifts/images/5655.webp" },
+    trigger: { ...trigger },
     participants: BATTLE_NAMES.slice(0, count).map((displayName, index) => ({
       slot: index + 1,
       userId: `preview-${index + 1}`,
       userName: `preview${index + 1}`,
       displayName,
-      avatarUrl: "",
+      avatarUrl: `/assets/creator-tools/simulator/avatars/${BATTLE_AVATARS[index]}.jpg`,
     })),
   };
 }
@@ -295,10 +308,70 @@ export function battleSimulationReducer(
   state: PeskyBattlePreviewSnapshot,
   action: BattleSimulationAction,
 ): PeskyBattlePreviewSnapshot {
-  if (action.type === "reset") return createBattleSimulation();
+  if (action.type === "gift") {
+    if (state.trigger.giftId === action.trigger.giftId &&
+        state.trigger.giftName === action.trigger.giftName &&
+        state.trigger.giftImagePath === action.trigger.giftImagePath) return state;
+    return { ...state, trigger: { ...action.trigger }, revision: state.revision + 1 };
+  }
+  if (action.type === "attack") {
+    if (state.phase !== "active" || state.participants.length === 0) return state;
+    const sequence = (state.attack?.sequence ?? 0) + 1;
+    const participant = action.slot === undefined
+      ? state.participants[(sequence - 1) % state.participants.length]
+      : state.participants.find(player => player.slot === action.slot);
+    if (!participant) return state;
+    const attack = {
+      id: `${state.eventEpoch}-${action.startedAt}-${state.revision + 1}`,
+      slot: participant.slot, name: action.name, imagePath: action.imagePath,
+      startedAt: action.startedAt, sequence,
+    };
+    return {
+      ...state,
+      revision: state.revision + 1,
+      attack,
+      attacks: [...(state.attacks ?? []).filter(event => action.startedAt - event.startedAt <= 12000), attack].slice(-32),
+    };
+  }
+  if (action.type === "challenge") {
+    if (state.phase !== "active" || !state.participants.some(player => player.slot === action.slot)) return state;
+    return { ...state, revision: state.revision + 1, challenges: [{ ...action,
+      id: `challenge-${state.eventEpoch}-${state.revision + 1}`,
+      phase: "countdown", secondsRemaining: 3,
+    }] };
+  }
+  if (action.type === "clear_challenge") return { ...state, revision: state.revision + 1, challenges: [] };
+  if (action.type === "challenge_tick") {
+    if (!state.challenges?.length) return state;
+    const challenges = state.challenges
+      .filter(event => action.now - event.startedAt < 18000)
+      .map(event => {
+        const elapsed = Math.max(0, (action.now - event.startedAt) / 1000);
+        return { ...event, phase: elapsed < 3 ? "countdown" as const : "active" as const,
+          secondsRemaining: Math.ceil(elapsed < 3 ? 3 - elapsed : 18 - elapsed) };
+      });
+    if (challenges.length === state.challenges.length && challenges.every((event, index) =>
+      event.phase === state.challenges![index].phase && event.secondsRemaining === state.challenges![index].secondsRemaining)) return state;
+    return { ...state, revision: state.revision + 1, challenges };
+  }
+  if (action.type === "reset") return { ...createBattleSimulation("recruiting", 0, state.capacity, state.trigger), eventEpoch: state.eventEpoch + 1 };
   if (action.type === "scenario") {
-    return createBattleSimulation(action.scenario,
-      action.scenario === "recruiting" ? state.participants.length : undefined);
+    return { ...createBattleSimulation(action.scenario,
+      action.scenario === "recruiting" ? Math.min(state.participants.length, state.capacity - 1) : undefined,
+      state.capacity, state.trigger), eventEpoch: state.eventEpoch + 1 };
+  }
+  if (action.type === "capacity") {
+    if (!Number.isInteger(action.capacity) || action.capacity < 2 || action.capacity > 5) return state;
+    const count = state.phase === "recruiting"
+      ? Math.min(state.participants.length, action.capacity)
+      : state.phase === "off" ? 0 : action.capacity;
+    const phase = state.phase === "recruiting" && count === action.capacity ? "ready" : state.phase;
+    return {
+      ...createBattleSimulation(phase, count, action.capacity, state.trigger),
+      revision: state.revision + 1,
+      attempt: state.attempt,
+      eventEpoch: state.eventEpoch + 1,
+    };
   }
   if (action.type === "participants") {
     const count = clamp(Math.floor(action.count), 0, state.capacity);
@@ -308,12 +381,14 @@ export function battleSimulationReducer(
         ? "recruiting"
         : state.phase;
     return {
-      ...createBattleSimulation(phase, count),
+      ...createBattleSimulation(phase, count, state.capacity, state.trigger),
       revision: state.revision + 1,
       attempt: state.attempt,
+      eventEpoch: state.eventEpoch + 1,
     };
   }
-  return { ...state, revision: state.revision + 1, attempt: Math.max(1, action.attempt) };
+  return { ...state, revision: state.revision + 1, attempt: Math.max(1, action.attempt),
+    eventEpoch: state.eventEpoch + 1, attack: undefined, attacks: [], challenges: [] };
 }
 
 export function previewCommand(
@@ -350,5 +425,12 @@ export function previewCommand(
     attempt: componentId === "tap_farming" ? tap.attempt : battle.attempt,
     participantCount: battle.participants.length,
     capacity: battle.capacity,
+    attackId: battle.attack?.id ?? "",
+    attackSlot: battle.attack?.slot ?? 0,
+    attackName: battle.attack?.name ?? "",
+    attackImagePath: battle.attack?.imagePath ?? "",
+    attackStartedAt: battle.attack?.startedAt ?? 0,
+    eventEpoch: battle.eventEpoch,
+    battleSignalsJson: JSON.stringify({ attacks: battle.attacks ?? [], challenges: battle.challenges ?? [] }),
   };
 }

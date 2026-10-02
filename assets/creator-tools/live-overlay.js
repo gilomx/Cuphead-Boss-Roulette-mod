@@ -219,6 +219,7 @@
 
   function embeddedUrl(definition) {
     const params = new URLSearchParams({ embedded: "1" });
+    if (definition.id === "pesky_battle") params.set("v", "battle-icons-10");
     if (activeLocale === "en") params.set("locale", "en");
     return `${definition.src}?${params}`;
   }
@@ -368,9 +369,8 @@
 
   function previewParticipants(preview, count, capacity) {
     const supplied = Array.isArray(preview.participants) ? preview.participants : [];
-    const fallbackNames = activeLocale === "en"
-      ? ["La Pichi", "Mugman", "Ms. Chalice", "CupFan", "Dice King"]
-      : ["La Pichi", "Mugman", "Srita. Cáliz", "CupFan", "Rey Dado"];
+    const fallbackNames = ["La Pichi", "Don Taza", "Srita. Cáliz", "Mugman MX", "CupFan"];
+    const fallbackAvatars = ["cuphead", "cuphead-coins", "knight", "cup-trio", "mugman"];
     return Array.from({ length: Math.min(count, capacity) }, (_, index) => {
       const participant = supplied[index] && typeof supplied[index] === "object"
         ? supplied[index]
@@ -380,13 +380,15 @@
         userId: String(participant.userId || `preview-${index + 1}`),
         userName: String(participant.userName || `preview${index + 1}`),
         displayName: String(participant.displayName || fallbackNames[index % fallbackNames.length]),
-        avatarUrl: String(participant.avatarUrl || ""),
+        avatarUrl: typeof participant.avatarUrl === "string" ? participant.avatarUrl
+          : `/assets/creator-tools/simulator/avatars/${fallbackAvatars[index]}.jpg`,
         joinedAt: String(participant.joinedAt || ""),
       };
     });
   }
 
   function previewPeskySnapshot(preview) {
+    const selectedGift = realStates.pesky_battle?.trigger || {};
     const capacity = clamp(Math.round(finiteNumber(preview.capacity, 5)), 1, 5);
     const requestedCount = Math.round(finiteNumber(preview.participantCount, 3));
     const count = clamp(requestedCount, 0, capacity);
@@ -399,17 +401,27 @@
       schemaVersion: 1,
       revision: Date.now(),
       phase,
-      sessionId: Math.max(1, Math.round(finiteNumber(preview.sessionId, 1))),
+      sessionId: String(preview.sessionId || "preview"),
+      eventEpoch: Number(preview.eventEpoch) || 0,
       attempt: Math.max(0, Math.round(finiteNumber(preview.attempt, 2))),
       capacity,
       trigger: {
-        giftId: String(preview.giftId || "preview-gift"),
-        giftName: String(preview.giftName || (activeLocale === "en"
+        giftId: String(preview.giftId || selectedGift.giftId || "preview-gift"),
+        giftName: String(preview.giftName || selectedGift.giftName || (activeLocale === "en"
           ? "Entry gift"
           : "Regalo de entrada")),
-        giftImagePath: String(preview.giftImagePath || preview.giftImageUrl || ""),
+        giftImagePath: String(preview.giftImagePath || preview.giftImageUrl || selectedGift.giftImagePath || ""),
       },
       participants: previewParticipants(preview, count, capacity),
+      attacks: preview.battleSignals?.attacks,
+      challenges: preview.battleSignals?.challenges,
+      attack: preview.attackId ? {
+        id: String(preview.attackId),
+        slot: Number(preview.attackSlot),
+        name: String(preview.attackName || ""),
+        imagePath: String(preview.attackImagePath || ""),
+        startedAt: Number(preview.attackStartedAt),
+      } : undefined,
     };
   }
 

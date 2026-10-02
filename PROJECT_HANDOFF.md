@@ -2,6 +2,374 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Ataques y retos 1.7× (2026-10-02)
+
+CSS escala las imágenes de ataques (53 % → 90.1 %, límite 128 → 217.6 px)
+y retos (37 % → 62.9 %, límite 79 → 134.3 px), con cuenta de reto más grande.
+Amplía el margen superior y la separación horizontal para los iconos, conserva
+el espacio vertical entre filas y separa ligeramente sus centros sobre el borde.
+Los iconos tienen ancho y alto explícitos para mantener su caja cuadrada con
+assets de distintas proporciones. En cinco cupos usa seis columnas sin gaps
+internos y retratos de diámetro explícito, evitando deformaciones cuando el
+espacio entre cupos supera el diámetro. La fila horizontal conserva cinco columnas.
+CSS e iframe renuevan caché a `battle-icons-10`, compositor a `composer-icons-19`.
+
+Validación: 22 pruebas JS satisfactorias y preview con cinco cupos a 960 × 560,
+tamaño mínimo 320 × 187 y fila horizontal 1760 × 300. Retratos circulares,
+ataque y reto simultáneos dentro del área y margen para el pico de animación.
+Publicación canónica en proceso independiente completada, destino físico
+verificado, 1,487 archivos y compilación sin errores ni advertencias. SHA-256:
+`7C79F585D8D41CC067DF0E76E537C17CC16F06AAF4115E2F49C193AE98F91379`.
+Recibo: `.deployment-cache/unpackaged-a98f352010a2460eab49e2e3dd4e60fb/response.json`.
+Preview: `.deployment-cache/battle-large-icons-preview.png`.
+
+## Nombres y slider de estado; avisos reales en OBS (2026-10-02)
+
+Nombres de hasta 14 grafemas, con punto sólo si se recortan; tamaño base de
+21 % del diámetro y máximo 46 px, sombra paralela más marcada y ajuste de
+texto medido para evitar cruces al redimensionar cinco cupos. Cada nombre
+conserva su identidad accesible completa y su animación de desvanecimiento.
+El estado reserva una fila fija, sin saltos: sale por la izquierda en 280 ms,
+se reemplaza sólo al terminar y el siguiente entra desde la derecha. La fase
+oculta restablece instantáneamente la posición de entrada. Esperas compactas
+en español e inglés; movimiento reducido actualiza los mensajes al instante.
+
+El usuario confirmó la fuente `/overlay/vertical` y que no había refrescado
+OBS después de conectar las señales. Lectura independiente de la sesión
+activa: su DLL sí contiene el journal y el hook de activación, y el registro
+muestra ataques y retos ejecutados. Su estado actual está fuera de gameplay,
+sin señales activas, por lo que no se alteró la partida para provocar ataques.
+Se comprobó el compositor vertical con el JSON generado por el controlador
+nativo del harness, sin datos de simulación del diseñador: ataques en ambos
+cupos y reto de NO DASH únicamente en su propietario, aunque compartan nombre.
+El harness permite exportar ese snapshot con `PICHI_BATTLE_OVERLAY_FIXTURE`.
+La reproducción para capturas vive sólo en `.deployment-cache`.
+
+Renueva HTML del compositor a `composer-signals-18`, añade versión al iframe
+de Batalla y renueva CSS/renderer a `battle-slider-9`, catálogo a
+`game-signals-9`. Después de instalar el paquete al siguiente arranque Dev,
+refrescar una vez la fuente del navegador en OBS; una página ya abierta no
+carga JavaScript nuevo sólo porque se haya publicado un ZIP.
+
+Validación visual: cinco jugadores en vertical, nombres de 14 caracteres,
+recorte por grafemas, sombra sobre fondo blanco y tamaño mínimo 320 × 187
+sin desbordes; horizontal nativo 1920 × 1080 con cinco cupos en una fila.
+22 pruebas JS y ambos harness nativos satisfactorios. Publicación canónica
+completada en proceso independiente, destino físico verificado, 1,487 archivos
+y cero errores o advertencias. SHA-256:
+`387866ACCC8CF52385ECADB1A44B2DD864038F1ECC35A024B09112F69FC4ED21`.
+Captura: `.deployment-cache/battle-five-player-names-preview.png`.
+Preview final con nombres habituales: `.deployment-cache/battle-slider-preview.png`.
+
+## Imagen del regalo elegido en Batalla (2026-10-02)
+
+El estado real publicaba `trigger.giftImagePath` con la ruta física de Windows
+utilizada por los efectos nativos. El renderer la rechazaba y mostraba monedas.
+Se reprodujo con Fuego (1261956), cuatro cupos vacíos: la imagen del asset
+servido sí respondía correctamente. `CreatorToolsGiftCatalogEntry` distingue
+ahora `ImagePath` para el juego e `ImageUrl` para el navegador. El resolver
+produce `/assets/creator-tools/gifts/images/<id>.webp` para regalos normales
+y conserva la imagen HTTPS del Community Gift aprendido; Batalla publica la
+URL. Los efectos nativos conservan su ruta local.
+
+El renderer también recupera imágenes de snapshots antiguos por ID numérico,
+sin convertir rutas de disco en URLs de archivos. El diseñador toma el regalo
+configurado y lo conserva al cambiar escenario, capacidad, participantes o
+reiniciar. La fuente compuesta de OBS usa el regalo configurado cuando la
+simulación no proporciona uno explícito. HTML renueva la caché del renderer
+a `battle-gift-8` y la del compositor a `composer-gift-17`.
+
+Validación: 21 pruebas JS, harness nativo de Batalla y harness completo Creator
+Tools. Regresiones para separación de rutas locales/URLs, Community Gift,
+snapshot antiguo con ruta Windows, cambio de regalo y persistencia de preview.
+Verificación visual de Fuego en cuatro cupos reales del mock, diseñador y
+simulación de OBS, con imágenes cargadas y fondo transparente.
+
+Publicación canónica completada en proceso independiente, respuesta satisfactoria
+y destino físico Dev verificado: 1,487 archivos, sin errores ni advertencias.
+SHA-256: `90F2C2862366459123FC9B64B10234E2ED97C6DDA719CFEE485AE62F9052E1D2`.
+Captura: `.deployment-cache/battle-selected-gift-preview.png`. Se aplica en el
+siguiente arranque Dev; la sesión activa de Cuphead no se modifica.
+
+## Entrada escalonada y nombres debajo de Batalla (2026-10-02)
+
+La petición de entrada se refiere a la separación temporal entre elementos.
+El texto comienza a los 40 ms; los cupos a 330, 620, 910, 1200 y 1490 ms,
+con 290 ms de separación como Farmeando taps. Conserva el desvanecimiento
+existente, sin añadir desplazamiento al conjunto. El primer snapshot con
+jugadores no duplica la entrada con el rebote de incorporación; llenar un
+cupo vacío después sí conserva esa animación desde el centro. Las consultas
+repetidas y los cambios de foto no reinician la incorporación.
+
+El espacio entre estado y equipo baja a 3–8 px más el margen de los iconos.
+Cada cupo reserva una fila para el nombre, separado 3–8 px del retrato;
+el cálculo del diámetro considera ambas filas para cinco jugadores en 3 + 2.
+`--portrait-size` es una propiedad de longitud registrada para resolver las
+unidades de contenedor antes de heredarlas a los cupos. Ataques y retos crecen
+aproximadamente un 16 %, conservando sus posiciones sobre el borde y la cola.
+El HTML renueva la caché de CSS y renderer a `battle-entrance-7`.
+
+Validación: 19 pruebas JS de renderer y simulador. En la fuente del compositor
+se comprobaron cinco jugadores en horizontal y vertical, con nombres debajo
+del retrato, sin cruces ni recortes y fondo transparente. El widget mínimo
+de 320 × 187 conserva ambas filas y todos los nombres dentro de sus límites.
+Se comprobaron en el navegador los retardos de los cinco cupos y la ausencia
+de una segunda animación de incorporación en el primer snapshot.
+
+Publicación canónica completada en proceso independiente, con respuesta
+satisfactoria y destino físico Dev verificado: 1,487 archivos, compilación
+sin errores ni advertencias. SHA-256:
+`0559EC12D2AC2D846AF9C6A890BDEF6DD125FC3E41750592501E5CF3CFFBC661`.
+Preview de cinco participantes con ataque y reto:
+`.deployment-cache/battle-layout-preview.png`. El launcher aplica este paquete
+en el siguiente arranque Dev; no se inicia ni se cierra el juego al publicar.
+
+## Batalla conectada al juego: avisos en cola y retos (2026-10-02)
+
+`CreatorToolsInteractionQueue.Entry` conserva sesión, intento y cupo asignados
+por el scheduler de Batalla. `TryDispatchEntry` notifica a Batalla únicamente
+después de un spawn nativo correcto. La atribución no compara nombres visibles.
+El estado `/api/config/pesky-battle` publica `attacks` (hasta 32 activaciones de
+los últimos 12 s), `eventEpoch` y `challenges`. La antigüedad `ageMs` se captura
+en Unity cada segundo para no reproducir historial viejo al conectar desde
+otra PC con un reloj diferente. Reinicios de arena, derrota y cancelación
+invalidan el historial y la cola visual.
+
+El renderer deduplica el historial y reproduce cada aviso durante 1.8 s, en
+orden por cupo; distintos participantes pueden tener avisos simultáneos. El
+reto usa otro icono pequeño en el borde superior derecho del retrato y muestra
+los segundos del handle nativo: aviso/activo/fin. No calcula una fecha de
+caducidad del reto en el navegador, por lo que respeta la pausa. Se preservan
+fondo transparente, nombres y animaciones existentes. La publicación desde
+workers sigue siendo una proyección de datos; nunca enumera handles de Unity.
+
+`overlay-interactions.js` se genera en el build desde el catálogo y las
+traducciones del panel; no mantener otro mapa de PNG o nombres manualmente.
+Se incluye como recurso del plugin. La simulación conserva un historial
+completo y transporta `battleSignalsJson`, validado y normalizado antes de
+actualizar la preview nativa. El diseñador añade jugador, ráfaga de tres
+ataques y reto de 3 s de aviso + 15 s activo; sólo cambia la preview, no el
+estado del juego. El botón de simulación de regalos del dashboard sigue siendo
+el camino para reclutar participantes y probar una batalla real sin live.
+
+Validación: 19 pruebas JS de renderer/simulador, harness nativo de Batalla con
+identidades duplicadas, activación frente a encolado/rechazo, limpieza, historial
+acotado, snapshots de worker y los 12 retos; harness completo Creator Tools,
+incluido transporte de ráfagas y rechazo atómico de previews inválidas.
+Verificación visual en diseñador y fuente de OBS mediante el mock local,
+con fotos e imágenes cargadas. Falta comprobarlo jugando tras el siguiente
+arranque Dev; no se inicia ni reinicia Cuphead durante la publicación.
+
+Publicación canónica completada por `deploy-launcher-dev.ps1` en proceso
+independiente, con respuesta satisfactoria y destino físico Dev verificado:
+1,487 archivos, compilación sin advertencias ni errores. SHA-256:
+`F5264CDAADA90C6E39E7D3C156728CFDD3DF8CF2D4921CF0BFDB4225989BA9EA`.
+Captura de la fuente de OBS (simulada):
+`.deployment-cache/battle-game-connection-preview-compact.png`.
+
+## Imágenes de ataques aprobadas (2026-10-02)
+
+Fósforo conserva `dragon_meteor_forward_0009` con `meteor_0001` ya separado
+de la boca; el cuello se cierra con una curva después de la primera espina.
+Baronesa usa sólo la cabeza de `top_baroness_head_toss_0018`, opción 8 aprobada
+por el usuario. El Diablo conserva cuatro llamas azules y el centro rosa en
+una cruz más compacta. Los PNG transparentes `*-v2.png` reemplazan las rutas
+del catálogo para evitar reutilizar la caché de los iconos anteriores.
+
+Los tres extractores de estos ataques se apoyan en
+`tools/native_interaction_preview.py`, que lee los sprites originales,
+compone sin duplicar alfa y rasteriza los recortes curvos con suavizado.
+Resuelve los bundles mediante `--bundle`, `CUPHEAD_DIR`, el archivo local
+del despliegue o las bibliotecas de Steam; no escribe en el juego.
+La alternativa 1 se conserva en la carpeta de previews excluida de Git.
+
+Validación: los tres extractores resolvieron los bundles locales y generaron
+PNG RGBA de 456 × 458 (Fósforo), 110 × 112 (Baronesa) y 296 × 352 (Diablo).
+El build validó 31 interacciones y 985 regalos; se comprobó la carga de las
+tres imágenes en el catálogo de Batalla. Publicación canónica completada en
+proceso independiente, con ruta física Dev verificada: 1,486 archivos,
+sin errores ni advertencias. SHA-256:
+`D74EC8667CF1E8D423865D01139EB76813D4F3272354BA1966749717F6A1F835`.
+
+## Nombres legibles y ataques en el borde superior izquierdo (2026-10-02)
+
+El overlay de Batalla muestra los nombres en reclutamiento, equipo completo,
+espera de nivel, combate y victoria. Se sigue respetando «Mostrar detalles».
+El texto visible conserva ocho caracteres y añade `.` sólo si se recortó;
+`Mugman MX` se muestra como `Mugman M.`. `Intl.Segmenter` cuenta grafemas para
+no dividir acentos compuestos ni emojis; el fallback cuenta puntos de código.
+La identidad, la etiqueta accesible y el nombre completo del estado no cambian.
+Los cambios de nombre siguen esperando la salida del texto anterior.
+
+Los nombres se centran en un ancho del 120 % del retrato, con fuente de 19 %
+del diámetro (límites 8–42 px), y bajan hasta 7 % del diámetro, máximo 18 px
+por debajo del borde. Cada cupo es un contenedor de tamaño en línea para que
+la fuente responda al propio círculo; se conserva el margen inferior del widget.
+
+El icono del ataque crece exactamente 1.2× respecto al tamaño anterior y su
+centro se sitúa a 14.65 % de arriba y de la izquierda del círculo, sobre el
+borde diagonal superior izquierdo señalado por el usuario. Su entrada escala
+0.35 → 1.16 → 1, mantiene la posición fija y sale hacia 0.7 con desvanecimiento.
+Conserva su duración de 1.8 s, la caducidad y la prevención de repeticiones al
+consultar el mismo snapshot. Animaciones desactivadas/movimiento reducido siguen
+mostrando el icono estático. HTML renueva los identificadores de caché de CSS/JS.
+
+Validación: 14 pruebas de renderer/reducer, incluidos recorte, nombres cortos,
+acentos/emojis, accesibilidad y nombres en todas las fases visibles. En el
+compositor real se verificaron nombres de reclutamiento, fuente de 28.5 px
+para retratos de 150 px, icono de 68.44 px (antes 57.03 px) centrado a 14.65 %,
+animación de 1.8 s y margen para su escala máxima. Los widgets mínimos de
+320 × 187 con 2–5 jugadores conservan todos los nombres sin desbordamiento.
+
+Publicación canónica completada: 1,486 archivos, compilación sin errores ni
+advertencias, proceso independiente y ruta física Dev verificada. SHA-256:
+`9A257930A09B2E5DF994C074F3CF5ED22A647CF8624B6EADC31FFDEE4DBE21C0`.
+El launcher aplicará estos ajustes en el próximo arranque Dev.
+
+## Perfiles con foto para simulaciones sin live (2026-10-02)
+
+Dashboard → «Simular evento» incluye cinco perfiles de prueba con foto, usuario,
+nombre visible e ID estable. Elegir un perfil rellena los datos; se pueden editar
+usuario, nombre visible e ID por separado. «Sin foto» conserva la identidad y
+envía el siguiente evento sin avatar. Un ID distinto obtiene un cupo distinto;
+reenviar el mismo ID no aumenta el número de participantes. El regalo de TikTok
+sigue viniendo del catálogo y debe coincidir con el regalo de reclutamiento.
+
+Las cinco imágenes fueron aportadas por el usuario. Sólo se distribuyen avatares
+JPEG de 256 × 256, calidad 82, en `assets/creator-tools/simulator/avatars/`:
+`cuphead`, `cuphead-coins`, `knight`, `cup-trio` y `mugman`. Se centran las fotos
+al encuadre cuadrado; en Mugman se retiran márgenes transparentes y se compone
+sobre blanco antes de reducirlo. Los cinco archivos suman 85,483 bytes frente
+a 3,410,712 bytes originales. No se usan servicios de imágenes ni un live.
+
+El controlador nativo admite `userDisplayName` y `userAvatarUrl` en la simulación,
+junto al `userId` que ya admitía. Conserva el nombre de usuario como fallback si
+no se especifica nombre visible y la compatibilidad con eventos sin foto. Las
+fotos viajan por la cola/evaluación habitual y quedan en el evento del Dashboard
+y el roster de la batalla. El mock reproduce esos mismos campos. El diseñador
+y la simulación de OBS usan también estos avatares como fotos predeterminadas,
+sin cambiar el estado de juego ni el protocolo de preview.
+
+Validación: suite de runtime (incluye perfil completo sin conexión y compatibilidad
+con simulaciones antiguas), suite de Batalla y 13 pruebas del renderer/reducer.
+QA de navegador: los cinco perfiles llenan un lobby 5/5 con sus fotos; reenviar
+el primero mantiene un único cupo y editar su nombre visible llega al roster.
+Las cinco imágenes cargan a 256 × 256 desde los assets locales.
+
+Publicación canónica completada en proceso independiente: 1,486 archivos,
+ruta física Dev verificada y SHA-256
+`C2670752CE49DE600103608688CE0C2AC93658D644FF55C2AFC16D71C482C70E`.
+Las cinco fotos cargaron también en el compositor del diseñador y en la fuente
+de OBS con el preview activo. El launcher aplicará este paquete en el siguiente
+arranque de «La Pichi Ruleta · Dev».
+
+## Movimiento centrado y textos secuenciales de Batalla (2026-10-02)
+
+Se ampliaron márgenes y separación de cupos para reservar el crecimiento y los
+pulsos dentro del iframe. El roster reserva además una franja superior para
+los iconos. La entrada del retrato usa exclusivamente escala desde su centro:
+0.76 → 1.08 → 1 durante 680 ms, con velocidad suave en cada tramo. La entrada
+del cupo sólo cambia opacidad, sin otro desplazamiento o escala superpuestos.
+
+El ataque simulado conserva el protocolo del preview, pero no pinta su nombre:
+lo usa únicamente como etiqueta accesible. La imagen se centra sobre el borde
+superior, mitad dentro y mitad fuera; su tamaño queda limitado por la franja
+reservada. Los nombres pasan al interior inferior del retrato, separados de
+la animación de la foto y del icono.
+
+Cada texto tiene un único nodo con transición de opacidad/desplazamiento de
+180 ms y una espera de 200 ms antes de reemplazarlo. Durante la salida se
+actualiza sólo el destino pendiente; el siguiente texto no se muestra hasta
+que el anterior desaparece. Esto cubre estado, nombres y los interruptores de
+título/detalles. Al cancelar, el overlay desvanece y elimina retratos y timers
+en 200 ms; sigue vacío antes del primer reclutamiento. Con animaciones apagadas
+o movimiento reducido, las actualizaciones y limpieza son inmediatas.
+
+Validación: 13 pruebas de renderer/reducer, incluyendo cambios rápidos,
+cancelación y movimiento reducido. QA del compositor real: márgenes para el
+crecimiento con 2–5 cupos, tamaño mínimo sin overflow, icono sin texto con su
+centro en el borde, transición secuencial y pivote del retrato en su centro.
+
+Para probar sin live ya existe Dashboard → «Simular evento». El evento pasa
+por la misma evaluación que uno real sin exigir conexión al stream. Con el
+reclutamiento abierto, seleccionar TikTok/regalo y el regalo configurado llena
+un cupo por usuario distinto; repetir regalos del mismo nombre no llena otros
+cupos. El diseñador comprueba sólo lo visual; el simulador del Dashboard permite
+después iniciar una batalla en Cuphead con participantes ficticios. No se añadió
+un laboratorio nuevo ni se arrancó el juego para esta validación.
+
+El publicador canónico compiló sin errores ni advertencias y entregó los 1,481
+archivos desde un proceso independiente, con la ruta física del ZIP Dev
+comprobada. SHA-256:
+`F4DFA43DD1D8C6BD3E54722CF0BDFA08B4375F1B9B9659C067DF0830DC4E8A08`.
+
+## Escala, bordes y simulación de ataques de Batalla (2026-10-02)
+
+El estado usa texto mayor y más separación de los retratos. Se eliminó el
+tope de 152 px; el roster aprovecha el espacio restante después del encabezado,
+incluido cuando éste ocupa dos líneas al reducir el widget. Cinco cupos usan
+una fila si el contenedor alcanza la proporción 5:2, y 3 + 2 en el resto.
+Los retratos entran con rebote, giro y brillo durante 760 ms. Dos capas de borde
+permiten pasar del discontinuo vacío al sólido ocupado sin cambiar el tamaño.
+
+El diseñador expone cuatro colores con opacidad, reutilizando el contrato
+persistido: `liquidColor` es el borde ocupado, `outlineColor` el vacío,
+`textColor` el texto y `collectingColor` el destello de ataque. No hay nueva
+configuración ni migración. Cada perfil conserva sus colores por separado.
+
+En escenario activo, «Simular ataque» alterna los cupos ocupados y las entradas
+de ataques/mini-jefes del catálogo. Presenta icono, nombre y pulso de 1.8 s en
+el diseñador y la fuente OBS si se activa su simulación. El evento viaja sólo
+por `/api/overlay-composer/preview`: ID, cupo, nombre, imagen y timestamp; nunca
+se encola en Unity ni modifica la batalla real. El renderer rechaza imágenes
+inseguras y eventos vencidos, evita repetirlos al sondear y cancela el efecto
+al salir del combate. Las animaciones opcionales y movimiento reducido siguen
+respetándose. Los nombres de muestra coinciden entre diseñador y OBS.
+
+Validación: 11 pruebas de renderer/reducer, contrato nativo del preview en el
+harness general, TypeScript y build del panel. QA del compositor real: bordes
+vacío/ocupado, guardar y recargar colores, 2–5 cupos a tamaño mínimo, encabezado
+multilínea sin recortes, entrada de 760 ms y simulación recibida por la fuente
+OBS. El tracking de ataques/retos/ayudas reales y de daño sigue pendiente como
+trabajo separado; esta entrega añade únicamente su simulación visual.
+
+El publicador canónico completó la compilación sin advertencias ni errores,
+validó los contratos nativos y publicó 1,481 archivos desde el proceso
+independiente con ruta física comprobada. ZIP Dev SHA-256:
+`97C89B7C7F197BDDB509D8642DF9A04A52F37525BB83697463F162ACAD0AB14F`.
+
+## Simulación de cupos y aparición transparente de Batalla (2026-10-02)
+
+El diseñador permite elegir de 2 a 5 jugadores en la simulación de Batalla.
+Parte de la cantidad configurada en el juego, pero cambiar este selector sólo
+modifica la previsualización. Conserva la cantidad al cambiar de escenario,
+llenar cupos, reiniciar y transmitir la simulación a OBS. El escenario
+«Sin activar (overlay vacío)» permite comprobar el estado anterior al evento.
+
+Por decisión del usuario, el overlay aparece al abrir el reclutamiento. Antes
+de eso y al cancelar no conserva círculos, textos ni solicitudes de fotos.
+Se retiraron los rellenos oscuros de retratos y nombres; `color-scheme: only
+light` evita también el fondo negro que puede aportar un iframe oscuro.
+Título y cupos entran progresivamente; cada participante tiene una aparición
+breve sin recrear los cupos ya ocupados. Animaciones desactivadas y la
+preferencia de movimiento reducido eliminan esos efectos.
+
+Validación: seis pruebas del renderer y dos del reducer/contrato de simulación
+(`npm run test:pesky-battle-overlay` y `npm run test:overlay-simulation`). Se
+comprobaron los cuatro tamaños, el estado vacío, la transparencia y el
+interruptor de animaciones en el compositor real con el servidor simulado.
+El publicador canónico compiló panel, mod y companion sin errores ni
+advertencias, validó los contratos nativos y publicó el ZIP Dev completo de
+1,481 archivos desde el proceso independiente, con ruta física comprobada.
+SHA-256: `F226834DA0D7B572B1421332264AC3497F0BD1725344755BBD5EC1B9F68F1932`.
+
+La interactividad adicional se consultó, pero no se implementó en esta entrega.
+Iconos de ataques/retos activos y aureolas de ayudas pueden partir del ciclo
+de vida existente, añadiendo el cupo o ID estable del participante a la
+proyección; no debe asociarse únicamente por nombre. La atribución fiable de
+daño o muerte exige además seguir dueño y proyectiles secundarios hasta el
+impacto y verificar pérdida real de HP; es trabajo separado.
+
 ## Reclutamiento minimalista de Batalla (2026-10-02)
 
 La cantidad de participantes usa un select nativo de 2 a 5, con el mismo

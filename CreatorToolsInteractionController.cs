@@ -1593,6 +1593,7 @@ namespace Gilomx.CupheadBossRoulette
             if (spawned)
             {
                 queue.Activate(entry, handle);
+                peskyBattle.ObserveActivation(entry);
                 InvalidateState();
                 if (logInfo != null)
                     logInfo((entry.Source ==

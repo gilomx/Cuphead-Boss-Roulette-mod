@@ -39,6 +39,10 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object stateLock = new object();
         private readonly List<Participant> participants =
             new List<Participant>(CreatorToolsPeskyBattleSettings.MaximumCapacity);
+        private readonly List<OverlayAttack> overlayAttacks = new List<OverlayAttack>();
+        private string overlayChallenges = "[]";
+        private long overlaySequence;
+        private int overlayEpoch;
 
         private string phase = "off";
         private int sessionId;
@@ -158,7 +162,83 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
             UpdateAttackScheduler(gameplayDispatchAllowed);
+            UpdateOverlaySignals();
             PublishState(server);
+        }
+
+        // Called only after a successful native spawn, on Unity's thread.
+        internal void ObserveActivation(CreatorToolsInteractionQueue.Entry entry)
+        {
+            if (entry == null || entry.Handle == null) return;
+            lock (stateLock)
+            {
+                if (!OwnsOverlayEntryLocked(entry) ||
+                    CreatorToolsTimedChallenge.Supports(entry.Item)) return;
+                overlayAttacks.Add(new OverlayAttack
+                {
+                    Id = (++overlaySequence).ToString(CultureInfo.InvariantCulture),
+                    Slot = entry.BattleSlot, Item = entry.Item,
+                    StartedAt = UtcMilliseconds(), ObservedAt = Time.realtimeSinceStartup
+                });
+                if (overlayAttacks.Count > 32) overlayAttacks.RemoveAt(0);
+                TouchLocked();
+            }
+        }
+
+        private bool OwnsOverlayEntryLocked(CreatorToolsInteractionQueue.Entry entry)
+        {
+            return phase == "active" &&
+                entry.Source == CreatorToolsInteractionSource.PeskyBattle &&
+                entry.BattleSessionId == sessionId && entry.BattleAttempt == attempt &&
+                entry.BattleSlot > 0 && entry.BattleSlot <= participants.Count;
+        }
+
+        private void UpdateOverlaySignals()
+        {
+            lock (stateLock)
+            {
+                if (overlayAttacks.RemoveAll(attack =>
+                        Time.realtimeSinceStartup - attack.ObservedAt > 12f) > 0)
+                    TouchLocked();
+                foreach (var attack in overlayAttacks)
+                {
+                    var age = (int)Math.Max(0f, Time.realtimeSinceStartup - attack.ObservedAt) * 1000;
+                    if (attack.AgeMilliseconds == age) continue;
+                    attack.AgeMilliseconds = age;
+                    TouchLocked();
+                }
+                var builder = new StringBuilder("[");
+                var first = true;
+                if (queue != null && phase == "active")
+                    queue.VisitActive(delegate(CreatorToolsInteractionQueue.Entry entry)
+                    {
+                        if (!OwnsOverlayEntryLocked(entry) || !CreatorToolsTimedChallenge.Supports(entry.Item)) return;
+                        var timed = entry.Handle as ICreatorToolsTimedInteractionHandle;
+                        if (timed == null || entry.Handle.IsComplete) return;
+                        if (!first) builder.Append(',');
+                        first = false;
+                        builder.Append("{\"id\":\"").Append(entry.Id)
+                            .Append("\",\"slot\":").Append(entry.BattleSlot)
+                            .Append(",\"item\":\"");
+                        CreatorToolsJson.AppendEscaped(builder, entry.Item);
+                        builder.Append("\",\"phase\":\"")
+                            .Append(timed.CountingDown ? "countdown" : "active")
+                            .Append("\",\"secondsRemaining\":")
+                            .Append(timed.CountingDown ? timed.CountdownSecondsRemaining : timed.SecondsRemaining)
+                            .Append('}');
+                    });
+                var challenges = builder.Append(']').ToString();
+                if (challenges != overlayChallenges)
+                {
+                    overlayChallenges = challenges;
+                    TouchLocked();
+                }
+            }
+        }
+
+        private static long UtcMilliseconds()
+        {
+            return (DateTime.UtcNow.Ticks - 621355968000000000L) / 10000L;
         }
 
         /// <summary>
@@ -184,7 +264,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (resolveGift == null ||
                     !resolveGift(giftId, out gift))
                     gift = new CreatorToolsGiftCatalogEntry(
-                        giftId, string.Empty, string.Empty, 0);
+                        giftId, string.Empty, string.Empty, 0, string.Empty);
 
                 lock (stateLock)
                 {
@@ -840,7 +920,9 @@ namespace Gilomx.CupheadBossRoulette
                     0, availableItems.Count)];
                 if (queue.Enqueue(
                         itemId, participant.Label, string.Empty, 1, 0f,
-                        CreatorToolsInteractionSource.PeskyBattle) <= 0)
+                        CreatorToolsInteractionSource.PeskyBattle,
+                        battleSessionId: sessionId, battleAttempt: attempt,
+                        battleSlot: participant.Slot) <= 0)
                     return;
                 if (logInfo != null)
                     logInfo("Batalla Molestosa agrego " + itemId +
@@ -957,6 +1039,16 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ClearBattleEntries()
         {
+            // Deferred cleanup can arrive outside stateLock. Protect the pure
+            // projection while the stream worker publishes it. King Dice
+            // arena changes also reset notices without changing the attempt.
+            lock (stateLock)
+            {
+                overlayAttacks.Clear();
+                overlayChallenges = "[]";
+                overlayEpoch++;
+                TouchLocked();
+            }
             if (queue != null)
                 queue.ClearSource(
                     CreatorToolsInteractionSource.PeskyBattle);
@@ -1058,7 +1150,9 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append("\",\"giftName\":\"");
             CreatorToolsJson.AppendEscaped(builder, gift.Name);
             builder.Append("\",\"giftImagePath\":\"");
-            CreatorToolsJson.AppendEscaped(builder, gift.ImagePath);
+            // The native executors need a disk path; browser overlays need
+            // the same asset through the Creator Tools HTTP server.
+            CreatorToolsJson.AppendEscaped(builder, gift.ImageUrl);
             builder.Append("\",\"coinsPerUnit\":")
                 .Append(gift.CoinsPerUnit)
                 .Append("},\"allowStreamAttacks\":")
@@ -1070,7 +1164,23 @@ namespace Gilomx.CupheadBossRoulette
                     builder.Append(',');
                 participants[i].AppendJson(builder);
             }
-            builder.Append("],\"items\":[");
+            builder.Append("],\"eventEpoch\":").Append(overlayEpoch)
+                .Append(",\"serverTime\":").Append(UtcMilliseconds())
+                .Append(",\"attacks\":[");
+            for (var i = 0; i < overlayAttacks.Count; i++)
+            {
+                if (i > 0) builder.Append(',');
+                var attack = overlayAttacks[i];
+                builder.Append("{\"id\":\"").Append(attack.Id)
+                    .Append("\",\"slot\":").Append(attack.Slot)
+                    .Append(",\"startedAt\":").Append(attack.StartedAt)
+                    .Append(",\"ageMs\":").Append(attack.AgeMilliseconds)
+                    .Append(",\"item\":\"");
+                CreatorToolsJson.AppendEscaped(builder, attack.Item);
+                builder.Append("\"}");
+            }
+            builder.Append("],\"challenges\":").Append(overlayChallenges)
+                .Append(",\"items\":[");
             AppendItemsLocked(builder, false);
             builder.Append("],\"disabledItems\":[");
             AppendItemsLocked(builder, true);
@@ -1191,6 +1301,16 @@ namespace Gilomx.CupheadBossRoulette
                     values[key] = value;
             }
             return values;
+        }
+
+        private sealed class OverlayAttack
+        {
+            internal string Id;
+            internal int Slot;
+            internal string Item;
+            internal long StartedAt;
+            internal float ObservedAt;
+            internal int AgeMilliseconds;
         }
 
         private sealed class Participant

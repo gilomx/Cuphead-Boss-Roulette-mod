@@ -109,7 +109,7 @@
         "progress": "Cupos ocupados",
         "emptySlot": "Cupo {slot}",
         "participantFallback": "Participante {slot}",
-        "simulationHint": "Los regalos enviados desde Simular evento también pueden llenar estos cupos; si no incluyen foto se mostrarán sus iniciales."
+        "simulationHint": "Usa los perfiles con foto de Simular evento y envía el regalo de entrada para llenar un cupo por ID distinto, sin iniciar un live."
       },
       "actions": {
         "arm": "Armar reclutamiento",
@@ -373,6 +373,11 @@
       "type": "Tipo de evento",
       "user": "Usuario",
       "userPlaceholder": "Donador de prueba",
+      "profile": "Perfil de prueba",
+      "noPhoto": "Sin foto",
+      "profileHint": "Cada perfil tiene foto, nombre e ID propios. Usa un ID distinto para cada jugador; repetirlo mantiene el mismo participante. Puedes editar sus datos abajo.",
+      "displayName": "Nombre visible",
+      "userId": "ID del usuario",
       "item": "Regalo de TikTok",
       "itemPlaceholder": "Buscar por nombre…",
       "itemLoading": "Cargando regalos…",
@@ -485,6 +490,13 @@
         "outlineColor": "Contorno",
         "alpha": "Opacidad"
       },
+      "battleColors": {
+        "title": "Colores de la batalla",
+        "liquidColor": "Borde con jugador",
+        "collectingColor": "Destello de ataque",
+        "textColor": "Texto",
+        "outlineColor": "Borde del cupo vacío"
+      },
       "options": {
         "enabled": "Visible",
         "enabledHint": "Aparece en este perfil.",
@@ -516,14 +528,23 @@
       },
       "battle": {
         "phases": {
+          "off": "Sin activar (overlay vacío)",
           "recruiting": "Reclutando",
           "ready": "Equipo completo",
           "waiting_level": "Esperando nivel",
           "active": "Batalla activa",
           "won": "Victoria"
         },
-        "participants": "Participantes",
-        "attempt": "Intento"
+        "capacity": "Número de jugadores",
+        "participants": "Cupos ocupados",
+        "attempt": "Intento",
+        "simulateAttack": "Simular ataque",
+        "attackPlayer": "Jugador para las pruebas",
+        "alternatePlayers": "Alternar jugadores",
+        "simulateBurst": "Simular 3 ataques al mismo jugador",
+        "simulateChallenge": "Simular reto",
+        "stopChallenge": "Quitar reto",
+        "attackHint": "Selecciona Batalla activa. Los ataques salen uno tras otro por jugador. El reto muestra 3 s de aviso y 15 s activo. Estas pruebas sólo afectan la previsualización."
       }
     },
     "preview": {

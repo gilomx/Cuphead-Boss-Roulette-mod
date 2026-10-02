@@ -114,14 +114,17 @@ namespace Gilomx.CupheadBossRoulette
         internal readonly string Id;
         internal readonly string Name;
         internal readonly string ImagePath;
+        internal readonly string ImageUrl;
         internal readonly int CoinsPerUnit;
 
         internal CreatorToolsGiftCatalogEntry(
-            string id, string name, string imagePath, int coinsPerUnit)
+            string id, string name, string imagePath, int coinsPerUnit,
+            string imageUrl)
         {
             Id = id ?? string.Empty;
             Name = name ?? string.Empty;
             ImagePath = imagePath ?? string.Empty;
+            ImageUrl = imageUrl ?? string.Empty;
             CoinsPerUnit = Math.Max(0, coinsPerUnit);
         }
     }

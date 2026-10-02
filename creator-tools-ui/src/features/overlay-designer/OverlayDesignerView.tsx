@@ -69,7 +69,7 @@ function createPreviewSessionId() {
 
 export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const { locale, t } = useLocalization();
-  const { tapFarming } = useConfig();
+  const { tapFarming, peskyBattle } = useConfig();
   const initialSelection = useMemo(querySelection, []);
   const [profileId, setProfileId] = useState<OverlayProfileId>(initialSelection.profileId);
   const [selectedComponentId, setSelectedComponentId] = useState<OverlayComponentId>(
@@ -78,9 +78,15 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const [tapState, dispatchTap] = useReducer(tapSimulationReducer, createTapSimulation());
   const [battleState, dispatchBattle] = useReducer(
     battleSimulationReducer,
-    createBattleSimulation(),
+    createBattleSimulation("recruiting", undefined, peskyBattle?.capacity ?? 5),
   );
   const [previewActive, setPreviewActive] = useState(false);
+  const challengeRunning = Boolean(battleState.challenges?.length);
+  useEffect(() => {
+    if (!challengeRunning) return;
+    const timer = window.setInterval(() => dispatchBattle({ type: "challenge_tick", now: Date.now() }), 250);
+    return () => window.clearInterval(timer);
+  }, [challengeRunning]);
   const [previewPending, setPreviewPending] = useState(false);
   const [copyStatus, setCopyStatus] = useState<OverlayProfileId | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
@@ -112,6 +118,17 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const configuredHealthPointsPerConversion = Math.max(1, Math.floor(
     tapFarming?.conversion?.healthPointsPerConversion ?? 1,
   ));
+
+  useEffect(() => {
+    if (peskyBattle?.capacity !== undefined) {
+      dispatchBattle({ type: "capacity", capacity: peskyBattle.capacity });
+    }
+  }, [peskyBattle?.capacity]);
+
+  useEffect(() => {
+    const trigger = peskyBattle?.trigger;
+    if (trigger?.giftId) dispatchBattle({ type: "gift", trigger });
+  }, [peskyBattle?.trigger?.giftId, peskyBattle?.trigger?.giftName, peskyBattle?.trigger?.giftImagePath]);
 
   useEffect(() => {
     dispatchTap({
