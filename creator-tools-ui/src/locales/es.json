@@ -59,7 +59,8 @@
         "ready": "Lista completa",
         "waiting_level": "Esperando nivel",
         "active": "En batalla",
-        "won": "Victoria"
+        "won": "Victoria",
+        "stopping": "Finalizando…"
       },
       "phaseDescription": {
         "off": "Configura el regalo, los participantes y el catálogo antes de abrir los {count} cupos.",
@@ -68,7 +69,8 @@
         "waiting_level": "Entra al siguiente nivel para comenzar la batalla.",
         "waitingTarget": "La batalla está armada para el siguiente nivel: {level}.",
         "active": "Intento {attempt}. Si pierdes, los mismos {count} participantes seguirán en el reintento.",
-        "won": "Ganaste el nivel. Los ataques se detuvieron y la lista queda visible hasta iniciar otra batalla."
+        "won": "Ganaste el nivel. Los ataques se detuvieron y la lista queda visible hasta iniciar otra batalla.",
+        "stopping": "Terminando la batalla y liberando el espacio de Eventos Live."
       },
       "overlay": {
         "idle": "Copiar URL del overlay",
@@ -368,12 +370,12 @@
       "eyebrow": "Laboratorio",
       "title": "Simular evento",
       "back": "Volver a eventos",
-      "description": "Envía un evento normalizado para validar el flujo sin iniciar una transmisión.",
+      "description": "Configura uno o varios eventos para validar el flujo sin iniciar una transmisión.",
       "platform": "Plataforma",
       "type": "Tipo de evento",
       "user": "Usuario",
       "userPlaceholder": "Donador de prueba",
-      "profile": "Perfil de prueba",
+      "profile": "Foto de perfil",
       "noPhoto": "Sin foto",
       "profileHint": "Cada perfil tiene foto, nombre e ID propios. Usa un ID distinto para cada jugador; repetirlo mantiene el mismo participante. Puedes editar sus datos abajo.",
       "displayName": "Nombre visible",
@@ -389,9 +391,15 @@
       "count": "Cantidad",
       "delay": "Retraso (segundos)",
       "delayHint": "0 = inmediato.",
+      "eventNumber": "Evento {number}",
+      "removeEvent": "Quitar",
+      "addEvent": "Agregar otro evento",
       "submit": "Enviar evento",
+      "submitMultiple": "Enviar eventos",
       "sending": "Enviando…",
+      "sendingMultiple": "Enviando eventos…",
       "sent": "Evento enviado correctamente.",
+      "batchSent": "{count} eventos aceptados correctamente.",
       "scheduled": "Evento programado; se enviará en {seconds} s.",
       "error": "No se pudo enviar el evento.",
       "hint": "El resultado aparecerá en el feed de esta sesión."

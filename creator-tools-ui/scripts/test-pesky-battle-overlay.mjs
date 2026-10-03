@@ -40,7 +40,7 @@ function harness(reducedMotion = false) {
   };
   const elements = Object.fromEntries(["battle", "battle-status", "battle-roster"].map(id => [id, new Element()]));
   elements["battle-slot-template"] = { content: { cloneNode() {
-    const nodes = Object.fromEntries(["battle-slot", "battle-slot__avatar", "battle-slot__gift", "battle-slot__coin", "battle-slot__initial", "battle-slot__name", "battle-slot__attack", "battle-slot__attack-image", "battle-slot__challenge", "battle-slot__challenge-image", "battle-slot__challenge-time"].map(name => [name, new Element()]));
+    const nodes = Object.fromEntries(["battle-slot", "battle-slot__avatar", "battle-slot__gift", "battle-slot__coin", "battle-slot__initial", "battle-slot__name", "battle-slot__attack", "battle-slot__attack-visual", "battle-slot__attack-image", "battle-slot__challenge", "battle-slot__challenge-visual", "battle-slot__challenge-image"].map(name => [name, new Element()]));
     nodes["battle-slot"].nodes = nodes;
     return { querySelector: selector => nodes[selector.slice(1)] };
   } } };
@@ -81,14 +81,17 @@ test("batches queue three native attacks per player, run different players concu
   const image = first.nodes["battle-slot__attack-image"];
   const expected = events.map(event => catalog.CreatorToolsOverlayInteractions[event.item].imagePath);
   assert.ok(image.src.endsWith(expected[0]));
+  assert.equal(first.nodes["battle-slot__attack-visual"].style.values["--battle-asset-size"], "82%");
   h.advance(700);
   h.render(snapshot);
   assert.equal(image.srcWrites, 1, "same poll never replaces or duplicates the displayed event");
   h.advance(1100);
   assert.ok(image.src.endsWith(expected[1]));
+  assert.equal(first.nodes["battle-slot__attack-visual"].style.values["--battle-asset-size"], "103%");
   assert.equal(second.dataset.attacking, "false");
   h.advance(1800);
   assert.ok(image.src.endsWith(expected[2]));
+  assert.equal(first.nodes["battle-slot__attack-visual"].style.values["--battle-asset-size"], "105%");
   h.advance(1800);
   assert.equal(first.dataset.attacking, "false");
   h.render(snapshot);
@@ -115,7 +118,7 @@ test("retry, roster changes and cancellation clear pending attacks and persisten
   assert.equal(h.timers.size, 0);
 });
 
-test("challenge countdown follows native snapshots through pause, active duration and expiry", () => {
+test("challenge state follows native snapshots without rendering a countdown", () => {
   const h = harness();
   const challenge = { id: "c", slot: 2, item: "challenge_no_dash", phase: "countdown", secondsRemaining: 3 };
   const snapshot = { ...state(2, [player(1), player(2)]), phase: "active", attacks: [], challenges: [challenge] };
@@ -125,14 +128,14 @@ test("challenge countdown follows native snapshots through pause, active duratio
   const nodes = second.nodes;
   assert.equal(first.dataset.challenge, "false");
   assert.equal(second.dataset.challenge, "true");
-  assert.equal(nodes["battle-slot__challenge-time"].textContent, "3");
+  assert.equal(nodes["battle-slot__challenge"].attributes["aria-label"], "NO DASH / NO MINIAVIÓN");
+  assert.equal(nodes["battle-slot__challenge-visual"].style.values["--battle-asset-size"], "100%");
   h.advance(30000);
   h.render(snapshot);
-  assert.equal(nodes["battle-slot__challenge-time"].textContent, "3", "browser time cannot expire a paused game challenge");
   assert.equal(nodes["battle-slot__challenge-image"].srcWrites, 1);
   h.render({ ...snapshot, challenges: [{ ...challenge, phase: "active", secondsRemaining: 15 }] });
   assert.equal(nodes["battle-slot__challenge"].dataset.phase, "active");
-  assert.equal(nodes["battle-slot__challenge-time"].textContent, "15");
+  assert.equal(nodes["battle-slot__challenge"].attributes["aria-label"], "NO DASH / NO MINIAVIÓN");
   h.render({ ...snapshot, challenges: [] });
   assert.equal(second.dataset.challenge, "false");
   h.render({ ...snapshot, challenges: [{ ...challenge, slot: 3 }] });

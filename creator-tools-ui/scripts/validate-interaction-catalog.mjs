@@ -99,6 +99,14 @@ for (const match of view.matchAll(/\{\s*id:\s*"([^"]+)"([\s\S]*?)\}/g)) {
   if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
     throw new Error(`The interaction preview is not a PNG: ${image}.`);
   }
+  const overlayScaleText = fields.match(/\boverlayScale:\s*([0-9.]+)/)?.[1];
+  if (category !== "challenge" && !overlayScaleText) {
+    throw new Error(`Missing overlayScale for ${id}.`);
+  }
+  const overlayScale = Number(overlayScaleText ?? 1);
+  if (!Number.isFinite(overlayScale) || overlayScale < 0.75 || overlayScale > 1.35) {
+    throw new Error(`Invalid overlayScale for ${id}: ${overlayScaleText}.`);
+  }
 }
 for (const key of [
   "interactions.categories.all",

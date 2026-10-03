@@ -152,7 +152,8 @@ export type PeskyBattlePhase =
   | "ready"
   | "waiting_level"
   | "active"
-  | "won";
+  | "won"
+  | "stopping";
 
 export interface PeskyBattleTrigger {
   giftId: string;

@@ -2,6 +2,190 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Batalla no queda bloqueada al detenerse sin foco (2026-10-02)
+
+`CreatorToolsPeskyBattleController` completa en el hilo HTTP el cierre lógico
+y la liberación de la reserva de Eventos Live. Sólo `ClearBattleEntries` queda
+diferido al hilo de Unity y conserva la protección por generación, por lo que
+se puede configurar otra batalla aunque Cuphead no esté produciendo frames en
+segundo plano. El Dashboard reconoce `stopping` como fase válida y muestra
+textos localizados en lugar de la clave cruda.
+
+La prueba nativa reproduce una cancelación HTTP sin ejecutar primero otro frame
+de Unity: comprueba que la fase y la reserva pasan inmediatamente a libres,
+que la cola permanece hasta el siguiente frame seguro y que entonces se limpia.
+También aprobaron las 17 pruebas del renderer y las cinco de simulación. El
+publicador canónico compiló UI, mod y companion con cero errores o advertencias,
+validó 1,487 archivos y publicó el paquete Dev. SHA-256:
+`C79F314E725FCEBE2AB028C27222072A19F869576E9118E70088E1EBAD37E2D0`.
+
+## Menor espacio entre título y círculos (2026-10-02)
+
+El offset responsivo del título cambia de `clamp(8px, 2vmin, 14px)` a
+`clamp(28px, 7.2vmin, 44px)`. Esto baja únicamente el texto superior y mantiene
+intactos los tamaños, posiciones y separaciones del roster. CSS y JS renuevan
+caché juntos a `battle-title-gap-19`.
+
+QA real a 960×560 redujo el hueco entre las cajas del título y del roster de
+unos 75 px a 46.41 px con tres jugadores y 44.38 px con cinco. Las 17 pruebas
+del renderer y las cinco de simulación aprobaron. El publicador canónico
+compiló UI, mod y companion con cero errores o advertencias, validó 1,487
+archivos y publicó el paquete Dev. SHA-256:
+`348414ACB39487C2A292D9F7C178DEE8B3FBE52D0139E95EAAEEE0CB853E285D`.
+
+## Círculos uniformes en rosters pequeños (2026-10-02)
+
+Las capacidades de dos y tres jugadores agregan al cálculo responsivo de
+`--portrait-size` un límite equivalente al diámetro de cuatro jugadores. La
+cuadrícula conserva dos o tres columnas, respectivamente, además del mismo
+`--battle-column-gap` y `place-self: center`; por eso el grupo se centra sin
+estirar los huecos. Los layouts de cuatro y cinco no reciben el límite. CSS y
+JS renuevan caché juntos a `battle-uniform-circles-18`.
+
+QA real a 960×560 confirmó diámetros de 200.66 px en dos, tres y cuatro
+jugadores, con separaciones constantes de 26.31 px y grupos centrados. Cinco
+conservó sus 155.27 px originales. Las 17 pruebas del renderer y las cinco de
+simulación aprobaron. El publicador canónico compiló UI, mod y companion con
+cero errores o advertencias, validó 1,487 archivos y publicó el paquete Dev.
+SHA-256: `6ABA118B06077BC4D317DB6C514BA6F1B2E00188FD702012CB032BC2DAEE7A9B`.
+
+## Título estable con 2 y 3 jugadores (2026-10-02)
+
+El título del overlay de Batalla Molestosa ya no sube cuando la capacidad baja
+a dos o tres participantes. Un desplazamiento responsivo calcula el espacio
+libre que tendría el roster de cuatro jugadores y usa esa posición como ancla,
+sin modificar el tamaño ni la ubicación de los retratos. El HTML renueva la
+caché conjunta de CSS y JS a `battle-title-anchor-17`.
+
+QA real a 960×560 midió el inicio del texto en 28.00 px para dos y tres
+jugadores antes del cambio. Después quedó en 63.54 px para dos y tres, igual a
+los 63.54 px del roster de cuatro; los rectángulos del roster conservaron sus
+medidas originales. Las 17 pruebas del renderer y las cinco de simulación
+aprobaron. El publicador canónico compiló UI, mod y companion con cero errores
+o advertencias, validó 1,487 archivos y publicó el paquete Dev. SHA-256:
+`712F44B1EC4B3C9247681A64E8B953981F7CFD9F353EDDEE10D5E8C2842FAE03`.
+
+## Retos sin contador y delante de los retratos (2026-10-02)
+
+El template y el renderer eliminan por completo `challenge-time`; el estado
+nativo conserva su duración, pero el overlay sólo muestra la insignia y su
+nombre accesible. Un cupo con `data-challenge="true"` usa `z-index: 10`, frente
+al nivel 0 de los demás cupos, para superar el contexto de apilado creado por
+los contenedores y pintar el reto delante de cualquier círculo vecino. CSS y
+script renuevan caché juntos a `battle-layer-16`.
+
+QA visual a 960×560 colocó un reto del jugador 1 sobre el borde del círculo 2,
+con un ataque activo en ese segundo cupo. El reto quedó delante del retrato,
+sin contador y separado visualmente del ataque superior. La inspección confirmó
+capas 10/0 y cero nodos `battle-slot__challenge-time`.
+
+Las 17 pruebas del renderer y las cinco de simulación aprobaron. El publicador
+canónico compiló UI, mod y companion con cero errores o advertencias, validó
+1,487 archivos y publicó el paquete Dev. SHA-256:
+`4871BDB090D2E09641443CAA90290426A766463751286F2D404AA55C6C81807B`.
+
+## Retos abajo a la derecha (2026-10-02)
+
+El reto aumenta de 62.9 % a 68 % del diámetro del retrato (máximo de 134.3 a
+145 px) y conserva el costado derecho, pero mueve su centro de 14.65 % a 72 %
+de la altura del círculo. El contador pasa de `bottom: -12%` a `bottom: 0`, por
+lo que permanece dentro de la caja y no tapa el nombre. Esta vía inferior deja
+libre la zona superior izquierda usada por el ataque del jugador siguiente.
+El CSS renueva caché a `battle-challenge-bottom-15`.
+
+QA visual a 960×560 enfrentó retos con ataques contiguos en cuatro y cinco
+jugadores. El reto mide aproximadamente 136.4 px con cuatro y 105.6 px con
+cinco; no se cruza visualmente con el ataque superior ni con el nombre. Las
+17 pruebas del renderer y las cinco de simulación aprobaron. El publicador
+canónico compiló UI, mod y companion con cero errores o advertencias, validó
+1,487 archivos y publicó el paquete Dev. SHA-256:
+`75CFD6B0DD3E2F4601C55979C5664F9BC8FEE59B4614C9CD01B721B56F249BF5`.
+
+## Normalización visual de señales de Batalla (2026-10-02)
+
+Las 19 imágenes no-reto del catálogo incorporan `overlayScale` entre 0.82 y
+1.27, calculado con su área alfa visible y limitado para que ninguna desborde
+por tamaño. El overlay resuelve la escala tanto por ID nativo como por ruta de
+imagen, por lo que la simulación del diseñador y el estado real coinciden. Los
+retos ya parten de PNG cuadrados 82×82 con el mismo relleno y usan escala 1.
+
+Ataques y retos ahora tienen un contenedor visual cuadrado, absolutamente
+posicionado dentro de su señal. Esto evita que el navegador recupere la relación
+de aspecto intrínseca y convierta, por ejemplo, una luciérnaga vertical en una
+imagen mucho más alta que su caja. Los PNG originales permanecen intactos y el
+tamaño/separación de retratos no cambia. El CSS renueva caché a
+`battle-normalized-14`.
+
+QA visual a 960×560 comparó dos grupos extremos: bomba, luciérnaga, zanahoria,
+cabeza de la Baronesa y bolas del dragón; después zepelín, perro globo, cupcake,
+chicle y círculo de fuego. Las cajas se mantuvieron cuadradas y el peso visual
+quedó equilibrado sin recortes laterales. Las 17 pruebas del renderer y las
+cinco de simulación aprobaron. El publicador canónico compiló UI, mod y companion
+con cero errores o advertencias, validó 1,487 archivos y publicó el paquete Dev.
+SHA-256: `870C3A4C4932620665551F8B5B26CF7848DC55ED3DF3DD30E852B5576964957D`.
+
+## Ataques y retos grandes sin reducir retratos (2026-10-02)
+
+Se restaura la escala grande aprobada para los elementos de cada jugador:
+ataques al 90.1 % del círculo (máximo 217.6 px), retos al 62.9 % (máximo
+134.3 px) y contador proporcional. También vuelve únicamente la reserva
+superior necesaria para que no se recorten. La separación horizontal permanece
+calculada por los bordes de los círculos, así que los efectos no vuelven a
+crear huecos ni a encoger los retratos. El CSS renueva caché a
+`battle-signals-13`.
+
+QA visual en un iframe real de 960×560: con cuatro jugadores, retratos de
+200.7 px, ataques de 180.8 px y retos de 126.2 px; con cinco, retratos de
+155.3 px, ataques de 139.9 px y retos de 97.7 px. El ataque del primer jugador
+y el reto del último se desplazan hacia dentro para no recortarse en los bordes.
+Las 17 pruebas del renderer de Batalla y las cinco de simulación aprobaron. El
+publicador canónico compiló UI, mod y companion con cero errores o advertencias,
+validó 1,487 archivos y reemplazó el paquete Dev de forma atómica. SHA-256:
+`44856D3A228D2B181D0DC6CFA2794F9350A256E4BE140E78E8D1A920977D77F1`.
+
+## Simulador compacto por lotes y título de Batalla (2026-10-02)
+
+Dashboard → Simular evento elimina los campos separados de usuario e ID. Cada
+tarjeta muestra cinco fotos de perfil en una sola fila, sin nombres debajo, y
+un único «Nombre visible». El valor se conserva literalmente en `user` y
+`userDisplayName`; `userId` se deriva sin espacios, acentos ni signos e incluye
+la foto elegida (`sim-<foto>-<nombre>`). Las tarjetas nuevas seleccionan primero
+una foto todavía no usada, conservan el tipo y regalo de la anterior y siguen
+siendo editables de forma independiente.
+
+Cantidad y retraso comparten fila. «Agregar otro evento» permanece al final y
+añade tantas tarjetas como se necesiten; cada una se puede quitar. Con más de
+una, el botón principal cambia a «Enviar eventos» y realiza las solicitudes en
+orden antes de volver al feed con una sola confirmación del lote. El título del
+overlay de Batalla baja 8–14 px y el CSS renueva caché a `battle-title-12`.
+
+Validación: TypeScript, build Vite, catálogos de 31 interacciones y 985 regalos,
+17 pruebas del renderer de Batalla y cinco del simulador. QA en navegador del
+formulario único y de dos tarjetas; un envío con `José Pérez!` y `María / Luna`
+conservó ambos nombres y produjo `sim-cuphead-jose-perez` y
+`sim-cuphead-coins-maria-luna`. El título quedó a 37.9 px del círculo en la
+composición 960×560. Publicación canónica completa, 1,487 archivos, cero errores
+o advertencias y ruta física Dev verificada. SHA-256:
+`1B0E8E28682D60560AE667A08D1EEEA407E9DF72BFE70DD00C50ACEC65700D55`.
+
+## Retratos grandes con separación sólo entre círculos (2026-10-02)
+
+Se corrige la interpretación del espacio de Batalla: la separación horizontal
+ya no reserva el tamaño de los ataques y retos que pertenecen a cada retrato.
+El gap se calcula como los dos bordes exteriores más un margen visible de
+4–10 px, por lo que los círculos nunca se enciman sin desperdiciar el resto del
+ancho. Cinco jugadores pasan a una fila desde proporción 3:2, incluida la
+composición estándar de 960×560. La escala reducida de señales que acompañó
+este ajuste quedó reemplazada por `battle-signals-13`; el cálculo compacto de
+los círculos permanece igual. CSS de esta etapa: `battle-spacing-11`.
+
+Validación en navegador a 960×560: cuatro retratos de 200.7 px y cinco de
+155.3 px; ambos dejan aproximadamente 10.2 px visibles entre sus bordes y no
+desbordan. Las 17 pruebas del renderer de Batalla y las cinco del simulador
+aprobaron. El publicador canónico compiló sin errores ni advertencias, validó
+los contratos nativos y entregó 1,487 archivos en la ruta física Dev. SHA-256:
+`3197CBC2C8A1643816C6D01AB33175B90EA795BC9D4270511725E889B6AEFC7F`.
+
 ## Ataques y retos 1.7× (2026-10-02)
 
 CSS escala las imágenes de ataques (53 % → 90.1 %, límite 128 → 217.6 px)

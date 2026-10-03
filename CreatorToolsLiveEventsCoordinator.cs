@@ -42,8 +42,8 @@ namespace Gilomx.CupheadBossRoulette
 
     /// <summary>
     /// Owns the single runtime reservation shared by all Creator Tools live
-    /// events. A lease is deliberately kept while an event is stopping so a
-    /// second event cannot start before Unity-side cleanup has completed.
+    /// events. Controllers mark their lease as stopping before releasing it;
+    /// Unity-only cleanup may remain generation-guarded for the next frame.
     /// </summary>
     internal sealed class CreatorToolsLiveEventsCoordinator
     {

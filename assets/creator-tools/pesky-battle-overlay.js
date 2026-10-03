@@ -106,6 +106,15 @@
         (url.protocol === "http:" && url.origin === window.location.origin) ? url.href : "";
     } catch { return ""; }
   };
+  const interactionCatalog = window.CreatorToolsOverlayInteractions || {};
+  const interactionByImage = new Map(Object.values(interactionCatalog)
+    .map(item => [safeImage(item?.imagePath), item])
+    .filter(([image]) => Boolean(image)));
+  const visualSize = (item) => {
+    const scale = Number(item?.visualScale);
+    const normalized = Number.isFinite(scale) ? Math.max(.75, Math.min(1.35, scale)) : 1;
+    return `${Math.round(normalized * 100)}%`;
+  };
   const nameMeasure = document.createElement?.("canvas").getContext?.("2d");
   const fitName = (slot) => {
     if (!nameMeasure || !slot.name.textContent || slot.name.hidden || !slot.item.clientWidth) return;
@@ -128,12 +137,13 @@
       initial: fragment.querySelector(".battle-slot__initial"),
       name: fragment.querySelector(".battle-slot__name"),
       attack: fragment.querySelector(".battle-slot__attack"),
+      attackVisual: fragment.querySelector(".battle-slot__attack-visual"),
       attackImage: fragment.querySelector(".battle-slot__attack-image"),
       attackTimer: 0,
       attackQueue: [],
       challenge: fragment.querySelector(".battle-slot__challenge"),
+      challengeVisual: fragment.querySelector(".battle-slot__challenge-visual"),
       challengeImage: fragment.querySelector(".battle-slot__challenge-image"),
-      challengeTime: fragment.querySelector(".battle-slot__challenge-time"),
     };
     slot.nameTransition = createTextTransition(slot.name, TEXT_DURATION, () => fitName(slot));
     if (typeof window.ResizeObserver === "function") {
@@ -159,12 +169,15 @@
     slot.attackQueue.length = 0;
     slot.item.dataset.attacking = "false";
     slot.attackImage.removeAttribute("src");
+    slot.attackVisual.style.setProperty("--battle-asset-size", "100%");
     slot.attack.removeAttribute("aria-label");
   });
   const interaction = (event) => {
-    const item = window.CreatorToolsOverlayInteractions?.[event.item];
-    return { image: safeImage(item?.imagePath || event.imagePath),
-      name: String(item?.names?.[activeLocale] || event.name || "").slice(0, 120) };
+    const eventImage = safeImage(event.imagePath);
+    const item = interactionCatalog[event.item] || interactionByImage.get(eventImage);
+    return { image: safeImage(item?.imagePath) || eventImage,
+      name: String(item?.names?.[activeLocale] || event.name || "").slice(0, 120),
+      size: visualSize(item) };
   };
   const showNextAttack = (slot) => {
     const attack = slot.attackQueue.shift();
@@ -173,6 +186,7 @@
     // Restart only this event's effect; preserve the loaded portrait and roster.
     void slot.attack.offsetWidth;
     slot.attackImage.src = attack.image;
+    slot.attackVisual.style.setProperty("--battle-asset-size", attack.size);
     slot.attack.setAttribute("aria-label", attack.name);
     slot.item.dataset.attacking = "true";
     slot.attackTimer = window.setTimeout(() => {
@@ -203,7 +217,6 @@
     slot.item.dataset.challenge = "false";
     slot.challenge.setAttribute("aria-hidden", "true");
     slot.challengeImage.removeAttribute("src");
-    slot.challengeTime.textContent = "";
   });
   const renderChallenges = (challenges) => {
     slots.forEach((slot, index) => {
@@ -214,12 +227,9 @@
       slot.challenge.setAttribute("aria-hidden", String(!active));
       if (!active) return;
       if (slot.challengeImage.src !== visual.image) slot.challengeImage.src = visual.image;
+      slot.challengeVisual.style.setProperty("--battle-asset-size", visual.size);
       slot.challenge.dataset.phase = event.phase === "countdown" ? "countdown" : "active";
-      const seconds = Math.max(0, Math.min(120, Math.ceil(Number(event.secondsRemaining) || 0)));
-      slot.challengeTime.textContent = String(seconds);
-      slot.challenge.setAttribute("aria-label", `${visual.name}: ${activeLocale === "en"
-        ? event.phase === "countdown" ? "starts in" : "remaining"
-        : event.phase === "countdown" ? "empieza en" : "restan"} ${seconds}s`);
+      slot.challenge.setAttribute("aria-label", visual.name);
     });
   };
   const clearRoster = () => {

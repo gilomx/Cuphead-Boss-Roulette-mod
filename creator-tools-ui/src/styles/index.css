@@ -5218,7 +5218,7 @@ textarea:focus-visible {
 
 .dashboard-simulator__description {
   margin: 0;
-  padding: 0.85rem var(--space-3) 0;
+  padding: 0.7rem 0.8rem 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   line-height: 1.45;
@@ -5226,8 +5226,53 @@ textarea:focus-visible {
 
 .dashboard-simulator-form {
   display: grid;
-  gap: 0.68rem;
-  padding: var(--space-3);
+  gap: 0.55rem;
+  padding: 0.75rem 0.8rem 0.85rem;
+}
+
+.dashboard-simulator-form__events {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dashboard-simulator-event {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.72rem;
+  border: 1px solid rgb(196 138 233 / 24%);
+  border-radius: var(--radius-medium);
+  background: rgb(255 255 255 / 2.5%);
+}
+
+.dashboard-simulator-event__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.dashboard-simulator-event__heading strong {
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+}
+
+.dashboard-simulator-event__heading button {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text-muted);
+  background: transparent;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.dashboard-simulator-event__heading button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-control);
 }
 
 .dashboard-simulator-form__row {
@@ -5244,30 +5289,30 @@ textarea:focus-visible {
 }
 
 .dashboard-simulator-form__profiles legend {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.32rem;
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
 }
 
 .dashboard-simulator-form__profiles > div {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.4rem;
-  margin-bottom: 0.4rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.3rem;
 }
 
 .dashboard-simulator-form__profiles button {
   display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 0.3rem;
-  padding: 0.5rem 0.2rem;
+  place-items: center;
+  min-width: 0;
+  min-height: 2.85rem;
+  padding: 0.18rem;
   border: 2px solid transparent;
   border-radius: var(--radius-small);
   color: var(--color-text);
-  background: var(--color-control);
-  font-size: var(--font-size-caption);
+  background: rgb(255 255 255 / 4%);
   cursor: pointer;
 }
 
@@ -5282,20 +5327,13 @@ textarea:focus-visible {
   background: var(--color-control-active);
 }
 
-.dashboard-simulator-form__profiles img,
-.dashboard-simulator-form__no-photo {
-  width: 48px;
-  height: 48px;
+.dashboard-simulator-form__profiles img {
+  width: min(100%, 42px);
+  height: auto;
+  aspect-ratio: 1;
   border-radius: 50%;
   object-fit: cover;
   background: white;
-}
-
-.dashboard-simulator-form__no-photo {
-  display: grid;
-  place-items: center;
-  color: #444;
-  font-size: 1.5rem;
 }
 
 .dashboard-simulator-form label {
@@ -5314,9 +5352,9 @@ textarea:focus-visible {
 
 .dashboard-simulator-form input,
 .dashboard-simulator-form select,
-.dashboard-simulator-form > button {
+.dashboard-simulator-form__actions button {
   min-width: 0;
-  min-height: 2.55rem;
+  min-height: 2.35rem;
   border: 1px solid transparent;
   border-radius: var(--radius-small);
 }
@@ -5355,8 +5393,12 @@ textarea:focus-visible {
   background: var(--color-control-hover);
 }
 
-.dashboard-simulator-form > button {
-  margin-top: 0.2rem;
+.dashboard-simulator-form__actions {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.dashboard-simulator-form__actions button {
   padding: 0.55rem 0.8rem;
   color: var(--color-text);
   font-size: var(--font-size-body);
@@ -5366,18 +5408,34 @@ textarea:focus-visible {
   transition: filter var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
-.dashboard-simulator-form > button:hover:not(:disabled) {
+.dashboard-simulator-form__actions button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-0.06rem);
 }
 
-.dashboard-simulator-form > button:disabled {
+.dashboard-simulator-form__actions button:disabled,
+.dashboard-simulator-event__heading button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
 
-.dashboard-simulator-form > button[data-sending="true"] {
+.dashboard-simulator-form__actions button[data-sending="true"] {
   cursor: wait;
+}
+
+.dashboard-simulator-form__actions .dashboard-simulator-form__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-color: var(--color-border);
+  color: var(--color-text-soft);
+  background: transparent;
+}
+
+.dashboard-simulator-form__add > span {
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .dashboard-simulator-form > p {
@@ -5532,7 +5590,9 @@ textarea:focus-visible {
   .dashboard-counter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-events-list li { grid-template-columns: 4.2rem minmax(0, 1fr); gap: var(--space-2); }
   .dashboard-event-status { grid-column: 2; justify-self: start; }
-  .dashboard-simulator-form__row { grid-template-columns: 1fr; }
+  .dashboard-simulator-form__row:not(.dashboard-simulator-form__row--metrics) {
+    grid-template-columns: 1fr;
+  }
   .searchable-select-menu { max-height: 15rem; }
   .searchable-select-option {
     grid-template-columns: 2rem minmax(0, 1fr) auto;

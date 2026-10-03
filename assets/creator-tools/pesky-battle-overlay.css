@@ -31,13 +31,23 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   --battle-columns: 3;
   --battle-rows: 2;
   --battle-column-gap-count: 3;
-  --battle-gap: clamp(24px, 8vmin, 64px);
-  --battle-column-gap: clamp(min(94px, 12vw), 30vmin, min(176px, 18vw));
+  --battle-rim: clamp(4px, 1.6vmin, 10px);
+  /* Keep a small visible gap between the outer rims. Visual effects do not
+     participate in roster sizing because they belong to their own portrait. */
+  --battle-circle-gap: clamp(4px, 1.5vmin, 10px);
+  --battle-gap: clamp(16px, 4vmin, 32px);
+  --battle-column-gap: calc(2 * var(--battle-rim) + var(--battle-circle-gap));
   --battle-section-gap: clamp(3px, 1vmin, 8px);
   --battle-edge: clamp(12px, 4vmin, 28px);
   --battle-icon-clearance: clamp(30.6px, 13.6vmin, 74.8px);
   --battle-heading-size: min(clamp(22px, 12vmin, 96px), 8vw);
-  --battle-rim: clamp(4px, 1.6vmin, 10px);
+  /* Keep the status visually attached to the roster instead of leaving a
+     large empty band between the text and the circles. */
+  --battle-title-offset: clamp(28px, 7.2vmin, 44px);
+  --battle-title-capacity-offset: 0px;
+  /* Anchor sparse rosters to the same title position as the four-player
+     layout without changing their larger portrait sizing. */
+  --battle-four-player-roster-height: calc(1.34 * (100cqw - 2 * var(--battle-edge) - 3 * var(--battle-column-gap)) / 4 + 3px + var(--battle-icon-clearance) + var(--battle-edge));
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -69,11 +79,9 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
 .battle[data-capacity="2"] { --battle-columns: 2; --battle-rows: 1; --battle-column-gap-count: 1; }
 .battle[data-capacity="3"] { --battle-columns: 3; --battle-rows: 1; --battle-column-gap-count: 2; }
 .battle[data-capacity="4"] { --battle-columns: 4; --battle-rows: 1; --battle-column-gap-count: 3; }
-.battle[data-capacity="5"] {
-  --battle-column-gap: clamp(min(68px, 14vw), 16vmin, min(176px, 14vw));
-}
-.battle[data-capacity="2"], .battle[data-capacity="3"], .battle[data-capacity="4"] {
-  --battle-icon-clearance: clamp(32px, 18vmin, 88px);
+.battle[data-capacity="2"],
+.battle[data-capacity="3"] {
+  --battle-title-capacity-offset: max(0px, calc((100cqh - var(--battle-heading-size) * 1.2 - var(--battle-section-gap) - var(--battle-four-player-roster-height)) / 2));
 }
 .battle__header {
   flex: none;
@@ -81,6 +89,7 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   height: calc(var(--battle-heading-size) * 1.2);
   overflow: hidden;
   text-align: center;
+  transform: translateY(calc(var(--battle-title-offset) + var(--battle-title-capacity-offset)));
 }
 .battle[data-show-title="false"] .battle__header { display: none; }
 .battle__status {
@@ -107,6 +116,7 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   /* Size relative to the widget, not the outer OBS canvas. */
   --portrait-size: min(
     calc((100cqw - var(--battle-column-gap-count) * var(--battle-column-gap)) / var(--battle-columns)),
+    var(--battle-portrait-cap, 10000px),
     calc((100cqh - (var(--battle-rows) - 1) * var(--battle-gap) - var(--battle-rows) * 3px) / (1.34 * var(--battle-rows))),
     calc((100cqh - (var(--battle-rows) - 1) * var(--battle-gap) - var(--battle-rows) * 14px) / var(--battle-rows)));
   --battle-name-height: clamp(11px, calc(var(--portrait-size) * .252), 55.2px);
@@ -122,6 +132,12 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   padding: 0;
   list-style: none;
 }
+.battle[data-capacity="2"] .battle__roster,
+.battle[data-capacity="3"] .battle__roster {
+  /* Sparse rosters use the four-player diameter while the grid itself keeps
+     its native column count, gap and centered placement. */
+  --battle-portrait-cap: calc((100cqw - 3 * var(--battle-column-gap)) / 4);
+}
 .battle[data-capacity="5"] .battle__roster {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   column-gap: 0;
@@ -134,18 +150,14 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
 .battle[data-capacity="5"] .battle-slot:nth-child(4) { grid-column: 2 / span 2; }
 .battle[data-capacity="5"] .battle-slot:nth-child(5) { grid-column: 4 / span 2; }
 /* A wide widget uses all its width instead of stacking a tiny 3 + 2 roster. */
-@container battle (min-aspect-ratio: 5 / 2) {
+@container battle (min-aspect-ratio: 3 / 2) {
   .battle[data-capacity="5"] .battle__roster-area {
     --battle-columns: 5; --battle-rows: 1; --battle-column-gap-count: 4;
-    --battle-column-gap: clamp(min(94px, 12vw), 30vmin, min(176px, 18vw));
-    --battle-icon-clearance: clamp(32px, 18vmin, 88px);
   }
   .battle[data-capacity="5"] .battle__roster {
     --battle-columns: 5;
     --battle-rows: 1;
     --battle-column-gap-count: 4;
-    --battle-column-gap: clamp(min(94px, 12vw), 30vmin, min(176px, 18vw));
-    --battle-icon-clearance: clamp(32px, 18vmin, 88px);
     grid-template-columns: repeat(5, minmax(0, 1fr));
     column-gap: var(--battle-column-gap);
   }
@@ -153,6 +165,7 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
 }
 .battle-slot {
   position: relative;
+  z-index: 0;
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -161,6 +174,7 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   container-type: inline-size;
   transform-origin: 50% calc(var(--portrait-size) / 2);
 }
+.battle-slot[data-challenge="true"] { z-index: 10; }
 .battle-slot__portrait {
   position: relative;
   width: 100%;
@@ -236,7 +250,7 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   --signal-size: max(40.8px, min(90.1cqw, 217.6px, calc(2.8 * var(--battle-icon-clearance))));
   position: absolute;
   z-index: 4;
-  /* Keep both enlarged icons over the upper rim without covering each other. */
+  /* Keep both icons over the upper rim without covering each other. */
   top: calc(var(--portrait-size) * .1465);
   left: min(8%, calc((100% - 40.8px) / 2 - 4px));
   width: var(--signal-size);
@@ -249,12 +263,36 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   opacity: 0;
   color: var(--battle-accent);
 }
-.battle-slot__attack img { width: 100%; height: 100%; object-fit: contain; transform-origin: center; filter: drop-shadow(0 0 5px var(--battle-accent)); }
+.battle-slot__attack-visual,
+.battle-slot__challenge-visual {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--battle-asset-size, 100%);
+  height: var(--battle-asset-size, 100%);
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+}
+.battle-slot__attack img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  filter: drop-shadow(0 0 5px var(--battle-accent));
+}
+.battle-slot:first-child .battle-slot__attack {
+  left: max(8%, calc(var(--signal-size) / 2 - var(--battle-edge)));
+}
 .battle-slot__challenge {
-  --signal-size: min(62.9cqw, 134.3px, calc(2 * var(--battle-icon-clearance)));
+  --signal-size: min(68cqw, 145px, calc(2 * var(--battle-icon-clearance)));
   position: absolute;
   z-index: 5;
-  top: calc(var(--portrait-size) * .1465);
+  /* Challenges stay on the right, but use the lower quadrant so the next
+     player's upper-left attack has its own visual lane. */
+  top: calc(var(--portrait-size) * .72);
   right: 8%;
   width: var(--signal-size);
   height: var(--signal-size);
@@ -266,18 +304,16 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   visibility: hidden;
   transition: opacity 180ms ease, transform 180ms ease, visibility 0s 180ms;
 }
-.battle-slot__challenge-image { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px var(--battle-accent)); }
-.battle-slot__challenge-time {
+.battle-slot__challenge-image {
   position: absolute;
-  bottom: -12%;
-  right: 0;
-  min-width: 1.5em;
-  border-radius: 1em;
-  padding: .1em .2em;
-  background: var(--battle-accent);
-  color: #24132c;
-  font: 800 clamp(clamp(10px, 4vmin, 17px), 3.74cqh, 30.6px)/1.1 system-ui, sans-serif;
-  text-align: center;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 4px var(--battle-accent));
+}
+.battle-slot:last-child .battle-slot__challenge {
+  right: max(8%, calc(var(--signal-size) / 2 - var(--battle-edge)));
 }
 .battle-slot__challenge[data-phase="countdown"] { filter: saturate(.4); }
 .battle-slot[data-challenge="true"] .battle-slot__challenge {

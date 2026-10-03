@@ -2,9 +2,49 @@
 
 ## Siguiente versión — Panel de configuración web
 
-- Ataques y retos de Batalla crecen a 1.7×. Amplía también la cuenta del reto,
-  reserva espacio para los iconos y separa sus centros para mostrarlos juntos.
-  Ajusta los cinco cupos sin deformar los círculos en tamaños pequeños.
+- Detener Batalla Molestosa desde el Dashboard libera inmediatamente su estado
+  lógico aunque Cuphead esté sin foco, evitando que quede bloqueada en
+  `stopping`; la limpieza de objetos de Unity permanece diferida y protegida.
+  La fase transitoria también cuenta con textos en español e inglés.
+
+- El texto superior de Batalla Molestosa baja para reducir el espacio vacío
+  que lo separaba de los círculos, sin desplazar ni redimensionar el roster.
+
+- Los rosters de dos y tres participantes limitan sus círculos al mismo
+  diámetro del layout de cuatro, mantienen intacta la separación y centran el
+  grupo completo; cuatro y cinco participantes no cambian.
+
+- El título de Batalla Molestosa conserva con dos o tres jugadores el mismo
+  inicio vertical que con cuatro, sin reducir ni desplazar los retratos.
+
+- Los retos dejan de mostrar el contador de segundos. El cupo que tiene un reto
+  activo sube de capa para que su insignia siempre se pinte delante de los
+  retratos vecinos, incluso cuando invade parte del círculo siguiente.
+
+- Los retos de Batalla crecen ligeramente y pasan del borde superior derecho
+  al cuadrante inferior derecho de cada retrato, mientras el ataque del
+  siguiente jugador conserva libre la franja superior izquierda.
+
+- Batalla normaliza el tamaño aparente de ataques, ayudas y minibosses según
+  el área visible de cada PNG, con límites para evitar desbordes. Un contenedor
+  cuadrado interno impide que las proporciones intrínsecas vuelvan a agrandar
+  los assets verticales; los PNG originales y el tamaño de los retratos no se
+  modifican. Los retos, que comparten el mismo lienzo, conservan escala uniforme.
+
+- El simulador del Dashboard usa un formulario compacto: cinco fotos de perfil
+  sin etiquetas en una fila, un solo nombre visible con ID seguro derivado,
+  cantidad y retraso juntos y sin campos técnicos de usuario. «Agregar otro
+  evento» crea tarjetas independientes; el envío cambia a plural, conserva el
+  orden y admite quitar cualquier tarjeta antes de enviar el lote.
+- El título de Batalla Molestosa baja ligeramente para acercarse a los retratos
+  sin modificar el tamaño ni la separación ya aprobados.
+
+- Batalla recupera el tamaño grande de los ataques, retos y su cuenta, sin
+  volver a separar ni reducir los retratos. La separación se calcula a partir
+  de los bordes reales de los círculos; cuatro y cinco participantes aprovechan
+  el ancho sin encimarse y el perfil estándar de 960×560 muestra cinco cupos
+  en una sola fila. Los avisos del primer y último jugador se desplazan hacia
+  dentro para que la escala ampliada no se recorte contra el lienzo.
 
 - Batalla amplía los nombres a 14 caracteres completos más punto si se recortan,
   sube un poco el tamaño y añade sombra paralela. Los nombres largos se ajustan

@@ -59,7 +59,8 @@
         "ready": "Roster ready",
         "waiting_level": "Waiting for level",
         "active": "In battle",
-        "won": "Victory"
+        "won": "Victory",
+        "stopping": "Finishing…"
       },
       "phaseDescription": {
         "off": "Configure the gift, participants and catalog before opening the {count} slots.",
@@ -68,7 +69,8 @@
         "waiting_level": "Enter the next level to start the battle.",
         "waitingTarget": "The battle is armed for the next level: {level}.",
         "active": "Attempt {attempt}. If you lose, the same {count} participants will remain for the retry.",
-        "won": "You won the level. Attacks stopped and the roster remains visible until you start another battle."
+        "won": "You won the level. Attacks stopped and the roster remains visible until you start another battle.",
+        "stopping": "Finishing the battle and releasing the Live Events slot."
       },
       "overlay": {
         "idle": "Copy overlay URL",
@@ -368,12 +370,12 @@
       "eyebrow": "Lab",
       "title": "Simulate event",
       "back": "Back to events",
-      "description": "Send a normalized event to validate the flow without starting a live stream.",
+      "description": "Configure one or more events to validate the flow without starting a live stream.",
       "platform": "Platform",
       "type": "Event type",
       "user": "User",
       "userPlaceholder": "Test donor",
-      "profile": "Test profile",
+      "profile": "Profile photo",
       "noPhoto": "No photo",
       "profileHint": "Each profile has its own photo, name and ID. Use a different ID for each player; repeating it keeps the same participant. You can edit their details below.",
       "displayName": "Display name",
@@ -389,9 +391,15 @@
       "count": "Count",
       "delay": "Delay (seconds)",
       "delayHint": "0 = immediate.",
+      "eventNumber": "Event {number}",
+      "removeEvent": "Remove",
+      "addEvent": "Add another event",
       "submit": "Send event",
+      "submitMultiple": "Send events",
       "sending": "Sending…",
+      "sendingMultiple": "Sending events…",
       "sent": "Event sent successfully.",
+      "batchSent": "{count} events accepted successfully.",
       "scheduled": "Event scheduled; it will be sent in {seconds} s.",
       "error": "The event could not be sent.",
       "hint": "The result will appear in this session's feed."

@@ -14,6 +14,7 @@ export const interactionItems = [
     imageAltKey: "interactions.helps.extraLife",
     typeKey: "interactions.groups.help",
     image: "/assets/creator-tools/interactions/extra-life-heart.png",
+    overlayScale: 0.82,
   },
   {
     id: "help_ghost",
@@ -24,6 +25,7 @@ export const interactionItems = [
     imageAltKey: "interactions.helps.ghost",
     typeKey: "interactions.groups.help",
     image: "/assets/creator-tools/interactions/ghost-help.png",
+    overlayScale: 0.93,
   },
   {
     id: "challenge_half_damage",
@@ -153,6 +155,7 @@ export const interactionItems = [
     imageAltKey: "interactions.zeppelin.green.imageAlt",
     typeKey: "interactions.zeppelin.type",
     image: "/assets/creator-tools/interactions/green-zeppelin.png",
+    overlayScale: 1.18,
   },
   {
     id: "hilda_purple_zeppelin",
@@ -162,6 +165,7 @@ export const interactionItems = [
     imageAltKey: "interactions.zeppelin.purple.imageAlt",
     typeKey: "interactions.zeppelin.type",
     image: "/assets/creator-tools/interactions/purple-zeppelin.png",
+    overlayScale: 1.18,
   },
   {
     id: "rootpack_homing_carrot",
@@ -171,6 +175,7 @@ export const interactionItems = [
     imageAltKey: "interactions.rootpack.homingCarrot.imageAlt",
     typeKey: "interactions.rootpack.type",
     image: "/assets/creator-tools/interactions/homing-carrot.png",
+    overlayScale: 1.21,
   },
   {
     id: "cagney_homing_plant",
@@ -180,6 +185,7 @@ export const interactionItems = [
     imageAltKey: "interactions.cagney.homingPlant.imageAlt",
     typeKey: "interactions.cagney.type",
     image: "/assets/creator-tools/interactions/cagney-homing-plant.png",
+    overlayScale: 1.27,
   },
   {
     id: "frogs_firefly",
@@ -189,6 +195,7 @@ export const interactionItems = [
     imageAltKey: "interactions.frogs.firefly.imageAlt",
     typeKey: "interactions.frogs.type",
     image: "/assets/creator-tools/interactions/frogs-firefly.png",
+    overlayScale: 1.25,
   },
   {
     id: "robot_homing_bomb",
@@ -198,6 +205,7 @@ export const interactionItems = [
     imageAltKey: "interactions.robot.homingBomb.imageAlt",
     typeKey: "interactions.robot.type",
     image: "/assets/creator-tools/interactions/robot-homing-bomb.png",
+    overlayScale: 1.27,
   },
   {
     id: "baroness_head_toss",
@@ -207,6 +215,7 @@ export const interactionItems = [
     imageAltKey: "interactions.baroness.headToss.imageAlt",
     typeKey: "interactions.baroness.type",
     image: "/assets/creator-tools/interactions/baroness-head-toss-v2.png",
+    overlayScale: 0.82,
   },
   {
     id: "dragon_fireballs",
@@ -216,6 +225,7 @@ export const interactionItems = [
     imageAltKey: "interactions.dragon.fireballs.imageAlt",
     typeKey: "interactions.dragon.type",
     image: "/assets/creator-tools/interactions/dragon-fireballs-v2.png",
+    overlayScale: 1.03,
   },
   {
     id: "train_bone_ring",
@@ -225,6 +235,7 @@ export const interactionItems = [
     imageAltKey: "interactions.train.boneRing.imageAlt",
     typeKey: "interactions.train.type",
     image: "/assets/creator-tools/interactions/train-bone-ring.png",
+    overlayScale: 0.98,
   },
   {
     id: "devil_fire_circle",
@@ -234,6 +245,7 @@ export const interactionItems = [
     imageAltKey: "interactions.devil.fireCircle.imageAlt",
     typeKey: "interactions.devil.type",
     image: "/assets/creator-tools/interactions/devil-fire-circle-v2.png",
+    overlayScale: 1.05,
   },
   {
     id: "beppi_balloon_dog",
@@ -243,6 +255,7 @@ export const interactionItems = [
     imageAltKey: "interactions.beppi.balloonDog.imageAlt",
     typeKey: "interactions.beppi.type",
     image: "/assets/creator-tools/interactions/beppi-balloon-dog.png",
+    overlayScale: 1.15,
   },
   {
     id: "beppi_pink_balloon_dog",
@@ -252,6 +265,7 @@ export const interactionItems = [
     imageAltKey: "interactions.beppi.pinkBalloonDog.imageAlt",
     typeKey: "interactions.beppi.type",
     image: "/assets/creator-tools/interactions/beppi-pink-balloon-dog.png",
+    overlayScale: 1.15,
   },
   {
     id: "baroness_cupcake",
@@ -261,6 +275,7 @@ export const interactionItems = [
     imageAltKey: "interactions.baroness.cupcake.imageAlt",
     typeKey: "interactions.miniBoss.type",
     image: "/assets/creator-tools/interactions/baroness-cupcake.png",
+    overlayScale: 1.12,
   },
   {
     id: "baroness_gumball",
@@ -270,6 +285,7 @@ export const interactionItems = [
     imageAltKey: "interactions.baroness.gumball.imageAlt",
     typeKey: "interactions.miniBoss.type",
     image: "/assets/creator-tools/interactions/baroness-gumball.png",
+    overlayScale: 1.13,
   },
   {
     id: "baroness_waffle",
@@ -279,6 +295,7 @@ export const interactionItems = [
     imageAltKey: "interactions.baroness.waffle.imageAlt",
     typeKey: "interactions.miniBoss.type",
     image: "/assets/creator-tools/interactions/baroness-waffle.png",
+    overlayScale: 0.92,
   },
   {
     id: "baroness_candy_corn",
@@ -288,6 +305,7 @@ export const interactionItems = [
     imageAltKey: "interactions.baroness.candyCorn.imageAlt",
     typeKey: "interactions.miniBoss.type",
     image: "/assets/creator-tools/interactions/baroness-candy-corn.png",
+    overlayScale: 0.96,
   },
   {
     id: "baroness_jawbreaker",
@@ -297,6 +315,7 @@ export const interactionItems = [
     imageAltKey: "interactions.baroness.jawbreaker.imageAlt",
     typeKey: "interactions.miniBoss.type",
     image: "/assets/creator-tools/interactions/baroness-jawbreaker.png",
+    overlayScale: 0.93,
   },
 ] as const;
 

@@ -89,9 +89,17 @@ internal static class Program
             Check(battle.Active && state.GetProperty("attempt").GetInt32() == 2, "retry starts a second attempt");
             Check(state.GetProperty("capacity").GetInt32() == capacity && state.GetProperty("participants").GetArrayLength() == capacity,
                 "retry retains the configured capacity and full roster");
+            scope.Queue.Enqueue(CreatorToolsInteractionIds.PurpleZeppelin,
+                "Viewer 1", string.Empty, 1, 0f,
+                CreatorToolsInteractionSource.PeskyBattle);
             battle.ProcessBackgroundCommand("action=off");
+            Check(battle.Phase == "off" && scope.Coordinator.Snapshot.ActiveEvent == string.Empty,
+                "background cancellation releases the event even while Unity is unfocused");
+            Check(scope.Queue.CountFor(CreatorToolsInteractionSource.PeskyBattle) == 1,
+                "background cancellation leaves Unity queue cleanup for the main thread");
             battle.ProcessCommands(null);
-            Check(battle.Phase == "off", "cancellation completes on the main thread");
+            Check(scope.Queue.CountFor(CreatorToolsInteractionSource.PeskyBattle) == 0,
+                "main-thread cleanup removes the cancelled battle entries");
             Check(CreatorToolsPeskyBattleSettings.Load(scope.ConfigPath, null).Capacity == capacity, "capacity persists after cancellation");
             battle.Dispose();
         }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Batalla Molestosa</title>
-  <link rel="stylesheet" href="/pesky-battle-overlay.css?v=battle-icons-10">
+  <link rel="stylesheet" href="/pesky-battle-overlay.css?v=battle-title-gap-19">
 </head>
 <body>
   <main
@@ -43,17 +43,20 @@
       </div>
       <span class="battle-slot__name" hidden></span>
       <span class="battle-slot__attack" role="status">
-        <img class="battle-slot__attack-image" alt="">
+        <span class="battle-slot__attack-visual">
+          <img class="battle-slot__attack-image" alt="">
+        </span>
       </span>
       <span class="battle-slot__challenge" role="status" aria-hidden="true">
-        <img class="battle-slot__challenge-image" alt="">
-        <small class="battle-slot__challenge-time"></small>
+        <span class="battle-slot__challenge-visual">
+          <img class="battle-slot__challenge-image" alt="">
+        </span>
       </span>
     </li>
   </template>
 
   <script src="/assets/creator-tools/live-event-overlay-runtime.js?v=composer-1"></script>
   <script src="/assets/creator-tools/overlay-interactions.js?v=game-signals-9"></script>
-  <script src="/pesky-battle-overlay.js?v=battle-slider-9"></script>
+  <script src="/pesky-battle-overlay.js?v=battle-title-gap-19"></script>
 </body>
 </html>

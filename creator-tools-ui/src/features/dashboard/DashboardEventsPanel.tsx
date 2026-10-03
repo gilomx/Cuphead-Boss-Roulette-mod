@@ -24,7 +24,7 @@ export function DashboardEventsPanel({
 }: DashboardEventsPanelProps) {
   const { locale, t } = useLocalization();
   const [view, setView] = useState<DashboardEventsView>("events");
-  const [submittedDelaySeconds, setSubmittedDelaySeconds] = useState<number | null>(null);
+  const [submittedSimulation, setSubmittedSimulation] = useState<DashboardSimulationResult | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const previousView = useRef<DashboardEventsView>(view);
   const confirmationTimer = useRef<number | null>(null);
@@ -46,26 +46,31 @@ export function DashboardEventsPanel({
       window.clearTimeout(confirmationTimer.current);
       confirmationTimer.current = null;
     }
-    setSubmittedDelaySeconds(null);
+    setSubmittedSimulation(null);
   };
 
-  const handleSimulationSubmitted = async ({ delaySeconds }: DashboardSimulationResult) => {
+  const handleSimulationSubmitted = async (result: DashboardSimulationResult) => {
     if (confirmationTimer.current !== null) window.clearTimeout(confirmationTimer.current);
-    setSubmittedDelaySeconds(delaySeconds);
+    setSubmittedSimulation(result);
     setView("events");
     confirmationTimer.current = window.setTimeout(() => {
-      setSubmittedDelaySeconds(null);
+      setSubmittedSimulation(null);
       confirmationTimer.current = null;
     }, SIMULATION_CONFIRMATION_DURATION_MS);
     await onSimulationSubmitted();
   };
 
-  const simulationConfirmation = submittedDelaySeconds === null
+  const simulationConfirmation = submittedSimulation === null
     ? null
-    : submittedDelaySeconds > 0
+    : submittedSimulation.eventCount > 1
+      ? t("dashboard.simulator.batchSent").replace(
+          "{count}",
+          submittedSimulation.eventCount.toLocaleString(locale === "es" ? "es-MX" : "en-US"),
+        )
+      : submittedSimulation.delaySeconds > 0
       ? t("dashboard.simulator.scheduled").replace(
           "{seconds}",
-          submittedDelaySeconds.toLocaleString(locale === "es" ? "es-MX" : "en-US"),
+          submittedSimulation.delaySeconds.toLocaleString(locale === "es" ? "es-MX" : "en-US"),
         )
       : t("dashboard.simulator.sent");
 

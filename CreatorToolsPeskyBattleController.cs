@@ -58,7 +58,6 @@ namespace Gilomx.CupheadBossRoulette
         private string lastState;
         private bool clearBattleEntriesPending;
         private bool disableFreePeskyPending;
-        private bool releaseLiveEventPending;
         private long deferredGameplayGeneration;
         private CreatorToolsLiveEventLease liveEventLease;
 
@@ -508,7 +507,6 @@ namespace Gilomx.CupheadBossRoulette
                 ResetAttackScheduleLocked();
                 clearBattleEntriesPending = false;
                 disableFreePeskyPending = false;
-                releaseLiveEventPending = false;
                 liveEventLease = null;
                 deferredGameplayGeneration = 0L;
                 lastState = null;
@@ -665,7 +663,6 @@ namespace Gilomx.CupheadBossRoulette
                     clearBattleEntriesPending = true;
                     disableFreePeskyPending = true;
                 }
-                releaseLiveEventPending = false;
                 liveEventLease = lease;
                 participants.Clear();
                 targetLevel = string.Empty;
@@ -945,13 +942,11 @@ namespace Gilomx.CupheadBossRoulette
                     // If arm and cancel both arrive before Unity resumes,
                     // the final off state must not disable free Pesky mode.
                     disableFreePeskyPending = false;
-                    releaseLiveEventPending = releasedLease != null;
                 }
                 else
                 {
                     clearBattleEntriesPending = false;
                     disableFreePeskyPending = false;
-                    releaseLiveEventPending = false;
                 }
                 participants.Clear();
                 phase = releasedLease == null ? "off" : "stopping";
@@ -965,7 +960,24 @@ namespace Gilomx.CupheadBossRoulette
             if (releasedLease != null && liveEvents != null)
                 liveEvents.BeginStopping(releasedLease);
             if (deferGameplaySideEffects)
+            {
+                // HTTP commands must finish their logical stop even while
+                // Cuphead is unfocused and Unity is not producing frames.
+                // Queue/handle disposal stays deferred to Unity's thread;
+                // its generation guard runs before any new battle dispatch.
+                if (releasedLease != null && liveEvents != null)
+                    liveEvents.CompleteRelease(releasedLease);
+                lock (stateLock)
+                {
+                    if (ReferenceEquals(liveEventLease, releasedLease))
+                    {
+                        liveEventLease = null;
+                        phase = "off";
+                        TouchLocked();
+                    }
+                }
                 return;
+            }
 
             ClearBattleEntries();
             lock (stateLock)
@@ -985,17 +997,11 @@ namespace Gilomx.CupheadBossRoulette
         {
             bool clearEntries;
             bool disablePesky;
-            bool releaseLiveEvent;
-            CreatorToolsLiveEventLease releasedLease;
             long generation;
             lock (stateLock)
             {
                 clearEntries = clearBattleEntriesPending;
                 disablePesky = disableFreePeskyPending;
-                releaseLiveEvent = releaseLiveEventPending;
-                releasedLease = releaseLiveEvent
-                    ? liveEventLease
-                    : null;
                 generation = deferredGameplayGeneration;
                 clearBattleEntriesPending = false;
                 disableFreePeskyPending = false;
@@ -1010,24 +1016,6 @@ namespace Gilomx.CupheadBossRoulette
                 if (disablePesky)
                     disableFreePesky();
             }
-            if (!releaseLiveEvent || releasedLease == null)
-                return;
-
-            lock (stateLock)
-            {
-                releaseLiveEvent = releaseLiveEventPending &&
-                    generation == deferredGameplayGeneration &&
-                    ReferenceEquals(liveEventLease, releasedLease);
-                if (releaseLiveEvent)
-                {
-                    releaseLiveEventPending = false;
-                    liveEventLease = null;
-                    phase = "off";
-                    TouchLocked();
-                }
-            }
-            if (releaseLiveEvent && liveEvents != null)
-                liveEvents.CompleteRelease(releasedLease);
         }
 
         private void AdvanceDeferredGameplayGenerationLocked()
