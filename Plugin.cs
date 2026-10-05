@@ -1370,16 +1370,19 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             var visibilityTarget = visible ? 1f : 0f;
-            cardVisibility = Mathf.Lerp(cardVisibility, visibilityTarget, Time.unscaledDeltaTime * 10f);
+            cardVisibility = Mathf.Lerp(cardVisibility, visibilityTarget, Mathf.Min(Time.unscaledDeltaTime, 0.05f) * 10f);
             if (Mathf.Abs(cardVisibility - visibilityTarget) < 0.001f)
                 cardVisibility = visibilityTarget;
 
             if (onMap && toggleShortcut.Value.IsDown())
                 SetVisible(!visible);
-            if (onMap && visible && !autoLoad.Value && resultReady &&
+            if (onMap && visible && (chatChoosesReviewCard || !autoLoad.Value) && resultReady &&
                 !running && !pendingLoad &&
                 (spinShortcut.Value.IsDown() || controllerRerollPressed))
-                StartRoulette();
+            {
+                if (chatChoosesReviewCard) BeginResultLoad();
+                else StartRoulette();
+            }
             if (visible && cardVisibility > 0.72f && !running && !pendingLoad)
                 HandleCardNavigation();
             if (running)
@@ -1394,7 +1397,14 @@ namespace Gilomx.CupheadBossRoulette
                 else if (cardVisibility <= 0.01f)
                 {
                     pendingLoad = false;
-                    LoadResult();
+                    var chatLoad = chatChoosesReviewCard;
+                    var loaded = LoadResult();
+                    if (chatLoad)
+                    {
+                        creatorToolsChatChooses.Loaded(loaded);
+                        chatChoosesReviewCard = false;
+                        if (!loaded) SetVisible(true);
+                    }
                 }
             }
         }
@@ -1413,13 +1423,13 @@ namespace Gilomx.CupheadBossRoulette
             if (Input.GetKeyDown(KeyCode.UpArrow) ||
                 IsControllerMenuButtonDown(CupheadButton.MenuUp))
             {
-                navigationIndex = Wrap(navigationIndex - 1, 4);
+                navigationIndex = chatChoosesReviewCard ? (navigationIndex == 0 ? 3 : 0) : Wrap(navigationIndex - 1, 4);
                 moved = true;
             }
             else if (Input.GetKeyDown(KeyCode.DownArrow) ||
                      IsControllerMenuButtonDown(CupheadButton.MenuDown))
             {
-                navigationIndex = Wrap(navigationIndex + 1, 4);
+                navigationIndex = chatChoosesReviewCard ? (navigationIndex == 0 ? 3 : 0) : Wrap(navigationIndex + 1, 4);
                 moved = true;
             }
             else if (Input.GetKeyDown(KeyCode.LeftArrow) ||
@@ -1459,6 +1469,21 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (running || pendingLoad || !resultReady)
                 return;
+            if (chatChoosesReviewCard)
+            {
+                if (chatChoosesCardEntrance.Pending || !creatorToolsApplicationFocused ||
+                    !visible || cardVisibility <= 0.72f) return;
+                int[] chosen;
+                if (!creatorToolsChatChooses.TryBeginLoad(out chosen)) return;
+                if (!IsChatChoosesSelectionValid(chosen))
+                {
+                    creatorToolsChatChooses.Loaded(false);
+                    ClearChatChoosesCard();
+                    return;
+                }
+                ClearActiveChallenge(); EndBattleResultHudSession();
+                chatChoosesBattleSeen = false;
+            }
             BeginCreatorToolsInteractionGameplayLevelLoad(
                 "roulette play action");
             pendingLoad = true;
@@ -1466,6 +1491,7 @@ namespace Gilomx.CupheadBossRoulette
         }
         private void ChangeCurrentSetting(int direction)
         {
+            if (chatChoosesReviewCard && navigationIndex != 0) return;
             var changed = false;
             if (navigationIndex == 0)
             {
@@ -1495,7 +1521,7 @@ namespace Gilomx.CupheadBossRoulette
                 return;
 
             Config.Save();
-            if (resultReady)
+            if (resultReady && !chatChoosesReviewCard)
             {
                 resultReady = false;
                 status = RouletteStatus.Ready;
@@ -1504,7 +1530,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SetVisible(bool value)
         {
-            if (value && creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved)
+            if (value && creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved &&
+                !(chatChoosesReviewCard && creatorToolsChatChooses.ShowingResult && !chatChoosesCardEntrance.Pending))
                 return;
             if (visible == value)
                 return;
@@ -2308,10 +2335,12 @@ namespace Gilomx.CupheadBossRoulette
             if (loadout == null)
                 return;
 
+            loadout.charm = RouletteData.Charms[result.Charm].Value;
+            if (chatChoosesReviewCard && RouletteData.Bosses[result.Boss].IsPlane)
+                return;
             loadout.primaryWeapon = RouletteData.Weapons[result.Weapon1].Value;
             loadout.secondaryWeapon = RouletteData.Weapons[result.Weapon2].Value;
             loadout.super = RouletteData.Supers[result.Super].Value;
-            loadout.charm = RouletteData.Charms[result.Charm].Value;
             loadout.HasEquippedSecondaryRegularWeapon =
                 loadout.secondaryWeapon != Weapon.None;
             // The roulette HUD already explains the temporary loadout. The
@@ -2580,7 +2609,6 @@ namespace Gilomx.CupheadBossRoulette
             DrawLanguageTestNotice();
             if (CanUseRouletteOnMap() && cardVisibility > 0.001f)
                 DrawRoulette();
-            if (CanUseRouletteOnMap()) DrawChatChoosesResult();
 
             GUI.color = previousColor;
             GUI.matrix = previousMatrix;

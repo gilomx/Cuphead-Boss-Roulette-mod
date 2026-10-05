@@ -22,10 +22,10 @@ static class Program
         catalog.Pools["modifier"] = new List<ChatChoice> { Option(0, kind: "ground"), Option(1, kind: "plane"), Option(2, true) };
         return catalog;
     }
-    static CreatorToolsChatChoosesController New(bool challenge = true, bool plane = false, CreatorToolsLiveEventsCoordinator coordinator = null)
+    static CreatorToolsChatChoosesController New(bool challenge = true, bool plane = false, CreatorToolsLiveEventsCoordinator coordinator = null, bool dev = false)
     {
         now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
-        var c = new CreatorToolsChatChoosesController(coordinator ?? new CreatorToolsLiveEventsCoordinator(), challenge, new Random(123), () => now);
+        var c = new CreatorToolsChatChoosesController(coordinator ?? new CreatorToolsLiveEventsCoordinator(), challenge, new Random(123), () => now, dev);
         c.SetCatalog(Catalog(plane), true);
         Assert(c.Command("operation=start&mode=" + (challenge ? "with" : "without")), "start");
         return c;
@@ -40,6 +40,114 @@ static class Program
     static void Advance(CreatorToolsChatChoosesController c) { now = now.AddSeconds(2); c.Tick(); }
     static CreatorToolsStreamEvent Vote(string user, string number, DateTime? received = null) => new CreatorToolsStreamEvent
     { Platform = "tiktok", Type = "chat", UserId = user, ChatText = number, ReceivedAt = (received ?? now).ToString("O") };
+    static string TestCommand(CreatorToolsChatChoosesController c)
+    {
+        var state = State(c);
+        return $"operation=test_votes&sessionId={state.GetProperty("sessionId")}&round={state.GetProperty("round")}";
+    }
+    static void TestDevVotes()
+    {
+        var c = New();
+        Assert(!State(c).GetProperty("developmentTools").GetBoolean(), "Release hides Dev tools");
+        Assert(!c.Command(TestCommand(c)), "Release rejects test votes through backend");
+        Assert(c.TakeDueTestVotes().Count == 0 && State(c).GetProperty("totalVotes").GetInt32() == 0, "Release cannot inject votes");
+        c = New(dev: true);
+        Assert(State(c).GetProperty("developmentTools").GetBoolean(), "Dev advertises tools");
+        Assert(!c.Command("operation=test_votes&sessionId=0&round=0"), "test votes reject stale round");
+        // Every ground phase, including four supers and two compatible challenges.
+        for (var stage = 0; stage < 6; stage++)
+        {
+            var query = TestCommand(c);
+            Assert(c.Command(query), "start test votes in stage " + stage);
+            var total = State(c).GetProperty("testVotes").GetProperty("total").GetInt32();
+            Assert(total >= 50 && total <= 80, "50–80 planned votes");
+            Assert(c.TakeDueTestVotes().Count == 0, "no immediate burst");
+            Assert(!c.Command(query), "double click cannot add concurrent batch");
+            var sent = new List<CreatorToolsStreamEvent>();
+            var start = now;
+            var arrivalTimes = new List<int>();
+            for (var tick = 1; tick <= 200; tick++)
+            {
+                now = start.AddMilliseconds(tick * 50);
+                var batch = c.TakeDueTestVotes();
+                if (batch.Count > 0) arrivalTimes.Add(tick);
+                foreach (var entry in batch)
+                {
+                    Assert(entry.Simulated && entry.Count == 1 && entry.Type == "chat", "normalized simulated chat ballot");
+                    Assert(c.Observe(entry) == "chat_vote_counted", "ballot follows normal counting");
+                    sent.Add(entry);
+                }
+                if (tick == 100) Assert(sent.Count > 0 && sent.Count < total, "partial batch at five seconds");
+                if (tick == 199) Assert(sent.Count < total, "last vote waits until ten seconds");
+            }
+            Assert(sent.Count == total && State(c).GetProperty("totalVotes").GetInt32() == total, "all votes delivered exactly at ten seconds");
+            Assert(arrivalTimes.Count > 20 && arrivalTimes.Last() == 200, "staggered votes span ten seconds");
+            Assert(arrivalTimes.Zip(arrivalTimes.Skip(1), (a, b) => b - a).Distinct().Count() > 1, "variable delays");
+            Assert(sent.Select(e => e.UserId).Distinct().Count() == total, "unique users");
+            var options = State(c).GetProperty("options").EnumerateArray().Select(o => o.GetProperty("votes").GetInt32()).ToArray();
+            Assert(options.Count(x => x == options.Max()) == 1, "biased batch has unique leader");
+            Assert(!State(c).GetProperty("testVotes").GetProperty("active").GetBoolean(), "button unlocked after completion");
+            Close(c); Advance(c);
+        }
+        c = New(dev: true);
+        Assert(c.Command(TestCommand(c)), "cancellation batch starts");
+        now = now.AddSeconds(1);
+        var inFlight = c.TakeDueTestVotes();
+        Assert(inFlight.Count > 0, "in-flight ballots extracted");
+        Close(c); Advance(c);
+        foreach (var entry in inFlight)
+        {
+            entry.ReceivedAt = now.ToString("O"); // Date alone cannot fence a racing batch.
+            Assert(c.Observe(entry) == "", "old batch rejected by round fence");
+        }
+        now = now.AddSeconds(20);
+        Assert(c.TakeDueTestVotes().Count == 0 && State(c).GetProperty("totalVotes").GetInt32() == 0, "next round cancels pending votes");
+        Assert(c.Command(TestCommand(c)), "new round can test again");
+        c.Command("operation=stop"); now = now.AddSeconds(20);
+        Assert(c.TakeDueTestVotes().Count == 0 && !State(c).GetProperty("testVotes").GetProperty("active").GetBoolean(), "stop cancels pending votes");
+        c.Command("operation=start&mode=with");
+        c.Observe(Vote("real-viewer", "1"));
+        c.Command(TestCommand(c)); now = now.AddSeconds(10);
+        var first = c.TakeDueTestVotes();
+        Assert(c.Command(TestCommand(c)), "another batch allowed in same round");
+        foreach (var entry in first) c.Observe(entry);
+        Assert(State(c).GetProperty("totalVotes").GetInt32() == first.Count + 1, "existing real vote preserved");
+        now = now.AddSeconds(10); var second = c.TakeDueTestVotes(); foreach (var entry in second) c.Observe(entry);
+        Assert(State(c).GetProperty("totalVotes").GetInt32() == first.Count + second.Count + 1, "repeated batch uses new identities");
+        c = New(plane: true, dev: true);
+        Close(c); Advance(c);
+        Assert(State(c).GetProperty("stage").GetString() == "charm", "plane jumps to its compatible stage");
+        Assert(c.Command(TestCommand(c)), "plane phase accepts test votes");
+        c.Command("operation=stop"); c.SetCatalog(Catalog(size: 1), true); c.Command("operation=start&mode=with");
+        Assert(c.Command(TestCommand(c)), "single candidate accepts test votes");
+        now = now.AddSeconds(10);
+        foreach (var entry in c.TakeDueTestVotes()) Assert(c.Observe(entry) == "chat_vote_counted" && entry.ChatText == "1", "single candidate receives valid vote");
+    }
+    static void TestCardEntrance()
+    {
+        var entrance = new ChatChoosesCardEntrance();
+        Assert(!entrance.ShouldOpen(true, true, 100), "no card before a result");
+        entrance.Begin();
+        Assert(entrance.Pending && !entrance.ShouldOpen(false, true, 100), "result waits without focus");
+        Assert(!entrance.ShouldOpen(false, true, 10000), "background time cannot finish the wait");
+        Assert(!entrance.ShouldOpen(true, true, 10001), "returning focus starts a fresh wait");
+        Assert(!entrance.ShouldOpen(true, true, 10002.49), "card hidden for the first 1.49 seconds");
+        Assert(entrance.ShouldOpen(true, true, 10002.5) && !entrance.Pending, "card opens once after 1.5 focused seconds");
+        Assert(!entrance.ShouldOpen(true, true, 20000), "closing the card does not automatically reopen it");
+        entrance.Begin(); entrance.ShouldOpen(true, true, 0);
+        entrance.Suspend(); // Focus callback with no background Update frames.
+        Assert(!entrance.ShouldOpen(true, true, 100), "focus callback resets an interrupted wait even when Unity was frozen");
+        Assert(!entrance.ShouldOpen(true, true, 101.49), "new wait remains complete after another focus change");
+        Assert(entrance.ShouldOpen(true, true, 101.5), "new continuous focus can finish the wait");
+        entrance.Begin(); entrance.ShouldOpen(true, true, 0);
+        Assert(!entrance.ShouldOpen(true, false, 1), "map unavailable suspends presentation");
+        Assert(!entrance.ShouldOpen(true, true, 10), "returning to map also starts a fresh wait");
+        Assert(entrance.ShouldOpen(true, true, 11.5), "map and focus both required for full delay");
+        entrance.Begin(); entrance.ShouldOpen(true, true, 0); entrance.Cancel();
+        Assert(!entrance.Pending && !entrance.ShouldOpen(true, true, 100), "stop cancels pending entrance");
+        entrance.Begin(); entrance.ShouldOpen(true, true, 0); entrance.Begin();
+        Assert(!entrance.ShouldOpen(true, true, 100), "new result cannot inherit the old presentation deadline");
+    }
     static void Main()
     {
         var c = New();
@@ -68,7 +176,10 @@ static class Program
         Close(c); Advance(c);
         Assert(State(c).GetProperty("options").GetArrayLength() == 4, "all supers plus none");
         Assert(State(c).GetProperty("options").EnumerateArray().Any(o => o.GetProperty("none").GetBoolean()), "super includes none");
+        Assert(State(c).GetProperty("options").EnumerateArray().Select(o => o.GetProperty("id").GetInt32()).SequenceEqual(new[] { 0, 1, 2, 3 }), "supers keep I, II, III, None order");
+        Assert(c.Observe(Vote("super-voter", "3")) == "chat_vote_counted", "number three votes for Super III");
         Close(c); Advance(c); Close(c); Advance(c);
+        Assert(State(c).GetProperty("selected").GetProperty("super").GetProperty("id").GetInt32() == 2, "fixed super number selects matching item");
         Assert(State(c).GetProperty("stage").GetString() == "modifier", "challenge round");
         Assert(State(c).GetProperty("options").EnumerateArray().All(o => o.GetProperty("id").GetInt32() != 1), "exclude plane-only challenge for ground boss");
         c.Observe(Vote("X", "1")); c.Observe(Vote("Y", "2")); Close(c);
@@ -77,13 +188,20 @@ static class Program
         Advance(c);
         Assert(State(c).GetProperty("phase").GetString() == "result", "result card");
         int[] chosen;
-        Assert(!c.TryBeginLoad(out chosen), "no premature load");
-        now = now.AddSeconds(5); c.Tick();
-        Assert(State(c).GetProperty("phase").GetString() == "countdown", "five second display before countdown");
+        Assert(c.TryGetResult(out chosen) && chosen.Length == 6, "read chosen loadout without starting game");
+        chosen[0] = -999;
+        Assert(c.TryGetResult(out chosen) && chosen[0] >= 0, "review copy cannot mutate selection");
+        var selectedJson = State(c).GetProperty("selected").GetRawText();
+        now = now.AddHours(1); c.Tick();
+        Assert(State(c).GetProperty("phase").GetString() == "result", "wait indefinitely for Play without countdown");
+        Assert(State(c).GetProperty("remainingSeconds").GetInt32() == 0, "no automatic start timer");
+        Assert(State(c).GetProperty("selected").GetRawText() == selectedJson, "waiting keeps every selected item");
+        Assert(!c.Command("operation=play&sessionId=1&round=6"), "web cannot skip native difficulty review");
         c.SetCatalog(null, false); c.Tick();
-        Assert(State(c).GetProperty("phase").GetString() == "waiting_map", "wait if map unavailable");
-        c.SetCatalog(null, true); c.Tick(); now = now.AddSeconds(3);
-        Assert(c.TryBeginLoad(out chosen) && chosen.Length == 6, "begin canonical load");
+        Assert(State(c).GetProperty("phase").GetString() == "result", "review remains available away from map");
+        Assert(!c.TryBeginLoad(out chosen), "cannot play away from map");
+        c.SetCatalog(null, true); c.Tick();
+        Assert(c.TryBeginLoad(out chosen) && chosen.Length == 6, "explicit Play begins canonical load immediately");
         Assert(!c.TryBeginLoad(out chosen), "load once only");
         c.Loaded(true); c.ReturnedToMap();
         Assert(!c.Reserved && State(c).GetProperty("phase").GetString() == "completed", "release on return");
@@ -97,8 +215,13 @@ static class Program
         c = New(true, true);
         Close(c); Advance(c);
         Assert(State(c).GetProperty("stage").GetString() == "charm", "plane skips regular weapons and supers");
+        Assert(State(c).GetProperty("round").GetInt32() == 2, "plane charm is the second round");
         Close(c); Advance(c);
         Assert(State(c).GetProperty("options").EnumerateArray().All(o => o.GetProperty("id").GetInt32() != 0), "plane challenge compatibility");
+        Assert(State(c).GetProperty("round").GetInt32() == 3, "plane challenge is the third and final round");
+        Close(c); Advance(c);
+        Assert(c.TryGetResult(out chosen) && chosen.Skip(1).Take(3).All(id => id == -1), "plane result has no invented weapon or super choices");
+        Assert(State(c).GetProperty("selected").EnumerateObject().Select(item => item.Name).SequenceEqual(new[] { "boss", "charm", "modifier" }), "plane votes only for boss, charm and challenge");
 
         // Relics that randomize ground weapons cannot override previous chat choices.
         c.Command("operation=stop");
@@ -116,6 +239,7 @@ static class Program
 
         c = New(false, true);
         Close(c); Advance(c); Close(c); Advance(c);
+        Assert(State(c).GetProperty("phase").GetString() == "result" && State(c).GetProperty("round").GetInt32() == 2, "plane without challenge completes in two rounds");
         now = now.AddSeconds(5); c.Tick(); now = now.AddSeconds(3);
         Assert(c.TryBeginLoad(out chosen), "prepare load failure test");
         c.Loaded(false);
@@ -137,6 +261,21 @@ static class Program
         c.SetCatalog(new ChatChoosesCatalog(), true);
         c.Command("operation=start&mode=with");
         Assert(!c.Reserved && State(c).GetProperty("feedback").GetString() == "no_options", "empty catalog releases lease");
+        c = New();
+        var timestamps = new[] { "2026-10-05T12:00:01.532Z", "2026-10-05T12:00:01.53Z", "2026-10-05T12:00:01Z",
+            "2026-10-05T06:00:01.532-06:00", "2026-10-05T12:00:01.532+00:00", "2026-10-05T12:00:01.5320000Z" };
+        for (var i = 0; i < timestamps.Length; i++)
+        {
+            var ballot = Vote("timestamp-" + i, "1"); ballot.ReceivedAt = timestamps[i]; ballot.Count = 1000;
+            Assert(c.Observe(ballot) == "chat_vote_counted", "ISO timestamp format " + i);
+        }
+        Assert(State(c).GetProperty("totalVotes").GetInt32() == timestamps.Length, "quantities do not multiply ballots");
+        var invalid = Vote("invalid", "1"); invalid.ReceivedAt = "invalid";
+        Assert(c.Observe(invalid) == "", "invalid timestamp remains rejected");
+        invalid.ReceivedAt = "2026-10-05T11:59:59.999Z";
+        Assert(c.Observe(invalid) == "", "old millisecond timestamp remains rejected");
+        TestDevVotes();
+        TestCardEntrance();
         Console.WriteLine($"Chat chooses: {assertions} assertions passed.");
     }
 }

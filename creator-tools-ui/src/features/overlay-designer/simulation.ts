@@ -6,6 +6,8 @@ import type {
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
+import type { ChatChoosesState } from "../../model";
+import { createChatSimulation } from "./chatSimulation";
 
 export type TapSimulationAction =
   | { type: "scenario"; scenario: TapFarmingPreviewSnapshot["phase"] }
@@ -400,6 +402,7 @@ export function previewCommand(
   battle: PeskyBattlePreviewSnapshot,
   profile: OverlayComposerProfile,
   simulationActive: boolean,
+  chat: ChatChoosesState = createChatSimulation(),
 ): OverlayPreviewCommand {
   return {
     schemaVersion: 1,
@@ -409,7 +412,7 @@ export function previewCommand(
     sessionId,
     simulationActive,
     layoutJson: JSON.stringify(profile),
-    scenario: componentId === "tap_farming" ? tap.phase : battle.phase,
+    scenario: componentId === "chat_chooses" ? chat.phase : componentId === "tap_farming" ? tap.phase : battle.phase,
     bossName: tap.bossName,
     levelId: tap.levelId,
     totalTaps: tap.counters.totalTaps,
@@ -432,5 +435,6 @@ export function previewCommand(
     attackStartedAt: battle.attack?.startedAt ?? 0,
     eventEpoch: battle.eventEpoch,
     battleSignalsJson: JSON.stringify({ attacks: battle.attacks ?? [], challenges: battle.challenges ?? [] }),
+    chatStateJson: JSON.stringify(chat),
   };
 }

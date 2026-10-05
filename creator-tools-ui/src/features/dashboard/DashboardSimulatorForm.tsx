@@ -171,7 +171,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
   };
 
   const queryForSimulation = (simulation: SimulationDraft) => {
-    const count = boundedInteger(String(simulation.count), 1, MAXIMUM_COUNT);
+    const count = simulation.type === "chat" ? 1 : boundedInteger(String(simulation.count), 1, MAXIMUM_COUNT);
     const delaySeconds = boundedInteger(
       String(simulation.delaySeconds),
       0,
@@ -192,7 +192,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
     });
     if (isCatalogGift(simulation) && gift) {
       query.set("giftId", gift.giftId);
-    } else {
+    } else if (simulation.type !== "chat") {
       query.set(
         "amount",
         String(Math.max(0, Math.min(MAXIMUM_AMOUNT, simulation.amount || 0))),
@@ -349,6 +349,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                     onChange={(event) => updateSimulation(simulation.key, (current) => ({ ...current, chatText: event.target.value }))}>
                     {[1, 2, 3, 4, 5, 6].map((number) => <option key={number}>{number}</option>)}
                   </select>
+                  <small className="dashboard-simulator-form__hint">{t("dashboard.simulator.voteHint")}</small>
                 </label> : catalogGift ? (
                   <div>
                     <SearchableSelectField
@@ -394,8 +395,8 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                   </label>
                 )}
 
-                <div className="dashboard-simulator-form__row dashboard-simulator-form__row--metrics">
-                  <label>
+                <div className="dashboard-simulator-form__row dashboard-simulator-form__row--metrics" data-chat={simulation.type === "chat"}>
+                  {simulation.type !== "chat" ? <label>
                     <span>{t("dashboard.simulator.count")}</span>
                     <input
                       type="number"
@@ -408,7 +409,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                         count: boundedInteger(event.target.value, 1, MAXIMUM_COUNT),
                       }))}
                     />
-                  </label>
+                  </label> : null}
                   <label>
                     <span>{t("dashboard.simulator.delay")}</span>
                     <input

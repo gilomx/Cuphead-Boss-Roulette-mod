@@ -2,6 +2,243 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Espacio vertical del resumen (2026-10-05)
+
+Se retiran `min-height: 280px` del contenedor del jefe y `min-height: 188px`
+del equipo que conservaban las alturas previas. Las imágenes siguen a 240/150 px
+y sólo queda el margen de 18 px entre sus bordes (antes 20 + 18 + 38 = 76 px).
+El resultado se ajusta a su marco usando su nueva altura natural, conservando
+el margen exterior para las animaciones. Tokens `chat-result-7` y `composer-chat-25`.
+
+Comprobado en el compositor del diseñador: jefe 240 px, fila 150 px y margen
+vertical 18 px. Captura `.deployment-cache/chat-final-result-compact-preview.png`.
+
+Publicación Dev validada por el proceso independiente: 1,491 archivos,
+destino físico confirmado y SHA-256
+`6EBDE04EB0AFFCFC5A5B5B33F760C70529465453E9611E231DECF5E8D8588219`.
+
+## Resumen final del overlay (2026-10-05)
+
+El jefe del resultado mide 240 px (antes 280), centrado en la misma ranura;
+se reserva la altura de equipo para conservar su acomodo y escala. El equipo
+sigue a 150 px y ya no crea etiquetas visibles, conservando aria-labels de
+ranura. Todos los retratos usan borde de 5 px y `--outline-color`; el jefe ya
+no usa el color del ganador. El inspector elimina el interruptor de etiquetas
+de esta capa; `showDetails` permanece en los perfiles por compatibilidad.
+
+El renderer distingue cancelación de ronda (inmediata) de salida del resultado:
+al llegar a active/off/completed conserva sus nodos y anima jefe/equipo con
+240 ms y retrasos de 60 ms. Sólo oculta al finalizar el último. La transición
+usa el estado más reciente si ya inició otra ronda y conserva el fallback
+contra throttling de OBS. Motion desactivado/reducido sigue siendo inmediato.
+Tokens `chat-result-6` y `composer-chat-24`.
+
+Validación: 26 pruebas JS, build web, previsualización del compositor con
+240/150 px, seis bordes iguales y ninguna etiqueta; después de pasar a batalla
+la capa queda vacía. Captura `.deployment-cache/chat-final-result-designer-preview.png`.
+
+Paquete Dev publicado y destino físico confirmado por el proceso independiente:
+1,491 archivos, SHA-256
+`E26260D3422DF09AE4C8A766464EE90D9CC82D0B2EC1657E1A0ACB272FAFD81B`.
+
+## Entrada con foco y equipo de avión (2026-10-05)
+
+`ChatChoosesCardEntrance` espera 1.5 segundos continuos con foco y mapa listo
+antes de abrir el resultado. `OnApplicationFocus` suspende la espera también
+cuando Unity no hace Update en segundo plano. Cancelar o cambiar de sesión
+elimina la espera; cerrar la tarjeta una vez mostrada no la reabre sola. Los
+atajos de abrir/Jugar respetan el pendiente y Jugar espera la entrada. Se usa
+`SetVisible(true)` y `DrawRoulette` para conservar sonido, inclinación aleatoria
+y desplazamiento existentes. El avance visual limita el delta a 50 ms para
+evitar que un fotograma largo complete la animación de golpe.
+
+El controlador ya omitía disparos/súper en avión; las pruebas ahora cubren el
+flujo completo de tres rondas con reto y dos sin reto. `CreateChatChoosesResult`
+conserva índices del equipo actual; `DrawEquipCardContents` proyecta Nada en
+esas tres ranuras. `ApplyLoadout` aplica el amuleto pero retorna antes de escribir
+armas, súper o flags de cambio para cada jugador cuando es una partida de avión
+del evento. Los demás usos de la ruleta mantienen su comportamiento.
+
+Validación: 1,024 aserciones del controlador/entrada, cinco pruebas del mock
+(incluido avión), build web y contrato IL de foco/atajos/equipo. No se arranca
+ni se recarga Cuphead; la animación nativa se revisa en el siguiente arranque Dev.
+
+Paquete publicado por el proceso independiente y comprobado en el destino
+físico: 1,491 archivos, SHA-256
+`09985A5DCBB8603DF0364363EF6C8297CEF31FA890FEC9FEC5B60C276058ADCE`.
+
+## Cierre manual en la ruleta y títulos de votación (2026-10-05)
+
+El resultado de «El chat elige» permanece en `result` hasta confirmar Jugar
+en la tarjeta habitual (`DrawRoulette` / `EquipCardLayout`). Se eliminó
+`DrawChatChoosesResult`, sus cinco segundos de presentación y la cuenta de
+tres segundos. `UpdateChatChooses` prepara lo votado y abre la ruleta; sólo
+`BeginResultLoad` puede cambiar el controlador a loading, desde Enter/aceptar,
+F7 o el atajo de mando. La navegación salta entre dificultad y Jugar, ocultando
+reto/carga automática. Cambiar dificultad guarda la preferencia y mantiene
+`resultReady`; cerrar/reabrir conserva el resultado. Detener cancela cualquier
+carga todavía pendiente y restaura la preferencia normal de retos.
+
+El controlador conserva la reserva Live durante la revisión, bloquea jugar
+fuera del mapa y revalida contenido/compatibilidad antes de cargar. El panel
+explica que se conserva la última dificultad y hay que revisarla antes de Jugar.
+La ronda Súper evita el shuffle y conserva I, II, III, Nada, con sus números
+1–4. El mock y el diseñador siguen esa misma regla.
+
+El overlay añade Votaciones (72 px) por encima de la etapa (48 px), con la
+entrada/salida escalonada existente. Las imágenes web de retos salen del
+catálogo limpio `creator-tools/modifiers`; no se alteran los assets nativos.
+El renderer y el diseñador eliminan la cuenta. Tokens `chat-voting-5` y
+`composer-chat-23`.
+
+Validación: controlador con espera de una hora sin iniciar, resultado inmutable,
+mapa ausente, confirmación manual y números de Súper; suites de runtime/JS,
+build web y contrato IL para carga sólo desde Jugar, interfaz reutilizada,
+dificultad conservada y controles ocultos. La tarjeta nativa requiere revisión
+visual tras el próximo arranque Dev; no se detiene ni recarga la sesión activa.
+
+Publicación Dev validada por el proceso independiente: 1,491 archivos,
+destino físico confirmado y SHA-256
+`9AAD2E8146739DF9CE0CE416F388D5DF86D97E77F56F655487473C93BB7556EC`.
+Contrato IL aprobado, 1,003 aserciones del controlador y 21 pruebas JS.
+Captura del compositor con la ronda de retos:
+`.deployment-cache/chat-voting-live-preview.png`.
+
+## Votos de prueba sólo en Dev (2026-10-05)
+
+El panel de «El chat elige» incorpora `Votos de prueba`, habilitado únicamente
+por la capacidad `developmentTools` del mod. `deploy-launcher-dev.ps1` compila
+con `LauncherDevBuild=true` / `PICHI_LAUNCHER_DEV`; las compilaciones normales
+ocultan el botón y rechazan su comando incluso al llamar directamente al API.
+
+El controlador prepara 50–80 votos con identidades únicas, pausas variables
+normalizadas a diez segundos y un candidato aleatorio con 55–65% del lote.
+El worker de stream los entrega al Dashboard y al evaluador de chat sin
+dependencia del foco del navegador, Unity o TikFinity. El panel muestra el
+progreso y bloquea un segundo lote concurrente; permite repetir al terminar.
+Avanzar/detener invalida el lote mediante sesión/ronda/generación, incluso si
+los mensajes ya fueron extraídos por el worker. Los votos reales se conservan.
+
+Validación: suite nativa completa con HTTP→worker→conteo/registro y rechazo
+Release; 981 aserciones del controlador para fases, duraciones, identidades,
+pausas, empates y cancelación; tres pruebas del fixture JS; 18 comprobaciones
+del publicador incluyendo el símbolo Dev y build del panel. Revisión de UI con
+fixture local: 76 votos (47 al líder) tras diez segundos, botón disponible al
+terminar y cancelación al avanzar. Captura local
+`.deployment-cache/chat-test-votes-preview.png`. El paquete Dev se aplica en
+el siguiente arranque del launcher; no se modifica la sesión activa.
+
+Paquete Dev publicado por el proceso independiente: 1,491 archivos, destino
+físico confirmado y SHA-256
+`4CB3D13D74E434B8D8856259EC7302E7CCB7804A75974A1B483CA8DE902C3375`.
+
+## Votos del simulador en Cuphead (2026-10-05)
+
+El registro real mostraba mensajes `chat` válidos con identidad y número, pero
+ningún voto contado. Se reprodujo el fallo con el Mono incluido en Cuphead,
+alojado en un proceso de prueba independiente: `DateTime.TryParse` rechaza las
+fechas ISO con tres decimales generadas por el Dashboard. El controlador usa
+ahora `TryParseExact` con fracción variable y zona horaria antes del fallback;
+conserva la comparación contra la apertura de ronda.
+
+El formulario oculta Cantidad para chat, explica el voto por identidad y envía
+count=1 sin importe. El backend también normaliza count=1/valor=0 para clientes
+anteriores; regalos y otros eventos conservan sus cantidades. El fixture de
+UI cuenta votos aunque Interacciones esté apagado, igual que el flujo real.
+
+Validación: 83 aserciones del controlador, suite completa de runtime y prueba
+HTTP→worker→votación con voto repetido, cambiado y segundo perfil; build del
+panel y envío desde su formulario. El controlador de producción pasó además
+una prueba independiente con el Mono real para seis formatos ISO, duplicados,
+cambios y fechas antiguas/invalidas. Captura del formulario en
+`.deployment-cache/chat-vote-simulator-preview.png`; el repro Mono permanece
+local en `.deployment-cache/chat-vote-diagnose/`, fuera de Git y del paquete.
+No se detuvo, recargó ni escribió en la sesión de Cuphead activa; la corrección
+de DLL se aplica en el próximo arranque de La Pichi Ruleta · Dev.
+
+Paquete Dev publicado por el proceso independiente: 1,491 archivos, ruta física
+confirmada y SHA-256
+`0585F26089674A1111446B15AF07FF2F9DEC397246DE58C1F9B03236B3166955`.
+
+## Overlay compacto y animado de El chat elige (2026-10-05)
+
+El renderer elimina los nombres de artículos y el título del evento, mantiene
+la etapa y coloca los números grandes dentro del círculo. El número de opción
+pasa a 76 px; los votos usan una insignia de 96 px con texto de 48 px. Las
+columnas coinciden con el diámetro de 240 px y tienen 24 px de separación.
+El margen interno es de 18 px; el escalado elimina su margen adicional.
+
+Los votos cambian mediante dos cifras que se deslizan y conservan siempre el
+último valor. Los cambios de ronda esperan todas las salidas (240 ms, desfase
+de 60 ms) antes de crear las entradas (420 ms, desfase de 80 ms). Cancelar o
+entrar al juego oculta inmediatamente; movimiento reducido omite la transición.
+Una espera de respaldo evita bloquear OBS si se retrasa el fin de una animación.
+
+El marco horizontal inicial usa 1360×320. La migración sólo compacta el marco
+anterior exacto, sin bloquear, en X=280/Y=540; conserva su backup. El inspector
+permite ajustar ancho y alto por separado para esta capa, y mantiene el resize
+proporcional desde las esquinas. Tokens `chat-motion-4` / `composer-chat-22`.
+
+Validación: build TypeScript/Vite, 34 pruebas de renderers/simulación y suite
+nativa completa, incluida la migración de marcos personalizados/bloqueados.
+Revisión con fixture local en ambos perfiles, contador y cambio de ronda;
+captura `.deployment-cache/chat-overlay-motion-preview.png`. La sesión real
+se comprueba tras el siguiente arranque del launcher y refresco de OBS.
+
+El publicador canónico validó 1,491 archivos y confirmó la ruta física del ZIP
+Dev mediante un proceso independiente. SHA-256:
+`46362EE2B905722314AA63B7F09EB3D98B189B17820134E6A9F71451A43DFE3A`.
+
+## Votación compacta de El chat elige (2026-10-05)
+
+El evento reutiliza el contenedor, encabezado y acciones de Batalla: los
+controles, etapas y candidatos quedan dentro del mismo panel. Su grid de
+candidatos mantiene una fila con dos a seis elementos y retratos de hasta 6 rem.
+Panel y renderer colocan el número de opción dentro del retrato, abajo y al
+centro, y los votos en la insignia superior. Las imágenes ya no tienen padding.
+Ambos calculan los líderes con votos positivos, permiten empates y cambian
+borde e insignia mediante una transición de 350 ms; reveal usa el ganador
+confirmado por el controlador. Los contadores mantienen su valor accesible
+completo y abrevian cantidades grandes en pantalla.
+
+OBS elimina instrucciones, estado de votación, total, barras y porcentajes;
+el footer queda reservado para cuenta, espera del mapa y carga. El diseñador
+denomina el color compartido «Líder y ganador». Los assets y el compositor
+actualizan sus tokens de caché a `chat-minimal-3` / `composer-chat-21`.
+
+Validación: build TypeScript/Vite, 30 pruebas de renderers/simulación y revisión
+visual con fixture local. Un voto cambiado movió el resaltado entre candidatos
+en el panel y en la fuente común de OBS, conservando los nodos de cada ronda.
+
+El publicador canónico validó 1,491 archivos y confirmó la entrega física del
+ZIP Dev. SHA-256:
+`92C7C71300C0431C0E0A1497E75D17111FE1A4CAE683983D43B73EE18F4A901B`.
+
+## El chat elige en el Diseñador de overlays (2026-10-05)
+
+`chat_chooses` es la tercera capa del compositor. El evento abre el diseñador
+mediante el mismo callout compartido de los demás eventos; la URL común de OBS
+muestra el estado real o la simulación del inspector. Posición, tamaño, colores,
+opacidad y opciones de presentación se guardan por perfil. La lectura de los
+perfiles anteriores añade la capa y conserva Batalla y Farmeando taps, además
+de mantener la copia de recuperación. El transporte de preview valida el JSON
+de chat y sus rutas locales antes de sustituir el estado anterior.
+
+Evento y renderer usan retratos circulares; el renderer tiene fondo transparente,
+entrada escalonada, ganador resaltado y resultado circular. El inspector prueba
+las seis rondas, votos, ganador, resultado, cuenta y estados vacíos. La fuente
+independiente anterior sigue funcionando por compatibilidad.
+
+Validación: compilación del panel, suite nativa de runtime, 28 pruebas de
+renderers/simulación y revisión visual con fixtures locales. Se comprobó el
+envío de votos del diseñador a la fuente común de OBS y la carga de imágenes.
+La comprobación de una sesión real queda a cargo del siguiente arranque desde
+el launcher; no se interrumpe el juego para aplicar una DLL.
+
+El publicador canónico compiló el mod y el companion, validó 1,491 archivos
+y confirmó la ruta física del ZIP Dev. SHA-256:
+`840C3F1181BD58689E9D99DD04CCC72FF9ACCA11E4F6216011D0797D005E01F3`.
+
 ## El chat elige (2026-10-05)
 
 Nuevo evento `chat_chooses`, con reserva exclusiva compartida con Batalla

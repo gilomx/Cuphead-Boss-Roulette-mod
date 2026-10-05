@@ -457,6 +457,13 @@ namespace Gilomx.CupheadBossRoulette
         private static bool ApplyPreviewValues(
             PreviewSlot slot, Dictionary<string, string> values)
         {
+            if (values.ContainsKey("chatStateJson"))
+            {
+                string chat;
+                if (!CreatorToolsOverlayComposerSettings.TryParseChatPreviewJson(
+                        Value(values, "chatStateJson"), out chat)) return false;
+                slot.ChatState = chat;
+            }
             if (values.ContainsKey("battleSignalsJson"))
             {
                 string signals;
@@ -750,6 +757,7 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJson.AppendEscaped(builder, slot.AttackImagePath);
             builder.Append("\",\"eventEpoch\":").Append(slot.EventEpoch)
                 .Append(",\"battleSignals\":").Append(slot.BattleSignals)
+                .Append(",\"chatState\":").Append(slot.ChatState)
                 .Append(",\"feedback\":\"");
             CreatorToolsJson.AppendEscaped(builder, feedback ?? string.Empty);
             builder.Append("\",\"error\":")
@@ -877,6 +885,7 @@ namespace Gilomx.CupheadBossRoulette
             internal long AttackStartedAt;
             internal int EventEpoch;
             internal string BattleSignals = "null";
+            internal string ChatState = "null";
             internal string Feedback = "ready";
 
             internal PreviewSlot(string profileId)

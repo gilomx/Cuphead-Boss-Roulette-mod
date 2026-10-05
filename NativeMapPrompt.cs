@@ -56,8 +56,9 @@ namespace Gilomx.CupheadBossRoulette
         private void UpdateNativeRoulettePrompt()
         {
             var canUse = CanUseRouletteOnMap();
-            var showOpen = canUse && !visible && cardVisibility <= 0.001f;
-            var showReroll = canUse && visible && !autoLoad.Value && resultReady &&
+            var chatReserved = creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved;
+            var showOpen = canUse && (!chatReserved || (chatChoosesReviewCard && !chatChoosesCardEntrance.Pending)) && !visible && cardVisibility <= 0.001f;
+            var showReroll = canUse && !chatReserved && visible && !autoLoad.Value && resultReady &&
                              !running && !pendingLoad;
             var shouldShow = showOpen || showReroll;
             var needsNativeLayer = canUse &&

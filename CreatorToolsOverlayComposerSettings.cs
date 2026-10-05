@@ -72,6 +72,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string HorizontalProfileId = "horizontal";
         internal const string TapFarmingComponentId = "tap_farming";
         internal const string PeskyBattleComponentId = "pesky_battle";
+        internal const string ChatChoosesComponentId = "chat_chooses";
         internal const string DefaultLiquidColor = "#ff4f92";
         internal const string DefaultCollectingColor = "#f4c95d";
         internal const string DefaultTextColor = "#ffffff";
@@ -338,7 +339,8 @@ namespace Gilomx.CupheadBossRoulette
                 components == null || components.ArrayValue == null ||
                 canvas.Integer("width", -1) != candidate.CanvasWidth ||
                 canvas.Integer("height", -1) != candidate.CanvasHeight ||
-                components.ArrayValue.Count != candidate.Components.Count)
+                components.ArrayValue.Count < 2 ||
+                components.ArrayValue.Count > candidate.Components.Count)
                 return false;
 
             var seenComponents = new HashSet<string>(
@@ -357,7 +359,8 @@ namespace Gilomx.CupheadBossRoulette
                     return false;
                 NormalizeComponent(candidate, component);
             }
-            if (seenComponents.Count != candidate.Components.Count)
+            if (!seenComponents.Contains(TapFarmingComponentId) ||
+                !seenComponents.Contains(PeskyBattleComponentId))
                 return false;
 
             profile = candidate;
@@ -375,7 +378,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             value = (value ?? string.Empty).Trim().ToLowerInvariant();
             return value == TapFarmingComponentId ||
-                value == PeskyBattleComponentId ? value : string.Empty;
+                value == PeskyBattleComponentId ||
+                value == ChatChoosesComponentId ? value : string.Empty;
         }
 
         internal static string NormalizeVariant(string value)
@@ -405,9 +409,9 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsOverlayComposerProfile profile,
             CreatorToolsOverlayComposerComponent component)
         {
-            var minimumWidth = component.Id == PeskyBattleComponentId
+            var minimumWidth = component.Id != TapFarmingComponentId
                 ? 320 : 120;
-            var minimumHeight = component.Id == PeskyBattleComponentId
+            var minimumHeight = component.Id != TapFarmingComponentId
                 ? 180 : 100;
             component.Width = Math.Max(minimumWidth,
                 Math.Min(profile.CanvasWidth, component.Width));
@@ -568,6 +572,25 @@ namespace Gilomx.CupheadBossRoulette
                     TextColor = DefaultTextColor,
                     OutlineColor = DefaultOutlineColor
                 });
+            profile.Components.Add(new CreatorToolsOverlayComposerComponent
+            {
+                Id = ChatChoosesComponentId,
+                X = vertical ? 60 : 280,
+                Y = vertical ? 1040 : 540,
+                Width = vertical ? 960 : 1360,
+                Height = vertical ? 760 : 320,
+                Enabled = true,
+                Layer = 30,
+                Opacity = 100,
+                Variant = "default",
+                ShowTitle = true,
+                ShowDetails = true,
+                Motion = true,
+                LiquidColor = DefaultLiquidColor,
+                CollectingColor = DefaultCollectingColor,
+                TextColor = DefaultTextColor,
+                OutlineColor = DefaultOutlineColor
+            });
             return profile;
         }
 
@@ -678,10 +701,17 @@ namespace Gilomx.CupheadBossRoulette
                             MigrateAnisotropicTapFarmingCopyBounds(
                                 target, component) ||
                             migratedBounds;
+                        migratedBounds =
+                            MigrateChatChoosesBounds(target, component) ||
+                            migratedBounds;
                         NormalizeComponent(target, component);
                     }
-                    if (seenComponents.Count != target.Components.Count)
+                    if (!seenComponents.Contains(TapFarmingComponentId) ||
+                        !seenComponents.Contains(PeskyBattleComponentId))
                         return false;
+                    // Add the new event without replacing either saved layout.
+                    if (!seenComponents.Contains(ChatChoosesComponentId))
+                        migratedBounds = true;
                 }
                 if (seenProfiles.Count != candidate.Profiles.Count)
                     return false;
@@ -695,6 +725,20 @@ namespace Gilomx.CupheadBossRoulette
             {
                 return false;
             }
+        }
+
+        private static bool MigrateChatChoosesBounds(
+            CreatorToolsOverlayComposerProfile profile,
+            CreatorToolsOverlayComposerComponent component)
+        {
+            if (profile == null || component == null ||
+                profile.Id != HorizontalProfileId ||
+                component.Id != ChatChoosesComponentId || component.Locked ||
+                component.X != 280 || component.Y != 540 ||
+                component.Width != 1360 || component.Height != 460)
+                return false;
+            component.Height = 320;
+            return true;
         }
 
         private static bool MigrateLegacyTapFarmingBounds(
@@ -824,6 +868,83 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (warning != null)
                 warning(message);
+        }
+
+        internal static bool TryParseChatPreviewJson(string json, out string normalized)
+        {
+            normalized = null;
+            if (string.IsNullOrEmpty(json) || json.Length > 8192) return false;
+            JsonValue root;
+            if (!JsonParser.TryParse(json, out root) || root.ObjectValue == null) return false;
+            var phases = new[] { "off", "voting", "reveal", "result", "countdown", "waiting_map", "loading", "active", "completed" };
+            var stages = new[] { "boss", "weapon1", "weapon2", "super", "charm", "modifier", "result" };
+            var phase = root.String("phase");
+            var stage = root.String("stage");
+            if (Array.IndexOf(phases, phase) < 0 || Array.IndexOf(stages, stage) < 0) return false;
+            var builder = new StringBuilder("{\"phase\":\"");
+            builder.Append(phase).Append("\",\"stage\":\"").Append(stage).Append('"');
+            foreach (var field in new[] { "revision", "sessionId", "round", "totalVotes", "winnerNumber", "remainingSeconds" })
+            {
+                int value;
+                if (!root.TryInteger(field, out value) || value < 0 || value > 1000000 ||
+                    (field == "winnerNumber" && value > 6) || (field == "remainingSeconds" && value > 5)) return false;
+                builder.Append(",\"").Append(field).Append("\":").Append(value);
+            }
+            foreach (var field in new[] { "plane", "withChallenge" })
+            {
+                bool value;
+                if (!root.TryBoolean(field, out value)) return false;
+                builder.Append(",\"").Append(field).Append("\":").Append(value ? "true" : "false");
+            }
+            var outcome = root.String("outcome");
+            if (outcome != "" && outcome != "tie" && outcome != "no_votes" && outcome != "most_votes") return false;
+            builder.Append(",\"outcome\":\"").Append(outcome).Append("\",\"options\":[");
+            var options = root.Property("options");
+            var selected = root.Property("selected");
+            if (options == null || options.ArrayValue == null || options.ArrayValue.Count > 6 ||
+                selected == null || selected.ObjectValue == null || selected.ObjectValue.Count > 6) return false;
+            for (var index = 0; index < options.ArrayValue.Count; index++)
+            {
+                var option = options.ArrayValue[index];
+                if (index > 0) builder.Append(',');
+                if (option.Integer("number", -1) != index + 1 || !AppendChatPreviewChoice(builder, option, true)) return false;
+            }
+            builder.Append("],\"selected\":{");
+            var first = true;
+            foreach (var item in selected.ObjectValue)
+            {
+                if (item.Key == "result" || Array.IndexOf(stages, item.Key) < 0) return false;
+                if (!first) builder.Append(',');
+                first = false;
+                builder.Append('"').Append(item.Key).Append("\":");
+                if (!AppendChatPreviewChoice(builder, item.Value, false)) return false;
+            }
+            normalized = builder.Append("}}").ToString();
+            return true;
+        }
+
+        private static bool AppendChatPreviewChoice(StringBuilder builder, JsonValue option, bool ballot)
+        {
+            if (option == null || option.ObjectValue == null) return false;
+            int id;
+            if (!option.TryInteger("id", out id)) return false;
+            var name = option.String("name");
+            var image = option.String("image");
+            if (name.Length == 0 || name.Length > 120 || image.Length == 0 || image.Length > 256 ||
+                image.Contains("..") || image.Contains(":") || image.Contains("\\") || image.StartsWith("/")) return false;
+            builder.Append("{\"id\":").Append(id).Append(",\"name\":\"");
+            CreatorToolsJson.AppendEscaped(builder, name);
+            builder.Append("\",\"image\":\"");
+            CreatorToolsJson.AppendEscaped(builder, image);
+            builder.Append('"');
+            if (ballot)
+            {
+                int votes;
+                if (!option.TryInteger("votes", out votes) || votes < 0 || votes > 1000000) return false;
+                builder.Append(",\"number\":").Append(option.Integer("number", 0)).Append(",\"votes\":").Append(votes);
+            }
+            builder.Append('}');
+            return true;
         }
 
         internal static bool TryParseBattleSignalsJson(string json, out string normalized)

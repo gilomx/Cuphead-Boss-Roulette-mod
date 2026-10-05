@@ -12,6 +12,10 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);TikFinityCompanion\**;CreatorToolsRuntimeTests\**;MugmanSkinMod\**;.deployment-cache\**</DefaultItemExcludes>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(LauncherDevBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);PICHI_LAUNCHER_DEV</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="tools\unity-shader\**\*.cs" />
     <Compile Remove="TikFinityCompanion\**\*.cs" />

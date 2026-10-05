@@ -2,7 +2,7 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { createChatChoosesMock } from "./mock-chat-chooses.mjs";
-const chatChooses = createChatChoosesMock();
+const chatChooses = createChatChoosesMock({ developmentTools: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0" });
 
 const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
 const port = Number.isInteger(configuredPort) && configuredPort > 0
@@ -328,7 +328,15 @@ function defaultOverlayProfiles() {
         },
       ],
     },
-  ];
+  ].map(profile => ({ ...profile, components: [...profile.components, {
+    id: "chat_chooses", x: profile.id === "vertical" ? 60 : 280,
+    y: profile.id === "vertical" ? 1040 : 540,
+    width: profile.id === "vertical" ? 960 : 1360,
+    height: profile.id === "vertical" ? 760 : 320,
+    enabled: true, locked: false, layer: 30, opacity: 100, variant: "default",
+    showTitle: true, showDetails: true, motion: true,
+    liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
+  }] }));
 }
 
 let overlayComposerProfiles = defaultOverlayProfiles();
@@ -628,7 +636,7 @@ function parseDashboardSimulation(searchParams) {
   const validType = allowedTypes.has(type);
   const rawCount = (searchParams.get("count") ?? "").trim();
   const parsedCount = /^[+-]?\d+$/.test(rawCount) ? Number(rawCount) : 1;
-  const count = Math.max(1, Math.min(1_000, parsedCount || 1));
+  const count = type === "chat" ? 1 : Math.max(1, Math.min(1_000, parsedCount || 1));
   const giftId = (
     (searchParams.get("giftId") ?? "").trim() ||
     (searchParams.get("itemId") ?? "").trim()
@@ -646,7 +654,7 @@ function parseDashboardSimulation(searchParams) {
   );
   const amount = gift
     ? Math.min(1_000_000_000, gift.coinsPerUnit * count)
-    : requestedAmount;
+    : type === "chat" ? 0 : requestedAmount;
   const defaultUnit = amount <= 0 || !["gift", "currency"].includes(type)
     ? null
     : platform === "tiktok"
@@ -757,7 +765,9 @@ function executeDashboardSimulation(command) {
     if (command.platform === "twitch" && ["gift", "currency"].includes(command.type)) {
       dashboardCounters.bits += command.amount;
     }
-    if (!interactionsEnabled) {
+    if (command.type === "chat") {
+      // Ballots are independent from the interactions master and rule queue.
+    } else if (!interactionsEnabled) {
       if (!recruitedForBattle) {
         event.status = "ignored";
         event.messageCode = "interactions_disabled";
@@ -951,8 +961,8 @@ function readJsonBody(req, res, callback) {
 }
 
 function normalizeOverlayComponent(component, canvas) {
-  const minimumWidth = component.id === "pesky_battle" ? 320 : 120;
-  const minimumHeight = component.id === "pesky_battle" ? 180 : 100;
+  const minimumWidth = component.id !== "tap_farming" ? 320 : 120;
+  const minimumHeight = component.id !== "tap_farming" ? 180 : 100;
   component.width = Math.max(
     minimumWidth,
     Math.min(canvas.width, Math.round(Number(component.width) || minimumWidth)),
@@ -1117,6 +1127,10 @@ function serveCreatorToolFile(fileName, contentType, res) {
   });
   createReadStream(file).pipe(res);
 }
+
+setInterval(() => {
+  for (const entry of chatChooses.takeDueTestVotes()) executeDashboardSimulation(entry);
+}, 50).unref();
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
@@ -1298,6 +1312,7 @@ createServer((req, res) => {
       attackStartedAt: Number(preview.attackStartedAt) || 0,
       eventEpoch: Number(preview.eventEpoch) || 0,
       battleSignals: preview.battleSignalsJson ? JSON.parse(preview.battleSignalsJson) : null,
+      chatState: preview.chatStateJson ? JSON.parse(preview.chatStateJson) : null,
       feedback: "preview_active",
       error: false,
     });
@@ -1393,7 +1408,7 @@ createServer((req, res) => {
         });
         return;
       }
-      if (!["tap_farming", "pesky_battle"].includes(command.componentId)) {
+      if (!["tap_farming", "pesky_battle", "chat_chooses"].includes(command.componentId)) {
         json(res, { ok: false, error: "unknown_component" }, 400);
         return;
       }
@@ -1404,7 +1419,7 @@ createServer((req, res) => {
         layout = null;
       }
       if (!layout || layout.id !== profileId ||
-          !Array.isArray(layout.components) || layout.components.length !== 2) {
+          !Array.isArray(layout.components) || layout.components.length !== 3) {
         json(res, { ok: false, error: "invalid_preview_layout" }, 400);
         return;
       }

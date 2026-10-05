@@ -2,6 +2,56 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El resumen final del overlay acerca el jefe al equipo: elimina las alturas
+  reservadas y reduce el espacio vertical entre sus imágenes de 76 a 18 px.
+
+- El resumen final del overlay de «El chat elige» reduce el jefe un 14%, quita
+  etiquetas y usa el mismo borde normal del diseñador en todos los retratos.
+  Al terminar sale de forma animada y escalonada antes de quedar vacío.
+
+- La tarjeta del resultado de «El chat elige» espera 1.5 segundos con el juego
+  enfocado y entra con la misma animación, inclinación variable y sonido de la
+  ruleta. Perder el foco reinicia la espera. En avión se votan sólo jefe,
+  amuleto y reto opcional; las tres ranuras de disparos/súper se ven vacías y
+  se conserva el equipo de cada jugador al cargar.
+
+- «El chat elige» termina en la tarjeta habitual de la ruleta con todo votado,
+  última dificultad conservada y sólo dificultad/Jugar disponibles. Espera
+  confirmación en el juego, sin cuenta regresiva ni inicio automático; el
+  panel explica la revisión de dificultad. El overlay añade «Votaciones» sobre
+  la ronda y usa iconos limpios de retos. Súper mantiene I, II, III y Nada en
+  ese orden, también en el diseñador.
+
+- «Votos de prueba», exclusivo del paquete Dev, envía 50–80 usuarios distintos
+  durante diez segundos en cada ronda de «El chat elige», con pausas variables
+  y una opción favorecida para reducir empates. Funciona sin quitar el foco al
+  juego; avanzar de ronda o detener el evento cancela los votos pendientes.
+
+- Los votos simulados de «El chat elige» vuelven a contarse en Cuphead: la
+  lectura de fechas acepta los milisegundos ISO que rechaza el parser genérico
+  del Mono antiguo. «Voto del chat» oculta Cantidad y conserva un voto por
+  identidad; cambiar su número mueve el voto y otro perfil suma otro.
+
+- El overlay de «El chat elige» elimina los nombres de artículos y el título
+  del evento, acerca los círculos y aumenta el número de opción y la insignia
+  de votos. Los contadores deslizan sus cifras al cambiar; cada ronda termina
+  su salida escalonada antes de entrar la siguiente. El marco horizontal por
+  defecto se compacta y esta capa permite ajustar ancho y alto por separado.
+
+- «El chat elige» reúne encabezado, controles y votación dentro del panel
+  común de Eventos Live. Los candidatos ocupan una sola fila compacta, con
+  el borde junto a la imagen, número de opción abajo dentro del círculo y
+  votos en la insignia. El panel y OBS resaltan al líder con una transición
+  de color, incluyendo empates y cambios de voto. OBS elimina instrucciones,
+  estado de votación, total, barras y porcentajes; mantiene la cuenta de inicio.
+
+- «El chat elige» se integra como capa del Diseñador de overlays y de las
+  fuentes vertical y horizontal de OBS. Permite ajustar posición, tamaño,
+  colores y animaciones, y probar votos, ganador, resultado y cuenta. Los
+  perfiles anteriores conservan sus ajustes al incorporar la nueva capa.
+  El evento y su overlay usan imágenes circulares; el overlay mantiene el
+  fondo transparente y entradas escalonadas.
+
 - Nuevo Evento Live «El chat elige»: rondas de candidatos aleatorios con votos
   cambiables por número, desempates automáticos y modo Con reto / Sin reto.
   Respeta compatibilidad y DLC; avión omite disparos y supers terrestres.

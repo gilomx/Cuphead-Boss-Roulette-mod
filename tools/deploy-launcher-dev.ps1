@@ -151,7 +151,7 @@ try {
     finally { Pop-Location }
     $modOutput = Join-Path $work 'mod'
     Invoke-Checked 'dotnet' @('build', (Join-Path $repoRoot 'CupheadBossRoulette.csproj'),
-        '-c', 'Release', '-o', $modOutput, "-p:CupheadDir=$CupheadDir",
+        '-c', 'Release', '-o', $modOutput, '-p:LauncherDevBuild=true', "-p:CupheadDir=$CupheadDir",
         "-p:BepInExCoreDir=$(Join-Path $stage 'BepInEx/core')")
     Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
         (Join-Path $PSScriptRoot 'verify_native_loading_contract.ps1'),

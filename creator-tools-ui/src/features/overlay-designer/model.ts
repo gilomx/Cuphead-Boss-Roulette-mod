@@ -1,5 +1,7 @@
+import type { ChatChoosesState } from "../../model";
+
 export type OverlayProfileId = "vertical" | "horizontal";
-export type OverlayComponentId = "tap_farming" | "pesky_battle";
+export type OverlayComponentId = "tap_farming" | "pesky_battle" | "chat_chooses";
 export type OverlayVariant = "default" | "compact" | "minimal";
 
 export interface OverlayCanvasSize {
@@ -101,6 +103,7 @@ export interface OverlayPreviewCommand {
   attackStartedAt: number;
   eventEpoch: number;
   battleSignalsJson: string;
+  chatStateJson: string;
 }
 
 export interface OverlayPreviewState {
@@ -208,6 +211,7 @@ export interface OverlayComposerDesignMessage {
   states: {
     tap_farming: TapFarmingPreviewSnapshot;
     pesky_battle: PeskyBattlePreviewSnapshot;
+    chat_chooses: ChatChoosesState;
   };
   locale: string;
   background: "alpha" | "light" | "dark";
@@ -221,12 +225,13 @@ export const PROFILE_DIMENSIONS: Record<OverlayProfileId, OverlayCanvasSize> = {
 export const COMPONENT_IDS: OverlayComponentId[] = [
   "tap_farming",
   "pesky_battle",
+  "chat_chooses",
 ];
 
 export function minimumComponentSize(
   componentId: OverlayComponentId,
 ): OverlayCanvasSize {
-  return componentId === "pesky_battle"
+  return componentId !== "tap_farming"
     ? { width: 320, height: 180 }
     : { width: 120, height: 100 };
 }
@@ -283,7 +288,7 @@ export function isOverlayProfileId(value: string | null): value is OverlayProfil
 }
 
 export function isOverlayComponentId(value: string | null): value is OverlayComponentId {
-  return value === "tap_farming" || value === "pesky_battle";
+  return value === "tap_farming" || value === "pesky_battle" || value === "chat_chooses";
 }
 
 export function cloneProfiles(profiles: OverlayComposerProfile[]) {

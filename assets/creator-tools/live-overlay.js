@@ -31,6 +31,10 @@
       endpoint: "/api/config/pesky-battle",
       src: "/pesky-battle-overlay",
     }),
+    chat_chooses: Object.freeze({
+      id: "chat_chooses", overlay: "chat-chooses",
+      endpoint: "/api/config/chat-chooses", src: "/chat-chooses-overlay",
+    }),
   });
 
   const components = new Map();
@@ -39,6 +43,7 @@
   let realStates = {
     tap_farming: initialTapState(),
     pesky_battle: initialPeskyState(),
+    chat_chooses: initialChatState(),
   };
   let previewState = { active: false };
   let previewGeneration = 0;
@@ -77,7 +82,7 @@
 
   function normalizeComponentId(value) {
     const id = String(value || "").trim().toLowerCase().replaceAll("-", "_");
-    if (id === "tap_farming" || id === "pesky_battle") return id;
+    if (id === "tap_farming" || id === "pesky_battle" || id === "chat_chooses") return id;
     return "";
   }
 
@@ -99,10 +104,12 @@
       ? {
           tap_farming: { x: 360, y: 1220, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 60, y: 1260, width: 960, height: 560, layer: 10 },
+          chat_chooses: { x: 60, y: 1040, width: 960, height: 760, layer: 30 },
         }
       : {
           tap_farming: { x: 1395, y: 565, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 80, y: 720, width: 1760, height: 300, layer: 10 },
+          chat_chooses: { x: 280, y: 540, width: 1360, height: 320, layer: 30 },
         };
     return {
       id,
@@ -220,6 +227,7 @@
   function embeddedUrl(definition) {
     const params = new URLSearchParams({ embedded: "1" });
     if (definition.id === "pesky_battle") params.set("v", "battle-icons-10");
+    if (definition.id === "chat_chooses") params.set("v", "chat-result-7");
     if (activeLocale === "en") params.set("locale", "en");
     return `${definition.src}?${params}`;
   }
@@ -441,15 +449,19 @@
   function initialPeskyState() {
     return { revision: 0, phase: "off", participants: [], capacity: 5 };
   }
+  function initialChatState() {
+    return { revision: 0, sessionId: 0, round: 0, phase: "off", options: [], selected: {} };
+  }
 
   function stateFor(id) {
     if (previewState?.active && previewState.simulationActive === true &&
         normalizeComponentId(previewState.componentId) === id) {
+      if (id === "chat_chooses") return previewState.chatState || initialChatState();
       return id === "tap_farming"
         ? previewTapSnapshot(previewState)
         : previewPeskySnapshot(previewState);
     }
-    return realStates[id] || (id === "tap_farming" ? initialTapState() : initialPeskyState());
+    return realStates[id] || (id === "chat_chooses" ? initialChatState() : id === "tap_farming" ? initialTapState() : initialPeskyState());
   }
 
   function acceptPreviewState(value) {
@@ -552,12 +564,15 @@
         fetchJson("/api/overlay-composer/config"),
         fetchJson(registry.tap_farming.endpoint),
         fetchJson(registry.pesky_battle.endpoint),
+        fetchJson(registry.chat_chooses.endpoint),
       ]);
       if (results[0].status === "fulfilled") {
         savedProfile = normalizedProfile(results[0].value);
       }
       if (results[1].status === "fulfilled") realStates.tap_farming = results[1].value;
       if (results[2].status === "fulfilled") realStates.pesky_battle = results[2].value;
+      if (results[3].status === "fulfilled") realStates.chat_chooses = results[3].value;
+      else realStates.chat_chooses = initialChatState();
       syncActiveProfile();
       render();
     } finally {
@@ -626,6 +641,8 @@
       pesky_battle: states.pesky_battle && typeof states.pesky_battle === "object"
         ? states.pesky_battle
         : previewPeskySnapshot({ scenario: "recruiting" }),
+      chat_chooses: states.chat_chooses && typeof states.chat_chooses === "object"
+        ? states.chat_chooses : initialChatState(),
     };
     previewState = { active: false };
     render();

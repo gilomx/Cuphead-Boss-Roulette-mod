@@ -96,6 +96,13 @@ namespace Gilomx.CupheadBossRoulette
                 4, result.Charm, availableCharmIndices,
                 availableCharmIndices.Count / 4);
 
+            if (chatChoosesReviewCard && boss.IsPlane)
+            {
+                weapon1 = RouletteData.Weapons.Length - 1;
+                weapon2 = RouletteData.Weapons.Length - 1;
+                super = RouletteData.Supers.Length - 1;
+            }
+
             DrawEquipSlot(ShotACenter, L(ModText.SlotWeaponA),
                 RouletteData.Weapons[weapon1].Image,
                 RouletteData.Weapons[weapon1].NativeSprite, 1);
@@ -206,6 +213,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             DrawChecklistRow(0, 468f, L(ModText.SettingDifficulty),
                 DifficultyLabel());
+            if (chatChoosesReviewCard) return;
             DrawChecklistRow(1, 498f, L(ModText.SettingChallenge),
                 uglyMode
                     ? L(ModText.ValueEnabled)

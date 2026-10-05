@@ -8,8 +8,10 @@ import type {
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
-import { proportionalComponentSize } from "./model";
+import { minimumComponentSize, proportionalComponentSize } from "./model";
 import type { BattleSimulationAction, TapSimulationAction } from "./simulation";
+import type { ChatChoosesState, ChatChoosesStage } from "../../model";
+import type { ChatSimulationAction } from "./chatSimulation";
 
 const battleAttacks = interactionItems.filter(item => item.category === "attack" || item.category === "mini_boss");
 
@@ -18,6 +20,7 @@ interface OverlayDesignerInspectorProps {
   component: OverlayComposerComponent;
   tapState: TapFarmingPreviewSnapshot;
   battleState: PeskyBattlePreviewSnapshot;
+  chatState: ChatChoosesState;
   previewActive: boolean;
   previewPending: boolean;
   previewError: boolean;
@@ -27,6 +30,7 @@ interface OverlayDesignerInspectorProps {
   onTogglePreview: () => void;
   dispatchTap: Dispatch<TapSimulationAction>;
   dispatchBattle: Dispatch<BattleSimulationAction>;
+  dispatchChat: Dispatch<ChatSimulationAction>;
 }
 
 function numberValue(value: string, fallback: number) {
@@ -202,6 +206,7 @@ export function OverlayDesignerInspector({
   component,
   tapState,
   battleState,
+  chatState,
   previewActive,
   previewPending,
   previewError,
@@ -211,20 +216,24 @@ export function OverlayDesignerInspector({
   onTogglePreview,
   dispatchTap,
   dispatchBattle,
+  dispatchChat,
 }: OverlayDesignerInspectorProps) {
   const { locale, t } = useLocalization();
   const [attackPlayer, setAttackPlayer] = useState(0);
+  const [voteNumber, setVoteNumber] = useState(1);
+  const colorGroup = component.id === "chat_chooses" ? "chatColors" : component.id === "pesky_battle" ? "battleColors" : "colors";
   const targetSlot = battleState.participants.some(player => player.slot === attackPlayer) ? attackPlayer : 0;
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
   const geometryDisabled = disabled || component.locked;
   const colorLabel = (key: "liquidColor" | "collectingColor" | "textColor" | "outlineColor") =>
-    t(`overlayDesigner.inspector.${component.id === "pesky_battle" ? "battleColors" : "colors"}.${key}`);
+    t(`overlayDesigner.inspector.${colorGroup}.${key}`);
   const maximumSize = {
     width: profile.canvas.width - component.x,
     height: profile.canvas.height - component.y,
   };
-  const minimumSize = proportionalComponentSize(component, 0, maximumSize);
-  const maximumProportionalSize = proportionalComponentSize(
+  const independentSize = component.id === "chat_chooses";
+  const minimumSize = independentSize ? minimumComponentSize(component.id) : proportionalComponentSize(component, 0, maximumSize);
+  const maximumProportionalSize = independentSize ? maximumSize : proportionalComponentSize(
     component,
     Number.POSITIVE_INFINITY,
     maximumSize,
@@ -239,6 +248,8 @@ export function OverlayDesignerInspector({
     "enabled" | "locked" | "showTitle" | "showDetails" | "motion"
   > = component.id === "tap_farming"
     ? ["enabled", "locked", "motion"]
+    : component.id === "chat_chooses"
+    ? ["enabled", "locked", "showTitle", "motion"]
     : ["enabled", "locked", "showTitle", "showDetails", "motion"];
   const updateGeometry = (
     key: typeof geometry[number][0],
@@ -250,7 +261,7 @@ export function OverlayDesignerInspector({
       Math.max(minimum, maximum),
       Math.max(minimum, value),
     );
-    if (key === "width" || key === "height") {
+    if (!independentSize && (key === "width" || key === "height")) {
       const currentValue = key === "width" ? component.width : component.height;
       onChange(proportionalComponentSize(
         component,
@@ -343,7 +354,7 @@ export function OverlayDesignerInspector({
 
         {(
           <div className="overlay-designer-properties__colors">
-            <strong>{t(`overlayDesigner.inspector.${component.id === "pesky_battle" ? "battleColors" : "colors"}.title`)}</strong>
+            <strong>{t(`overlayDesigner.inspector.${colorGroup}.title`)}</strong>
             {(["liquidColor", "collectingColor", "textColor", "outlineColor"] as const).map((key) => (
               <OverlayColorPicker
                 key={key}
@@ -372,8 +383,8 @@ export function OverlayDesignerInspector({
               onClick={() => onChange({ [key]: !component[key] })}
             >
               <span>
-                <strong>{t(`overlayDesigner.inspector.options.${key}`)}</strong>
-                <small>{t(`overlayDesigner.inspector.options.${key}Hint`)}</small>
+                <strong>{t(`overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}`)}</strong>
+                <small>{t(`overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}Hint`)}</small>
               </span>
               <i aria-hidden="true"><b /></i>
             </button>
@@ -387,7 +398,40 @@ export function OverlayDesignerInspector({
           <h2 id="overlay-designer-simulation-title">{t("overlayDesigner.simulation.title")}</h2>
         </header>
 
-        {component.id === "tap_farming" ? (
+        {component.id === "chat_chooses" ? (
+          <div className="overlay-designer-simulation__body">
+            <label><span>{t("overlayDesigner.simulation.scenario")}</span>
+              <select value={chatState.phase} onChange={event => dispatchChat({ type: "scenario", phase: event.target.value as ChatChoosesState["phase"] })}>
+                {(["off", "voting", "reveal", "result", "active"] as const).map(phase =>
+                  <option key={phase} value={phase}>{t(`overlayDesigner.simulation.chat.phases.${phase}`)}</option>)}
+              </select>
+            </label>
+            <label><span>{t("overlayDesigner.simulation.chat.stage")}</span>
+              <select value={chatState.stage} onChange={event => dispatchChat({ type: "stage", stage: event.target.value as Exclude<ChatChoosesStage, "result"> })}>
+                {(["boss", "weapon1", "weapon2", "super", "charm", "modifier"] as const).map(stage =>
+                  <option key={stage} value={stage}>{t(`dashboard.chatChooses.stages.${stage}`)}</option>)}
+              </select>
+            </label>
+            <label><span>{t("overlayDesigner.simulation.chat.count")}</span>
+              <select value={chatState.options.length} disabled={chatState.stage === "super"} onChange={event => dispatchChat({ type: "count", count: Number(event.target.value) })}>
+                {(chatState.stage === "super" ? [4] : [2, 3, 4, 5, 6]).map(count => <option key={count}>{count}</option>)}
+              </select>
+            </label>
+            <label><span>{t("dashboard.simulator.voteNumber")}</span>
+              <select value={Math.min(voteNumber, chatState.options.length)} onChange={event => setVoteNumber(Number(event.target.value))}>
+                {chatState.options.map(option => <option key={option.number} value={option.number}>{option.number} · {option.name}</option>)}
+              </select>
+            </label>
+            <button type="button" disabled={chatState.phase !== "voting"}
+              onClick={() => dispatchChat({ type: "vote", number: Math.min(voteNumber, chatState.options.length) })}>
+              {t("overlayDesigner.simulation.chat.vote")}
+            </button>
+            <small>{t("overlayDesigner.simulation.chat.hint")}</small>
+            <button className="overlay-designer-simulation__reset" type="button" onClick={() => dispatchChat({ type: "reset" })}>
+              <RotateCcw aria-hidden="true" />{t("overlayDesigner.simulation.reset")}
+            </button>
+          </div>
+        ) : component.id === "tap_farming" ? (
           <div className="overlay-designer-simulation__body">
             <label>
               <span>{t("overlayDesigner.simulation.scenario")}</span>

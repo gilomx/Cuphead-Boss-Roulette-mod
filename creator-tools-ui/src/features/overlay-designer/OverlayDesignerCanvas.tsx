@@ -18,6 +18,7 @@ import type {
   TapFarmingPreviewSnapshot,
 } from "./model";
 import { proportionalComponentSize } from "./model";
+import type { ChatChoosesState } from "../../model";
 
 type PreviewBackground = "alpha" | "light" | "dark";
 type ZoomOption = "fit" | 0.25 | 0.5 | 1;
@@ -28,6 +29,7 @@ interface OverlayDesignerCanvasProps {
   selectedComponentId: OverlayComponentId;
   tapState: TapFarmingPreviewSnapshot;
   battleState: PeskyBattlePreviewSnapshot;
+  chatState: ChatChoosesState;
   disabled?: boolean;
   onChange: (
     componentId: OverlayComponentId,
@@ -94,6 +96,7 @@ export function OverlayDesignerCanvas({
   selectedComponentId,
   tapState,
   battleState,
+  chatState,
   disabled = false,
   onChange,
 }: OverlayDesignerCanvasProps) {
@@ -140,10 +143,11 @@ export function OverlayDesignerCanvas({
     states: {
       tap_farming: tapState,
       pesky_battle: battleState,
+      chat_chooses: chatState,
     },
     locale,
     background,
-  }), [background, battleState, locale, profile, selectedComponentId, tapState]);
+  }), [background, battleState, chatState, locale, profile, selectedComponentId, tapState]);
 
   const latestMessageRef = useRef(message);
   latestMessageRef.current = message;

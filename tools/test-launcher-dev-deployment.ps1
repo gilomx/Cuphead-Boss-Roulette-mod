@@ -24,6 +24,13 @@ function New-Candidate {
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $candidate)
 }
 try {
+    $project = Join-Path (Split-Path -Parent $PSScriptRoot) 'CupheadBossRoulette.csproj'
+    $releaseSymbols = & dotnet msbuild $project -nologo -getProperty:DefineConstants
+    if ($LASTEXITCODE -ne 0 -or $releaseSymbols -match 'PICHI_LAUNCHER_DEV') { throw 'Release unexpectedly exposes Dev tools.' }
+    $devSymbols = & dotnet msbuild $project -nologo -p:LauncherDevBuild=true -getProperty:DefineConstants
+    if ($LASTEXITCODE -ne 0 -or $devSymbols -notmatch 'PICHI_LAUNCHER_DEV') { throw 'Launcher Dev build does not enable its tools.' }
+    $count++
+    Write-Host 'PASS only LauncherDevBuild enables Dev tools'
     # A repository file is outside AppData redirection in both process contexts.
     $modulePath = Join-Path $PSScriptRoot 'LauncherDevPackage.psm1'
     $moduleStream = [IO.File]::OpenRead($modulePath)

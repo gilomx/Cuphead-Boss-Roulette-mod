@@ -136,6 +136,55 @@ try {
     Write-Output 'Compiled homing carrot contract passed: preload reaches the serialized carrot prefab before boss lifecycle runs.'
 
     $plugin = $mod.Types | Where-Object Name -eq 'Plugin'
+    # The live event must hand its result to the existing roulette and wait
+    # for the native Play action; no timer/Update callback may start a load.
+    $chatType = $mod.Types | Where-Object Name -eq 'CreatorToolsChatChoosesController'
+    $chatLoadCallers = @(foreach ($type in (SelfAndNestedTypes $plugin)) {
+        foreach ($method in ($type.Methods | Where-Object HasBody)) {
+            if (@(Calls $method $chatType.FullName 'TryBeginLoad').Count -gt 0) { $method.Name }
+        }
+    })
+    Require ($chatLoadCallers.Count -eq 1 -and $chatLoadCallers[0] -eq 'BeginResultLoad') 'Chat selection must load only from the roulette Play action'
+    Require (@($plugin.Methods | Where-Object Name -eq 'DrawChatChoosesResult').Count -eq 0) 'The separate chat result card must be removed'
+    $chatUpdate = $plugin.Methods | Where-Object Name -like '<UpdateChatChooses>*'
+    Require (@($chatUpdate | ForEach-Object { Calls $_ $plugin.FullName 'LoadResult' }).Count -eq 0) 'Chat Update must never start gameplay'
+    Require (@($chatUpdate | ForEach-Object { $_.Body.Instructions } | Where-Object {
+        $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'difficulty'
+    }).Count -eq 0) 'Chat result must keep the player last difficulty'
+    $checklist = $plugin.Methods | Where-Object Name -eq 'DrawChecklistSettings'
+    $reviewGuard = @($checklist.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'chatChoosesReviewCard'
+    })
+    Require ($reviewGuard.Count -eq 1 -and $reviewGuard[0].Next.OpCode.Code -in @('Brfalse', 'Brfalse_S') -and
+        $reviewGuard[0].Next.Next.OpCode.Code -eq 'Ret') 'Chat review must hide challenge and automatic loading settings'
+    Write-Output 'Compiled chat review contract passed: existing roulette, preserved difficulty, difficulty-only controls, and explicit native Play.'
+
+    $entrance = $mod.Types | Where-Object Name -eq 'ChatChoosesCardEntrance'
+    $focus = $plugin.Methods | Where-Object Name -eq 'OnApplicationFocus'
+    Require (@(Calls $focus $entrance.FullName 'Suspend').Count -eq 1) 'Focus callbacks must restart the pending card wait even without Update frames'
+    Require (@($chatUpdate | ForEach-Object { Calls $_ $entrance.FullName 'ShouldOpen' }).Count -eq 1) 'Chat result must wait for focused presentation before opening the roulette'
+    Require (@($chatUpdate | ForEach-Object { Calls $_ $entrance.FullName 'Begin' }).Count -eq 1) 'Every prepared chat result must start a fresh presentation wait'
+    $visibility = $plugin.Methods | Where-Object Name -eq 'SetVisible'
+    Require (@(Calls $visibility $entrance.FullName 'get_Pending').Count -eq 1) 'Native open shortcuts must not bypass the presentation wait'
+    $playAction = $plugin.Methods | Where-Object Name -eq 'BeginResultLoad'
+    Require (@(Calls $playAction $entrance.FullName 'get_Pending').Count -eq 1) 'Native Play must not bypass the presentation wait'
+
+    $applyLoadout = $plugin.Methods | Where-Object Name -eq 'ApplyLoadout'
+    $planeGuard = @($applyLoadout.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'IsPlane'
+    })
+    $charmStore = @($applyLoadout.Body.Instructions | Where-Object { $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'charm' })
+    $weaponStore = @($applyLoadout.Body.Instructions | Where-Object { $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'primaryWeapon' })
+    Require ($planeGuard.Count -eq 1 -and $planeGuard[0].Next.OpCode.Code -in @('Brfalse', 'Brfalse_S') -and
+        $planeGuard[0].Next.Next.OpCode.Code -eq 'Ret') 'Chat plane loadout must return before touching weapons, super or switch flags'
+    Require ($charmStore.Count -eq 1 -and $weaponStore.Count -eq 1 -and
+        $charmStore[0].Offset -lt $planeGuard[0].Offset -and $planeGuard[0].Offset -lt $weaponStore[0].Offset) 'Plane chat result must still apply the voted charm before preserving equipment'
+    $chatProjection = $plugin.Methods | Where-Object Name -eq 'CreateChatChoosesResult'
+    Require (@($chatProjection.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -eq 'GetPlayerLoadout'
+    }).Count -eq 1) 'Plane chat result must derive its internal equipment from the player loadout'
+    Require (@(Calls $chatProjection $plugin.FullName 'RandomNonEmptyPoolIndex').Count -eq 0) 'Plane result must never invent a random ground weapon'
+    Write-Output 'Compiled focus and plane contract passed: focus delay guards opening/Play and both players preserve weapons, super and switch flags.'
     $preload = $plugin.Methods | Where-Object Name -eq 'CanPreloadNativeInteractionAssets'
     Require (@(Calls $preload 'SceneLoader' 'get_CurrentlyLoading').Count -eq 1) 'Native catalog must require a loading screen'
     Require (@($preload.Body.Instructions | Where-Object {

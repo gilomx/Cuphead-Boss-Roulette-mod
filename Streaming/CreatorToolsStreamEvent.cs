@@ -34,6 +34,10 @@ namespace Gilomx.CupheadBossRoulette
         internal string ReceivedAt = string.Empty;
         internal bool Simulated;
         internal string RawEventType = string.Empty;
+        // Internal round fence for Dev ballots; never accepted from adapters/HTTP.
+        internal int TestVoteSession;
+        internal int TestVoteRound;
+        internal int TestVoteGeneration;
     }
 
     internal sealed class CreatorToolsStreamConnectionUpdate

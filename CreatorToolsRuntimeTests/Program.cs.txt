@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 
 namespace Gilomx.CupheadBossRoulette
@@ -50,6 +52,10 @@ namespace Gilomx.CupheadBossRoulette
                 TestDashboardRetainsThirtyEvents);
             Run("Dashboard simulation preserves profile data without a live connection",
                 TestDashboardSimulationProfiles);
+            Run("Simulated chat ballots travel through HTTP and the background worker once per identity",
+                TestDashboardChatSimulationVoting);
+            Run("Dev chat votes run in the background and cancel with their round",
+                TestDevelopmentChatVotes);
             Run("Server projects the worker backlog into interaction JSON",
                 TestServerBacklogProjection);
             Run("Server marks controls applied before Unity consumes them",
@@ -82,6 +88,10 @@ namespace Gilomx.CupheadBossRoulette
                 TestOverlayComposerPreservesProportionsAcrossProfiles);
             Run("Overlay composer serves POST config and preview routes",
                 TestOverlayComposerHttpRoutes);
+            Run("Chat overlay joins saved scenes without losing positions and validates preview transport",
+                TestChatOverlayMigrationAndPreview);
+            Run("Chat overlay compacts only the original unlocked horizontal bounds",
+                TestChatOverlayCompactsDefaultBounds);
             Run("Chat chooses HTTP commands and companion ballots preserve identity",
                 TestChatChoosesHttpAndProtocol);
             Run("Overlay preview expires and stops without gameplay state",
@@ -612,6 +622,140 @@ namespace Gilomx.CupheadBossRoulette
                 "completed state ignores leftover reserve");
             Equal(0d, completed.Ratio,
                 "completed state is empty");
+        }
+
+        private static void TestDashboardChatSimulationVoting()
+        {
+            using (var scope = new TestScope("chat-vote-simulator"))
+            using (var server = scope.StartServer())
+            {
+                var clock = DateTime.UtcNow.AddMinutes(-1);
+                var controller = new CreatorToolsChatChoosesController(
+                    new CreatorToolsLiveEventsCoordinator(), true, new Random(1), delegate { return clock; });
+                var catalog = new ChatChoosesCatalog();
+                catalog.Pools["boss"] = new List<ChatChoice> {
+                    new ChatChoice { Id = 1 }, new ChatChoice { Id = 2 } };
+                controller.SetCatalog(catalog, true);
+                server.SetChatChoosesController(controller, controller.Command);
+                Equal(HttpStatusCode.Accepted, GetStatusCode(server,
+                    "/api/config/chat-chooses/set?operation=start&mode=with"), "open real voting controller");
+                var dashboard = new CreatorToolsDashboardController(null);
+                var warnings = 0;
+                using (var worker = new CreatorToolsStreamWorker(null, dashboard, null, server,
+                    delegate(CreatorToolsStreamEvent entry) {
+                        return new CreatorToolsStreamEvaluation { MessageCode = controller.Observe(entry) };
+                    }, null, delegate { Interlocked.Increment(ref warnings); }))
+                {
+                    server.SetDashboardSimulationHandler(worker.ScheduleSimulation);
+                    worker.Start();
+                    var requests = new[] { "userId=sim-cuphead&chatText=1", "userId=sim-cuphead&chatText=1",
+                        "userId=sim-cuphead&chatText=2", "userId=sim-mugman&chatText=2" };
+                    var totals = new[] { 1, 1, 1, 2 };
+                    for (var i = 0; i < requests.Length; i++)
+                    {
+                        Equal(HttpStatusCode.Accepted, GetStatusCode(server,
+                            "/api/dashboard/simulate?platform=tiktok&type=chat&count=99&amount=100&" + requests[i]), "HTTP simulation accepted");
+                        var expectedReceived = i + 1;
+                        WaitUntil(delegate {
+                            using (var feed = GetJson(server, "/api/dashboard"))
+                                return feed.RootElement.GetProperty("counters").GetProperty("received").GetInt64() == expectedReceived;
+                        }, 3000, "background worker did not publish the ballot");
+                        using (var state = GetJson(server, "/api/config/chat-chooses"))
+                            Equal(totals[i], state.RootElement.GetProperty("totalVotes").GetInt32(), "one vote per identity regardless of quantity");
+                        using (var feed = GetJson(server, "/api/dashboard"))
+                        {
+                            var entry = feed.RootElement.GetProperty("events")[0];
+                            Equal(i == 1 ? "chat_vote_unchanged" : "chat_vote_counted", entry.GetProperty("messageCode").GetString(), "ballot feedback published");
+                            Equal(1, entry.GetProperty("count").GetInt32(), "chat quantity normalized");
+                            Equal(0m, entry.GetProperty("totalValue").GetDecimal(), "chat has no currency value");
+                        }
+                    }
+                    using (var state = GetJson(server, "/api/config/chat-chooses"))
+                    {
+                        Equal(0, state.RootElement.GetProperty("options")[0].GetProperty("votes").GetInt32(), "changed vote removed from previous option");
+                        Equal(2, state.RootElement.GetProperty("options")[1].GetProperty("votes").GetInt32(), "two profiles counted for new option");
+                    }
+                    Equal(0, warnings, "background worker remains healthy");
+                }
+                False(IsUnityAssemblyLoaded(), "simulated ballots work independently of Unity frames");
+            }
+        }
+
+        private static void TestDevelopmentChatVotes()
+        {
+            using (var scope = new TestScope("dev-chat-votes"))
+            using (var server = scope.StartServer())
+            {
+                var ticks = DateTime.UtcNow.Ticks;
+                var started = ticks;
+                var controller = new CreatorToolsChatChoosesController(
+                    new CreatorToolsLiveEventsCoordinator(), true, new Random(6),
+                    delegate { return new DateTime(Interlocked.Read(ref ticks), DateTimeKind.Utc); }, true);
+                var catalog = new ChatChoosesCatalog();
+                foreach (var stage in new[] { "boss", "weapon1" })
+                    catalog.Pools[stage] = new List<ChatChoice> { new ChatChoice { Id = 1 }, new ChatChoice { Id = 2 } };
+                controller.SetCatalog(catalog, true);
+                server.SetChatChoosesController(controller, controller.Command);
+                Equal(HttpStatusCode.Accepted, GetStatusCode(server,
+                    "/api/config/chat-chooses/set?operation=start&mode=with"), "start event");
+                var dashboard = new CreatorToolsDashboardController(null);
+                Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation> evaluate = delegate(CreatorToolsStreamEvent entry) {
+                    return new CreatorToolsStreamEvaluation { MessageCode = controller.Observe(entry) };
+                };
+                var warnings = 0;
+                using (var worker = new CreatorToolsStreamWorker(null, dashboard, null, server, evaluate,
+                    delegate {
+                        foreach (var entry in controller.TakeDueTestVotes()) dashboard.ProcessEvent(entry, evaluate);
+                    }, delegate { Interlocked.Increment(ref warnings); }))
+                {
+                    worker.Start();
+                    var command = "/api/config/chat-chooses/set?operation=test_votes&sessionId=1&round=1";
+                    Equal(HttpStatusCode.Accepted, GetStatusCode(server, command), "Dev HTTP command accepted");
+                    Equal(HttpStatusCode.Conflict, GetStatusCode(server, command), "second concurrent batch rejected");
+                    Interlocked.Exchange(ref ticks, started + TimeSpan.FromSeconds(5).Ticks);
+                    WaitUntil(delegate {
+                        using (var json = GetJson(server, "/api/config/chat-chooses"))
+                            return json.RootElement.GetProperty("totalVotes").GetInt32() > 0;
+                    }, 3000, "background did not count test votes");
+                    using (var json = GetJson(server, "/api/config/chat-chooses"))
+                    {
+                        var state = json.RootElement;
+                        True(state.GetProperty("developmentTools").GetBoolean(), "Dev capability advertised");
+                        True(state.GetProperty("totalVotes").GetInt32() < state.GetProperty("testVotes").GetProperty("total").GetInt32(), "five seconds delivers partial batch");
+                    }
+                    Interlocked.Exchange(ref ticks, started + TimeSpan.FromSeconds(10).Ticks);
+                    WaitUntil(delegate {
+                        using (var json = GetJson(server, "/api/config/chat-chooses"))
+                            return json.RootElement.GetProperty("totalVotes").GetInt32() == json.RootElement.GetProperty("testVotes").GetProperty("total").GetInt32();
+                    }, 3000, "test batch did not finish");
+                    WaitUntil(delegate {
+                        using (var feed = GetJson(server, "/api/dashboard"))
+                            return feed.RootElement.GetProperty("counters").GetProperty("received").GetInt64() >= 50;
+                    }, 3000, "test ballots did not reach feed");
+                    using (var feed = GetJson(server, "/api/dashboard"))
+                    {
+                        var events = feed.RootElement.GetProperty("events");
+                        True(events.EnumerateArray().All(e => e.GetProperty("simulated").GetBoolean() &&
+                            e.GetProperty("messageCode").GetString() == "chat_vote_counted"), "test events use normal dashboard evaluation");
+                    }
+                    Equal(HttpStatusCode.Accepted, GetStatusCode(server, command), "repeat batch accepted");
+                    Equal(HttpStatusCode.Accepted, GetStatusCode(server,
+                        "/api/config/chat-chooses/set?operation=next&sessionId=1&round=1"), "next closes and cancels batch");
+                    Interlocked.Exchange(ref ticks, started + TimeSpan.FromSeconds(30).Ticks);
+                    using (var json = GetJson(server, "/api/config/chat-chooses"))
+                    {
+                        Equal("weapon1", json.RootElement.GetProperty("stage").GetString(), "new phase");
+                        Equal(0, json.RootElement.GetProperty("totalVotes").GetInt32(), "pending votes never enter new round");
+                        False(json.RootElement.GetProperty("testVotes").GetProperty("active").GetBoolean(), "batch canceled");
+                    }
+                    Equal(0, warnings, "no background exceptions");
+                }
+                var release = new CreatorToolsChatChoosesController(new CreatorToolsLiveEventsCoordinator(), true);
+                release.SetCatalog(catalog, true); server.SetChatChoosesController(release, release.Command);
+                Equal(HttpStatusCode.Conflict, GetStatusCode(server,
+                    "/api/config/chat-chooses/set?operation=test_votes&sessionId=1&round=1"), "Release rejects Dev endpoint command");
+                False(IsUnityAssemblyLoaded(), "test votes require no Unity frames or live connection");
+            }
         }
 
         private static void TestWorkerAndDispose()
@@ -1512,6 +1656,82 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(HttpStatusCode.Accepted, GetStatusCode(server, "/api/config/chat-chooses/set?operation=stop"), "HTTP stop");
                 True(!controller.Reserved, "HTTP stop releases without Unity update");
                 Equal(HttpStatusCode.Accepted, GetStatusCode(server, "/api/config/chat-chooses/set?operation=start&mode=with"), "HTTP restart");
+            }
+        }
+
+        private static void TestChatOverlayMigrationAndPreview()
+        {
+            using (var scope = new TestScope("chat-overlay-migration"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(
+                    "{\"operation\":\"update\",\"expectedRevision\":0,\"profileId\":\"vertical\",\"componentId\":\"pesky_battle\",\"x\":99,\"liquidColor\":\"#12345680\"}").StatusCode,
+                    "save customized existing component");
+                var path = Path.Combine(scope.ConfigDirectory,
+                    "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                    profile["components"].AsArray().RemoveAt(2);
+                File.WriteAllText(path, legacy.ToJsonString());
+                var migrated = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(migrated.GetConfigState()))
+                {
+                    Equal(99, FindComposerComponent(json.RootElement, "vertical", "pesky_battle").GetProperty("x").GetInt32(), "saved battle position retained");
+                    Equal("#12345680", FindComposerComponent(json.RootElement, "vertical", "pesky_battle").GetProperty("liquidColor").GetString(), "saved battle alpha retained");
+                    Equal(960, FindComposerComponent(json.RootElement, "vertical", "chat_chooses").GetProperty("width").GetInt32(), "new chat layer added");
+                }
+                using (var backup = JsonDocument.Parse(File.ReadAllText(path + ".bak")))
+                    Equal(2, backup.RootElement.GetProperty("profiles")[0].GetProperty("components").GetArrayLength(), "legacy scene retained in recovery backup");
+
+                var ballot = "{\"phase\":\"voting\",\"stage\":\"boss\",\"revision\":1,\"sessionId\":1,\"round\":1,\"totalVotes\":7,\"winnerNumber\":1,\"remainingSeconds\":3,\"plane\":false,\"withChallenge\":true,\"outcome\":\"most_votes\",\"options\":[{\"id\":1,\"number\":1,\"votes\":7,\"name\":\"The Root Pack\",\"image\":\"bosses/pandillaraiz.png\"}],\"selected\":{}}";
+                var request = JsonSerializer.Serialize(new { operation = "start", profileId = "vertical", sessionId = "chat-design-test", componentId = "chat_chooses", chatStateJson = ballot,
+                    layoutJson = legacy["profiles"][0].ToJsonString() });
+                Equal(200, migrated.ProcessPreviewCommand(request).StatusCode, "legacy layout accepts new preview component");
+                using (var json = JsonDocument.Parse(migrated.GetPreviewState("vertical").Json))
+                {
+                    Equal("chat_chooses", json.RootElement.GetProperty("componentId").GetString(), "selected simulation component");
+                    Equal(7, json.RootElement.GetProperty("chatState").GetProperty("options")[0].GetProperty("votes").GetInt32(), "chat preview votes delivered to OBS");
+                    Equal(3, json.RootElement.GetProperty("layout").GetProperty("components").GetArrayLength(), "legacy preview adds chat layer");
+                }
+                request = JsonSerializer.Serialize(new { operation = "update", profileId = "vertical", sessionId = "chat-design-test", componentId = "chat_chooses",
+                    chatStateJson = ballot.Replace("bosses/pandillaraiz.png", "../private.png") });
+                Equal(400, migrated.ProcessPreviewCommand(request).StatusCode, "invalid synthetic image rejected atomically");
+                using (var json = JsonDocument.Parse(migrated.GetPreviewState("vertical").Json))
+                    Equal("bosses/pandillaraiz.png", json.RootElement.GetProperty("chatState").GetProperty("options")[0].GetProperty("image").GetString(), "invalid update keeps valid snapshot");
+            }
+        }
+
+        private static void TestChatOverlayCompactsDefaultBounds()
+        {
+            foreach (var mode in new[] { "default", "custom", "locked" })
+            using (var scope = new TestScope("chat-overlay-bounds-" + mode))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(
+                    "{\"operation\":\"update\",\"expectedRevision\":0,\"profileId\":\"horizontal\",\"componentId\":\"chat_chooses\",\"showTitle\":true}").StatusCode,
+                    "save initial chat scene");
+                var path = Path.Combine(scope.ConfigDirectory,
+                    "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var saved = JsonNode.Parse(File.ReadAllText(path));
+                var component = saved["profiles"].AsArray()
+                    .First(profile => profile["id"].GetValue<string>() == "horizontal")["components"].AsArray()
+                    .First(item => item["id"].GetValue<string>() == "chat_chooses");
+                Equal(320, component["height"].GetValue<int>(), "compact horizontal default");
+                component["height"] = 460;
+                if (mode == "custom") component["x"] = 281;
+                if (mode == "locked") component["locked"] = true;
+                File.WriteAllText(path, saved.ToJsonString());
+                var reloaded = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(reloaded.GetConfigState()))
+                {
+                    var current = FindComposerComponent(json.RootElement, "horizontal", "chat_chooses");
+                    Equal(mode == "default" ? 320 : 460, current.GetProperty("height").GetInt32(), "preserve customized or locked dimensions");
+                    Equal(mode == "custom" ? 281 : 280, current.GetProperty("x").GetInt32(), "preserve horizontal position");
+                    Equal(1360, current.GetProperty("width").GetInt32(), "preserve horizontal width");
+                }
+                if (mode == "default")
+                using (var backup = JsonDocument.Parse(File.ReadAllText(path + ".bak")))
+                    Equal(460, FindComposerComponent(backup.RootElement, "horizontal", "chat_chooses").GetProperty("height").GetInt32(), "original dimensions remain in backup");
             }
         }
 

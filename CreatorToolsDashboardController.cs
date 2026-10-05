@@ -319,6 +319,11 @@ namespace Gilomx.CupheadBossRoulette
                 MaximumSimulationCount,
                 ParseCount(Value(values, "count")));
             var totalValue = ParseAmount(Value(values, "amount"));
+            if (type == "chat")
+            {
+                count = 1;
+                totalValue = 0m;
+            }
             var giftId = NormalizeText(
                 Value(values, "giftId"), string.Empty, 160);
             if (giftId.Length == 0)

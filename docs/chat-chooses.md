@@ -15,7 +15,8 @@ Se inicia desde el mapa, sin otra ruleta cargando ni otro Evento Live activo.
 2. Disparo 1: hasta seis disparos reales; no participa Nada.
 3. Disparo 2: hasta seis candidatos, sin repetir el primero. Nada entra en el
    sorteo como cualquier candidato, no ocupa un espacio garantizado.
-4. Super: los tres supers y Nada, en orden aleatorio.
+4. Super: siempre I, II, III y Nada, en ese orden. Sus números de voto son
+   1, 2, 3 y 4 respectivamente.
 5. Amuleto: hasta seis candidatos aleatorios, incluyendo Nada en el sorteo.
    En tierra se excluyen las reliquias Maldita y Divina porque cambian los
    disparos y anularían las decisiones previas del chat.
@@ -24,6 +25,10 @@ Se inicia desde el mapa, sin otra ruleta cargando ni otro Evento Live activo.
 
 Los jefes de avión pasan directamente del jefe al amuleto: conservan su
 equipamiento nativo y sólo admiten retos compatibles con avión.
+Son tres rondas con reto o dos sin reto. La tarjeta del juego muestra Nada
+en Disparo 1, Disparo 2 y Súper; internamente mantiene el equipo actual y al
+cargar no modifica los disparos, el súper ni los indicadores de cambio de
+ninguno de los dos jugadores. Sólo aplica el amuleto y reto elegidos.
 
 El chat escribe únicamente el número mostrado. Cada usuario tiene un voto por
 ronda; otro número sustituye el anterior. El botón del jugador indica la
@@ -32,26 +37,109 @@ ganador durante 1.5 segundos. Si hay empate, se sortea entre los líderes; si
 nadie votó, se sortea entre todos los candidatos mostrados. Los votos y mensajes
 anteriores al comienzo de la siguiente ronda no se arrastran a ella.
 
-La tarjeta **EL CHAT ELIGIÓ** aparece cinco segundos y después comienza una
-cuenta de tres segundos. La carga usa el resultado, equipamiento, dificultad,
-HUD, reintentos y ruta de regreso de la ruleta existente. Si el mapa dejó de
-estar disponible, espera a regresar al mapa y reinicia la cuenta. Al regresar
-de la batalla se libera el evento. Detener también libera la reserva de forma
-inmediata, pero no cierra el juego ni interrumpe una batalla ya cargada.
+Al terminar, la tarjeta espera 1.5 segundos continuos con el juego enfocado y
+el mapa disponible. Luego entra mediante la misma animación de la ruleta,
+incluyendo su inclinación aleatoria y sonido. Si se pierde el foco durante la
+espera, ésta se reinicia, incluso si Unity dejó de actualizar en segundo plano.
+No se anima anticipadamente fuera de foco ni permite abrir o jugar durante
+la espera. Los fotogramas largos tampoco saltan toda la entrada.
+La tarjeta muestra las decisiones del chat ya elegidas. Sólo ofrece el ajuste de dificultad y **Jugar**; oculta
+los interruptores de reto y carga automática. Conserva la última dificultad
+guardada por el jugador. Cambiarla mantiene intacto el resultado. El panel web
+recuerda revisarla antes de jugar. No existe cuenta ni inicio automático:
+el resultado espera hasta que el jugador confirme en el juego.
+
+Enter/aceptar sobre **Jugar** (también F7 o el atajo de mando) inicia la carga
+habitual, con equipamiento, dificultad, HUD, reintentos y regreso al mapa.
+F6 permite cerrar y reabrir la tarjeta sin cambiar lo elegido. La navegación
+recorre únicamente dificultad y Jugar. Si el mapa no está disponible, conserva
+la selección hasta regresar. Al volver de la batalla se libera el evento.
+Detener también libera la reserva inmediatamente y cancela una carga aún
+pendiente; no cierra el juego ni interrumpe una batalla ya cargada.
 
 ## OBS y pruebas
 
-Copiar la URL desde la página del evento. La fuente `/chat-chooses-overlay`
-es transparente, se adapta a su resolución y muestra votos, resultado y cuenta.
-`?lang=en` cambia los textos del overlay al inglés. Fuera de las rondas y de la
-presentación final se oculta; la vista previa del Dashboard usa `preview=1` y
-conserva el resultado durante la batalla para revisar las selecciones.
+Abrir **Configurar overlay** desde el evento o seleccionar **El chat elige**
+en el Diseñador de overlays. La capa tiene posición, tamaño, opacidad, colores,
+etapa y animaciones propios en cada perfil. Ancho y
+alto se pueden ajustar por separado desde el inspector. Las fuentes comunes de
+OBS son `/overlay/vertical` (1080×1920) y `/overlay/horizontal` (1920×1080);
+copiar su URL desde el diseñador. Los perfiles guardados con sólo Batalla y
+Farmeando taps incorporan la capa sin cambiar las posiciones existentes.
+
+Las opciones y el resultado usan imágenes circulares sobre fondo transparente.
+El resumen final no muestra etiquetas. Su jefe mide 240 px frente a los
+280 px anteriores; el equipo mide 150 px por artículo. Entre las imágenes del
+jefe y del equipo quedan sólo 18 px, sin reservar alturas para los títulos
+eliminados. Todos los retratos del resumen usan el mismo
+borde de 5 px con el color normal **Borde del círculo** del diseñador,
+sin destacar un ganador. Al iniciar la partida o detener el evento desde
+el resumen, los retratos salen uno por uno (240 ms, separados por 60 ms)
+antes de ocultar la capa. Una nueva ronda espera esa salida y entra con los
+datos más recientes. Desactivar animaciones o preferir movimiento reducido
+oculta inmediatamente; la cancelación durante las rondas mantiene prioridad.
+El overlay no muestra nombres de artículos ni el título del evento; durante
+la votación muestra **Votaciones** (72 px) sobre la etapa actual (48 px).
+Los retos usan los iconos de `creator-tools/modifiers`, con el borde limpio
+del catálogo web; la tarjeta del juego conserva sus gráficos nativos.
+Los círculos usan columnas de su
+mismo diámetro, separadas por un espacio pequeño. El marco deja 18 px de margen
+interno para las sombras y el movimiento, sin un segundo margen en el escalado.
+El perfil horizontal parte de 1360×320. Al cargar el antiguo marco de
+1360×460 en su posición inicial se compacta y conserva el original en `.bak`;
+los marcos personalizados o bloqueados mantienen sus dimensiones.
+El número de opción aparece centrado en la parte inferior del retrato y la
+insignia superior muestra sus votos. Ambas cifras crecen, y cada cambio de
+votos desliza la cifra anterior y la nueva dentro de la insignia. Cada ronda
+sale de forma escalonada antes de mostrar la entrada escalonada de la siguiente;
+los votos recibidos durante la salida se conservan en la nueva vista.
+Desactivar animaciones o preferir movimiento reducido aplica los cambios
+inmediatamente. El borde y la insignia cambian suavemente
+al color de **Líder y ganador** según entra o cambia cada voto. Los empates
+resaltan a todos los líderes con votos; en una ronda vacía no se resalta ninguno
+hasta revelar el ganador. El overlay muestra los votos de cada opción, sin
+instrucciones, barras, porcentajes ni total general, y ya no muestra cuenta de inicio.
+El panel del evento reúne todos sus controles en un contenedor común y muestra
+los candidatos en una sola fila compacta.
+El formato ancho dispone los candidatos en una fila; los demás usan dos filas.
+Fuera de las rondas y de la presentación final la capa queda vacía.
+La fuente independiente `/chat-chooses-overlay` sigue disponible por
+compatibilidad; `?lang=en` cambia sus textos al inglés.
+
+El inspector permite probar cada ronda con dos a seis opciones, añadir un voto,
+mostrar el ganador y el resultado final. El Súper conserva sus cuatro candidatos
+en el diseñador. **Mostrar simulación en OBS**
+envía estos datos de prueba a la fuente común mientras el diseñador está abierto.
+Para emitir votos al evento real, usar **Simular evento → Voto del chat** desde
+el Dashboard: un perfil equivale a una identidad y puede cambiar su voto.
+**Voto del chat** no muestra Cantidad: cada envío es un mensaje de una persona.
+Repetir el mismo número conserva su voto; otro número lo mueve. Para sumar un
+voto adicional se usa otro perfil. El retraso permite programar el mensaje.
+La lectura de fechas ISO es explícita para aceptar los milisegundos del
+simulador en el Mono antiguo de Cuphead, conservando el rechazo de mensajes
+anteriores a la ronda y de fechas inválidas.
+
+El paquete **La Pichi Ruleta · Dev** añade **Votos de prueba** al panel del
+evento. Al pulsarlo en una ronda abierta, envía entre 50 y 80 mensajes de
+usuarios distintos durante diez segundos, con pausas variables. Un candidato
+aleatorio recibe una pequeña mayoría del lote para reducir empates; no cambia
+los votos que ya existían. El panel muestra enviados, total y tiempo restante.
+Se puede repetir al terminar y usar en cada ronda, incluidas las de avión.
+Avanzar o detener cancela los mensajes pendientes y evita arrastrarlos a la
+siguiente ronda. Usa el conteo y registro reales de mensajes simulados, sin
+necesitar un live, foco del navegador ni fotogramas de Unity.
+
+El publicador Dev activa `LauncherDevBuild=true` y el símbolo
+`PICHI_LAUNCHER_DEV`. Las compilaciones normales ocultan el botón y rechazan
+`operation=test_votes` también en el backend. El fixture local de UI permite
+comprobar ambos modos con `CREATOR_TOOLS_DEV_TOOLS=0` para ocultarlo.
 
 - `dotnet run --project CreatorToolsRuntimeTests/ChatChooses/ChatChooses.csproj`
 - `dotnet run --project CreatorToolsRuntimeTests/CreatorToolsRuntimeTests.csproj`
 - `dotnet run --project TikFinityCompanion/tests/LaPichiRuleta.TikFinity.Tests.csproj`
 - `npm run build` desde `creator-tools-ui`.
 - `npm run test:chat-chooses-overlay` desde `creator-tools-ui`.
+- `node --test scripts/test-chat-test-votes.mjs` desde `creator-tools-ui`.
 
 El publicador canónico es `pwsh -NoProfile -File ./tools/deploy-launcher-dev.ps1`.
 Los nuevos assets deben estar en el índice de Git antes de empaquetar. No se

@@ -3,6 +3,7 @@
   <ItemGroup>
     <Compile Include="*.cs.txt" />
     <Compile Include="../../CreatorToolsChatChoosesController.cs" />
+    <Compile Include="../../ChatChoosesCardEntrance.cs" />
     <Compile Include="../../CreatorToolsLiveEventsCoordinator.cs" />
     <Compile Include="../../Streaming/CreatorToolsStreamEvent.cs" />
     <Compile Include="../../Streaming/CreatorToolsJson.cs" />

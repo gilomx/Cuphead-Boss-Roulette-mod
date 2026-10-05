@@ -203,6 +203,8 @@ export interface ChatChoiceOption {
   votes?: number;
 }
 export interface ChatChoosesState {
+  developmentTools?: boolean;
+  testVotes?: { active: boolean; sent: number; total: number; remainingSeconds: number };
   ready: boolean;
   revision: number;
   sessionId: number;

@@ -35,7 +35,7 @@ interface ConfigValue {
   liveEvents: LiveEventsConfigState | null;
   tapFarming: TapFarmingConfigState | null;
   chatChooses: ChatChoosesState | null;
-  sendChatChooses: (operation: "save" | "start" | "next" | "stop" | "finish", withChallenge?: boolean) => Promise<void>;
+  sendChatChooses: (operation: "save" | "start" | "next" | "stop" | "finish" | "test_votes", withChallenge?: boolean) => Promise<void>;
   streamRules: StreamRulesConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
@@ -1239,7 +1239,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const sendChatChooses = useCallback(async (
-    operation: "save" | "start" | "next" | "stop" | "finish", withChallenge?: boolean,
+    operation: "save" | "start" | "next" | "stop" | "finish" | "test_votes", withChallenge?: boolean,
   ) => {
     const query = new URLSearchParams({ operation,
       sessionId: String(chatChooses?.sessionId ?? 0), round: String(chatChooses?.round ?? 0),

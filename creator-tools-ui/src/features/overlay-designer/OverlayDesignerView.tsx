@@ -40,6 +40,7 @@ import {
   tapSimulationReducer,
 } from "./simulation";
 import { useOverlayComposer } from "./useOverlayComposer";
+import { chatSimulationReducer, createChatSimulation } from "./chatSimulation";
 
 interface OverlayDesignerViewProps {
   onBack: () => void;
@@ -76,6 +77,8 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     initialSelection.componentId,
   );
   const [tapState, dispatchTap] = useReducer(tapSimulationReducer, createTapSimulation());
+  const [chatState, dispatchChat] = useReducer(chatSimulationReducer, createChatSimulation(locale));
+  useEffect(() => dispatchChat({ type: "locale", locale }), [locale]);
   const [battleState, dispatchBattle] = useReducer(
     battleSimulationReducer,
     createBattleSimulation("recruiting", undefined, peskyBattle?.capacity ?? 5),
@@ -106,9 +109,11 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const previewRetryAttemptsRef = useRef(0);
   const tapStateRef = useRef(tapState);
   const battleStateRef = useRef(battleState);
+  const chatStateRef = useRef(chatState);
   const viewMountedRef = useRef(true);
   tapStateRef.current = tapState;
   battleStateRef.current = battleState;
+  chatStateRef.current = chatState;
 
   const configuredTapsPerConversion = Math.max(1, Math.floor(
     tapFarming?.conversion?.tapsPerConversion ??
@@ -208,6 +213,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       currentProfile,
       false,
+      chatStateRef.current,
     )).then((result) => {
       if (!viewMountedRef.current) return result;
       if (previewRef.current === active && result !== "error") {
@@ -247,6 +253,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
         battleStateRef.current,
         currentProfile,
         false,
+        chatStateRef.current,
       ));
     };
     const handlePageHide = () => stopOwnedPreview(true);
@@ -290,6 +297,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       currentProfile,
       previewActiveRef.current,
+      chatStateRef.current,
     )).then((result) => {
       if (viewMountedRef.current &&
           (result === "conflict" || result === "expired") &&
@@ -329,6 +337,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       profile,
       false,
+      chatStateRef.current,
     )).then((result) => {
       if (!viewMountedRef.current || previewRef.current !== active) return;
       previewPendingRef.current = false;
@@ -347,6 +356,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
         battleStateRef.current,
         profileRef.current ?? profile,
         false,
+        chatStateRef.current,
       ));
       previewRef.current = null;
       if (result !== "conflict") schedulePreviewRetry();
@@ -358,7 +368,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     if (!profile || previewPending || !previewRef.current) return;
     const timer = window.setTimeout(() => publishLatest(), 80);
     return () => window.clearTimeout(timer);
-  }, [battleState, previewActive, previewPending, profile, publishLatest,
+  }, [battleState, chatState, previewActive, previewPending, profile, publishLatest,
     selectedComponentId, tapState]);
 
   useEffect(() => {
@@ -456,6 +466,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       currentProfile,
       nextPreviewActive,
+      chatStateRef.current,
     ));
     if (!viewMountedRef.current || previewRef.current !== active) return;
     previewPendingRef.current = false;
@@ -636,6 +647,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             selectedComponentId={selectedComponentId}
             tapState={tapState}
             battleState={battleState}
+            chatState={chatState}
             disabled={busy}
             onChange={(componentId, update) => changeComponent(componentId, update)}
           />
@@ -644,6 +656,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             component={component}
             tapState={tapState}
             battleState={battleState}
+            chatState={chatState}
             previewActive={previewActive}
             previewPending={previewPending}
             previewError={previewError}
@@ -653,6 +666,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             onTogglePreview={togglePreview}
             dispatchTap={dispatchTap}
             dispatchBattle={dispatchBattle}
+            dispatchChat={dispatchChat}
           />
         </div>
       ) : (

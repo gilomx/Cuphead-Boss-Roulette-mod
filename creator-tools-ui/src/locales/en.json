@@ -21,16 +21,21 @@
     "chatChooses": {
       "title": "The chat chooses",
       "description": "The system proposes; the chat decides the fight.",
+      "votingTitle": "Voting",
+      "playHelp": "After voting, return to the game: the roulette appears after 1.5 seconds with every selection ready. It keeps your last difficulty: review or change it before pressing Play. The match waits for your confirmation.",
       "mode": "Match mode",
       "withChallenge": "With challenge",
       "withoutChallenge": "Without challenge",
       "start": "Start event",
       "stop": "Stop event",
+      "testVotes": "Test votes",
+      "testVotesHelp": "Development only: send 50–80 votes over 10 seconds in this round, favoring one option.",
+      "testVotesProgress": "Test votes: {sent}/{total} · {seconds} s remaining",
       "next": "Choose {current} and continue to {next}",
       "voteHelp": "Vote by sending only an option number. One vote per person; you can change it while the round is open.",
       "blocked": "Finish the other Live Event before starting this one.",
       "mapRequired": "Open a save and return to the map to start the event.",
-      "planeHelp": "The plane uses its own weapons and super. Vote for Charm and, when enabled, Challenge.",
+      "planeHelp": "The plane uses its own weapons and super. After Boss, vote only for Charm and, when enabled, Challenge. The card shows None for both weapons and super; your equipment is preserved.",
       "progress": "Match selections",
       "votes": "{count} votes",
       "vote": "{count} vote",
@@ -40,9 +45,9 @@
       "openOverlay": "Open overlay",
       "overlayHelp": "Add this URL as an OBS browser source at 1920 × 1080. The preview shows the event's current state.",
       "stages": { "boss": "Boss", "weapon1": "Weapon 1", "weapon2": "Weapon 2", "super": "Super", "charm": "Charm", "modifier": "Challenge", "result": "Result" },
-      "phase": { "off": "Ready to start", "voting": "Voting open", "reveal": "Winner selected", "result": "The chat chose", "waiting_map": "Waiting for the map", "countdown": "Countdown", "loading": "Starting match", "active": "Match in progress", "completed": "Event finished" },
+      "phase": { "off": "Ready to start", "voting": "Voting open", "reveal": "Winner selected", "result": "Ready to play", "waiting_map": "Waiting for the map", "countdown": "Countdown", "loading": "Starting match", "active": "Match in progress", "completed": "Event finished" },
       "outcome": { "tie": "Tie: the system picked randomly among the top options.", "no_votes": "No votes: the system picked randomly among all presented options.", "most_votes": "The option with the most votes won." },
-      "feedback": { "already_running": "The event is already running.", "invalid_action": "Could not apply that configuration.", "map_required": "Return to a save's map before starting.", "blocked_by_live_event": "Another Live Event is running.", "stale_round": "This round has already closed. Wait for the next round.", "no_options": "No compatible options are available.", "load_failed": "Could not start the chosen boss. Return to the map and start a new event.", "request_failed": "Could not confirm the action. Check the connection to the game." }
+      "feedback": { "already_running": "The event is already running.", "development_only": "This test is only available in the Dev package.", "test_votes_running": "Test votes are already being sent in this round.", "invalid_action": "Could not apply that configuration.", "map_required": "Return to a save's map before starting.", "blocked_by_live_event": "Another Live Event is running.", "stale_round": "This round has already closed. Wait for the next round.", "no_options": "No compatible options are available.", "load_failed": "Could not start the chosen boss. Return to the map and start a new event.", "request_failed": "Could not confirm the action. Check the connection to the game." }
     },
     "documentTitle": "La Pichi Ruleta — Dashboard",
     "title": "Dashboard",
@@ -395,6 +400,7 @@
     },
     "simulator": {
       "voteNumber": "Vote number",
+      "voteHint": "Each person has one vote per round. Another number changes their choice; use another profile to add a vote.",
       "eyebrow": "Lab",
       "title": "Simulate event",
       "back": "Back to events",
@@ -475,7 +481,8 @@
     },
     "components": {
       "tap_farming": "Tap Farming",
-      "pesky_battle": "Pesky Battle"
+      "pesky_battle": "Pesky Battle",
+      "chat_chooses": "Chat chooses"
     },
     "canvas": {
       "title": "Overlay canvas",
@@ -529,6 +536,14 @@
         "open": "Open color picker",
         "close": "Close color picker"
       },
+      "chatColors": {
+        "title": "Vote colors", "liquidColor": "Vote count",
+        "collectingColor": "Leader and winner", "textColor": "Text and number", "outlineColor": "Circle border"
+      },
+      "chatOptions": {
+        "showTitle": "Show headings", "showTitleHint": "Shows Voting and the group the chat is voting on.",
+        "showDetails": "Result labels", "showDetailsHint": "Labels the selected equipment slots."
+      },
       "battleColors": {
         "title": "Battle colors",
         "liquidColor": "Occupied player border",
@@ -564,6 +579,11 @@
         "damage": "Simulate damage",
         "nextPhase": "Next phase",
         "retry": "Lose and retry"
+      },
+      "chat": {
+        "phases": { "off": "Inactive (empty overlay)", "voting": "Voting open", "reveal": "Round winner", "result": "Final selection", "countdown": "Start countdown", "active": "Battle (empty overlay)" },
+        "stage": "Round", "count": "Visible options", "vote": "Simulate one vote",
+        "hint": "These tests only affect the preview. To vote in the real event, use Simulate event → Chat vote."
       },
       "battle": {
         "phases": {

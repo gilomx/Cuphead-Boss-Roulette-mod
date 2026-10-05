@@ -1620,6 +1620,9 @@ namespace Gilomx.CupheadBossRoulette
         private void OnApplicationFocus(bool hasFocus)
         {
             creatorToolsApplicationFocused = hasFocus;
+            // Focus callbacks still arrive when Unity stops updating in the
+            // background, so an interrupted wait cannot elapse while away.
+            chatChoosesCardEntrance.Suspend();
             if (hasFocus && creatorToolsStreamWorker != null)
                 creatorToolsStreamWorker.Signal();
         }
@@ -1668,6 +1671,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void PublishCreatorToolsBackgroundState()
         {
+            if (creatorToolsChatChooses != null && creatorToolsDashboard != null)
+                foreach (var entry in creatorToolsChatChooses.TakeDueTestVotes())
+                    creatorToolsDashboard.ProcessEvent(entry, EvaluateCreatorToolsStreamEvent);
             if (creatorToolsInteractions != null)
                 creatorToolsInteractions.PublishPeskyBattleState(
                     creatorToolsServer);

@@ -135,6 +135,12 @@ Se excluyen ejecutables y datos originales de Cuphead, partidas, configuraciones
 personales, logs, cachés, backups y otros mods. No se empaqueta el README de
 instalación manual de la versión base, que corresponde a otro procedimiento.
 
+El script compila la DLL con `LauncherDevBuild=true`, que define
+`PICHI_LAUNCHER_DEV` y habilita controles exclusivos de desarrollo como
+**Votos de prueba** en «El chat elige». Una compilación normal no define ese
+símbolo: el panel oculta estos controles y el backend rechaza sus comandos.
+El build sigue siendo Release para conservar las optimizaciones.
+
 Para comprobar la publicación atómica y el rechazo de paquetes defectuosos sin
 tocar el juego ni el destino real:
 

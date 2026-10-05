@@ -133,8 +133,8 @@ export default function App() {
       return;
     }
     const component = new URLSearchParams(window.location.search).get("component");
-    const next: AppView = component === "pesky_battle" ? "peskyBattle" : "tapFarming";
-    const path = next === "peskyBattle" ? "/config/pesky-battle" : "/config/tap-farming";
+    const next: AppView = component === "chat_chooses" ? "chatChooses" : component === "pesky_battle" ? "peskyBattle" : "tapFarming";
+    const path = next === "chatChooses" ? "/config/chat-chooses" : next === "peskyBattle" ? "/config/pesky-battle" : "/config/tap-farming";
     window.history.pushState(null, "", path);
     setView(next);
     window.scrollTo({ top: 0 });
@@ -164,7 +164,7 @@ export default function App() {
             onOpenChatChooses={openChatChooses}
           />
         : view === "chatChooses"
-          ? <ChatChoosesDetailView onBack={() => returnToLiveEvents("chatChooses")} />
+          ? <ChatChoosesDetailView onBack={() => returnToLiveEvents("chatChooses")} onOpenOverlayDesigner={() => openOverlayDesigner("chat_chooses")} />
         : view === "peskyBattle"
           ? <PeskyBattleDetailView
               onBack={() => returnToLiveEvents("peskyBattle")}

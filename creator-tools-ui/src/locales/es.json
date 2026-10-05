@@ -21,16 +21,21 @@
     "chatChooses": {
       "title": "El chat elige",
       "description": "El sistema propone; el chat decide la pelea.",
+      "votingTitle": "Votaciones",
+      "playHelp": "Al terminar las votaciones, vuelve al juego: tras 1.5 segundos aparece la ruleta con todo elegido. Conserva tu última dificultad: revísala o cámbiala antes de pulsar Jugar. La partida espera tu confirmación.",
       "mode": "Modo de partida",
       "withChallenge": "Con reto",
       "withoutChallenge": "Sin reto",
       "start": "Iniciar evento",
       "stop": "Detener evento",
+      "testVotes": "Votos de prueba",
+      "testVotesHelp": "Sólo desarrollo: envía de 50 a 80 votos durante 10 segundos en esta ronda, favoreciendo una opción.",
+      "testVotesProgress": "Votos de prueba: {sent}/{total} · {seconds} s restantes",
       "next": "Elegir {current} y continuar a {next}",
       "voteHelp": "Vota escribiendo sólo el número de una opción. Un voto por persona; puedes cambiarlo mientras siga abierta la ronda.",
       "blocked": "Termina el otro Evento Live antes de iniciar éste.",
       "mapRequired": "Abre una partida y vuelve al mapa para iniciar el evento.",
-      "planeHelp": "El avión usa sus disparos y super propios. Se votan Amuleto y, si está activado, Reto.",
+      "planeHelp": "El avión usa sus disparos y súper propios. Después del jefe sólo se votan Amuleto y, si está activado, Reto. La tarjeta muestra Nada en los dos disparos y el súper; tu equipamiento se conserva.",
       "progress": "Selecciones de la partida",
       "votes": "{count} votos",
       "vote": "{count} voto",
@@ -40,9 +45,9 @@
       "openOverlay": "Abrir overlay",
       "overlayHelp": "Agrega esta URL como fuente de navegador en OBS a 1920 × 1080. La vista previa muestra el estado actual del evento.",
       "stages": { "boss": "Jefe", "weapon1": "Disparo 1", "weapon2": "Disparo 2", "super": "Super", "charm": "Amuleto", "modifier": "Reto", "result": "Resultado" },
-      "phase": { "off": "Listo para iniciar", "voting": "Votación abierta", "reveal": "Ganador elegido", "result": "El chat eligió", "waiting_map": "Esperando el mapa", "countdown": "Cuenta regresiva", "loading": "Iniciando partida", "active": "Partida en curso", "completed": "Evento finalizado" },
+      "phase": { "off": "Listo para iniciar", "voting": "Votación abierta", "reveal": "Ganador elegido", "result": "Listo para jugar", "waiting_map": "Esperando el mapa", "countdown": "Cuenta regresiva", "loading": "Iniciando partida", "active": "Partida en curso", "completed": "Evento finalizado" },
       "outcome": { "tie": "Empate: el sistema sorteó entre las opciones más votadas.", "no_votes": "Sin votos: el sistema sorteó entre las opciones presentadas.", "most_votes": "Ganó la opción más votada." },
-      "feedback": { "already_running": "El evento ya está en curso.", "invalid_action": "No se pudo aplicar esa configuración.", "map_required": "Vuelve al mapa de una partida antes de iniciar.", "blocked_by_live_event": "Otro Evento Live está en curso.", "stale_round": "Esta ronda ya se cerró. Espera a la siguiente.", "no_options": "No hay opciones compatibles disponibles.", "load_failed": "No se pudo iniciar el jefe elegido. Vuelve al mapa e inicia un nuevo evento.", "request_failed": "No se pudo confirmar la acción. Revisa la conexión con el juego." }
+      "feedback": { "already_running": "El evento ya está en curso.", "development_only": "Esta prueba sólo está disponible en el paquete Dev.", "test_votes_running": "Ya se están enviando votos de prueba en esta ronda.", "invalid_action": "No se pudo aplicar esa configuración.", "map_required": "Vuelve al mapa de una partida antes de iniciar.", "blocked_by_live_event": "Otro Evento Live está en curso.", "stale_round": "Esta ronda ya se cerró. Espera a la siguiente.", "no_options": "No hay opciones compatibles disponibles.", "load_failed": "No se pudo iniciar el jefe elegido. Vuelve al mapa e inicia un nuevo evento.", "request_failed": "No se pudo confirmar la acción. Revisa la conexión con el juego." }
     },
     "documentTitle": "La Pichi Ruleta — Dashboard",
     "title": "Dashboard",
@@ -395,6 +400,7 @@
     },
     "simulator": {
       "voteNumber": "Número del voto",
+      "voteHint": "Una persona tiene un voto por ronda. Otro número cambia su elección; usa otro perfil para sumar un voto más.",
       "eyebrow": "Laboratorio",
       "title": "Simular evento",
       "back": "Volver a eventos",
@@ -475,7 +481,8 @@
     },
     "components": {
       "tap_farming": "Farmeando taps",
-      "pesky_battle": "Batalla Molestosa"
+      "pesky_battle": "Batalla Molestosa",
+      "chat_chooses": "El chat elige"
     },
     "canvas": {
       "title": "Lienzo del overlay",
@@ -529,6 +536,14 @@
         "open": "Abrir selector de color",
         "close": "Cerrar selector de color"
       },
+      "chatColors": {
+        "title": "Colores de la votación", "liquidColor": "Conteo de votos",
+        "collectingColor": "Líder y ganador", "textColor": "Texto y número", "outlineColor": "Borde del círculo"
+      },
+      "chatOptions": {
+        "showTitle": "Mostrar títulos", "showTitleHint": "Muestra Votaciones y el grupo que está votando el chat.",
+        "showDetails": "Etiquetas del resultado", "showDetailsHint": "Indica las ranuras del equipo elegido."
+      },
       "battleColors": {
         "title": "Colores de la batalla",
         "liquidColor": "Borde con jugador",
@@ -564,6 +579,11 @@
         "damage": "Simular daño",
         "nextPhase": "Siguiente fase",
         "retry": "Perder y reintentar"
+      },
+      "chat": {
+        "phases": { "off": "Sin activar (overlay vacío)", "voting": "Votación abierta", "reveal": "Ganador de la ronda", "result": "Resultado final", "countdown": "Cuenta para comenzar", "active": "Batalla (overlay vacío)" },
+        "stage": "Ronda", "count": "Opciones visibles", "vote": "Simular un voto",
+        "hint": "Estas pruebas sólo cambian la previsualización. Para votar en el evento real, usa Simular evento → Voto del chat."
       },
       "battle": {
         "phases": {

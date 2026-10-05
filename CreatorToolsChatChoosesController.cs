@@ -32,6 +32,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsLiveEventsCoordinator coordinator;
         private readonly Random random;
         private readonly Func<DateTime> clock;
+        private readonly bool developmentTools;
         private readonly Dictionary<string, int> votes = new Dictionary<string, int>();
         private readonly ChatChoice[] selected = new ChatChoice[6];
         private ChatChoosesCatalog catalog;
@@ -52,26 +53,33 @@ namespace Gilomx.CupheadBossRoulette
         private int winner = -1;
         private DateTime openedAt;
         private DateTime until;
+        private int[] testVoteOptions = new int[0];
+        private double[] testVoteOffsets = new double[0];
+        private DateTime testVotesStartedAt;
+        private int testVotesSent;
+        private int testVoteGeneration;
+        private string testVoteRun = string.Empty;
 
         internal CreatorToolsChatChoosesController(
             CreatorToolsLiveEventsCoordinator coordinator, bool withChallenge,
-            Random random = null, Func<DateTime> clock = null)
+            Random random = null, Func<DateTime> clock = null, bool developmentTools = false)
         {
             this.coordinator = coordinator;
             this.withChallenge = withChallenge;
             this.random = random ?? new Random();
             this.clock = clock ?? delegate { return DateTime.UtcNow; };
+            this.developmentTools = developmentTools;
         }
 
         internal bool WithChallenge { get { lock (stateLock) return withChallenge; } }
         internal bool Reserved { get { lock (stateLock) return lease != null; } }
         internal bool ShowingResult
         {
-            get { lock (stateLock) return phase == "result" || phase == "countdown" || phase == "waiting_map"; }
+            get { lock (stateLock) return phase == "result"; }
         }
+        internal int SessionId { get { lock (stateLock) return session; } }
         internal bool NeedsCatalog { get { lock (stateLock) return lease == null; } }
         internal ChatChoice[] SelectedOptions { get { lock (stateLock) return (ChatChoice[])selected.Clone(); } }
-        internal int CountdownSeconds { get { lock (stateLock) return phase == "countdown" ? Math.Max(0, (int)Math.Ceiling((until - clock()).TotalSeconds)) : 0; } }
 
         internal void SetCatalog(ChatChoosesCatalog value, bool available)
         {
@@ -90,6 +98,8 @@ namespace Gilomx.CupheadBossRoulette
             lock (stateLock)
             {
                 TickLocked();
+                if (action == "test_votes" && !developmentTools)
+                    return RejectLocked("development_only");
                 if (action == "stop" || action == "finish")
                 {
                     ReleaseLocked(); phase = "off"; feedback = "ready"; error = false;
@@ -121,10 +131,12 @@ namespace Gilomx.CupheadBossRoulette
                 int requestSession, requestRound;
                 string rawSession, rawRound;
                 values.TryGetValue("sessionId", out rawSession); values.TryGetValue("round", out rawRound);
-                if (action != "next" || phase != "voting" ||
+                if ((action != "next" && action != "test_votes") || phase != "voting" ||
                     !int.TryParse(rawSession, out requestSession) || requestSession != session ||
                     !int.TryParse(rawRound, out requestRound) || requestRound != round)
                     return RejectLocked("stale_round");
+                if (action == "test_votes") return StartTestVotesLocked();
+                CancelTestVotesLocked();
                 var maximum = 0;
                 for (var i = 0; i < counts.Length; i++) maximum = Math.Max(maximum, counts[i]);
                 var leaders = new List<int>();
@@ -148,10 +160,12 @@ namespace Gilomx.CupheadBossRoulette
             {
                 TickLocked();
                 if (phase != "voting") return string.Empty;
+                if (entry.TestVoteGeneration != 0 && (!developmentTools ||
+                    entry.TestVoteSession != session || entry.TestVoteRound != round ||
+                    entry.TestVoteGeneration != testVoteGeneration)) return string.Empty;
                 DateTime received;
                 // Old queued messages must never leak into a subsequent round.
-                if (!DateTime.TryParse(entry.ReceivedAt, CultureInfo.InvariantCulture,
-                        DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out received) ||
+                if (!TryReadReceivedAt(entry.ReceivedAt, out received) ||
                     received < openedAt) return string.Empty;
                 var option = text[0] - '1';
                 if (option >= choices.Count) return string.Empty;
@@ -173,6 +187,86 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void Tick() { lock (stateLock) TickLocked(); }
 
+        private bool StartTestVotesLocked()
+        {
+            if (testVotesSent < testVoteOptions.Length) return RejectLocked("test_votes_running");
+            var total = random.Next(50, 81);
+            var favorite = random.Next(choices.Count);
+            // A small majority in this batch avoids ties without editing real votes.
+            var favoredVotes = (int)Math.Ceiling(total * (0.55 + random.NextDouble() * 0.1));
+            testVoteOptions = new int[total]; testVoteOffsets = new double[total];
+            var elapsed = 0d;
+            for (var i = 0; i < total; i++)
+            {
+                var option = favorite;
+                if (i >= favoredVotes && choices.Count > 1)
+                {
+                    option = random.Next(choices.Count - 1);
+                    if (option >= favorite) option++;
+                }
+                testVoteOptions[i] = option;
+                elapsed += 0.3 + random.NextDouble() * 1.7;
+                testVoteOffsets[i] = elapsed;
+            }
+            for (var i = total - 1; i > 0; i--)
+            {
+                var j = random.Next(i + 1); var option = testVoteOptions[i];
+                testVoteOptions[i] = testVoteOptions[j]; testVoteOptions[j] = option;
+            }
+            for (var i = 0; i < total; i++) testVoteOffsets[i] = testVoteOffsets[i] / elapsed * 10;
+            testVotesStartedAt = clock(); testVotesSent = 0;
+            testVoteRun = Guid.NewGuid().ToString("N");
+            feedback = "ready"; error = false; revision++; return true;
+        }
+
+        // Drained by the streaming worker, independent from Unity/browser focus.
+        // Never hold stateLock while calling the dashboard: its evaluator calls Observe.
+        internal List<CreatorToolsStreamEvent> TakeDueTestVotes()
+        {
+            lock (stateLock)
+            {
+                TickLocked();
+                var result = new List<CreatorToolsStreamEvent>();
+                if (!developmentTools || phase != "voting") return result;
+                var now = clock();
+                var elapsed = (now - testVotesStartedAt).TotalSeconds;
+                while (testVotesSent < testVoteOptions.Length && elapsed >= testVoteOffsets[testVotesSent])
+                {
+                    var index = testVotesSent++;
+                    var identity = "dev-chat-" + testVoteRun + "-" + index.ToString(CultureInfo.InvariantCulture);
+                    result.Add(new CreatorToolsStreamEvent {
+                        EventId = identity, IdempotencyKey = identity,
+                        ConnectionId = "simulator-tiktok", Platform = "tiktok", Connector = "simulator",
+                        Type = "chat", UserId = identity, UserName = "Viewer" + (index + 1),
+                        UserDisplayName = "Viewer" + (index + 1),
+                        ChatText = (testVoteOptions[index] + 1).ToString(CultureInfo.InvariantCulture),
+                        ReceivedAt = now.ToString("O", CultureInfo.InvariantCulture), Count = 1,
+                        Simulated = true, RawEventType = "development_test_vote",
+                        TestVoteSession = session, TestVoteRound = round, TestVoteGeneration = testVoteGeneration
+                    });
+                }
+                if (result.Count > 0) revision++;
+                return result;
+            }
+        }
+
+        private void CancelTestVotesLocked()
+        {
+            testVoteOptions = new int[0]; testVoteOffsets = new double[0]; testVotesSent = 0;
+            testVoteGeneration++;
+        }
+
+        private static bool TryReadReceivedAt(string raw, out DateTime received)
+        {
+            const DateTimeStyles styles =
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal;
+            // Cuphead's legacy Mono TryParse rejects ISO timestamps with three
+            // fractional digits, including every Dashboard simulation timestamp.
+            return DateTime.TryParseExact(raw, "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFK",
+                    CultureInfo.InvariantCulture, styles, out received) ||
+                DateTime.TryParse(raw, CultureInfo.InvariantCulture, styles, out received);
+        }
+
         private void TickLocked()
         {
             var now = clock();
@@ -180,18 +274,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 stage = NextStageLocked();
                 if (stage < Stages.Length) OpenRoundLocked();
-                else { phase = "result"; until = now.AddSeconds(5); revision++; }
+                else { phase = "result"; revision++; }
             }
-            else if ((phase == "result" && now >= until) || phase == "waiting_map")
-            {
-                if (!mapAvailable)
-                {
-                    if (phase != "waiting_map") { phase = "waiting_map"; revision++; }
-                }
-                else { phase = "countdown"; until = now.AddSeconds(3); revision++; }
-            }
-            else if (phase == "countdown" && !mapAvailable)
-            { phase = "waiting_map"; revision++; }
         }
 
         private int NextStageLocked()
@@ -203,6 +287,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OpenRoundLocked()
         {
+            CancelTestVotesLocked();
             List<ChatChoice> pool;
             if (!catalog.Pools.TryGetValue(Stages[stage], out pool)) pool = new List<ChatChoice>();
             choices = new List<ChatChoice>();
@@ -214,8 +299,14 @@ namespace Gilomx.CupheadBossRoulette
                 if (stage == 5 && option.Kind != "both" && option.Kind != (plane ? "plane" : "ground")) continue;
                 choices.Add(option);
             }
-            for (var i = choices.Count - 1; i > 0; i--)
-            { var j = random.Next(i + 1); var item = choices[i]; choices[i] = choices[j]; choices[j] = item; }
+            if (stage == 3)
+                choices.Sort(delegate(ChatChoice a, ChatChoice b) {
+                    if (a.None != b.None) return a.None ? 1 : -1;
+                    return a.Id.CompareTo(b.Id);
+                });
+            else
+                for (var i = choices.Count - 1; i > 0; i--)
+                { var j = random.Next(i + 1); var item = choices[i]; choices[i] = choices[j]; choices[j] = item; }
             if (choices.Count > 6) choices.RemoveRange(6, choices.Count - 6);
             if (choices.Count == 0)
             { ReleaseLocked(); phase = "off"; RejectLocked("no_options"); return; }
@@ -223,14 +314,25 @@ namespace Gilomx.CupheadBossRoulette
             openedAt = clock(); round++; phase = "voting"; feedback = "ready"; error = false; revision++;
         }
 
-        internal bool TryBeginLoad(out int[] result)
+        internal bool TryGetResult(out int[] result)
         {
             lock (stateLock)
             {
                 TickLocked(); result = null;
-                if (phase != "countdown" || !mapAvailable || clock() < until || !coordinator.IsOwner(lease)) return false;
+                if (phase != "result" || !coordinator.IsOwner(lease)) return false;
                 result = new int[6];
                 for (var i = 0; i < result.Length; i++) result[i] = selected[i] == null ? -1 : selected[i].Id;
+                return true;
+            }
+        }
+
+        // Called only by the native roulette's explicit Play action.
+        internal bool TryBeginLoad(out int[] result)
+        {
+            lock (stateLock)
+            {
+                result = null;
+                if (!mapAvailable || !TryGetResult(out result)) return false;
                 phase = "loading"; revision++; return true;
             }
         }
@@ -255,8 +357,18 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal void InvalidateResult()
+        {
+            lock (stateLock)
+            {
+                if (phase != "result") return;
+                phase = "completed"; ReleaseLocked(); feedback = "load_failed"; error = true; revision++;
+            }
+        }
+
         private void ReleaseLocked()
         {
+            CancelTestVotesLocked();
             if (lease == null) return;
             coordinator.BeginStopping(lease); coordinator.CompleteRelease(lease); lease = null;
         }
@@ -270,6 +382,7 @@ namespace Gilomx.CupheadBossRoulette
                 var live = coordinator.Snapshot;
                 var builder = new StringBuilder(4096);
                 builder.Append("{\"ready\":").Append(catalog != null ? "true" : "false")
+                    .Append(",\"developmentTools\":").Append(developmentTools ? "true" : "false")
                     .Append(",\"schemaVersion\":1,\"revision\":").Append(revision)
                     .Append(",\"sessionId\":").Append(session).Append(",\"round\":").Append(round)
                     .Append(",\"phase\":"); AppendString(builder, phase);
@@ -278,12 +391,17 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append(",\"withChallenge\":").Append(withChallenge ? "true" : "false")
                     .Append(",\"plane\":").Append(plane ? "true" : "false")
                     .Append(",\"mapAvailable\":").Append(mapAvailable ? "true" : "false")
-                    .Append(",\"remainingSeconds\":").Append(phase == "reveal" || phase == "result" || phase == "countdown" ?
+                    .Append(",\"remainingSeconds\":").Append(phase == "reveal" ?
                         Math.Max(0, (int)Math.Ceiling((until - clock()).TotalSeconds)) : 0)
                     .Append(",\"totalVotes\":").Append(votes.Count)
                     .Append(",\"winnerNumber\":").Append(winner + 1)
                     .Append(",\"outcome\":"); AppendString(builder, outcome);
                 builder.Append(",\"blockedByLiveEvent\":"); AppendString(builder, live.ActiveEvent == CreatorToolsLiveEventIds.ChatChooses ? "" : live.ActiveEvent);
+                var testing = testVotesSent < testVoteOptions.Length;
+                builder.Append(",\"testVotes\":{\"active\":").Append(testing ? "true" : "false")
+                    .Append(",\"sent\":").Append(testVotesSent).Append(",\"total\":").Append(testVoteOptions.Length)
+                    .Append(",\"remainingSeconds\":").Append(testing ? Math.Max(0,
+                        (int)Math.Ceiling(10 - (clock() - testVotesStartedAt).TotalSeconds)) : 0).Append('}');
                 builder.Append(",\"feedback\":"); AppendString(builder, feedback);
                 builder.Append(",\"error\":").Append(error ? "true" : "false").Append(",\"options\":[");
                 for (var i = 0; i < choices.Count; i++)

@@ -1,29 +1,55 @@
+:root { color-scheme: only light; }
 * { box-sizing: border-box; }
-html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; color: #fff8e6; }
-body { display: grid; place-items: center; font-family: Memphis, 'Trebuchet MS', sans-serif; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; }
 [hidden] { display: none !important; }
-#event { position: absolute; left: 50%; top: 50%; width: 1480px; transform-origin: center; padding: 36px; border-radius: 38px; background: linear-gradient(145deg, #251430f2, #100c1bf2); border: 3px solid #e7bc78; box-shadow: 0 15px 40px #0006; }
-header { text-align: center; }
-header p { margin: 0 0 12px; font-size: 25px; color: #e7bc78; }
-h1 { font-size: 60px; line-height: 1.15; margin: 0 0 16px; text-transform: uppercase; }
-#instructions { color: #fff8e6; font-size: 24px; max-width: 1120px; margin: 0 auto 25px; }
-#options { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
-#options[data-count="4"] { max-width: 1100px; margin: 0 auto; }
-.choice { width: 448px; position: relative; border: 2px solid #735476; border-radius: 24px; background: #ffffff08; padding: 20px 26px; text-align: center; transition: border-color .2s, opacity .2s, transform .2s; }
-.choice .number { position: absolute; top: 15px; left: 18px; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #e7bc78; color: #1d1126; font: bold 42px 'Trebuchet MS', sans-serif; }
-.choice img { display: block; width: 136px; height: 136px; object-fit: contain; margin: 0 auto 10px; }
-.choice h2 { margin: 0 0 10px; font-size: 29px; height: 70px; display: grid; place-items: center; }
-.bar { height: 12px; border-radius: 10px; overflow: hidden; background: #ffffff15; }
-.bar span { display: block; height: 100%; width: 0; background: #e7bc78; transition: width .3s ease; }
-.choice .votes { display: block; margin-top: 10px; font-size: 23px; }
-.choice[data-winner="true"] { border-color: #9de7a5; box-shadow: 0 0 20px #9de7a530; transform: translateY(-4px); }
-#event[data-phase="reveal"] .choice[data-winner="false"] { opacity: .4; }
-footer { display: grid; gap: 8px; text-align: center; margin-top: 25px; }
-#status { font-size: 33px; } #summary { color: #e7bc78; font-size: 22px; }
-#boss { display: grid; justify-items: center; gap: 8px; margin: 0 0 30px; }
-#boss img { width: 220px; height: 220px; object-fit: contain; } #boss strong { font-size: 43px; }
-#equipment { display: flex; justify-content: center; gap: 28px; }
-.equipment { width: 230px; text-align: center; display: grid; justify-items: center; gap: 8px; }
-.equipment img { width: 112px; height: 112px; object-fit: contain; }
-.equipment small { font-size: 23px; color: #e7bc78; } .equipment strong { font-size: 24px; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+#event {
+  --choice-color: #ff4f92; --winner-color: #f4c95d;
+  --text-color: #ffffff; --outline-color: #f5f5f7;
+  --circle-size: 240px;
+  position: absolute; left: 50%; top: 50%; width: max-content;
+  padding: 18px; transform-origin: center; color: var(--text-color);
+  text-shadow: 0 3px 5px #000d, 0 1px 1px #000;
+}
+header { display: grid; gap: 4px; text-align: center; margin-bottom: 16px; }
+h1 { font-size: 72px; line-height: 1.1; margin: 0; font-weight: 900; }
+h2 { font-size: 48px; line-height: 1.1; margin: 0; font-weight: 800; }
+#options { display: grid; grid-template-columns: repeat(3, var(--circle-size)); justify-content: center; gap: 24px; }
+#options[data-count='2'], #options[data-count='4'] { grid-template-columns: repeat(2, var(--circle-size)); }
+.choice { position: relative; text-align: center; transform-origin: center; transition: opacity .24s; }
+.portrait { position: relative; width: var(--circle-size); height: var(--circle-size); }
+.choice img, #boss img, .equipment img {
+  display: block; width: var(--circle-size); height: var(--circle-size);
+  object-fit: contain; border: 7px solid var(--outline-color);
+  border-radius: 50%; margin: 0 auto; filter: drop-shadow(0 3px 4px #0005);
+  transition: border-color .35s ease, filter .35s ease;
+}
+.portrait img { margin: 0; }
+.choice .number {
+  position: absolute; z-index: 1; bottom: 20px; left: 50%; transform: translateX(-50%);
+  color: var(--text-color); font-size: 76px; font-weight: 900; line-height: 1;
+  text-shadow: 0 3px 6px #000, 2px 0 3px #000, -2px 0 3px #000;
+}
+.votes {
+  position: absolute; z-index: 2; top: -4px; left: -4px; display: grid; place-items: center;
+  width: 96px; height: 96px; overflow: hidden; border-radius: 50%;
+  background: var(--choice-color); color: #fff; border: 4px solid var(--outline-color);
+  font-size: 48px; font-weight: 800; line-height: 1; text-shadow: 0 2px 3px #0008;
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
+.vote-digit { position: absolute; inset: 0; display: grid; place-items: center; }
+.votes[data-wide='true'] .vote-digit { font-size: 32px; }
+.choice[data-leader='true'] img, .choice[data-winner='true'] img { border-color: var(--winner-color); filter: drop-shadow(0 0 6px var(--winner-color)); }
+.choice[data-leader='true'] .votes, .choice[data-winner='true'] .votes { background: var(--winner-color); border-color: var(--winner-color); color: #28152f; text-shadow: none; }
+#event[data-phase='reveal'] .choice[data-winner='false'] { opacity: .35; }
+#boss { display: grid; justify-items: center; margin: 0 0 18px; }
+#boss img { --circle-size: 240px; }
+#result img { border-width: 5px; border-color: var(--outline-color); }
+#equipment { display: flex; justify-content: center; gap: 18px; }
+.equipment { width: 150px; display: grid; justify-items: center; }
+.equipment img { --circle-size: 150px; border-width: 5px; margin: 0; }
+#event[data-motion='false'] *, #event[data-motion='false'] *::before, #event[data-motion='false'] *::after { animation: none; transition: none; }
+@media (min-aspect-ratio: 5/2) {
+  #options, #options[data-count='2'], #options[data-count='4'] { grid-template-columns: repeat(var(--option-count, 6), var(--circle-size)); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

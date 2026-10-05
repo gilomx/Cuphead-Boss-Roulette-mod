@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInNewContext } from "node:vm";
 import test from "node:test";
 
 // Run the production reducer on every supported Node version, including Node 20.
@@ -18,11 +18,39 @@ try {
     "--outDir", temporary, "--skipLibCheck",
   ], { cwd: uiRoot, encoding: "utf8", windowsHide: true });
   assert.equal(compiled.status, 0, compiled.error?.message || compiled.stdout + compiled.stderr);
-  runInNewContext(readFileSync(join(temporary, "simulation.js"), "utf8"), { exports });
+  const folder = existsSync(join(temporary, "simulation.js")) ? temporary : join(temporary, "features/overlay-designer");
+  const require = createRequire(import.meta.url);
+  Object.assign(exports, require(join(folder, "simulation.js")), require(join(folder, "chatSimulation.js")));
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
 const { createBattleSimulation, battleSimulationReducer, previewCommand } = exports;
+
+test("chat designer scenarios and votes travel to OBS independently of real events", () => {
+  const { createChatSimulation, chatSimulationReducer } = exports;
+  let chat = createChatSimulation("en");
+  chat = chatSimulationReducer(chat, { type: "vote", number: 1 });
+  assert.equal(chat.totalVotes, 46);
+  assert.equal(chat.options[0].votes, 9);
+  chat = chatSimulationReducer(chat, { type: "stage", stage: "super" });
+  assert.equal(chat.options.length, 4);
+  assert.deepEqual(chat.options.map(option => option.image), ["supers/super1.png", "supers/super2.png", "supers/super3.png", "creator-tools/empty.png"]);
+  chat = chatSimulationReducer(chat, { type: "count", count: 2 });
+  assert.equal(chat.options.length, 4, "super always preserves all four candidates");
+  chat = chatSimulationReducer(chat, { type: "scenario", phase: "reveal" });
+  const before = JSON.stringify(chat.options);
+  chat = chatSimulationReducer(chat, { type: "vote", number: 1 });
+  assert.equal(JSON.stringify(chat.options), before, "reveal does not accept votes");
+  chat = chatSimulationReducer(chat, { type: "scenario", phase: "result" });
+  const command = previewCommand("update", "vertical", "chat_chooses", "preview-session",
+    exports.createTapSimulation(), createBattleSimulation(),
+    { id: "vertical", canvas: { width: 1080, height: 1920 }, components: [] }, true, chat);
+  assert.equal(command.scenario, "result");
+  assert.equal(JSON.parse(command.chatStateJson).selected.weapon1.name, "Peashooter");
+  const reset = chatSimulationReducer(chat, { type: "reset" });
+  assert.equal(reset.options[0].name, "Ribby and Croaks");
+  assert.ok(reset.sessionId > chat.sessionId);
+});
 
 test("the selected entry gift survives scenario changes, capacity, joining and reset", () => {
   const trigger = { giftId: "1261956", giftName: "Fuego", giftImagePath: "/assets/creator-tools/gifts/images/1261956.webp" };
