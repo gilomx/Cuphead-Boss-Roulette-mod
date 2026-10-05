@@ -730,7 +730,7 @@ textarea:focus-visible {
   padding: 0.28rem 0;
   border: 0;
   color: var(--color-text-soft);
-  font-size: var(--font-size-body);
+  font-size: 1.12rem;
   font-weight: 700;
   text-align: left;
   background: transparent;
@@ -752,7 +752,7 @@ textarea:focus-visible {
 
 .sidebar__item--active {
   color: var(--color-text);
-  font-size: var(--font-size-body);
+  font-size: 1.48rem;
   font-weight: 800;
   letter-spacing: 0.01em;
 }
@@ -761,7 +761,7 @@ textarea:focus-visible {
   margin-top: auto;
   padding-top: var(--space-6);
   color: rgb(251 248 252 / 63%);
-  font-size: var(--font-size-caption);
+  font-size: 0.57rem;
   font-weight: 700;
   line-height: 1.55;
   text-align: center;
@@ -773,7 +773,7 @@ textarea:focus-visible {
 }
 
 .sidebar__footer p:first-child {
-  font-size: var(--font-size-caption);
+  font-size: 0.68rem;
 }
 
 .sidebar__footer p:first-child span {
@@ -5220,7 +5220,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 0.7rem 0.8rem 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  font-size: 0.88rem;
   line-height: 1.45;
 }
 
@@ -5547,13 +5547,13 @@ textarea:focus-visible {
   .status-badge {
     min-height: 1.45rem;
     padding: 0.25rem 0.4rem;
-    font-size: var(--font-size-caption);
+    font-size: 0.55rem;
     letter-spacing: 0.035em;
   }
   .sidebar__nav { display: flex; align-items: baseline; gap: 0.65rem; margin: 0; }
-  .sidebar__item { width: auto; font-size: var(--font-size-body); }
-  .sidebar__item--active { font-size: var(--font-size-body); }
-  .sidebar__footer { max-width: 19rem; margin: 0 0 0 auto; padding: 0 5.5rem 0 0; font-size: var(--font-size-caption); }
+  .sidebar__item { width: auto; font-size: 0.88rem; }
+  .sidebar__item--active { font-size: 1rem; }
+  .sidebar__footer { max-width: 19rem; margin: 0 0 0 auto; padding: 0 5.5rem 0 0; font-size: 0.5rem; }
   .locale-switch--floating { top: 0.85rem; right: 1.2rem; }
   .main-content { margin-left: 0; padding: 3.5rem 1.5rem 4rem; }
   .page-header { flex-direction: column; margin-bottom: 2.5rem; }
@@ -5583,7 +5583,7 @@ textarea:focus-visible {
   .sidebar { flex-wrap: wrap; }
   .sidebar__nav { width: 100%; flex-wrap: wrap; gap: 0.35rem 0.75rem; }
   .sidebar__footer { width: 100%; max-width: none; margin: 0; padding: 0; }
-  .sidebar__footer p:first-child { font-size: var(--font-size-caption); }
+  .sidebar__footer p:first-child { font-size: 0.62rem; }
   .main-content { padding: 2.5rem 1rem 3rem; }
   .page-header h1 { font-size: var(--font-size-title); }
   .page-header p { font-size: var(--font-size-body); }

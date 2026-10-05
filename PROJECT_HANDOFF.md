@@ -2,6 +2,19 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Tipografía original del sidebar (2026-10-04)
+
+La escala tipográfica compartida continúa aplicada a todo el contenido del
+panel, pero el sidebar vuelve a sus medidas anteriores. En escritorio la
+navegación usa 1.12 rem y el elemento activo 1.48 rem; el estado y el pie
+recuperan también sus tamaños originales. Los breakpoints de 54 y 39 rem
+restauran las medidas compactas previas para navegación, estado y pie.
+
+El build validó 31 interacciones y 985 regalos, compiló TypeScript y Vite. El
+publicador canónico completó mod y companion con cero errores o advertencias,
+validó 1,487 archivos y publicó el ZIP Dev. SHA-256:
+`610757642B3BB84B3983A6ED3805A48473C5EF970E96FEF0E7B3EFAC55F0F2D4`.
+
 ## Batalla no queda bloqueada al detenerse sin foco (2026-10-02)
 
 `CreatorToolsPeskyBattleController` completa en el hilo HTTP el cierre lógico

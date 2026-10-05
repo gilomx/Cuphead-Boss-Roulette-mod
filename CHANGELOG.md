@@ -2,6 +2,10 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- El sidebar recupera su jerarquía tipográfica anterior: navegación normal y
+  activa, estado y pie vuelven a sus tamaños originales tanto en escritorio
+  como en layouts compactos. La escala nueva se conserva en el contenido.
+
 - Detener Batalla Molestosa desde el Dashboard libera inmediatamente su estado
   lógico aunque Cuphead esté sin foco, evitando que quede bloqueada en
   `stopping`; la limpieza de objetos de Unity permanece diferida y protegida.
