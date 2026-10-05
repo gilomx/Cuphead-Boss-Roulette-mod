@@ -12,6 +12,7 @@ const EVENT_TYPES: StreamEventType[] = [
   "follow",
   "subscription",
   "redemption",
+  "chat",
 ];
 const MAXIMUM_COUNT = 1_000;
 const MAXIMUM_AMOUNT = 1_000_000_000;
@@ -34,6 +35,7 @@ interface SimulationDraft {
   count: number;
   selectedItemId: string;
   delaySeconds: number;
+  chatText: string;
 }
 
 interface DashboardSimulatorFormProps {
@@ -62,6 +64,7 @@ function createSimulationDraft(
     count: source?.count ?? 1,
     selectedItemId: source?.selectedItemId ?? "",
     delaySeconds: source?.delaySeconds ?? 0,
+    chatText: source?.chatText ?? "1",
   };
 }
 
@@ -97,6 +100,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
     gifts.find((gift) => gift.giftId === simulation.selectedItemId);
   const canSubmit = simulationStatus !== "sending" && simulations.every((simulation) =>
     Boolean(simulation.displayName.trim()) &&
+    (simulation.type !== "chat" || /^[1-6]$/.test(simulation.chatText.trim())) &&
     (!isCatalogGift(simulation) || Boolean(selectedGift(simulation))));
   const multiple = simulations.length > 1;
 
@@ -184,6 +188,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
       userAvatarUrl: `/assets/creator-tools/simulator/avatars/${simulation.profileId}.jpg`,
       count: String(count),
       delaySeconds: String(delaySeconds),
+      chatText: simulation.type === "chat" ? simulation.chatText.trim() : "",
     });
     if (isCatalogGift(simulation) && gift) {
       query.set("giftId", gift.giftId);
@@ -338,7 +343,13 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                   />
                 </label>
 
-                {catalogGift ? (
+                {simulation.type === "chat" ? <label>
+                  <span>{t("dashboard.simulator.voteNumber")}</span>
+                  <select value={simulation.chatText} disabled={simulationStatus === "sending"}
+                    onChange={(event) => updateSimulation(simulation.key, (current) => ({ ...current, chatText: event.target.value }))}>
+                    {[1, 2, 3, 4, 5, 6].map((number) => <option key={number}>{number}</option>)}
+                  </select>
+                </label> : catalogGift ? (
                   <div>
                     <SearchableSelectField
                       id={`dashboard-simulator-item-${simulation.key}`}

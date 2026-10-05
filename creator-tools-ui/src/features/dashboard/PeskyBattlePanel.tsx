@@ -85,7 +85,7 @@ export function PeskyBattlePanel() {
   const slots = participantsBySlot(peskyBattle?.participants ?? [], capacity);
   const participantCount = slots.filter(Boolean).length;
   const rosterReady = participantCount === capacity;
-  const blockedByTapFarming = liveEvents?.activeEvent === "tap_farming";
+  const blockedByTapFarming = Boolean(liveEvents?.activeEvent && liveEvents.activeEvent !== "pesky_battle");
   const canArm = Boolean(
     peskyBattle?.ready && phase === "off" && giftDraft && selectedGift &&
     enabledItemCount > 0 && !blockedByTapFarming,
@@ -137,7 +137,7 @@ export function PeskyBattlePanel() {
             <AlertTriangle aria-hidden="true" />
             <div>
               <strong>{t("dashboard.liveEvents.conflict.title")}</strong>
-              <span>{t("dashboard.liveEvents.conflict.tapFarmingActive")}</span>
+              <span>{t("dashboard.chatChooses.blocked")}</span>
             </div>
           </div>
         ) : null}

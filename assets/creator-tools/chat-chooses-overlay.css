@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; color: #fff8e6; }
+body { display: grid; place-items: center; font-family: Memphis, 'Trebuchet MS', sans-serif; }
+[hidden] { display: none !important; }
+#event { position: absolute; left: 50%; top: 50%; width: 1480px; transform-origin: center; padding: 36px; border-radius: 38px; background: linear-gradient(145deg, #251430f2, #100c1bf2); border: 3px solid #e7bc78; box-shadow: 0 15px 40px #0006; }
+header { text-align: center; }
+header p { margin: 0 0 12px; font-size: 25px; color: #e7bc78; }
+h1 { font-size: 60px; line-height: 1.15; margin: 0 0 16px; text-transform: uppercase; }
+#instructions { color: #fff8e6; font-size: 24px; max-width: 1120px; margin: 0 auto 25px; }
+#options { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+#options[data-count="4"] { max-width: 1100px; margin: 0 auto; }
+.choice { width: 448px; position: relative; border: 2px solid #735476; border-radius: 24px; background: #ffffff08; padding: 20px 26px; text-align: center; transition: border-color .2s, opacity .2s, transform .2s; }
+.choice .number { position: absolute; top: 15px; left: 18px; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #e7bc78; color: #1d1126; font: bold 42px 'Trebuchet MS', sans-serif; }
+.choice img { display: block; width: 136px; height: 136px; object-fit: contain; margin: 0 auto 10px; }
+.choice h2 { margin: 0 0 10px; font-size: 29px; height: 70px; display: grid; place-items: center; }
+.bar { height: 12px; border-radius: 10px; overflow: hidden; background: #ffffff15; }
+.bar span { display: block; height: 100%; width: 0; background: #e7bc78; transition: width .3s ease; }
+.choice .votes { display: block; margin-top: 10px; font-size: 23px; }
+.choice[data-winner="true"] { border-color: #9de7a5; box-shadow: 0 0 20px #9de7a530; transform: translateY(-4px); }
+#event[data-phase="reveal"] .choice[data-winner="false"] { opacity: .4; }
+footer { display: grid; gap: 8px; text-align: center; margin-top: 25px; }
+#status { font-size: 33px; } #summary { color: #e7bc78; font-size: 22px; }
+#boss { display: grid; justify-items: center; gap: 8px; margin: 0 0 30px; }
+#boss img { width: 220px; height: 220px; object-fit: contain; } #boss strong { font-size: 43px; }
+#equipment { display: flex; justify-content: center; gap: 28px; }
+.equipment { width: 230px; text-align: center; display: grid; justify-items: center; gap: 8px; }
+.equipment img { width: 112px; height: 112px; object-fit: contain; }
+.equipment small { font-size: 23px; color: #e7bc78; } .equipment strong { font-size: 24px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

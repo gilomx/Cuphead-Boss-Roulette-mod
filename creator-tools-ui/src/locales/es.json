@@ -18,6 +18,32 @@
     "pesky": "Modo Molestoso"
   },
   "dashboard": {
+    "chatChooses": {
+      "title": "El chat elige",
+      "description": "El sistema propone; el chat decide la pelea.",
+      "mode": "Modo de partida",
+      "withChallenge": "Con reto",
+      "withoutChallenge": "Sin reto",
+      "start": "Iniciar evento",
+      "stop": "Detener evento",
+      "next": "Elegir {current} y continuar a {next}",
+      "voteHelp": "Vota escribiendo sólo el número de una opción. Un voto por persona; puedes cambiarlo mientras siga abierta la ronda.",
+      "blocked": "Termina el otro Evento Live antes de iniciar éste.",
+      "mapRequired": "Abre una partida y vuelve al mapa para iniciar el evento.",
+      "planeHelp": "El avión usa sus disparos y super propios. Se votan Amuleto y, si está activado, Reto.",
+      "progress": "Selecciones de la partida",
+      "votes": "{count} votos",
+      "vote": "{count} voto",
+      "overlay": "Overlay de votación",
+      "copyUrl": "Copiar URL para OBS",
+      "copied": "URL copiada",
+      "openOverlay": "Abrir overlay",
+      "overlayHelp": "Agrega esta URL como fuente de navegador en OBS a 1920 × 1080. La vista previa muestra el estado actual del evento.",
+      "stages": { "boss": "Jefe", "weapon1": "Disparo 1", "weapon2": "Disparo 2", "super": "Super", "charm": "Amuleto", "modifier": "Reto", "result": "Resultado" },
+      "phase": { "off": "Listo para iniciar", "voting": "Votación abierta", "reveal": "Ganador elegido", "result": "El chat eligió", "waiting_map": "Esperando el mapa", "countdown": "Cuenta regresiva", "loading": "Iniciando partida", "active": "Partida en curso", "completed": "Evento finalizado" },
+      "outcome": { "tie": "Empate: el sistema sorteó entre las opciones más votadas.", "no_votes": "Sin votos: el sistema sorteó entre las opciones presentadas.", "most_votes": "Ganó la opción más votada." },
+      "feedback": { "already_running": "El evento ya está en curso.", "invalid_action": "No se pudo aplicar esa configuración.", "map_required": "Vuelve al mapa de una partida antes de iniciar.", "blocked_by_live_event": "Otro Evento Live está en curso.", "stale_round": "Esta ronda ya se cerró. Espera a la siguiente.", "no_options": "No hay opciones compatibles disponibles.", "load_failed": "No se pudo iniciar el jefe elegido. Vuelve al mapa e inicia un nuevo evento.", "request_failed": "No se pudo confirmar la acción. Revisa la conexión con el juego." }
+    },
     "documentTitle": "La Pichi Ruleta — Dashboard",
     "title": "Dashboard",
     "description": "Observa las conexiones, eventos e interacciones de todas tus plataformas en un solo lugar.",
@@ -345,6 +371,7 @@
       "action": "Acción"
     },
     "eventTypes": {
+      "chat": "Voto del chat",
       "gift": "Regalo",
       "currency": "Monedas",
       "like": "Likes",
@@ -367,6 +394,7 @@
       "money": "valor"
     },
     "simulator": {
+      "voteNumber": "Número del voto",
       "eyebrow": "Laboratorio",
       "title": "Simular evento",
       "back": "Volver a eventos",
@@ -496,7 +524,10 @@
         "collectingColor": "Vida reunida",
         "textColor": "Texto",
         "outlineColor": "Contorno",
-        "alpha": "Opacidad"
+        "alpha": "Opacidad",
+        "hex": "HEX",
+        "open": "Abrir selector de color",
+        "close": "Cerrar selector de color"
       },
       "battleColors": {
         "title": "Colores de la batalla",

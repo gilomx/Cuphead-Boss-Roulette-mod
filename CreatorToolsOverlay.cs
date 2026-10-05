@@ -561,6 +561,8 @@ namespace Gilomx.CupheadBossRoulette
                     rearmExistingLevel ||
                     creatorToolsInteractionLevelStartObserved);
                 creatorToolsInteractions.PeskyBattleLevelStarted(level);
+                if (creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved)
+                    chatChoosesBattleSeen = true;
             }
             creatorToolsInteractionLevelStartObserved = false;
             Logger.LogInfo(
@@ -1354,6 +1356,7 @@ namespace Gilomx.CupheadBossRoulette
                     ObserveCreatorToolsPeskyBattleCommand);
                 creatorToolsServer.SetTapFarmingCommandHandler(
                     ObserveCreatorToolsTapFarmingCommand);
+                InitializeChatChooses();
             }
             if (creatorToolsDashboard != null)
                 creatorToolsServer.SetDashboardSimulationHandler(
@@ -1585,6 +1588,7 @@ namespace Gilomx.CupheadBossRoulette
 
             UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
+            UpdateChatChooses();
             if (creatorToolsInteractions != null)
             {
                 // Process control commands before stream events and backlog
@@ -1623,6 +1627,9 @@ namespace Gilomx.CupheadBossRoulette
         private CreatorToolsStreamEvaluation EvaluateCreatorToolsStreamEvent(
             CreatorToolsStreamEvent streamEvent)
         {
+            if (streamEvent.Type == "chat")
+                return new CreatorToolsStreamEvaluation { MessageCode = creatorToolsChatChooses == null
+                    ? string.Empty : creatorToolsChatChooses.Observe(streamEvent) };
             var battleObservation = creatorToolsInteractions == null
                 ? new CreatorToolsPeskyBattleObservation(
                     string.Empty, true)
@@ -1679,6 +1686,7 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsServer.SetInteractionControlObserver(null);
                 creatorToolsServer.SetPeskyBattleCommandHandler(null);
                 creatorToolsServer.SetTapFarmingCommandHandler(null);
+                creatorToolsServer.SetChatChoosesController(null, null);
                 creatorToolsServer.SetOverlayComposerController(null);
             }
             if (creatorToolsStreamWorker != null)

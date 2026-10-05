@@ -1,0 +1,116 @@
+{
+  "es": {
+    "title": "El chat elige",
+    "description": "El sistema propone; el chat decide la pelea.",
+    "mode": "Modo de partida",
+    "withChallenge": "Con reto",
+    "withoutChallenge": "Sin reto",
+    "start": "Iniciar evento",
+    "stop": "Detener evento",
+    "next": "Elegir {current} y continuar a {next}",
+    "voteHelp": "Vota escribiendo sólo el número de una opción. Un voto por persona; puedes cambiarlo mientras siga abierta la ronda.",
+    "blocked": "Termina el otro Evento Live antes de iniciar éste.",
+    "mapRequired": "Abre una partida y vuelve al mapa para iniciar el evento.",
+    "planeHelp": "El avión usa sus disparos y super propios. Se votan Amuleto y, si está activado, Reto.",
+    "progress": "Selecciones de la partida",
+    "votes": "{count} votos",
+    "vote": "{count} voto",
+    "overlay": "Overlay de votación",
+    "copyUrl": "Copiar URL para OBS",
+    "copied": "URL copiada",
+    "openOverlay": "Abrir overlay",
+    "overlayHelp": "Agrega esta URL como fuente de navegador en OBS a 1920 × 1080. La vista previa muestra el estado actual del evento.",
+    "stages": {
+      "boss": "Jefe",
+      "weapon1": "Disparo 1",
+      "weapon2": "Disparo 2",
+      "super": "Super",
+      "charm": "Amuleto",
+      "modifier": "Reto",
+      "result": "Resultado"
+    },
+    "phase": {
+      "off": "Listo para iniciar",
+      "voting": "Votación abierta",
+      "reveal": "Ganador elegido",
+      "result": "El chat eligió",
+      "waiting_map": "Esperando el mapa",
+      "countdown": "Cuenta regresiva",
+      "loading": "Iniciando partida",
+      "active": "Partida en curso",
+      "completed": "Evento finalizado"
+    },
+    "outcome": {
+      "tie": "Empate: el sistema sorteó entre las opciones más votadas.",
+      "no_votes": "Sin votos: el sistema sorteó entre las opciones presentadas.",
+      "most_votes": "Ganó la opción más votada."
+    },
+    "feedback": {
+      "already_running": "El evento ya está en curso.",
+      "invalid_action": "No se pudo aplicar esa configuración.",
+      "map_required": "Vuelve al mapa de una partida antes de iniciar.",
+      "blocked_by_live_event": "Otro Evento Live está en curso.",
+      "stale_round": "Esta ronda ya se cerró. Espera a la siguiente.",
+      "no_options": "No hay opciones compatibles disponibles.",
+      "load_failed": "No se pudo iniciar el jefe elegido. Vuelve al mapa e inicia un nuevo evento.",
+      "request_failed": "No se pudo confirmar la acción. Revisa la conexión con el juego."
+    }
+  },
+  "en": {
+    "title": "The chat chooses",
+    "description": "The system proposes; the chat decides the fight.",
+    "mode": "Match mode",
+    "withChallenge": "With challenge",
+    "withoutChallenge": "Without challenge",
+    "start": "Start event",
+    "stop": "Stop event",
+    "next": "Choose {current} and continue to {next}",
+    "voteHelp": "Vote by sending only an option number. One vote per person; you can change it while the round is open.",
+    "blocked": "Finish the other Live Event before starting this one.",
+    "mapRequired": "Open a save and return to the map to start the event.",
+    "planeHelp": "The plane uses its own weapons and super. Vote for Charm and, when enabled, Challenge.",
+    "progress": "Match selections",
+    "votes": "{count} votes",
+    "vote": "{count} vote",
+    "overlay": "Voting overlay",
+    "copyUrl": "Copy URL for OBS",
+    "copied": "URL copied",
+    "openOverlay": "Open overlay",
+    "overlayHelp": "Add this URL as an OBS browser source at 1920 × 1080. The preview shows the event's current state.",
+    "stages": {
+      "boss": "Boss",
+      "weapon1": "Weapon 1",
+      "weapon2": "Weapon 2",
+      "super": "Super",
+      "charm": "Charm",
+      "modifier": "Challenge",
+      "result": "Result"
+    },
+    "phase": {
+      "off": "Ready to start",
+      "voting": "Voting open",
+      "reveal": "Winner selected",
+      "result": "The chat chose",
+      "waiting_map": "Waiting for the map",
+      "countdown": "Countdown",
+      "loading": "Starting match",
+      "active": "Match in progress",
+      "completed": "Event finished"
+    },
+    "outcome": {
+      "tie": "Tie: the system picked randomly among the top options.",
+      "no_votes": "No votes: the system picked randomly among all presented options.",
+      "most_votes": "The option with the most votes won."
+    },
+    "feedback": {
+      "already_running": "The event is already running.",
+      "invalid_action": "Could not apply that configuration.",
+      "map_required": "Return to a save's map before starting.",
+      "blocked_by_live_event": "Another Live Event is running.",
+      "stale_round": "This round has already closed. Wait for the next round.",
+      "no_options": "No compatible options are available.",
+      "load_failed": "Could not start the chosen boss. Return to the map and start a new event.",
+      "request_failed": "Could not confirm the action. Check the connection to the game."
+    }
+  }
+}

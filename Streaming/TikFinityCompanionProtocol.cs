@@ -66,7 +66,7 @@ namespace Gilomx.CupheadBossRoulette
             var type = Identifier(CreatorToolsFlatJson.Value(values, "type"));
             if (type != "gift" && type != "currency" &&
                 type != "like" && type != "follow" &&
-                type != "subscription" && type != "redemption")
+                type != "subscription" && type != "redemption" && type != "chat")
                 return false;
             var eventId = Text(CreatorToolsFlatJson.Value(
                 values, "eventId"), string.Empty, 160);
@@ -103,6 +103,8 @@ namespace Gilomx.CupheadBossRoulette
                         values, "userAvatarUrl"), string.Empty, 2048),
                     UserId = Text(CreatorToolsFlatJson.Value(
                         values, "userId"), string.Empty, 160),
+                    ChatText = Text(CreatorToolsFlatJson.Value(
+                        values, "chatText"), string.Empty, 16),
                     ItemId = Text(CreatorToolsFlatJson.Value(
                         values, "itemId"), string.Empty, 160),
                     ItemName = Text(CreatorToolsFlatJson.Value(

@@ -86,6 +86,7 @@ export function DashboardEventsPanel({
   };
 
   const eventSummary = (event: DashboardEvent) => {
+    if (event.type === "chat") return event.chatText ?? "";
     if (event.itemName) {
       return `${event.count && event.count > 1 ? `${event.count} × ` : ""}${event.itemName}`;
     }

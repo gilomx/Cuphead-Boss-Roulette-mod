@@ -1,0 +1,142 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using Gilomx.CupheadBossRoulette;
+
+static class Program
+{
+    static DateTime now;
+    static int assertions;
+    static void Assert(bool value, string message)
+    { assertions++; if (!value) throw new Exception(message); }
+    static JsonElement State(CreatorToolsChatChoosesController c) => JsonDocument.Parse(c.Snapshot()).RootElement.Clone();
+    static ChatChoice Option(int id, bool none = false, string kind = "both", bool plane = false) =>
+        new ChatChoice { Id = id, Name = "Option " + id, Image = "weapons/vacio.png", None = none, Kind = kind, Plane = plane };
+    static ChatChoosesCatalog Catalog(bool plane = false, int size = 9)
+    {
+        var catalog = new ChatChoosesCatalog();
+        foreach (var key in new[] { "boss", "weapon1", "weapon2", "charm" })
+            catalog.Pools[key] = Enumerable.Range(0, size).Select(i => Option(i, key != "boss" && i == size - 1, plane: key == "boss" && plane)).ToList();
+        catalog.Pools["super"] = Enumerable.Range(0, 4).Select(i => Option(i, i == 3)).ToList();
+        catalog.Pools["modifier"] = new List<ChatChoice> { Option(0, kind: "ground"), Option(1, kind: "plane"), Option(2, true) };
+        return catalog;
+    }
+    static CreatorToolsChatChoosesController New(bool challenge = true, bool plane = false, CreatorToolsLiveEventsCoordinator coordinator = null)
+    {
+        now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        var c = new CreatorToolsChatChoosesController(coordinator ?? new CreatorToolsLiveEventsCoordinator(), challenge, new Random(123), () => now);
+        c.SetCatalog(Catalog(plane), true);
+        Assert(c.Command("operation=start&mode=" + (challenge ? "with" : "without")), "start");
+        return c;
+    }
+    static string Close(CreatorToolsChatChoosesController c)
+    {
+        var state = State(c);
+        var query = $"operation=next&sessionId={state.GetProperty("sessionId")}&round={state.GetProperty("round")}";
+        Assert(c.Command(query), "close round");
+        return query;
+    }
+    static void Advance(CreatorToolsChatChoosesController c) { now = now.AddSeconds(2); c.Tick(); }
+    static CreatorToolsStreamEvent Vote(string user, string number, DateTime? received = null) => new CreatorToolsStreamEvent
+    { Platform = "tiktok", Type = "chat", UserId = user, ChatText = number, ReceivedAt = (received ?? now).ToString("O") };
+    static void Main()
+    {
+        var c = New();
+        Assert(State(c).GetProperty("options").GetArrayLength() == 6, "six bosses");
+        Assert(State(c).GetProperty("options").EnumerateArray().Select(o => o.GetProperty("id").GetInt32()).Distinct().Count() == 6, "no duplicate options");
+        Assert(c.Observe(Vote("A", "1")) == "chat_vote_counted", "count vote");
+        Assert(c.Observe(Vote("A", "1")) == "chat_vote_unchanged", "same vote idempotent");
+        Assert(c.Observe(Vote("A", "2")) == "chat_vote_counted", "change vote");
+        Assert(State(c).GetProperty("totalVotes").GetInt32() == 1, "one vote per user");
+        Assert(State(c).GetProperty("options")[0].GetProperty("votes").GetInt32() == 0, "previous vote removed");
+        Assert(c.Observe(Vote("A", "2!")) == "", "exact digit only");
+        Assert(c.Observe(Vote("B", "1", now.AddSeconds(-10))) == "", "ignore old backlog");
+        var close = Close(c);
+        Assert(State(c).GetProperty("winnerNumber").GetInt32() == 2, "plurality winner");
+        Assert(c.Observe(Vote("B", "1")) == "", "closed round ignores votes");
+        Assert(!c.Command(close), "double click cannot close another round");
+        Advance(c);
+        Assert(!c.Command(close), "stale token rejected after next round");
+        Assert(State(c).GetProperty("stage").GetString() == "weapon1", "next weapon1");
+        Assert(State(c).GetProperty("totalVotes").GetInt32() == 0, "votes reset");
+        Assert(State(c).GetProperty("options").EnumerateArray().All(o => !o.GetProperty("none").GetBoolean()), "weapon1 cannot be none");
+        Assert(!c.Command("operation=save&mode=without"), "mode locked");
+        Close(c); Advance(c);
+        var weapon1 = State(c).GetProperty("selected").GetProperty("weapon1").GetProperty("id").GetInt32();
+        Assert(State(c).GetProperty("options").EnumerateArray().All(o => o.GetProperty("id").GetInt32() != weapon1), "weapon2 excludes weapon1");
+        Close(c); Advance(c);
+        Assert(State(c).GetProperty("options").GetArrayLength() == 4, "all supers plus none");
+        Assert(State(c).GetProperty("options").EnumerateArray().Any(o => o.GetProperty("none").GetBoolean()), "super includes none");
+        Close(c); Advance(c); Close(c); Advance(c);
+        Assert(State(c).GetProperty("stage").GetString() == "modifier", "challenge round");
+        Assert(State(c).GetProperty("options").EnumerateArray().All(o => o.GetProperty("id").GetInt32() != 1), "exclude plane-only challenge for ground boss");
+        c.Observe(Vote("X", "1")); c.Observe(Vote("Y", "2")); Close(c);
+        Assert(State(c).GetProperty("outcome").GetString() == "tie", "tie breaker");
+        Assert(new[] { 1, 2 }.Contains(State(c).GetProperty("winnerNumber").GetInt32()), "tie winner among leaders");
+        Advance(c);
+        Assert(State(c).GetProperty("phase").GetString() == "result", "result card");
+        int[] chosen;
+        Assert(!c.TryBeginLoad(out chosen), "no premature load");
+        now = now.AddSeconds(5); c.Tick();
+        Assert(State(c).GetProperty("phase").GetString() == "countdown", "five second display before countdown");
+        c.SetCatalog(null, false); c.Tick();
+        Assert(State(c).GetProperty("phase").GetString() == "waiting_map", "wait if map unavailable");
+        c.SetCatalog(null, true); c.Tick(); now = now.AddSeconds(3);
+        Assert(c.TryBeginLoad(out chosen) && chosen.Length == 6, "begin canonical load");
+        Assert(!c.TryBeginLoad(out chosen), "load once only");
+        c.Loaded(true); c.ReturnedToMap();
+        Assert(!c.Reserved && State(c).GetProperty("phase").GetString() == "completed", "release on return");
+
+        c = New(false);
+        for (var i = 0; i < 5; i++) { Close(c); Advance(c); }
+        Assert(State(c).GetProperty("phase").GetString() == "result", "without challenge skips round");
+        Assert(!State(c).GetProperty("selected").TryGetProperty("modifier", out _), "without challenge never chooses one");
+        Assert(State(c).GetProperty("outcome").GetString() == "no_votes", "zero votes use random choice");
+
+        c = New(true, true);
+        Close(c); Advance(c);
+        Assert(State(c).GetProperty("stage").GetString() == "charm", "plane skips regular weapons and supers");
+        Close(c); Advance(c);
+        Assert(State(c).GetProperty("options").EnumerateArray().All(o => o.GetProperty("id").GetInt32() != 0), "plane challenge compatibility");
+
+        // Relics that randomize ground weapons cannot override previous chat choices.
+        c.Command("operation=stop");
+        var relicCatalog = Catalog(size: 6);
+        relicCatalog.Pools["charm"][0].RandomWeapons = true;
+        c.SetCatalog(relicCatalog, true);
+        c.Command("operation=start&mode=with");
+        for (var i = 0; i < 4; i++) { Close(c); Advance(c); }
+        Assert(State(c).GetProperty("options").EnumerateArray().All(o => o.GetProperty("id").GetInt32() != 0), "ground excludes random-weapon relic");
+        c.Command("operation=stop");
+        relicCatalog.Pools["boss"].ForEach(option => option.Plane = true);
+        c.SetCatalog(relicCatalog, true); c.Command("operation=start&mode=with");
+        Close(c); Advance(c);
+        Assert(State(c).GetProperty("options").EnumerateArray().Any(o => o.GetProperty("id").GetInt32() == 0), "plane keeps compatible relics");
+
+        c = New(false, true);
+        Close(c); Advance(c); Close(c); Advance(c);
+        now = now.AddSeconds(5); c.Tick(); now = now.AddSeconds(3);
+        Assert(c.TryBeginLoad(out chosen), "prepare load failure test");
+        c.Loaded(false);
+        Assert(!c.Reserved && State(c).GetProperty("feedback").GetString() == "load_failed", "load failure releases lease");
+        Assert(c.Command("operation=start&mode=without"), "can restart after failed load");
+
+        var coordinator = new CreatorToolsLiveEventsCoordinator();
+        c = New(coordinator: coordinator);
+        CreatorToolsLiveEventLease lease; string blocker;
+        Assert(!coordinator.TryAcquire("pesky_battle", out lease, out blocker), "exclusive live event");
+        Assert(c.Command("operation=stop") && !c.Reserved, "cancel releases reservation immediately");
+        Assert(coordinator.TryAcquire("tap_farming", out lease, out blocker), "other event allowed after stop");
+        Assert(!c.Command("operation=start&mode=with"), "start blocked by other live event");
+        coordinator.CompleteRelease(lease);
+        Assert(c.Command("operation=start&mode=without"), "restart after stop");
+        now = now.AddSeconds(30); c.Tick();
+        Assert(State(c).GetProperty("phase").GetString() == "voting", "old deadlines cannot advance new event");
+        c.Command("operation=stop");
+        c.SetCatalog(new ChatChoosesCatalog(), true);
+        c.Command("operation=start&mode=with");
+        Assert(!c.Reserved && State(c).GetProperty("feedback").GetString() == "no_options", "empty catalog releases lease");
+        Console.WriteLine($"Chat chooses: {assertions} assertions passed.");
+    }
+}

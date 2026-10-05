@@ -19,3 +19,7 @@ const catalog = Object.fromEntries([...source.matchAll(/\{\s*id:\s*"([^"]+)"([\s
 }));
 writeFileSync(resolve(ui, "../assets/creator-tools/overlay-interactions.js"),
   `// Generated from interactionCatalog.ts and locales by npm run build.\nwindow.CreatorToolsOverlayInteractions = ${JSON.stringify(catalog, null, 2)};\n`);
+
+writeFileSync(resolve(ui, "../assets/creator-tools/chat-chooses-labels.json"),
+  JSON.stringify(Object.fromEntries(Object.entries(translations).map(([locale, messages]) =>
+    [locale, messages.dashboard.chatChooses])), null, 2) + "\n");

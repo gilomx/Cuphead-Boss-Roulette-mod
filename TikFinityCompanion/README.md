@@ -68,16 +68,18 @@ Semántica principal:
   acumulado. `unit` es `coin`; `currency` queda `null` porque Coins no es una
   divisa ISO.
 - `eventId` conserva `msgId`/`eventId` si existe. Si no existe, se genera un ID
-  estable a partir del tipo y del JSON de `data`.
+  estable a partir del tipo y del JSON de `data`, excepto para votos del chat:
+  éstos reciben un ID nuevo para permitir cambiar de `1` a `2` y volver a `1`.
 - `idempotencyKey` es un SHA-256 determinista con prefijo `tfn1:`. En regalos
   incluye evento, racha, conteo y estado para deduplicar reenvíos idénticos sin
   confundir una actualización provisional con el cierre.
 - `receivedAt` es la hora UTC en que el acompañante recibió el mensaje, no una
   hora prometida por TikFinity.
 - `type` traduce `subscribe` a `subscription`. Los mensajes que el contrato
-  actual puede accionar son `gift`, `like`, `follow` y `subscription`.
-  `chat`, `share`, `roomUser` y tipos desconocidos se descartan silenciosamente
-  en el límite del adaptador para no inundar al mod.
+  actual puede accionar son `gift`, `like`, `follow`, `subscription` y `chat`.
+  `chat` (o `comment`) sólo transmite un número de `1` a `6`, sin otro texto,
+  en `chatText`, para «El chat elige». El resto del chat, `share`, `roomUser`
+  y tipos desconocidos se descartan en el adaptador para no inundar al mod.
 
 ### Rachas de regalos
 

@@ -1,4 +1,4 @@
-import { ChevronRight, MousePointerClick, Swords, Users } from "lucide-react";
+import { ChevronRight, MousePointerClick, Swords, Users, Vote } from "lucide-react";
 import type { Ref } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
@@ -6,6 +6,8 @@ import { useLocalization } from "../../i18n/LocalizationContext";
 interface LiveEventsSectionProps {
   onOpenPeskyBattle: () => void;
   onOpenTapFarming: () => void;
+  onOpenChatChooses: () => void;
+  chatChoosesCardRef?: Ref<HTMLButtonElement>;
   peskyBattleCardRef?: Ref<HTMLButtonElement>;
   tapFarmingCardRef?: Ref<HTMLButtonElement>;
 }
@@ -13,10 +15,12 @@ interface LiveEventsSectionProps {
 export function LiveEventsSection({
   onOpenPeskyBattle,
   onOpenTapFarming,
+  onOpenChatChooses,
+  chatChoosesCardRef,
   peskyBattleCardRef,
   tapFarmingCardRef,
 }: LiveEventsSectionProps) {
-  const { liveEvents, peskyBattle, tapFarming } = useConfig();
+  const { liveEvents, peskyBattle, tapFarming, chatChooses } = useConfig();
   const { locale, t } = useLocalization();
   const phase = peskyBattle?.phase ?? "off";
   const tapPhase = tapFarming?.phase ?? "off";
@@ -42,6 +46,18 @@ export function LiveEventsSection({
       </div>
 
       <div className="dashboard-live-event-grid">
+        <button ref={chatChoosesCardRef} className="dashboard-live-event-card" type="button"
+          data-active={activeEvent === "chat_chooses"} onClick={onOpenChatChooses}>
+          <span className="dashboard-live-event-card__icon" aria-hidden="true"><Vote /></span>
+          <span className="dashboard-live-event-card__copy">
+            <strong>{t("dashboard.chatChooses.title")}</strong>
+            <small>{t("dashboard.chatChooses.description")}</small>
+          </span>
+          <span className="dashboard-live-event-card__meta">
+            <span>{t(`dashboard.chatChooses.phase.${chatChooses?.phase ?? "off"}`)}</span>
+          </span>
+          <ChevronRight className="dashboard-live-event-card__arrow" aria-hidden="true" />
+        </button>
         <button
           ref={peskyBattleCardRef}
           className="dashboard-live-event-card"

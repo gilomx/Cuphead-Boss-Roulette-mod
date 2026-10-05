@@ -54,6 +54,9 @@ namespace Gilomx.CupheadBossRoulette
         private readonly object tapFarmingLock = new object();
         private readonly object tapFarmingProcessingLock = new object();
         private readonly object liveEventsLock = new object();
+        private readonly object chatChoosesProcessingLock = new object();
+        private CreatorToolsChatChoosesController chatChooses;
+        private Func<string, bool> chatChoosesCommandHandler;
         private readonly object streamRulesLock = new object();
         private readonly object streamRulesProcessingLock = new object();
         private readonly Queue<string> streamRuleCommands =
@@ -158,6 +161,14 @@ namespace Gilomx.CupheadBossRoulette
             "\"engineActive\":false,\"rules\":[]}";
 
         internal int Port { get; private set; }
+
+        internal void SetChatChoosesController(CreatorToolsChatChoosesController controller, Func<string, bool> handler)
+        {
+            lock (chatChoosesProcessingLock) { chatChooses = controller; chatChoosesCommandHandler = handler; }
+        }
+
+        internal void ApplyChatChoosesMainThreadActions(Action action)
+        { lock (chatChoosesProcessingLock) action(); }
 
         internal bool IsRunning
         {
@@ -1247,6 +1258,8 @@ namespace Gilomx.CupheadBossRoulette
                 path == "/config/tap-farming" ||
                 path == "/config/tap-farming/" ||
                 path == "/config/tap-farming.html" ||
+                path == "/config/chat-chooses" ||
+                path == "/config/chat-chooses/" ||
                 path == "/config/overlay-designer" ||
                 path == "/config/overlay-designer/" ||
                 path == "/config/overlay-designer.html" ||
@@ -1868,6 +1881,32 @@ namespace Gilomx.CupheadBossRoulette
                         ? "{\"ok\":true}"
                         : "{\"ok\":false,\"error\":" +
                           "\"tap_farming_command_rejected\"}"), false);
+                return;
+            }
+            if (path == "/api/config/chat-chooses" || path == "/api/config/chat-chooses/set")
+            {
+                string json;
+                var accepted = true;
+                var statusCode = 200;
+                lock (chatChoosesProcessingLock)
+                {
+                    if (path.EndsWith("/set"))
+                    {
+                        if (request.Method != "GET" || (request.Query ?? "").Length > 512 || chatChoosesCommandHandler == null)
+                            accepted = false;
+                        else accepted = chatChoosesCommandHandler(request.Query);
+                        statusCode = accepted ? 202 : 409;
+                    }
+                    json = chatChooses == null ? "{\"ready\":false}" : chatChooses.Snapshot();
+                }
+                WriteResponse(stream, statusCode, accepted ? "OK" : "Conflict",
+                    "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/chat-chooses-overlay" || path == "/chat-chooses-overlay/")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory, "creator-tools\\chat-chooses-overlay.html"),
+                    "text/html; charset=utf-8", false, true);
                 return;
             }
             if (path == "/api/config/live-events")

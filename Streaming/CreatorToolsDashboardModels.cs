@@ -99,6 +99,8 @@ namespace Gilomx.CupheadBossRoulette
                 builder, entry.UserAvatarUrl);
             builder.Append(",\"userId\":");
             CreatorToolsJson.AppendNullableString(builder, entry.UserId);
+            builder.Append(",\"chatText\":");
+            CreatorToolsJson.AppendNullableString(builder, entry.ChatText);
             builder.Append(",\"itemId\":");
             CreatorToolsJson.AppendNullableString(builder, entry.ItemId);
             builder.Append(",\"itemName\":");

@@ -85,12 +85,14 @@ interface DashboardViewProps {
   onOpenInteractions: () => void;
   onOpenPeskyBattle: () => void;
   onOpenTapFarming: () => void;
+  onOpenChatChooses: () => void;
 }
 
 export function DashboardView({
   onOpenInteractions,
   onOpenPeskyBattle,
   onOpenTapFarming,
+  onOpenChatChooses,
 }: DashboardViewProps) {
   const { locale, t } = useLocalization();
   const [dashboard, setDashboard] = useState<DashboardState>(EMPTY_STATE);
@@ -98,6 +100,7 @@ export function DashboardView({
   const latestDashboardRequest = useRef(0);
   const peskyBattleCardRef = useRef<HTMLButtonElement>(null);
   const tapFarmingCardRef = useRef<HTMLButtonElement>(null);
+  const chatChoosesCardRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const navigationState = window.history.state as {
@@ -105,10 +108,13 @@ export function DashboardView({
       [key: string]: unknown;
     } | null;
     if (navigationState?.focusLiveEvent !== "peskyBattle" &&
-        navigationState?.focusLiveEvent !== "tapFarming") return;
+        navigationState?.focusLiveEvent !== "tapFarming" &&
+        navigationState?.focusLiveEvent !== "chatChooses") return;
 
     const frame = window.requestAnimationFrame(() => {
-      if (navigationState.focusLiveEvent === "tapFarming") {
+      if (navigationState.focusLiveEvent === "chatChooses") {
+        chatChoosesCardRef.current?.focus();
+      } else if (navigationState.focusLiveEvent === "tapFarming") {
         tapFarmingCardRef.current?.focus();
       } else {
         peskyBattleCardRef.current?.focus();
@@ -207,6 +213,8 @@ export function DashboardView({
       <LiveEventsSection
         onOpenPeskyBattle={onOpenPeskyBattle}
         onOpenTapFarming={onOpenTapFarming}
+        onOpenChatChooses={onOpenChatChooses}
+        chatChoosesCardRef={chatChoosesCardRef}
         peskyBattleCardRef={peskyBattleCardRef}
         tapFarmingCardRef={tapFarmingCardRef}
       />

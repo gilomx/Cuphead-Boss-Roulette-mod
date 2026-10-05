@@ -44,7 +44,7 @@ export function TapFarmingPanel() {
   );
   const phase = tapFarming?.phase ?? "off";
   const locked = phase !== "off";
-  const blockedByPeskyBattle = liveEvents?.activeEvent === "pesky_battle";
+  const blockedByPeskyBattle = Boolean(liveEvents?.activeEvent && liveEvents.activeEvent !== "tap_farming");
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
 
   useEffect(() => {
@@ -152,7 +152,7 @@ export function TapFarmingPanel() {
           <AlertTriangle aria-hidden="true" />
           <div>
             <strong>{t("dashboard.liveEvents.conflict.title")}</strong>
-            <span>{t("dashboard.liveEvents.conflict.peskyBattleActive")}</span>
+            <span>{t("dashboard.chatChooses.blocked")}</span>
           </div>
         </div>
       ) : null}

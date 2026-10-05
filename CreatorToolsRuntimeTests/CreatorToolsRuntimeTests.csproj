@@ -73,6 +73,8 @@
              Link="Product\CreatorToolsDashboardController.cs" />
     <Compile Include="..\CreatorToolsServer.cs"
              Link="Product\CreatorToolsServer.cs" />
+    <Compile Include="..\CreatorToolsChatChoosesController.cs" />
+    <Compile Include="..\CreatorToolsLiveEventsCoordinator.cs" />
     <Compile Include="..\CreatorToolsOverlayComposerController.cs"
              Link="Product\CreatorToolsOverlayComposerController.cs" />
     <Compile Include="..\CreatorToolsOverlayComposerSettings.cs"

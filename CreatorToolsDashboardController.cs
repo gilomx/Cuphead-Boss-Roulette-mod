@@ -338,6 +338,7 @@ namespace Gilomx.CupheadBossRoulette
                     Value(values, "userAvatarUrl"), string.Empty, 2048),
                 UserId = NormalizeText(
                     Value(values, "userId"), string.Empty, 160),
+                ChatText = NormalizeText(Value(values, "chatText"), string.Empty, 16),
                 ItemId = giftId,
                 Count = count,
                 UnitValue = count > 0 ? totalValue / count : totalValue,
@@ -556,7 +557,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             return value == "gift" || value == "currency" ||
                 value == "like" || value == "follow" ||
-                value == "subscription" || value == "redemption";
+                value == "subscription" || value == "redemption" || value == "chat";
         }
 
         private static string DefaultUnit(

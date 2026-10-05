@@ -191,7 +191,38 @@ export interface PeskyBattleConfigState {
   error: boolean;
 }
 
-export type LiveEventId = "pesky_battle" | "tap_farming";
+export type LiveEventId = "pesky_battle" | "tap_farming" | "chat_chooses";
+
+export type ChatChoosesStage = "boss" | "weapon1" | "weapon2" | "super" | "charm" | "modifier" | "result";
+export interface ChatChoiceOption {
+  id: number;
+  name: string;
+  image: string;
+  none: boolean;
+  number?: number;
+  votes?: number;
+}
+export interface ChatChoosesState {
+  ready: boolean;
+  revision: number;
+  sessionId: number;
+  round: number;
+  phase: "off" | "voting" | "reveal" | "result" | "waiting_map" | "countdown" | "loading" | "active" | "completed";
+  stage: ChatChoosesStage;
+  nextStage: ChatChoosesStage;
+  withChallenge: boolean;
+  plane: boolean;
+  mapAvailable: boolean;
+  remainingSeconds: number;
+  totalVotes: number;
+  winnerNumber: number;
+  outcome: "" | "tie" | "no_votes" | "most_votes";
+  blockedByLiveEvent: LiveEventId | "";
+  feedback: string;
+  error: boolean;
+  options: ChatChoiceOption[];
+  selected: Partial<Record<ChatChoosesStage, ChatChoiceOption>>;
+}
 
 export interface LiveEventsConfigState {
   ready: boolean;
@@ -362,7 +393,8 @@ export type StreamEventType =
   | "like"
   | "follow"
   | "subscription"
-  | "redemption";
+  | "redemption"
+  | "chat";
 
 export interface DashboardConnection {
   id: string;
@@ -418,6 +450,7 @@ export interface DashboardEvent {
   currency?: string | null;
   count?: number;
   itemName?: string;
+  chatText?: string;
   itemId?: string | null;
   itemImageUrl?: string | null;
   isCommunityGift?: boolean;

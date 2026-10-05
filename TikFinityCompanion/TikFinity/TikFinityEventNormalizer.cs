@@ -126,6 +126,15 @@ internal sealed class TikFinityEventNormalizer
         if (!IsEmittedType(type))
             return;
 
+        var chatText = type == "chat"
+            ? CleanOptional(JsonFieldReader.String(data, "comment", "text", "message"))
+            : null;
+        // Only numeric ballot messages cross the legacy Unity boundary.
+        // General LIVE chatter cannot fill the gameplay event queue.
+        if (type == "chat" && (chatText is null || chatText.Length != 1 ||
+            chatText[0] < '1' || chatText[0] > '6'))
+            return;
+
         var userName = CleanOptional(JsonFieldReader.String(
             data,
             "uniqueId",
@@ -244,7 +253,9 @@ internal sealed class TikFinityEventNormalizer
             "common.msgId",
             "common.msg_id"));
         var dataFingerprint = Fingerprint(rawEventType + "\n" + data.GetRawText());
-        var eventId = upstreamEventId ?? "generated:" + dataFingerprint;
+        var eventId = upstreamEventId ?? (type == "chat"
+            ? "chat:" + Guid.NewGuid().ToString("N")
+            : "generated:" + dataFingerprint);
         var idempotencyKey = BuildIdempotencyKey(
             rawEventType,
             eventId,
@@ -261,6 +272,7 @@ internal sealed class TikFinityEventNormalizer
             UserName = userName,
             UserDisplayName = userDisplayName,
             UserId = userId,
+            ChatText = chatText,
             UserAvatarUrl = userAvatarUrl,
             ItemId = itemId,
             ItemName = itemName,
@@ -481,11 +493,7 @@ internal sealed class TikFinityEventNormalizer
 
     private static bool IsEmittedType(string type)
     {
-        // The mod's v1 boundary currently accepts only actionable TikTok
-        // event types. Chat, shares, room-user updates, and unknown future
-        // types are intentionally dropped here so a busy LIVE cannot flood
-        // the protocol reader with unsupported messages.
-        return type is "gift" or "like" or "follow" or "subscription";
+        return type is "gift" or "like" or "follow" or "subscription" or "chat";
     }
 
     private static string? CleanOptional(string? value)

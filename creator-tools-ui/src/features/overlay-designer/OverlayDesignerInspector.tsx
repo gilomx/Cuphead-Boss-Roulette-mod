@@ -1,5 +1,5 @@
 import { Activity, HeartPulse, MousePointerClick, RotateCcw, Swords, Users } from "lucide-react";
-import { useState, type Dispatch } from "react";
+import { useEffect, useRef, useState, type Dispatch } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { interactionItems } from "../interactions/interactionCatalog";
 import type {
@@ -53,6 +53,148 @@ function colorWithOpacity(value: string, opacity: number) {
 function colorWithBase(value: string, base: string) {
   const alpha = /^#[0-9a-f]{8}$/i.test(value) ? value.slice(7, 9) : "ff";
   return `${base}${alpha}`.toLowerCase();
+}
+
+interface OverlayColorPickerProps {
+  label: string;
+  value: string;
+  disabled: boolean;
+  alphaLabel: string;
+  hexLabel: string;
+  openLabel: string;
+  closeLabel: string;
+  onChange: (value: string) => void;
+}
+
+function OverlayColorPicker({
+  label,
+  value,
+  disabled,
+  alphaLabel,
+  hexLabel,
+  openLabel,
+  closeLabel,
+  onChange,
+}: OverlayColorPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [hexDraft, setHexDraft] = useState(colorBase(value).toUpperCase());
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setHexDraft(colorBase(value).toUpperCase());
+  }, [value]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeFromOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeFromOutside);
+    document.addEventListener("keydown", closeFromKeyboard);
+    return () => {
+      document.removeEventListener("pointerdown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromKeyboard);
+    };
+  }, [open]);
+
+  const commitHex = () => {
+    const normalized = hexDraft.trim().toUpperCase();
+    if (/^#[0-9A-F]{6}$/.test(normalized)) {
+      onChange(colorWithBase(value, normalized));
+      setHexDraft(normalized);
+      return;
+    }
+    setHexDraft(colorBase(value).toUpperCase());
+  };
+
+  const opacity = colorOpacity(value);
+
+  return (
+    <div
+      className="overlay-designer-color-picker"
+      data-open={open}
+      ref={rootRef}
+    >
+      <span className="overlay-designer-color-picker__label">{label}</span>
+      <button
+        className="overlay-designer-color-picker__trigger"
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        aria-label={`${openLabel}: ${label}`}
+        onClick={() => setOpen(current => !current)}
+      >
+        <i aria-hidden="true"><b style={{ backgroundColor: value }} /></i>
+        <code>{colorBase(value).toUpperCase()}</code>
+        <output>{opacity}%</output>
+      </button>
+
+      {open ? (
+        <div className="overlay-designer-color-picker__panel" role="group" aria-label={label}>
+          <div className="overlay-designer-color-picker__heading">
+            <strong>{label}</strong>
+            <button type="button" aria-label={closeLabel} onClick={() => setOpen(false)}>×</button>
+          </div>
+          <label className="overlay-designer-color-picker__native">
+            <span>{label}</span>
+            <input
+              type="color"
+              value={colorBase(value)}
+              disabled={disabled}
+              onInput={(event) => onChange(colorWithBase(
+                value,
+                (event.currentTarget as HTMLInputElement).value,
+              ))}
+              onChange={(event) => onChange(colorWithBase(value, event.target.value))}
+            />
+          </label>
+          <label className="overlay-designer-color-picker__hex">
+            <span>{hexLabel}</span>
+            <input
+              type="text"
+              value={hexDraft}
+              disabled={disabled}
+              inputMode="text"
+              maxLength={7}
+              spellCheck={false}
+              aria-invalid={!/^#[0-9A-F]{6}$/.test(hexDraft.trim().toUpperCase())}
+              onChange={(event) => setHexDraft(event.target.value)}
+              onBlur={commitHex}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitHex();
+                  event.currentTarget.select();
+                }
+              }}
+            />
+          </label>
+          <label className="overlay-designer-color-picker__alpha">
+            <span>{alphaLabel}</span>
+            <span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={opacity}
+                disabled={disabled}
+                onInput={(event) => onChange(colorWithOpacity(
+                  value,
+                  Number((event.currentTarget as HTMLInputElement).value),
+                ))}
+                onChange={(event) => onChange(colorWithOpacity(value, Number(event.target.value)))}
+              />
+              <output>{opacity}%</output>
+            </span>
+          </label>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function OverlayDesignerInspector({
@@ -203,48 +345,17 @@ export function OverlayDesignerInspector({
           <div className="overlay-designer-properties__colors">
             <strong>{t(`overlayDesigner.inspector.${component.id === "pesky_battle" ? "battleColors" : "colors"}.title`)}</strong>
             {(["liquidColor", "collectingColor", "textColor", "outlineColor"] as const).map((key) => (
-              <label key={key}>
-                <span>{colorLabel(key)}</span>
-                <span className="overlay-designer-properties__color-control">
-                  <input
-                    type="color"
-                    value={colorBase(component[key])}
-                    disabled={disabled}
-                    aria-label={colorLabel(key)}
-                    onInput={(event) => onChange({
-                      [key]: colorWithBase(
-                        component[key],
-                        (event.currentTarget as HTMLInputElement).value,
-                      ),
-                    })}
-                    onChange={(event) => onChange({
-                      [key]: colorWithBase(component[key], event.target.value),
-                    })}
-                  />
-                  <span className="overlay-designer-properties__color-alpha">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={colorOpacity(component[key])}
-                      disabled={disabled}
-                      aria-label={`${colorLabel(key)} · ${t("overlayDesigner.inspector.colors.alpha")}`}
-                      onInput={(event) => onChange({
-                        [key]: colorWithOpacity(
-                          component[key],
-                          Number((event.currentTarget as HTMLInputElement).value),
-                        ),
-                      })}
-                      onChange={(event) => onChange({
-                        [key]: colorWithOpacity(component[key], Number(event.target.value)),
-                      })}
-                    />
-                    <output>{colorOpacity(component[key])}%</output>
-                  </span>
-                  <code>{component[key]}</code>
-                </span>
-              </label>
+              <OverlayColorPicker
+                key={key}
+                label={colorLabel(key)}
+                value={component[key]}
+                disabled={disabled}
+                alphaLabel={t("overlayDesigner.inspector.colors.alpha")}
+                hexLabel={t("overlayDesigner.inspector.colors.hex")}
+                openLabel={t("overlayDesigner.inspector.colors.open")}
+                closeLabel={t("overlayDesigner.inspector.colors.close")}
+                onChange={(value) => onChange({ [key]: value })}
+              />
             ))}
           </div>
         )}

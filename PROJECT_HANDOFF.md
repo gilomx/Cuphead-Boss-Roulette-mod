@@ -2,6 +2,49 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## El chat elige (2026-10-05)
+
+Nuevo evento `chat_chooses`, con reserva exclusiva compartida con Batalla
+Molestosa y Farmeando taps. El controlador mantiene votos por identidad,
+transiciones y tokens de ronda fuera del navegador. El companion sólo envía
+mensajes numéricos de 1 a 6; simulador, protocolo y registro admiten `chatText`.
+Con reto / Sin reto se guarda en la configuración del mod. Empates y rondas
+sin votos se sortean; avión omite equipo terrestre y los amuletos que cambian
+disparos se excluyen en tierra. Resultado cinco segundos + cuenta tres antes
+de la carga canónica. La confirmación de carga usa el retorno del método,
+no el estado inmediato de la barrera asíncrona de SceneLoader.
+
+Página `/config/chat-chooses`, OBS `/chat-chooses-overlay`. Los assets nuevos
+deben estar versionados para que el publicador los incluya. Detalles y comandos
+de pruebas: [docs/chat-chooses.md](docs/chat-chooses.md). La validación visual
+se realiza con el servidor local de fixtures; falta confirmar la presentación
+y el directo en Cuphead real, sin arrancarlo desde Codex.
+
+Validación: 73 aserciones del controlador, pruebas HTTP/protocolo del runtime,
+22 pruebas del companion, cuatro del renderer nuevo y regresiones de Batalla
+y simulación aprobadas. UI compilada; mod y companion con cero advertencias
+o errores. El publicador canónico validó 1,491 archivos y comprobó la entrega
+física del ZIP Dev. SHA-256:
+`7C11145DD3A0446AED7E032A7EF00DB965516CE5C04B0AB788A88FBB63041631`.
+
+## Controles del Diseñador de overlays (2026-10-04)
+
+El encabezado deja vacío el estado estable `ready`; los estados transitorios
+de carga, guardado, confirmación y error continúan visibles. Guardar cambios ya
+no usa la regla especial con `--color-focus` y hereda el mismo color que los
+demás botones de la barra. El panel Escena/Capas usa `position: sticky` en el
+workspace y vuelve a flujo normal bajo 45 rem.
+
+Cada color muestra una muestra, su `#RRGGBB` y el porcentaje de opacidad. Al
+abrirlo, el bloque ocupa el ancho del inspector y presenta el selector nativo,
+un campo HEX editable y el alpha en un solo control; conserva internamente el
+contrato `#RRGGBBAA`. Clic exterior y Escape lo cierran. El build validó 31
+interacciones, 985 regalos, TypeScript y Vite; aprobaron las cinco pruebas de
+simulación y las 17 del renderer de Batalla. El publicador canónico compiló mod
+y companion sin errores ni advertencias, validó 1,487 archivos y publicó el
+ZIP Dev. SHA-256:
+`3262B5556812962A42FF5F0B91E8371B779A58A4972BD03E850EF6745170A503`.
+
 ## Tipografía original del sidebar (2026-10-04)
 
 La escala tipográfica compartida continúa aplicada a todo el contenido del

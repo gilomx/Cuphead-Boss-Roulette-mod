@@ -1,6 +1,8 @@
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
+import { createChatChoosesMock } from "./mock-chat-chooses.mjs";
+const chatChooses = createChatChoosesMock();
 
 const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
 const port = Number.isInteger(configuredPort) && configuredPort > 0
@@ -611,6 +613,7 @@ function publicInteractionQueue() {
 function parseDashboardSimulation(searchParams) {
   const allowedPlatforms = new Set(["tiktok", "twitch", "youtube"]);
   const allowedTypes = new Set([
+    "chat",
     "gift",
     "currency",
     "like",
@@ -673,6 +676,7 @@ function parseDashboardSimulation(searchParams) {
       amount,
       user: (searchParams.get("user") ?? "").trim().slice(0, 80),
       userId: (searchParams.get("userId") ?? "").trim().slice(0, 160),
+      chatText: (searchParams.get("chatText") ?? "").trim().slice(0, 16),
       userDisplayName: (searchParams.get("userDisplayName") ?? "").trim().slice(0, 80) ||
         (searchParams.get("user") ?? "").trim().slice(0, 80),
       userAvatarUrl: (searchParams.get("userAvatarUrl") ?? "").trim().slice(0, 2048),
@@ -696,6 +700,7 @@ function executeDashboardSimulation(command) {
   const eventId = `sim-${String(sequence).padStart(10, "0")}`;
   const receivedAt = new Date().toISOString();
   const valid = command.validPlatform && command.validType;
+  const chatFeedback = command.type === "chat" ? chatChooses.vote(command) : "";
   const event = {
     schemaVersion: 2,
     id: eventId,
@@ -711,6 +716,7 @@ function executeDashboardSimulation(command) {
     userDisplayName: command.userDisplayName,
     userAvatarUrl: command.userAvatarUrl,
     userId: command.userId || null,
+    chatText: command.chatText,
     amount: command.amount,
     unitValue: command.unitValue,
     totalValue: command.amount,
@@ -724,13 +730,13 @@ function executeDashboardSimulation(command) {
     streakState: "none",
     rawEventType: "dashboard_simulation",
     status: valid ? "received" : "ignored",
-    messageCode: valid
+    messageCode: chatFeedback || (valid
       ? "simulation_received"
       : !command.validPlatform && !command.validType
         ? "unsupported_platform_and_type"
         : !command.validPlatform
           ? "unsupported_platform"
-          : "unsupported_event_type",
+          : "unsupported_event_type"),
     receivedAt,
     simulated: true,
   };
@@ -1114,6 +1120,14 @@ function serveCreatorToolFile(fileName, contentType, res) {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
+  if (url.pathname === "/api/config/chat-chooses") { json(res, chatChooses.snapshot()); return; }
+  if (url.pathname === "/api/config/chat-chooses/set") {
+    const state = chatChooses.command(url.searchParams, tapFarmingPhase !== "off" || peskyBattleIsExclusive());
+    json(res, state, state.error ? 409 : 202); return;
+  }
+  if (url.pathname === "/chat-chooses-overlay" || url.pathname === "/chat-chooses-overlay/") {
+    serveCreatorToolFile("chat-chooses-overlay.html", "text/html; charset=utf-8", res); return;
+  }
   if (url.pathname === "/dashboard" || url.pathname === "/config" || url.pathname.startsWith("/config/")) {
     serveCreatorToolFile(
       "config.html",
@@ -1696,7 +1710,7 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === "/api/config/live-events") {
-    const activeEvent = tapFarmingPhase !== "off"
+    const activeEvent = chatChooses.active() ? "chat_chooses" : tapFarmingPhase !== "off"
       ? "tap_farming"
       : peskyBattleIsExclusive()
         ? "pesky_battle"

@@ -28,6 +28,7 @@ internal static class Program
             ("like normalization", LikeNormalization),
             ("array envelope", ArrayEnvelope),
             ("unsupported event is dropped", UnsupportedEventIsDropped),
+            ("chat ballot normalization", ChatBallotNormalization),
             ("malformed input", MalformedInput),
             ("status JSON contract", StatusJsonContract),
             ("event JSON null contract", EventJsonNullContract),
@@ -262,6 +263,29 @@ internal static class Program
             """);
         Equal(0, batch.Events.Count);
         Equal(0, batch.Errors.Count);
+    }
+
+    private static void ChatBallotNormalization()
+    {
+        var ballot = One("""
+            {"event":"chat","data":{"msgId":"chat-vote-1","userId":"123","uniqueId":"viewer","comment":" 2 "}}
+            """);
+        Equal("chat", ballot.Type);
+        Equal("2", ballot.ChatText);
+        Equal("123", ballot.UserId);
+        Equal("viewer", ballot.UserName);
+        using var json = JsonDocument.Parse(NdjsonWriter.Serialize(ballot));
+        Equal("2", json.RootElement.GetProperty("chatText").GetString());
+        var comment = One("""{"event":"comment","data":{"comment":"6","userId":"9"}}""");
+        Equal("6", comment.ChatText);
+        foreach (var value in new[] { "hello", "7", "0", "1 2", "!1", "12", "" })
+        {
+            var result = new TikFinityEventNormalizer().Normalize(
+                JsonSerializer.Serialize(new { @event = "chat", data = new { comment = value } }), FixedTime);
+            Equal(0, result.Events.Count);
+        }
+        var repeat = One("""{"event":"chat","data":{"comment":"6","userId":"9"}}""");
+        NotEqual(comment.IdempotencyKey, repeat.IdempotencyKey);
     }
 
     private static void StatusJsonContract()

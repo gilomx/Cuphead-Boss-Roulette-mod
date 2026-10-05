@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell";
 import { DashboardView } from "./features/dashboard/DashboardView";
 import { PeskyBattleDetailView } from "./features/dashboard/PeskyBattleDetailView";
 import { TapFarmingDetailView } from "./features/dashboard/TapFarmingDetailView";
+import { ChatChoosesDetailView } from "./features/dashboard/ChatChoosesDetailView";
 import { OverlayDesignerView } from "./features/overlay-designer/OverlayDesignerView";
 import type { OverlayComponentId } from "./features/overlay-designer/model";
 import { InteractionsView } from "./features/interactions/InteractionsView";
@@ -11,9 +12,10 @@ import { RouletteView } from "./features/roulette/RouletteView";
 import { useLocalization } from "./i18n/LocalizationContext";
 
 export type ConfigSection = "dashboard" | "roulette" | "interactions" | "pesky";
-type AppView = ConfigSection | "peskyBattle" | "tapFarming" | "overlayDesigner";
+type AppView = ConfigSection | "peskyBattle" | "tapFarming" | "chatChooses" | "overlayDesigner";
 
 function viewFromPath(): AppView {
+  if (window.location.pathname.startsWith("/config/chat-chooses")) return "chatChooses";
   if (window.location.pathname.startsWith("/config/overlay-designer")) {
     return "overlayDesigner";
   }
@@ -40,7 +42,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = view === "overlayDesigner"
+    document.title = view === "chatChooses" ? `${t("dashboard.chatChooses.title")} — La Pichi Ruleta` : view === "overlayDesigner"
       ? `${t("overlayDesigner.title")} — La Pichi Ruleta`
       : view === "peskyBattle" || view === "tapFarming"
       ? `${t(view === "peskyBattle"
@@ -53,6 +55,7 @@ export default function App() {
     if (next === view) return;
     const path = next === "dashboard"
       ? "/dashboard"
+      : next === "chatChooses" ? "/config/chat-chooses"
       : next === "peskyBattle"
         ? "/config/pesky-battle"
         : next === "tapFarming"
@@ -91,7 +94,12 @@ export default function App() {
     navigate("tapFarming", { fromLiveEvents: true });
   };
 
-  const returnToLiveEvents = (focusLiveEvent: "peskyBattle" | "tapFarming") => {
+  const openChatChooses = () => {
+    window.history.replaceState({ ...window.history.state, focusLiveEvent: "chatChooses" }, "", window.location.href);
+    navigate("chatChooses", { fromLiveEvents: true });
+  };
+
+  const returnToLiveEvents = (focusLiveEvent: "peskyBattle" | "tapFarming" | "chatChooses") => {
     const currentState = window.history.state as {
       fromLiveEvents?: boolean;
     } | null;
@@ -133,6 +141,7 @@ export default function App() {
   };
 
   const activeSection: ConfigSection = view === "peskyBattle" || view === "tapFarming" ||
+    view === "chatChooses" ||
     view === "overlayDesigner"
     ? "dashboard"
     : view;
@@ -141,6 +150,7 @@ export default function App() {
     <AppShell
       activeSection={activeSection}
       currentSection={view === "peskyBattle" || view === "tapFarming" ||
+        view === "chatChooses" ||
         view === "overlayDesigner" ? null : activeSection}
       workspace={view === "overlayDesigner"}
       onOpenOverlays={() => openOverlayDesigner("tap_farming")}
@@ -151,7 +161,10 @@ export default function App() {
             onOpenInteractions={() => navigate("interactions")}
             onOpenPeskyBattle={openPeskyBattle}
             onOpenTapFarming={openTapFarming}
+            onOpenChatChooses={openChatChooses}
           />
+        : view === "chatChooses"
+          ? <ChatChoosesDetailView onBack={() => returnToLiveEvents("chatChooses")} />
         : view === "peskyBattle"
           ? <PeskyBattleDetailView
               onBack={() => returnToLiveEvents("peskyBattle")}

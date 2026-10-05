@@ -537,12 +537,14 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
           <h1>{t("overlayDesigner.title")}</h1>
           <p>{t("overlayDesigner.description")}</p>
         </div>
-        <div className="overlay-designer-header__status" data-status={status}>
-          <span>{t(`overlayDesigner.status.${status}`)}</span>
-          {status === "error" ? (
-            <button type="button" onClick={() => void reload()}>{t("overlayDesigner.actions.retry")}</button>
-          ) : null}
-        </div>
+        {status !== "ready" ? (
+          <div className="overlay-designer-header__status" data-status={status}>
+            <span>{t(`overlayDesigner.status.${status}`)}</span>
+            {status === "error" ? (
+              <button type="button" onClick={() => void reload()}>{t("overlayDesigner.actions.retry")}</button>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div className="overlay-designer-toolbar">

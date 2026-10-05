@@ -6,6 +6,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         internal const string PeskyBattle = "pesky_battle";
         internal const string TapFarming = "tap_farming";
+        internal const string ChatChooses = "chat_chooses";
     }
 
     internal sealed class CreatorToolsLiveEventLease

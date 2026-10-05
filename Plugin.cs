@@ -1084,7 +1084,8 @@ namespace Gilomx.CupheadBossRoulette
         private static void BlockMapMovementPostfix(ref bool __result)
         {
             var plugin = activeInstance;
-            if (plugin != null && plugin.visible)
+            if (plugin != null && (plugin.visible ||
+                (plugin.creatorToolsChatChooses != null && plugin.creatorToolsChatChooses.ShowingResult)))
                 __result = false;
         }
 
@@ -1092,7 +1093,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             var plugin = activeInstance;
             return plugin == null ||
-                   (!plugin.visible && plugin.cardVisibility <= 0.001f);
+                   (!plugin.visible && plugin.cardVisibility <= 0.001f &&
+                    (plugin.creatorToolsChatChooses == null || !plugin.creatorToolsChatChooses.ShowingResult));
         }
 
         private static void ApplyRouletteReturnDestinationPrefix()
@@ -1502,6 +1504,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private void SetVisible(bool value)
         {
+            if (value && creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved)
+                return;
             if (visible == value)
                 return;
             if (value)
@@ -1541,6 +1545,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void StartRoulette()
         {
+            if (creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved) return;
             if (!CanUseRouletteOnMap() || running || pendingLoad)
                 return;
             RefreshAvailableContent();
@@ -2048,7 +2053,7 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private void LoadResult()
+        private bool LoadResult()
         {
             var previousMap = default(Scenes);
             var returnDestinationPrepared = false;
@@ -2059,13 +2064,13 @@ namespace Gilomx.CupheadBossRoulette
                     CancelCreatorToolsInteractionGameplayLevelLoad();
                     status = RouletteStatus.SaveRequired;
                     Logger.LogWarning("Selecciona primero una partida guardada.");
-                    return;
+                    return false;
                 }
                 if (SceneLoader.CurrentlyLoading)
                 {
                     CancelCreatorToolsInteractionGameplayLevelLoad();
                     status = RouletteStatus.SceneLoading;
-                    return;
+                    return false;
                 }
 
                 resultReady = false;
@@ -2088,6 +2093,7 @@ namespace Gilomx.CupheadBossRoulette
                 returnDestinationPrepared = true;
                 Logger.LogInfo("Cargando " + boss.Character + " (" + boss.Level + ")");
                 SceneLoader.LoadLevel(boss.Level, SceneLoader.Transition.Iris, SceneLoader.Icon.None);
+                return true;
             }
             catch (Exception exception)
             {
@@ -2104,6 +2110,7 @@ namespace Gilomx.CupheadBossRoulette
                 EndBattleResultHudSession();
                 Logger.LogError(exception);
                 SetVisible(true);
+                return false;
             }
         }
 
@@ -2573,6 +2580,7 @@ namespace Gilomx.CupheadBossRoulette
             DrawLanguageTestNotice();
             if (CanUseRouletteOnMap() && cardVisibility > 0.001f)
                 DrawRoulette();
+            if (CanUseRouletteOnMap()) DrawChatChoosesResult();
 
             GUI.color = previousColor;
             GUI.matrix = previousMatrix;

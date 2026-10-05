@@ -22,6 +22,7 @@ import type {
   StreamRuleDraft,
   StreamRulesConfigState,
   TapFarmingConfigState,
+  ChatChoosesState,
 } from "../model";
 import { validPacing, type PacingValues } from "../features/interactions/pacingValues";
 
@@ -33,6 +34,8 @@ interface ConfigValue {
   peskyBattle: PeskyBattleConfigState | null;
   liveEvents: LiveEventsConfigState | null;
   tapFarming: TapFarmingConfigState | null;
+  chatChooses: ChatChoosesState | null;
+  sendChatChooses: (operation: "save" | "start" | "next" | "stop" | "finish", withChallenge?: boolean) => Promise<void>;
   streamRules: StreamRulesConfigState | null;
   optimisticInteractionQueue: InteractionQueueEntry[];
   interactionTesting: boolean;
@@ -187,6 +190,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [peskyBattle, setPeskyBattle] = useState<PeskyBattleConfigState | null>(null);
   const [liveEvents, setLiveEvents] = useState<LiveEventsConfigState | null>(null);
   const [tapFarming, setTapFarming] = useState<TapFarmingConfigState | null>(null);
+  const [chatChooses, setChatChooses] = useState<ChatChoosesState | null>(null);
   const [streamRules, setStreamRules] = useState<StreamRulesConfigState | null>(null);
   const [optimisticInteractionQueue, setOptimisticInteractionQueue] = useState<
     InteractionQueueEntry[]
@@ -246,6 +250,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         peskyBattleResponse,
         liveEventsResponse,
         tapFarmingResponse,
+        chatChoosesResponse,
         streamRulesResponse,
       ] = await Promise.all([
         fetch("/api/config", { cache: "no-store" }),
@@ -254,6 +259,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         fetch("/api/config/pesky-battle", { cache: "no-store" }),
         fetch("/api/config/live-events", { cache: "no-store" }),
         fetch("/api/config/tap-farming", { cache: "no-store" }),
+        fetch("/api/config/chat-chooses", { cache: "no-store" }),
         fetch("/api/config/interactions/rules", { cache: "no-store" }),
       ]);
       if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
@@ -262,6 +268,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       if (!peskyBattleResponse.ok) throw new Error(`HTTP ${peskyBattleResponse.status}`);
       if (!liveEventsResponse.ok) throw new Error(`HTTP ${liveEventsResponse.status}`);
       if (!tapFarmingResponse.ok) throw new Error(`HTTP ${tapFarmingResponse.status}`);
+      if (!chatChoosesResponse.ok) throw new Error(`HTTP ${chatChoosesResponse.status}`);
       if (!streamRulesResponse.ok) throw new Error(`HTTP ${streamRulesResponse.status}`);
       const next = (await configResponse.json()) as RouletteConfigState;
       const nextInteraction = (await interactionResponse.json()) as InteractionConfigState;
@@ -274,6 +281,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         conversion: normalizeTapFarmingConversion(nextTapFarmingPayload.conversion),
       };
       const nextStreamRules = (await streamRulesResponse.json()) as StreamRulesConfigState;
+      const nextChatChooses = (await chatChoosesResponse.json()) as ChatChoosesState;
       if (
         !mountedRef.current ||
         loadRevision < lastAppliedLoadRevisionRef.current
@@ -473,6 +481,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const peskyBattlePending = pendingPeskyBattleChanges.length > 0;
       setLiveEvents(nextLiveEvents);
       setTapFarming(nextTapFarming);
+      setChatChooses(nextChatChooses);
       let streamRulesPending = false;
       const streamRulesRevision = streamRulesRevisionRef.current;
       if (streamRulesRevision !== null) {
@@ -1229,6 +1238,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [finishPeskyBattle],
   );
 
+  const sendChatChooses = useCallback(async (
+    operation: "save" | "start" | "next" | "stop" | "finish", withChallenge?: boolean,
+  ) => {
+    const query = new URLSearchParams({ operation,
+      sessionId: String(chatChooses?.sessionId ?? 0), round: String(chatChooses?.round ?? 0),
+      mode: (withChallenge ?? chatChooses?.withChallenge ?? true) ? "with" : "without" });
+    try {
+      const response = await fetch(`/api/config/chat-chooses/set?${query}`, { cache: "no-store" });
+      const state = await response.json() as ChatChoosesState;
+      if (mountedRef.current) setChatChooses(state);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      void load();
+    } catch (error) {
+      if (mountedRef.current) setStatus("error");
+      throw error;
+    }
+  }, [chatChooses, load]);
+
   const sendTapFarmingUpdate = useCallback(
     (
       operation: "activate" | "deactivate" | "finish" | "save",
@@ -1493,6 +1520,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       peskyBattle,
       liveEvents,
       tapFarming,
+      chatChooses,
+      sendChatChooses,
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,
@@ -1538,6 +1567,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       peskyBattle,
       liveEvents,
       tapFarming,
+      chatChooses,
+      sendChatChooses,
       streamRules,
       optimisticInteractionQueue,
       interactionTesting,

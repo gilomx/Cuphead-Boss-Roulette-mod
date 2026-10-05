@@ -2,6 +2,21 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Nuevo Evento Live «El chat elige»: rondas de candidatos aleatorios con votos
+  cambiables por número, desempates automáticos y modo Con reto / Sin reto.
+  Respeta compatibilidad y DLC; avión omite disparos y supers terrestres.
+  Incluye página de control, simulador de votos y overlay transparente de OBS.
+  Presenta lo elegido cinco segundos, cuenta tres y carga la batalla usando
+  la ruleta existente. Detener libera el evento inmediatamente.
+
+- El Diseñador de overlays oculta el estado redundante «Edición local» cuando
+  está listo, devuelve Guardar cambios al estilo común de botones y mantiene
+  fijo el panel de Escena al recorrer el workspace en escritorio.
+
+- Los colores del Diseñador usan un control desplegable propio: presenta HEX
+  como valor principal editable y reúne en el mismo bloque la muestra nativa y
+  el ajuste de opacidad. Escape o un clic exterior cierran el control.
+
 - El sidebar recupera su jerarquía tipográfica anterior: navegación normal y
   activa, estado y pie vuelven a sus tamaños originales tanto en escritorio
   como en layouts compactos. La escala nueva se conserva en el contenido.

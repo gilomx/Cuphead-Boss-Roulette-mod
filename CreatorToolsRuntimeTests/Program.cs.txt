@@ -82,6 +82,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestOverlayComposerPreservesProportionsAcrossProfiles);
             Run("Overlay composer serves POST config and preview routes",
                 TestOverlayComposerHttpRoutes);
+            Run("Chat chooses HTTP commands and companion ballots preserve identity",
+                TestChatChoosesHttpAndProtocol);
             Run("Overlay preview expires and stops without gameplay state",
                 TestOverlayComposerPreviewLifetime);
             Run("Tap Farming migrates exact conversion settings to v2",
@@ -1481,6 +1483,38 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private static void TestChatChoosesHttpAndProtocol()
+        {
+            using (var scope = new TestScope("chat-chooses-http"))
+            using (var server = scope.StartServer())
+            {
+                var catalog = new ChatChoosesCatalog();
+                catalog.Pools["boss"] = new List<ChatChoice> {
+                    new ChatChoice { Id = 0, Name = "Boss", Image = "bosses/test.png" } };
+                var controller = new CreatorToolsChatChoosesController(new CreatorToolsLiveEventsCoordinator(), true);
+                controller.SetCatalog(catalog, true);
+                server.SetChatChoosesController(controller, controller.Command);
+                Equal(HttpStatusCode.OK, GetStatusCode(server, "/config/chat-chooses"), "event SPA route");
+                Equal(HttpStatusCode.OK, GetStatusCode(server, "/chat-chooses-overlay"), "event OBS route");
+                Equal(HttpStatusCode.Accepted, GetStatusCode(server, "/api/config/chat-chooses/set?operation=start&mode=without"), "HTTP start");
+                using (var state = GetJson(server, "/api/config/chat-chooses"))
+                {
+                    Equal("voting", state.RootElement.GetProperty("phase").GetString(), "immediate HTTP projection");
+                    True(!state.RootElement.GetProperty("withChallenge").GetBoolean(), "HTTP mode");
+                }
+                CreatorToolsStreamMessage message;
+                True(TikFinityCompanionProtocol.TryParse("{\"protocolVersion\":1,\"kind\":\"event\",\"type\":\"chat\",\"eventId\":\"ballot\",\"platform\":\"tiktok\",\"userId\":\"viewer\",\"chatText\":\"1\",\"receivedAt\":\"" + DateTime.UtcNow.ToString("O") + "\"}", out message), "parse chat ballot");
+                Equal("1", message.Event.ChatText, "preserve chat text");
+                Equal("chat_vote_counted", controller.Observe(message.Event), "protocol ballot reaches voting");
+                Equal("chat_vote_unchanged", controller.Observe(message.Event), "duplicate identity does not add votes");
+                Equal(HttpStatusCode.Conflict, GetStatusCode(server, "/api/config/chat-chooses/set?operation=next&sessionId=0&round=0"), "reject stale HTTP round");
+                Equal(HttpStatusCode.MethodNotAllowed, PostStatus(server, "/api/config/chat-chooses/set", "{}", "application/json"), "reject wrong HTTP method");
+                Equal(HttpStatusCode.Accepted, GetStatusCode(server, "/api/config/chat-chooses/set?operation=stop"), "HTTP stop");
+                True(!controller.Reserved, "HTTP stop releases without Unity update");
+                Equal(HttpStatusCode.Accepted, GetStatusCode(server, "/api/config/chat-chooses/set?operation=start&mode=with"), "HTTP restart");
+            }
+        }
+
         private static void TestOverlayComposerHttpRoutes()
         {
             using (var scope = new TestScope("overlay-composer-http"))
@@ -2258,6 +2292,9 @@ namespace Gilomx.CupheadBossRoulette
                 File.WriteAllText(Path.Combine(
                     assetsDirectory, "creator-tools", "config.html"),
                     "<!doctype html><title>Config</title>");
+                File.WriteAllText(Path.Combine(
+                    assetsDirectory, "creator-tools", "chat-chooses-overlay.html"),
+                    "<!doctype html><title>Chat chooses</title>");
             }
 
             internal CreatorToolsStreamRulesController CreateRules(
