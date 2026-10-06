@@ -25,6 +25,7 @@ namespace Gilomx.CupheadBossRoulette
         internal string CollectingColor;
         internal string TextColor;
         internal string OutlineColor;
+        internal string VoteOutlineColor = CreatorToolsOverlayComposerSettings.DefaultVoteOutlineColor;
 
         internal CreatorToolsOverlayComposerComponent Clone()
         {
@@ -77,6 +78,8 @@ namespace Gilomx.CupheadBossRoulette
         internal const string DefaultCollectingColor = "#f4c95d";
         internal const string DefaultTextColor = "#ffffff";
         internal const string DefaultOutlineColor = "#f5f5f7";
+        internal const string DefaultChatOutlineColor = "#d3af93";
+        internal const string DefaultVoteOutlineColor = "#ffffff";
 
         private const int MaximumLayer = 100;
         private readonly string path;
@@ -442,7 +445,11 @@ namespace Gilomx.CupheadBossRoulette
                 ? DefaultTextColor : textColor;
             var outlineColor = NormalizeColor(component.OutlineColor);
             component.OutlineColor = outlineColor.Length == 0
-                ? DefaultOutlineColor : outlineColor;
+                ? (component.Id == ChatChoosesComponentId ? DefaultChatOutlineColor : DefaultOutlineColor)
+                : outlineColor;
+            var voteOutlineColor = NormalizeColor(component.VoteOutlineColor);
+            component.VoteOutlineColor = voteOutlineColor.Length == 0
+                ? DefaultVoteOutlineColor : voteOutlineColor;
         }
 
         private string BuildFileJson()
@@ -515,6 +522,9 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append("\",\"outlineColor\":\"");
                 CreatorToolsJson.AppendEscaped(
                     builder, component.OutlineColor);
+                builder.Append("\",\"voteOutlineColor\":\"");
+                CreatorToolsJson.AppendEscaped(
+                    builder, component.VoteOutlineColor);
                 builder.Append("\"}");
             }
             builder.Append("]}");
@@ -589,7 +599,7 @@ namespace Gilomx.CupheadBossRoulette
                 LiquidColor = DefaultLiquidColor,
                 CollectingColor = DefaultCollectingColor,
                 TextColor = DefaultTextColor,
-                OutlineColor = DefaultOutlineColor
+                OutlineColor = DefaultChatOutlineColor
             });
             return profile;
         }
@@ -621,6 +631,7 @@ namespace Gilomx.CupheadBossRoulette
             destination.CollectingColor = source.CollectingColor;
             destination.TextColor = source.TextColor;
             destination.OutlineColor = source.OutlineColor;
+            destination.VoteOutlineColor = source.VoteOutlineColor;
         }
 
         private static double ComponentFitScale(
@@ -854,6 +865,13 @@ namespace Gilomx.CupheadBossRoulette
                 var color = NormalizeColor(node.String("outlineColor"));
                 if (color.Length == 0) return false;
                 component.OutlineColor = color;
+            }
+            colorNode = node.Property("voteOutlineColor");
+            if (colorNode != null)
+            {
+                var color = NormalizeColor(node.String("voteOutlineColor"));
+                if (color.Length == 0) return false;
+                component.VoteOutlineColor = color;
             }
             if (legacyTapPresentation)
             {

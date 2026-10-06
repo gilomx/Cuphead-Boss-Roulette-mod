@@ -2295,6 +2295,8 @@ namespace Gilomx.CupheadBossRoulette
                 return "image/jpeg";
             if (extension == ".webp")
                 return "image/webp";
+            if (extension == ".svg")
+                return "image/svg+xml";
             if (extension == ".css")
                 return "text/css; charset=utf-8";
             if (extension == ".js")

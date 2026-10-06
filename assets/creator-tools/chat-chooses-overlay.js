@@ -31,10 +31,18 @@
     return node;
   }
   function picture(image) {
-    const node = element('img'); node.alt = '';
     // Catalog paths are plugin-local; never load viewer-controlled URLs.
-    node.src = `/assets/${image && !image.includes('..') && !image.includes(':') ? image : 'weapons/vacio.png'}`;
-    return node;
+    let path = typeof image === 'string' && !image.includes('..') && !image.includes(':') &&
+      !image.includes('\\') && !image.startsWith('/') ? image.toLowerCase() : 'weapons/vacio.png';
+    // Match the main roulette overlay's framed artwork, including its empty slot.
+    if (path === 'weapons/vacio.png') path = 'creator-tools/empty.png';
+    else if (/^(weapons|supers|charms|modifiers)\//.test(path)) path = `creator-tools/${path}`;
+    const artwork = element('div', 'artwork');
+    artwork.dataset.boss = String(/^bosses\//.test(path));
+    artwork.dataset.framed = String(artwork.dataset.boss === 'true' || /^creator-tools\/(weapons|supers|charms|modifiers)\//.test(path));
+    const node = element('img'); node.alt = ''; node.src = `/assets/${path}`;
+    artwork.append(node);
+    return artwork;
   }
   function resize() {
     if (root.hidden) return;
@@ -110,7 +118,8 @@
     root.style.setProperty('--choice-color', color(view.liquidColor, '#ff4f92'));
     root.style.setProperty('--winner-color', color(view.collectingColor, '#f4c95d'));
     root.style.setProperty('--text-color', color(view.textColor, '#ffffff'));
-    root.style.setProperty('--outline-color', color(view.outlineColor, '#f5f5f7'));
+    root.style.setProperty('--outline-color', color(view.outlineColor, '#d3af93'));
+    root.style.setProperty('--vote-outline-color', color(view.voteOutlineColor, '#ffffff'));
     root.dataset.showTitle = String(view.showTitle !== false);
     root.dataset.showDetails = String(view.showDetails !== false);
     root.dataset.motion = String(view.motion !== false);

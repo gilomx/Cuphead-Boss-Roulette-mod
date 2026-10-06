@@ -31,6 +31,7 @@ const EDITABLE_KEYS = [
   "collectingColor",
   "textColor",
   "outlineColor",
+  "voteOutlineColor",
 ] as const;
 
 function sameComponent(
@@ -65,6 +66,7 @@ function updateCommand(
     collectingColor: component.collectingColor,
     textColor: component.textColor,
     outlineColor: component.outlineColor,
+    voteOutlineColor: component.voteOutlineColor,
   };
 }
 

@@ -225,7 +225,9 @@ export function OverlayDesignerInspector({
   const targetSlot = battleState.participants.some(player => player.slot === attackPlayer) ? attackPlayer : 0;
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
   const geometryDisabled = disabled || component.locked;
-  const colorLabel = (key: "liquidColor" | "collectingColor" | "textColor" | "outlineColor") =>
+  const colorKeys = ["liquidColor", "collectingColor", "textColor", "outlineColor",
+    ...(component.id === "chat_chooses" ? ["voteOutlineColor" as const] : [])] as const;
+  const colorLabel = (key: typeof colorKeys[number]) =>
     t(`overlayDesigner.inspector.${colorGroup}.${key}`);
   const maximumSize = {
     width: profile.canvas.width - component.x,
@@ -355,7 +357,7 @@ export function OverlayDesignerInspector({
         {(
           <div className="overlay-designer-properties__colors">
             <strong>{t(`overlayDesigner.inspector.${colorGroup}.title`)}</strong>
-            {(["liquidColor", "collectingColor", "textColor", "outlineColor"] as const).map((key) => (
+            {colorKeys.map((key) => (
               <OverlayColorPicker
                 key={key}
                 label={colorLabel(key)}

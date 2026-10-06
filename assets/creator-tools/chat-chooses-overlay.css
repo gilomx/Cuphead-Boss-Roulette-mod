@@ -5,7 +5,8 @@ body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; }
 [hidden] { display: none !important; }
 #event {
   --choice-color: #ff4f92; --winner-color: #f4c95d;
-  --text-color: #ffffff; --outline-color: #f5f5f7;
+  --text-color: #ffffff; --outline-color: #d3af93;
+  --vote-outline-color: #ffffff;
   --circle-size: 240px;
   position: absolute; left: 50%; top: 50%; width: max-content;
   padding: 18px; transform-origin: center; color: var(--text-color);
@@ -18,36 +19,51 @@ h2 { font-size: 48px; line-height: 1.1; margin: 0; font-weight: 800; }
 #options[data-count='2'], #options[data-count='4'] { grid-template-columns: repeat(2, var(--circle-size)); }
 .choice { position: relative; text-align: center; transform-origin: center; transition: opacity .24s; }
 .portrait { position: relative; width: var(--circle-size); height: var(--circle-size); }
-.choice img, #boss img, .equipment img {
-  display: block; width: var(--circle-size); height: var(--circle-size);
-  object-fit: contain; border: 7px solid var(--outline-color);
-  border-radius: 50%; margin: 0 auto; filter: drop-shadow(0 3px 4px #0005);
-  transition: border-color .35s ease, filter .35s ease;
+.artwork {
+  --frame-color: var(--outline-color);
+  position: relative; width: var(--circle-size); height: var(--circle-size); margin: 0 auto;
 }
-.portrait img { margin: 0; }
+.artwork img {
+  display: block; width: var(--circle-size); height: var(--circle-size);
+  object-fit: contain;
+}
+.artwork[data-framed='true'] img { border-radius: 50%; }
+.artwork[data-boss='true'] img {
+  /* Fit the boss inside the frame, with a small overlap to hide resampling seams. */
+  --frame-inset: calc(100% * 6 / 82);
+  position: absolute; top: var(--frame-inset); left: var(--frame-inset);
+  width: calc(100% - 2 * var(--frame-inset)); height: calc(100% - 2 * var(--frame-inset));
+}
+.artwork[data-framed='true']::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-color: var(--frame-color);
+  -webkit-mask: url('/assets/creator-tools/chat-chooses-frame.svg?v=chat-frame-9') center / contain no-repeat;
+  mask: url('/assets/creator-tools/chat-chooses-frame.svg?v=chat-frame-9') center / contain no-repeat;
+  transition: background-color .35s ease;
+}
+.portrait .artwork { margin: 0; }
 .choice .number {
   position: absolute; z-index: 1; bottom: 20px; left: 50%; transform: translateX(-50%);
-  color: var(--text-color); font-size: 76px; font-weight: 900; line-height: 1;
-  text-shadow: 0 3px 6px #000, 2px 0 3px #000, -2px 0 3px #000;
+  color: var(--text-color); font-size: 96px; font-weight: 900; line-height: 1;
+  text-shadow: 0 2px 3px #0004;
 }
 .votes {
   position: absolute; z-index: 2; top: -4px; left: -4px; display: grid; place-items: center;
   width: 96px; height: 96px; overflow: hidden; border-radius: 50%;
-  background: var(--choice-color); color: #fff; border: 4px solid var(--outline-color);
+  background: var(--choice-color); color: #fff; border: 5px solid var(--vote-outline-color);
   font-size: 48px; font-weight: 800; line-height: 1; text-shadow: 0 2px 3px #0008;
   transition: background-color .35s ease, border-color .35s ease, color .35s ease;
 }
 .vote-digit { position: absolute; inset: 0; display: grid; place-items: center; }
 .votes[data-wide='true'] .vote-digit { font-size: 32px; }
-.choice[data-leader='true'] img, .choice[data-winner='true'] img { border-color: var(--winner-color); filter: drop-shadow(0 0 6px var(--winner-color)); }
-.choice[data-leader='true'] .votes, .choice[data-winner='true'] .votes { background: var(--winner-color); border-color: var(--winner-color); color: #28152f; text-shadow: none; }
+.choice[data-leader='true'] .artwork, .choice[data-winner='true'] .artwork { --frame-color: var(--winner-color); }
+.choice[data-leader='true'] .votes, .choice[data-winner='true'] .votes { background: var(--winner-color); color: #28152f; text-shadow: none; }
 #event[data-phase='reveal'] .choice[data-winner='false'] { opacity: .35; }
 #boss { display: grid; justify-items: center; margin: 0 0 18px; }
-#boss img { --circle-size: 240px; }
-#result img { border-width: 5px; border-color: var(--outline-color); }
+#boss .artwork { --circle-size: 240px; }
 #equipment { display: flex; justify-content: center; gap: 18px; }
 .equipment { width: 150px; display: grid; justify-items: center; }
-.equipment img { --circle-size: 150px; border-width: 5px; margin: 0; }
+.equipment .artwork { --circle-size: 150px; margin: 0; }
 #event[data-motion='false'] *, #event[data-motion='false'] *::before, #event[data-motion='false'] *::after { animation: none; transition: none; }
 @media (min-aspect-ratio: 5/2) {
   #options, #options[data-count='2'], #options[data-count='4'] { grid-template-columns: repeat(var(--option-count, 6), var(--circle-size)); }

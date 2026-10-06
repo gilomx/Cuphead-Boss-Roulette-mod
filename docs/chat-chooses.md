@@ -71,9 +71,15 @@ Las opciones y el resultado usan imágenes circulares sobre fondo transparente.
 El resumen final no muestra etiquetas. Su jefe mide 240 px frente a los
 280 px anteriores; el equipo mide 150 px por artículo. Entre las imágenes del
 jefe y del equipo quedan sólo 18 px, sin reservar alturas para los títulos
-eliminados. Todos los retratos del resumen usan el mismo
-borde de 5 px con el color normal **Borde del círculo** del diseñador,
-sin destacar un ganador. Al iniciar la partida o detener el evento desde
+eliminados. Armas, supers, amuletos y retos usan las mismas imágenes con marco
+de `creator-tools` que el overlay principal; los jefes y el hueco vacío conservan
+también sus imágenes originales. El marco circular es continuo y algo más grueso
+(7 unidades sobre una imagen de 82), para cubrir las irregularidades del borde
+incorporado al escalar. Los jefes usan el mismo marco en la votación y el resultado.
+**Marco de la imagen** permite cambiar su color sin recolorear la ilustración
+ni añadir brillo difuso. El tono predeterminado es el original
+`#d3af93`; los colores personalizados guardados se conservan. El resumen usa
+ese color normal sin destacar un ganador. Al iniciar la partida o detener el evento desde
 el resumen, los retratos salen uno por uno (240 ms, separados por 60 ms)
 antes de ocultar la capa. Una nueva ronda espera esa salida y entra con los
 datos más recientes. Desactivar animaciones o preferir movimiento reducido
@@ -84,17 +90,20 @@ Los retos usan los iconos de `creator-tools/modifiers`, con el borde limpio
 del catálogo web; la tarjeta del juego conserva sus gráficos nativos.
 Los círculos usan columnas de su
 mismo diámetro, separadas por un espacio pequeño. El marco deja 18 px de margen
-interno para las sombras y el movimiento, sin un segundo margen en el escalado.
+interno para las insignias y el movimiento, sin un segundo margen en el escalado.
 El perfil horizontal parte de 1360×320. Al cargar el antiguo marco de
 1360×460 en su posición inicial se compacta y conserva el original en `.bak`;
 los marcos personalizados o bloqueados mantienen sus dimensiones.
-El número de opción aparece centrado en la parte inferior del retrato y la
-insignia superior muestra sus votos. Ambas cifras crecen, y cada cambio de
+El número de opción mide 96 px y aparece centrado en la parte inferior del retrato con una
+sombra paralela muy leve, sin contorno negro. La insignia superior muestra sus
+votos; **Borde del círculo de votos** configura su color por separado del marco
+de la imagen, con blanco `#ffffff` predeterminado y 5 px de grosor frente a los
+4 px anteriores. Conserva ese color al destacar líderes y ganadores. Ambas cifras crecen, y cada cambio de
 votos desliza la cifra anterior y la nueva dentro de la insignia. Cada ronda
 sale de forma escalonada antes de mostrar la entrada escalonada de la siguiente;
 los votos recibidos durante la salida se conservan en la nueva vista.
 Desactivar animaciones o preferir movimiento reducido aplica los cambios
-inmediatamente. El borde y la insignia cambian suavemente
+inmediatamente. El marco de la imagen y el fondo de la insignia cambian suavemente
 al color de **Líder y ganador** según entra o cambia cada voto. Los empates
 resaltan a todos los líderes con votos; en una ronda vacía no se resalta ninguno
 hasta revelar el ganador. El overlay muestra los votos de cada opción, sin

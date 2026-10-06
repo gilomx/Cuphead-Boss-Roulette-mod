@@ -27,6 +27,7 @@ export interface OverlayComposerComponent {
   collectingColor: string;
   textColor: string;
   outlineColor: string;
+  voteOutlineColor: string;
 }
 
 export interface OverlayComposerProfile {
@@ -69,6 +70,7 @@ export interface OverlayComposerCommand {
   collectingColor?: string;
   textColor?: string;
   outlineColor?: string;
+  voteOutlineColor?: string;
 }
 
 export interface OverlayPreviewCommand {

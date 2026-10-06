@@ -143,23 +143,69 @@ test('final preview keeps compatible plane equipment, no challenge, and safe loc
   await view.finishAnimations();
   assert.equal(view.nodes.event.hidden, false);
   assert.equal(view.nodes.heading.hidden, true);
-  assert.equal(view.nodes.boss.children[0].src, '/assets/weapons/vacio.png');
+  assert.equal(view.nodes.boss.children[0].children[0].src, '/assets/creator-tools/empty.png');
   assert.equal(view.nodes.equipment.children.length, 2, 'skip ground weapons and super');
-  assert.equal(view.nodes.equipment.children[1].children[0].src, '/assets/creator-tools/empty.png');
+  assert.equal(view.nodes.equipment.children[1].children[0].children[0].src, '/assets/creator-tools/empty.png');
   assert.equal(view.nodes.equipment.children[1].children.length, 1, 'slot labels and selected names are absent');
 });
 
 test('final result contains only portraits and retains the designer normal outline color', async () => {
   const view = await boot('?embedded=1');
   const state = finalSelection();
-  state.presentation = { outlineColor: '#12345680', collectingColor: '#ff0000', showDetails: true };
+  state.presentation = { outlineColor: '#12345680', voteOutlineColor: '#abcdef80', collectingColor: '#ff0000', showDetails: true };
   view.send(state);
   assert.equal(view.nodes.event.style['--outline-color'], '#12345680');
+  assert.equal(view.nodes.event.style['--vote-outline-color'], '#abcdef80', 'vote border has its own color and alpha');
   assert.equal(view.nodes.heading.hidden, true);
   assert.equal(view.nodes.boss.children.length, 1);
   assert.equal(view.nodes.equipment.children.length, 5);
   assert.ok(view.nodes.equipment.children.every(card => card.children.length === 1));
   assert.equal(view.nodes.equipment.children[0].attributes['aria-label'], labels.es.stages.weapon1, 'slot remains accessible without visible labels');
+  state.presentation.voteOutlineColor = 'url(https://invalid.test)';
+  view.send(state);
+  assert.equal(view.nodes.event.style['--vote-outline-color'], '#ffffff', 'invalid vote border falls back to white');
+  assert.equal(view.nodes.event.style['--outline-color'], '#12345680', 'vote border does not change the image frame');
+});
+
+test('voting and results use the main roulette framed assets and native empty slot', async () => {
+  const view = await boot('?embedded=1');
+  const paths = ['bosses/hoscoytosco.png', 'weapons/lanzaguisantes.png', 'supers/super1.png',
+    'charms/corazon.png', 'creator-tools/modifiers/nodash_01.png', 'weapons/vacio.png'];
+  const expected = ['bosses/hoscoytosco.png', 'creator-tools/weapons/lanzaguisantes.png',
+    'creator-tools/supers/super1.png', 'creator-tools/charms/corazon.png',
+    'creator-tools/modifiers/nodash_01.png', 'creator-tools/empty.png'];
+  const state = ballot(); state.presentation = { motion: false };
+  state.options = state.options.map((option, index) => ({ ...option, image: paths[index] }));
+  view.send(state);
+  assert.equal(view.nodes.event.style['--outline-color'], '#d3af93', 'default matches the native frame');
+  assert.equal(view.nodes.event.style['--vote-outline-color'], '#ffffff', 'older presentation defaults to a white vote border');
+  const portraits = view.nodes.options.children.map(card => card.children[0].children[0]);
+  portraits.forEach((artwork, index) => {
+    assert.equal(artwork.children[0].src, `/assets/${expected[index]}`);
+    assert.equal(artwork.dataset.framed, String(index < 5), 'equipment and bosses share the configurable frame');
+    assert.equal(artwork.dataset.boss, String(index === 0), 'boss portraits fit inside the frame');
+    assert.ok(readFileSync(new URL(`../../assets/${expected[index]}`, import.meta.url)).length > 0);
+  });
+  state.phase = 'result';
+  state.selected = Object.fromEntries(['boss', 'weapon1', 'weapon2', 'super', 'charm', 'modifier']
+    .map((stage, index) => [stage, state.options[index]]));
+  view.send(state);
+  const finalPortraits = [view.nodes.boss.children[0], ...view.nodes.equipment.children.map(card => card.children[0])];
+  finalPortraits.forEach((artwork, index) => assert.equal(artwork.children[0].src, `/assets/${expected[index]}`));
+  assert.equal(finalPortraits[0].dataset.framed, 'true', 'the selected boss keeps its frame in the result');
+});
+
+test('unsafe image paths always use the native empty slot without a frame tint', async () => {
+  const view = await boot('?embedded=1');
+  const state = ballot(); state.presentation = { motion: false };
+  const paths = ['../private.png', 'https://external.test/icon.png', '/private.png', 'weapons\\private.png', null, 'weapons/vacio.png'];
+  state.options = state.options.map((option, index) => ({ ...option, image: paths[index] }));
+  view.send(state);
+  for (const card of view.nodes.options.children) {
+    const artwork = card.children[0].children[0];
+    assert.equal(artwork.children[0].src, '/assets/creator-tools/empty.png');
+    assert.equal(artwork.dataset.framed, 'false');
+  }
 });
 
 test('starting gameplay staggers the final result exit and waits for its last portrait', async () => {

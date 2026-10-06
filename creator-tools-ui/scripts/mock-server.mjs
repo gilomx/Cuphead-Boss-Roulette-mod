@@ -335,8 +335,8 @@ function defaultOverlayProfiles() {
     height: profile.id === "vertical" ? 760 : 320,
     enabled: true, locked: false, layer: 30, opacity: 100, variant: "default",
     showTitle: true, showDetails: true, motion: true,
-    liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
-  }] }));
+    liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#d3af93",
+  }].map(component => ({ ...component, voteOutlineColor: "#ffffff" })) }));
 }
 
 let overlayComposerProfiles = defaultOverlayProfiles();
@@ -1003,7 +1003,10 @@ function normalizeOverlayComponent(component, canvas) {
     : "#ffffff";
   component.outlineColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.outlineColor ?? ""))
     ? String(component.outlineColor).toLowerCase()
-    : "#f5f5f7";
+    : component.id === "chat_chooses" ? "#d3af93" : "#f5f5f7";
+  component.voteOutlineColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.voteOutlineColor ?? ""))
+    ? String(component.voteOutlineColor).toLowerCase()
+    : "#ffffff";
 }
 
 function applyOverlayComposerCommand(command, res) {
@@ -1065,7 +1068,7 @@ function applyOverlayComposerCommand(command, res) {
       json(res, { ok: false, error: "unknown_component" }, 400);
       return;
     }
-    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor"]) {
+    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor"]) {
       if (Object.prototype.hasOwnProperty.call(command, key) &&
           !/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(command[key] ?? ""))) {
         json(res, { ok: false, error: "invalid_color" }, 400);
@@ -1076,7 +1079,7 @@ function applyOverlayComposerCommand(command, res) {
       "x", "y", "width", "height", "enabled", "locked", "layer",
       "opacity",
       "variant", "showTitle", "showDetails", "motion",
-      "liquidColor", "collectingColor", "textColor", "outlineColor",
+      "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",
     ]) {
       if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];
     }

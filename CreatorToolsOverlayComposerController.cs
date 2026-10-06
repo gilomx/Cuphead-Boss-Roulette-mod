@@ -410,6 +410,14 @@ namespace Gilomx.CupheadBossRoulette
                 if (color.Length == 0) return false;
                 component.OutlineColor = color; changed = true;
             }
+            if (values.ContainsKey("voteOutlineColor"))
+            {
+                var color =
+                    CreatorToolsOverlayComposerSettings.NormalizeColor(
+                        Value(values, "voteOutlineColor"));
+                if (color.Length == 0) return false;
+                component.VoteOutlineColor = color; changed = true;
+            }
             if (!changed) return false;
             CreatorToolsOverlayComposerSettings.NormalizeComponent(
                 profile, component);

@@ -130,7 +130,8 @@
         liquidColor: "#ff4f92",
         collectingColor: "#f4c95d",
         textColor: "#ffffff",
-        outlineColor: "#f5f5f7",
+        outlineColor: componentId === "chat_chooses" ? "#d3af93" : "#f5f5f7",
+        voteOutlineColor: "#ffffff",
       })),
     };
   }
@@ -194,7 +195,8 @@
       liquidColor: normalizeHexColor(component.liquidColor, "#ff4f92"),
       collectingColor: normalizeHexColor(component.collectingColor, "#f4c95d"),
       textColor: normalizeHexColor(component.textColor, "#ffffff"),
-      outlineColor: normalizeHexColor(component.outlineColor, "#f5f5f7"),
+      outlineColor: normalizeHexColor(component.outlineColor, component.id === "chat_chooses" ? "#d3af93" : "#f5f5f7"),
+      voteOutlineColor: normalizeHexColor(component.voteOutlineColor, "#ffffff"),
     };
   }
 
@@ -227,7 +229,7 @@
   function embeddedUrl(definition) {
     const params = new URLSearchParams({ embedded: "1" });
     if (definition.id === "pesky_battle") params.set("v", "battle-icons-10");
-    if (definition.id === "chat_chooses") params.set("v", "chat-result-7");
+    if (definition.id === "chat_chooses") params.set("v", "chat-frame-11");
     if (activeLocale === "en") params.set("locale", "en");
     return `${definition.src}?${params}`;
   }

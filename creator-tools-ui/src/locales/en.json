@@ -538,7 +538,8 @@
       },
       "chatColors": {
         "title": "Vote colors", "liquidColor": "Vote count",
-        "collectingColor": "Leader and winner", "textColor": "Text and number", "outlineColor": "Circle border"
+        "collectingColor": "Leader and winner", "textColor": "Text and number", "outlineColor": "Image frame",
+        "voteOutlineColor": "Vote counter border"
       },
       "chatOptions": {
         "showTitle": "Show headings", "showTitleHint": "Shows Voting and the group the chat is voting on.",

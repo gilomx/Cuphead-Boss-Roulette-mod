@@ -538,7 +538,8 @@
       },
       "chatColors": {
         "title": "Colores de la votación", "liquidColor": "Conteo de votos",
-        "collectingColor": "Líder y ganador", "textColor": "Texto y número", "outlineColor": "Borde del círculo"
+        "collectingColor": "Líder y ganador", "textColor": "Texto y número", "outlineColor": "Marco de la imagen",
+        "voteOutlineColor": "Borde del círculo de votos"
       },
       "chatOptions": {
         "showTitle": "Mostrar títulos", "showTitleHint": "Muestra Votaciones y el grupo que está votando el chat.",

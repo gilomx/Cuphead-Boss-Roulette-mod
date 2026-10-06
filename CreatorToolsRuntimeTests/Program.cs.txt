@@ -90,6 +90,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestOverlayComposerHttpRoutes);
             Run("Chat overlay joins saved scenes without losing positions and validates preview transport",
                 TestChatOverlayMigrationAndPreview);
+            Run("Chat vote borders persist, migrate, copy and reset independently of image frames",
+                TestChatVoteBorderSettings);
             Run("Chat overlay compacts only the original unlocked horizontal bounds",
                 TestChatOverlayCompactsDefaultBounds);
             Run("Chat chooses HTTP commands and companion ballots preserve identity",
@@ -1679,6 +1681,7 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(99, FindComposerComponent(json.RootElement, "vertical", "pesky_battle").GetProperty("x").GetInt32(), "saved battle position retained");
                     Equal("#12345680", FindComposerComponent(json.RootElement, "vertical", "pesky_battle").GetProperty("liquidColor").GetString(), "saved battle alpha retained");
                     Equal(960, FindComposerComponent(json.RootElement, "vertical", "chat_chooses").GetProperty("width").GetInt32(), "new chat layer added");
+                    Equal("#d3af93", FindComposerComponent(json.RootElement, "vertical", "chat_chooses").GetProperty("outlineColor").GetString(), "new chat frame uses the original artwork tone");
                 }
                 using (var backup = JsonDocument.Parse(File.ReadAllText(path + ".bak")))
                     Equal(2, backup.RootElement.GetProperty("profiles")[0].GetProperty("components").GetArrayLength(), "legacy scene retained in recovery backup");
@@ -1698,6 +1701,64 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(400, migrated.ProcessPreviewCommand(request).StatusCode, "invalid synthetic image rejected atomically");
                 using (var json = JsonDocument.Parse(migrated.GetPreviewState("vertical").Json))
                     Equal("bosses/pandillaraiz.png", json.RootElement.GetProperty("chatState").GetProperty("options")[0].GetProperty("image").GetString(), "invalid update keeps valid snapshot");
+            }
+        }
+
+        private static void TestChatVoteBorderSettings()
+        {
+            using (var scope = new TestScope("chat-vote-border"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 0, profileId = "vertical",
+                    componentId = "chat_chooses", outlineColor = "#12345680",
+                    voteOutlineColor = "#ABCDEF80" })).StatusCode, "save independent borders");
+                var reloaded = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(reloaded.GetConfigState()))
+                {
+                    var component = FindComposerComponent(json.RootElement, "vertical", "chat_chooses");
+                    Equal("#abcdef80", component.GetProperty("voteOutlineColor").GetString(), "vote border and alpha survive reload");
+                    Equal("#12345680", component.GetProperty("outlineColor").GetString(), "image border survives reload independently");
+                }
+                Equal(400, reloaded.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 1, profileId = "vertical",
+                    componentId = "chat_chooses", outlineColor = "#ff0000",
+                    voteOutlineColor = "url(invalid)" })).StatusCode, "reject invalid vote border atomically");
+                using (var json = JsonDocument.Parse(reloaded.GetConfigState()))
+                {
+                    Equal(1, json.RootElement.GetProperty("revision").GetInt32(), "invalid border does not advance revision");
+                    Equal("#12345680", FindComposerComponent(json.RootElement, "vertical", "chat_chooses")
+                        .GetProperty("outlineColor").GetString(), "invalid border keeps image color");
+                }
+                var copied = reloaded.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "copy", expectedRevision = 1, profileId = "horizontal",
+                    sourceProfileId = "vertical", componentId = "chat_chooses" }));
+                Equal(200, copied.StatusCode, "copy chat border to other profile");
+                using (var json = JsonDocument.Parse(copied.Json))
+                    Equal("#abcdef80", FindComposerComponent(json.RootElement, "horizontal", "chat_chooses")
+                        .GetProperty("voteOutlineColor").GetString(), "copy retains vote border");
+                var reset = reloaded.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "reset", expectedRevision = 2, profileId = "horizontal",
+                    componentId = "chat_chooses" }));
+                Equal(200, reset.StatusCode, "reset chat appearance");
+                using (var json = JsonDocument.Parse(reset.Json))
+                    Equal("#ffffff", FindComposerComponent(json.RootElement, "horizontal", "chat_chooses")
+                        .GetProperty("voteOutlineColor").GetString(), "reset uses white vote border");
+
+                var path = Path.Combine(scope.ConfigDirectory,
+                    "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                    foreach (var component in profile["components"].AsArray())
+                        component.AsObject().Remove("voteOutlineColor");
+                File.WriteAllText(path, legacy.ToJsonString());
+                var migrated = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(migrated.GetConfigState()))
+                {
+                    var component = FindComposerComponent(json.RootElement, "vertical", "chat_chooses");
+                    Equal("#ffffff", component.GetProperty("voteOutlineColor").GetString(), "existing settings default new border to white");
+                    Equal("#12345680", component.GetProperty("outlineColor").GetString(), "migration preserves customized frame");
+                }
             }
         }
 
