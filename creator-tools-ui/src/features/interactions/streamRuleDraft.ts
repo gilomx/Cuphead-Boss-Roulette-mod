@@ -1,12 +1,19 @@
-import type { StreamRule, StreamRuleDraft, TikTokGift } from "../../model";
+import type { StreamRule, StreamRuleDraft, StreamRulePlatform, StreamRuleTrigger, TikTokGift } from "../../model";
 import { interactionItems } from "./interactionCatalog";
 
-export function createStreamRuleDraft(gift?: TikTokGift): StreamRuleDraft {
+export const platformTriggers: Record<StreamRulePlatform, StreamRuleTrigger[]> = {
+  tiktok: ["gift", "like", "follow"],
+  twitch: ["follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption"],
+};
+
+export function createStreamRuleDraft(gift?: TikTokGift, platform: StreamRulePlatform = "tiktok"): StreamRuleDraft {
   return {
     name: gift?.name ?? "",
     enabled: true,
-    eventType: "gift",
-    giftId: gift?.giftId ?? "",
+    platform,
+    rewardName: "",
+    eventType: platformTriggers[platform][0],
+    giftId: platform === "tiktok" ? gift?.giftId ?? "" : "",
     every: 1,
     interaction: interactionItems.find((item) => item.category === "attack")!.id,
     durationSeconds: 15,
@@ -22,6 +29,8 @@ export function draftForStreamRule(rule: StreamRule): StreamRuleDraft {
     id: rule.id,
     name: rule.name,
     enabled: rule.enabled,
+    platform: rule.platform ?? "tiktok",
+    rewardName: rule.rewardName ?? "",
     eventType: rule.eventType,
     giftId: rule.giftId,
     every: rule.every,
@@ -42,6 +51,8 @@ export function sameStreamRuleDraft(
   return left.id === right.id &&
     left.name === right.name &&
     left.enabled === right.enabled &&
+    left.platform === right.platform &&
+    left.rewardName === right.rewardName &&
     left.eventType === right.eventType &&
     left.giftId === right.giftId &&
     left.every === right.every &&

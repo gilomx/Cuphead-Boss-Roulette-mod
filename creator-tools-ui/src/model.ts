@@ -328,7 +328,9 @@ export interface TikTokGiftCatalog {
   gifts: TikTokGift[];
 }
 
-export type StreamRuleTrigger = "gift" | "like" | "follow";
+export type StreamRulePlatform = "tiktok" | "twitch";
+export type StreamRuleTrigger = "gift" | "like" | "follow" | "currency" |
+  "subscription" | "subscription_gift" | "resubscription" | "redemption";
 
 export interface StreamRule {
   durationSeconds?: number;
@@ -336,11 +338,12 @@ export interface StreamRule {
   id: number;
   name: string;
   enabled: boolean;
-  platform: "tiktok";
+  platform: StreamRulePlatform;
   connectionId: "all";
   eventType: StreamRuleTrigger;
   giftId: string;
   giftName: string;
+  rewardName?: string;
   coinsPerUnit?: number;
   every: number;
   interaction: string;
@@ -355,6 +358,8 @@ export interface StreamRuleDraft {
   id?: number;
   name: string;
   enabled: boolean;
+  platform: StreamRulePlatform;
+  rewardName: string;
   eventType: StreamRuleTrigger;
   giftId: string;
   every: number;

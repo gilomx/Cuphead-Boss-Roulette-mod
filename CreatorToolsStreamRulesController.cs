@@ -9,7 +9,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsStreamRulesController
     {
-        private const int SchemaVersion = 5;
+        private const int SchemaVersion = 6;
         private const int MinimumSupportedSchemaVersion = 1;
         private const string GiftEventType = "gift";
         private const string LikeEventType = "like";
@@ -289,9 +289,9 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsStreamEvent streamEvent)
         {
             var result = new CreatorToolsStreamEvaluation();
+            var eventType = RuleEventType(streamEvent);
             if (!catalogReady || streamEvent == null ||
-                streamEvent.Platform != "tiktok" ||
-                !IsSupportedEventType(streamEvent.Type))
+                !IsSupportedEventType(streamEvent.Platform, eventType))
                 return result;
             if (streamEvent.Type == GiftEventType &&
                 string.IsNullOrEmpty(streamEvent.ItemId))
@@ -315,6 +315,7 @@ namespace Gilomx.CupheadBossRoulette
                 for (var i = 0; i < rules.Count; i++)
                 {
                     if (rules[i].Enabled &&
+                        rules[i].Platform == streamEvent.Platform &&
                         rules[i].EventType == FollowEventType)
                     {
                         hasEnabledFollowRule = true;
@@ -324,7 +325,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (!hasEnabledFollowRule)
                     return result;
                 var followKey = BuildConnectionViewerKey(
-                    streamEvent.ConnectionId, viewerKey);
+                    streamEvent.Platform + ":" + streamEvent.ConnectionId, viewerKey);
                 if (!TryRememberFollowViewer(followKey))
                 {
                     result.MessageCode = "follow_already_seen";
@@ -336,12 +337,18 @@ namespace Gilomx.CupheadBossRoulette
             var interactionIds = new List<string>();
             var pending = new List<PendingRuleDispatch>();
             var thresholdObserved = false;
+            // Bits are measured by value, not by the number of Cheer messages.
+            var amount = eventType == "currency"
+                ? (long)Math.Min(1000000000m, Math.Max(0m, decimal.Floor(streamEvent.TotalValue)))
+                : Math.Max(0L, streamEvent.Count);
             for (var i = 0; i < rules.Count; i++)
             {
                 var rule = rules[i];
-                if (!rule.Enabled || rule.EventType != streamEvent.Type ||
+                if (!rule.Enabled || rule.Platform != streamEvent.Platform || rule.EventType != eventType ||
                     (rule.EventType == GiftEventType &&
-                     rule.GiftId != streamEvent.ItemId))
+                     rule.GiftId != streamEvent.ItemId) ||
+                    (rule.EventType == "redemption" && !string.Equals(
+                        rule.RewardName, (streamEvent.ItemName ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase)))
                     continue;
                 thresholdObserved = true;
                 long triggers;
@@ -357,8 +364,8 @@ namespace Gilomx.CupheadBossRoulette
                             : string.Empty);
                     long remainder;
                     accumulators.TryGetValue(accumulatorKey, out remainder);
-                    var total = Math.Min(long.MaxValue - streamEvent.Count,
-                        Math.Max(0L, remainder)) + streamEvent.Count;
+                    var total = Math.Min(long.MaxValue - amount,
+                        Math.Max(0L, remainder)) + amount;
                     triggers = total / rule.Every;
                     SetAccumulatorRemainder(
                         accumulatorKey, total % rule.Every);
@@ -669,6 +676,8 @@ namespace Gilomx.CupheadBossRoulette
                 if (!TryBuildRule(values, id, out rule))
                     return;
                 var resetRuntimeState =
+                    rules[index].Platform != rule.Platform ||
+                    rules[index].RewardName != rule.RewardName ||
                     rules[index].EventType != rule.EventType ||
                     rules[index].GiftId != rule.GiftId ||
                     rules[index].Every != rule.Every ||
@@ -732,6 +741,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             rule = null;
             var name = NormalizeRuleName(Value(values, "name"));
+            var platform = Value(values, "platform").Trim().ToLowerInvariant();
+            if (platform.Length == 0) platform = "tiktok";
+            var rewardName = Value(values, "rewardName").Trim();
             var eventType = Value(values, "eventType").Trim()
                 .ToLowerInvariant();
             if (eventType.Length == 0)
@@ -739,7 +751,8 @@ namespace Gilomx.CupheadBossRoulette
             var giftId = Value(values, "giftId").Trim();
             var interaction = Value(values, "interaction").Trim();
             GiftEntry gift = null;
-            if (name.Length == 0 || !IsSupportedEventType(eventType) ||
+            if (name.Length == 0 || !IsSupportedEventType(platform, eventType) ||
+                (eventType == "redemption" && (rewardName.Length == 0 || rewardName.Length > MaximumRuleNameLength)) ||
                 (eventType == GiftEventType &&
                  !gifts.TryGetValue(giftId, out gift)) ||
                 !IsKnownInteraction(interaction))
@@ -784,6 +797,8 @@ namespace Gilomx.CupheadBossRoulette
                 Id = id,
                 Name = name,
                 Enabled = enabled,
+                Platform = platform,
+                RewardName = eventType == "redemption" ? rewardName : string.Empty,
                 EventType = eventType,
                 GiftId = eventType == GiftEventType
                     ? gift.Id
@@ -897,7 +912,9 @@ namespace Gilomx.CupheadBossRoulette
             AppendJson(builder, rule.Name);
             builder.Append("\",\"enabled\":")
                 .Append(rule.Enabled ? "true" : "false")
-                .Append(",\"platform\":\"tiktok\"")
+                .Append(",\"platform\":\"");
+            AppendJson(builder, rule.Platform);
+            builder.Append("\"")
                 .Append(",\"connectionId\":\"all\"")
                 .Append(",\"eventType\":\"");
             AppendJson(builder, rule.EventType);
@@ -906,6 +923,8 @@ namespace Gilomx.CupheadBossRoulette
             AppendJson(builder, rule.GiftId);
             builder.Append("\",\"giftName\":\"");
             AppendJson(builder, rule.GiftName);
+            builder.Append("\",\"rewardName\":\"");
+            AppendJson(builder, rule.RewardName);
             builder.Append("\",\"every\":")
                 .Append(rule.Every)
                 .Append(",\"interaction\":\"");
@@ -1234,11 +1253,12 @@ namespace Gilomx.CupheadBossRoulette
                     "\\{\\\"id\\\":(?<id>\\d+)," +
                     "\\\"name\\\":\\\"(?<name>(?:\\\\.|[^\\\"])*)\\\"," +
                     "\\\"enabled\\\":(?<enabled>true|false)," +
-                    "\\\"platform\\\":\\\"tiktok\\\"," +
+                    "\\\"platform\\\":\\\"(?<platform>tiktok|twitch)\\\"," +
                     "\\\"connectionId\\\":\\\"all\\\"," +
-                    "\\\"eventType\\\":\\\"(?<eventType>gift|like|follow)\\\"," +
+                    "\\\"eventType\\\":\\\"(?<eventType>[a-z_]+)\\\"," +
                     "\\\"giftId\\\":\\\"(?<giftId>\\d*)\\\"," +
                     "\\\"giftName\\\":\\\"(?<giftName>(?:\\\\.|[^\\\"])*)\\\"," +
+                    "(?:\\\"rewardName\\\":\\\"(?<rewardName>(?:\\\\.|[^\\\"])*)\\\",)?" +
                     "\\\"every\\\":(?<every>\\d+)," +
                     "\\\"interaction\\\":\\\"(?<interaction>[^\\\"]+)\\\"," +
                     "\\\"quantity\\\":(?<quantity>\\d+)" +
@@ -1248,6 +1268,10 @@ namespace Gilomx.CupheadBossRoulette
                     "(?:,\\\"countdownSeconds\\\":(?<countdown>\\d+))?\\}",
                     RegexOptions.CultureInvariant);
                 var matches = expression.Matches(json);
+                // Reject an unsupported or malformed rule instead of silently
+                // migrating a partially matched file and losing saved rules.
+                if (matches.Count != Regex.Matches(json, "\\{\\s*\\\"id\\\"\\s*:").Count)
+                    return false;
                 var ids = new HashSet<long>();
                 for (var i = 0; i < matches.Count; i++)
                 {
@@ -1259,6 +1283,8 @@ namespace Gilomx.CupheadBossRoulette
                     int duration, countdown;
                     var eventType =
                         matches[i].Groups["eventType"].Value;
+                    var platform = matches[i].Groups["platform"].Value;
+                    var rewardName = UnescapeJson(matches[i].Groups["rewardName"].Value).Trim();
                     var giftId = matches[i].Groups["giftId"].Value;
                     var interaction = matches[i].Groups["interaction"].Value;
                     if (!long.TryParse(matches[i].Groups["id"].Value,
@@ -1281,6 +1307,8 @@ namespace Gilomx.CupheadBossRoulette
                         id <= 0 || !ids.Add(id) ||
                         every < 1 || every > MaximumEvery ||
                         quantity < 1 || quantity > MaximumQuantity ||
+                        !IsSupportedEventType(platform, eventType) ||
+                        (eventType == "redemption" && (rewardName.Length == 0 || rewardName.Length > MaximumRuleNameLength)) ||
                         (eventType == GiftEventType &&
                          !gifts.ContainsKey(giftId)) ||
                         (eventType == FollowEventType && every != 1) ||
@@ -1294,6 +1322,8 @@ namespace Gilomx.CupheadBossRoulette
                         Name = NormalizeRuleName(UnescapeJson(
                             matches[i].Groups["name"].Value)),
                         Enabled = matches[i].Groups["enabled"].Value == "true",
+                        Platform = platform,
+                        RewardName = eventType == "redemption" ? rewardName : string.Empty,
                         EventType = eventType,
                         GiftId = eventType == GiftEventType
                             ? giftId
@@ -1442,10 +1472,25 @@ namespace Gilomx.CupheadBossRoulette
             return false;
         }
 
-        private static bool IsSupportedEventType(string value)
+        private static bool IsSupportedEventType(string platform, string value)
         {
-            return value == GiftEventType || value == LikeEventType ||
-                value == FollowEventType;
+            if (platform == "tiktok")
+                return value == GiftEventType || value == LikeEventType || value == FollowEventType;
+            return platform == "twitch" && (value == FollowEventType || value == "currency" ||
+                value == "subscription" || value == "subscription_gift" || value == "resubscription" || value == "redemption");
+        }
+
+        private static string RuleEventType(CreatorToolsStreamEvent entry)
+        {
+            if (entry == null) return string.Empty;
+            if (entry.Platform != "twitch") return entry.Type;
+            if (entry.Type == "currency") return entry.Unit == "bit" ? "currency" : string.Empty;
+            if (entry.Type == "subscription")
+            {
+                if (entry.RawEventType == "channel.subscription.gift") return "subscription_gift";
+                if (entry.RawEventType == "channel.subscription.message") return "resubscription";
+            }
+            return entry.Type;
         }
 
         private static string BuildViewerKey(
@@ -1774,6 +1819,8 @@ namespace Gilomx.CupheadBossRoulette
             internal long Id;
             internal string Name;
             internal bool Enabled;
+            internal string Platform;
+            internal string RewardName;
             internal string EventType;
             internal string GiftId;
             internal string GiftName;
@@ -1792,6 +1839,8 @@ namespace Gilomx.CupheadBossRoulette
                     Id = id,
                     Name = Name,
                     Enabled = Enabled,
+                    Platform = Platform,
+                    RewardName = RewardName,
                     EventType = EventType,
                     GiftId = GiftId,
                     GiftName = GiftName,

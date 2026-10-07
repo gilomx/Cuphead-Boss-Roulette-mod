@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="Program.cs.txt" Link="Program.cs" />
     <Compile Include="TwitchConnectionTests.cs.txt" Link="TwitchConnectionTests.cs" />
+    <Compile Include="StreamPlatformRuleTests.cs.txt" Link="StreamPlatformRuleTests.cs" />
     <Compile Include="TimedChallengeTests.cs.txt" Link="TimedChallengeTests.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallenge.cs" Link="Product\Interactions\CreatorToolsTimedChallenge.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallengeHudState.cs" Link="Product\Interactions\CreatorToolsTimedChallengeHudState.cs" />

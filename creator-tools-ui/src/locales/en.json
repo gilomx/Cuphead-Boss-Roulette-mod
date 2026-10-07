@@ -446,6 +446,7 @@
     },
     "simulator": {
       "voteNumber": "Vote number",
+      "subscriptionKind": "Twitch subscription type",
       "voteHint": "Each person has one vote per round. Another number changes their choice; use another profile to add a vote.",
       "eyebrow": "Lab",
       "title": "Simulate event",
@@ -731,7 +732,7 @@
   },
   "interactions": {
     "title": "Interactions",
-    "description": "Configure how gifts, taps, and follows affect the match and test their execution order.",
+    "description": "Configure how TikTok and Twitch events affect gameplay and test their execution.",
     "workspace": {
       "eyebrow": "Interactions panel",
       "back": "Back to interactions"
@@ -755,7 +756,7 @@
         "disabled": "Inactive",
         "toggleLabel": "Enable or disable {name}",
         "status": "Status",
-        "trigger": "When this arrives",
+        "trigger": "Triggered by",
         "result": "Send to game",
         "actions": "Actions",
         "every": "every {count} units",
@@ -765,7 +766,14 @@
         "quantity": "Quantity ×{count}",
         "userCooldown": "user {seconds}s",
         "giftCooldown": "gift {seconds}s",
-        "globalCooldown": "global {seconds}s"
+        "globalCooldown": "global {seconds}s",
+        "platformFilter": "Filter by platform",
+        "allPlatforms": "All",
+        "currencyEvery": "every {count} accumulated Bits",
+        "subscriptionEvery": "every {count} new subscriptions",
+        "subscription_giftEvery": "every {count} gifted subscriptions",
+        "resubscriptionEvery": "every {count} resubscriptions",
+        "redemptionEvery": "every {count} redemptions of this reward"
       },
       "editor": {
         "eyebrow": "Redeem editor",
@@ -783,7 +791,7 @@
         "triggerLike": "Taps (likes)",
         "triggerFollow": "Follow",
         "giftName": "Gift",
-        "likeName": "Taps",
+        "likeName": "Taps (likes)",
         "followName": "Follow",
         "giftTriggerHint": "Uses the received quantity of one specific gift.",
         "likeTriggerHint": "Tracks the taps sent by each user separately during the session.",
@@ -817,7 +825,27 @@
         "cooldownSummaryBoth": "Each person will wait {user} s and everyone will share a {global} s wait.",
         "cooldownAdvancedPrefix": "These times also respect the",
         "cooldownAdvancedLink": "advanced settings and distribution",
-        "cooldownAdvancedSuffix": "when enabled."
+        "cooldownAdvancedSuffix": "when enabled.",
+        "platform": "Platform",
+        "currencyName": "Bits",
+        "subscriptionName": "New subscription",
+        "subscription_giftName": "Gifted subscription",
+        "resubscriptionName": "Resubscription",
+        "redemptionName": "Channel points redemption",
+        "currencyTriggerHint": "Accumulate Bits sent with Cheers by all viewers. Remainders are preserved.",
+        "subscriptionTriggerHint": "Count new subscriptions; gifted subscriptions and resubscriptions have their own triggers.",
+        "subscription_giftTriggerHint": "Count each gifted subscription. A bundle of 5 counts as 5, including anonymous gifts.",
+        "resubscriptionTriggerHint": "Triggered when a resubscription is shared in chat. Accumulated months do not multiply activations.",
+        "redemptionTriggerHint": "Count redemptions of a custom reward. Channel points must be enabled on your channel.",
+        "rewardName": "Twitch reward name",
+        "rewardNameHint": "Enter the name as shown on Twitch. If you rename it there, update it here too.",
+        "bitsEvery": "Accumulated Bits",
+        "redemptionsEvery": "Every how many redemptions",
+        "executioncurrencySummary": "{every} accumulated Bits will send {quantity} {interaction} to the game.",
+        "executionsubscriptionSummary": "{every} new subscriptions will send {quantity} {interaction} to the game.",
+        "executionsubscription_giftSummary": "{every} gifted subscriptions will send {quantity} {interaction} to the game.",
+        "executionresubscriptionSummary": "{every} shared resubscriptions will send {quantity} {interaction} to the game.",
+        "executionredemptionSummary": "{every} redemptions of “{trigger}” will send {quantity} {interaction} to the game."
       },
       "actions": {
         "label": "Redeem actions",

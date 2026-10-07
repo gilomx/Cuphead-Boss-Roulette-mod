@@ -348,6 +348,8 @@ namespace Gilomx.CupheadBossRoulette
                     Value(values, "userId"), string.Empty, 160),
                 ChatText = NormalizeText(Value(values, "chatText"), string.Empty, 16),
                 ItemId = giftId,
+                ItemName = platform == "twitch" && type == "redemption"
+                    ? NormalizeText(Value(values, "rewardName"), string.Empty, 64) : string.Empty,
                 Count = count,
                 UnitValue = count > 0 ? totalValue / count : totalValue,
                 TotalValue = totalValue,
@@ -357,6 +359,13 @@ namespace Gilomx.CupheadBossRoulette
                 Simulated = true,
                 RawEventType = "dashboard_simulation"
             };
+
+            if (platform == "twitch" && type == "subscription")
+            {
+                var subscriptionKind = Value(values, "subscriptionKind");
+                entry.RawEventType = subscriptionKind == "subscription_gift" ? "channel.subscription.gift"
+                    : subscriptionKind == "resubscription" ? "channel.subscription.message" : "channel.subscribe";
+            }
 
             if (platform == "tiktok" && type == "gift")
             {
@@ -476,16 +485,15 @@ namespace Gilomx.CupheadBossRoulette
 
         private string EngineStatus()
         {
-            var tikfinity = FindConnectionByPlatform("tiktok");
-            if (tikfinity == null) return "idle";
-            if (tikfinity.Status == "connected" ||
-                tikfinity.Status == "live")
-                return "running";
-            if (tikfinity.Status == "connecting" ||
-                tikfinity.Status == "reconnecting")
-                return "connecting";
-            if (tikfinity.Status == "error") return "degraded";
-            return "idle";
+            var connecting = false;
+            var degraded = false;
+            foreach (var connection in connections)
+            {
+                if (connection.Status == "connected" || connection.Status == "live") return "running";
+                connecting |= connection.Status == "connecting" || connection.Status == "reconnecting";
+                degraded |= connection.Status == "error";
+            }
+            return connecting ? "connecting" : degraded ? "degraded" : "idle";
         }
 
         private CreatorToolsDashboardConnection FindConnectionById(string id)

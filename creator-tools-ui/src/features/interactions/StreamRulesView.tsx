@@ -3,7 +3,8 @@ import { ArrowLeft, Plus, Settings } from "lucide-react";
 import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import type { StreamRule, StreamRuleDraft } from "../../model";
+import type { StreamRule, StreamRuleDraft, StreamRulePlatform } from "../../model";
+import { StreamPlatformIcon } from "./StreamRuleIcons";
 import {
   createStreamRuleDraft,
   draftForStreamRule,
@@ -53,6 +54,7 @@ export function StreamRulesView({
   const { t } = useLocalization();
   const { catalog, error: catalogError } = useTikTokGiftCatalog();
   const [draft, setDraft] = useState<StreamRuleDraft | null>(null);
+  const [platformFilter, setPlatformFilter] = useState<StreamRulePlatform | "all">("all");
   const [savePending, setSavePending] = useState(false);
   const [highlightedRuleId, setHighlightedRuleId] = useState<number | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
@@ -194,8 +196,13 @@ export function StreamRulesView({
       (rule) => !request.previousIds.includes(rule.id),
     )?.id;
     if (request.closeEditor) setDraft(null);
-    if (id !== undefined) highlightRule(id);
-  }, [highlightRule, streamRules]);
+    if (id !== undefined) {
+      const saved = streamRules.rules.find((rule) => rule.id === id);
+      if (saved && platformFilter !== "all" && saved.platform !== platformFilter)
+        setPlatformFilter(saved.platform);
+      highlightRule(id);
+    }
+  }, [highlightRule, platformFilter, streamRules]);
 
   useEffect(() => {
     if (!savePending || status !== "error") return;
@@ -240,7 +247,9 @@ export function StreamRulesView({
 
   const beginCreate = () => {
     if (!canCreate) return;
-    const nextDraft = createStreamRuleDraft(catalog?.gifts[0]);
+    const nextDraft = createStreamRuleDraft(
+      catalog?.gifts[0], platformFilter === "twitch" ? "twitch" : "tiktok",
+    );
     initialDraftRef.current = nextDraft;
     setDraft(nextDraft);
   };
@@ -348,8 +357,19 @@ export function StreamRulesView({
               onSave={saveDraft}
             />
           ) : (
+            <>
+            <div className="stream-platform-filters" role="group" aria-label={t("interactions.rules.list.platformFilter")}>
+              {(["all", "tiktok", "twitch"] as const).map((platform) => (
+                <button type="button" key={platform} aria-pressed={platformFilter === platform}
+                  aria-label={platform === "all" ? t("interactions.rules.list.allPlatforms") : platform === "tiktok" ? "TikTok" : "Twitch"}
+                  onClick={() => { setPlatformFilter(platform); setConfirmingDeleteId(null); }}>
+                  {platform !== "all" ? <StreamPlatformIcon platform={platform} /> : null}
+                  {platform === "all" ? t("interactions.rules.list.allPlatforms") : platform === "tiktok" ? "TikTok" : "Twitch"}
+                </button>
+              ))}
+            </div>
             <StreamRulesTable
-              rules={rules}
+              rules={rules.filter((rule) => platformFilter === "all" || rule.platform === platformFilter)}
               gifts={catalog?.gifts ?? []}
               canCreate={canCreate}
               disabled={!streamRules?.ready || !catalog || deletingRuleId !== null}
@@ -370,6 +390,7 @@ export function StreamRulesView({
                 if (deleteStreamRule(id)) setDeletingRuleId(id);
               }}
             />
+            </>
           )}
         </div>
 

@@ -50,7 +50,11 @@ avoid extra retry frames, drain source-scene and native texture requests, and
 cover timeout/cancellation/resumption. A ready prefab does not permit the native
 loader to close bundles while their textures are still loading. These tests do
 not run Unity or verify the rendered actors.
-The current harness has 84 test groups.
+Platform-rule tests cover independent TikTok/Twitch follows, accumulated Bits,
+separate new/gifted/shared repeat subscriptions, custom reward names, legacy
+TikTok migration, full backup recovery and dashboard simulations. They use
+normalized fixtures and recording queues; no Twitch account or payment is used.
+The current harness has 162 test groups.
 
 `tools/verify_native_loading_contract.ps1` reads the installed game's IL and the
 compiled mod. It checks the covered loading window and verifies that all ten

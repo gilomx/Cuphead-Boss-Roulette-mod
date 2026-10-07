@@ -4,6 +4,7 @@ import { useLocalization } from "../../i18n/LocalizationContext";
 import type { StreamRule, TikTokGift } from "../../model";
 import { interactionItemFor } from "./interactionCatalog";
 import { StreamRuleDeleteConfirmation } from "./StreamRuleDeleteConfirmation";
+import { StreamPlatformIcon, StreamTriggerIcon } from "./StreamRuleIcons";
 
 interface StreamRuleRowProps {
   rule: StreamRule;
@@ -41,6 +42,8 @@ export function StreamRuleRow({
   const [returningFromDelete, setReturningFromDelete] = useState(false);
   const ruleName = rule.eventType === "gift"
     ? gift?.name || rule.giftName || rule.name
+    : rule.eventType === "redemption"
+      ? rule.rewardName || rule.name
     : t(`interactions.rules.editor.${rule.eventType}Name`);
   const triggerDetail = rule.eventType === "gift"
     ? `${rule.coinsPerUnit ?? 0} ${t("interactions.rules.coins")} · ${rule.every === 1
@@ -48,7 +51,9 @@ export function StreamRuleRow({
       : t("interactions.rules.list.every").replace("{count}", String(rule.every))}`
     : rule.eventType === "like"
       ? t("interactions.rules.list.likeEvery").replace("{count}", String(rule.every))
-      : t("interactions.rules.list.followOnce");
+      : rule.eventType === "follow"
+        ? t("interactions.rules.list.followOnce")
+        : t(`interactions.rules.list.${rule.eventType}Every`).replace("{count}", String(rule.every));
   const cooldownDetail = [
     rule.userCooldownSeconds > 0
       ? t("interactions.rules.list.userCooldown").replace(
@@ -126,6 +131,7 @@ export function StreamRuleRow({
           </td>
           <td>
             <div className="stream-rule-table__gift">
+              <StreamPlatformIcon platform={rule.platform} />
               {rule.eventType === "gift" && gift ? (
                 <img
                   src={gift.imagePath}
@@ -138,7 +144,7 @@ export function StreamRuleRow({
                     event.currentTarget.hidden = true;
                   }}
                 />
-              ) : null}
+              ) : <StreamTriggerIcon eventType={rule.eventType} />}
               <span>
                 <strong>{ruleName}</strong>
                 <small>

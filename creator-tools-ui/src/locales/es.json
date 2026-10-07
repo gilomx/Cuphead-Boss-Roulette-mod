@@ -446,6 +446,7 @@
     },
     "simulator": {
       "voteNumber": "Número del voto",
+      "subscriptionKind": "Tipo de suscripción de Twitch",
       "voteHint": "Una persona tiene un voto por ronda. Otro número cambia su elección; usa otro perfil para sumar un voto más.",
       "eyebrow": "Laboratorio",
       "title": "Simular evento",
@@ -731,7 +732,7 @@
   },
   "interactions": {
     "title": "Interacciones",
-    "description": "Configura cómo los regalos, taps y follows afectan la partida y prueba su orden de ejecución.",
+    "description": "Configura cómo los eventos de TikTok y Twitch afectan la partida y prueba su ejecución.",
     "workspace": {
       "eyebrow": "Panel de interacciones",
       "back": "Volver a interacciones"
@@ -755,7 +756,7 @@
         "disabled": "Inactivo",
         "toggleLabel": "Activar o desactivar {name}",
         "status": "Estado",
-        "trigger": "Cuando llega",
+        "trigger": "Se activa con",
         "result": "Enviar al juego",
         "actions": "Acciones",
         "every": "cada {count} unidades",
@@ -765,7 +766,14 @@
         "quantity": "Cantidad ×{count}",
         "userCooldown": "usuario {seconds} s",
         "giftCooldown": "regalo {seconds} s",
-        "globalCooldown": "global {seconds} s"
+        "globalCooldown": "global {seconds} s",
+        "platformFilter": "Filtrar por plataforma",
+        "allPlatforms": "Todas",
+        "currencyEvery": "cada {count} Bits acumulados",
+        "subscriptionEvery": "cada {count} suscripciones nuevas",
+        "subscription_giftEvery": "cada {count} suscripciones regaladas",
+        "resubscriptionEvery": "cada {count} resuscripciones",
+        "redemptionEvery": "cada {count} canjes de esta recompensa"
       },
       "editor": {
         "eyebrow": "Editor de interacción",
@@ -783,7 +791,7 @@
         "triggerLike": "Taps (likes)",
         "triggerFollow": "Follow",
         "giftName": "Regalo",
-        "likeName": "Taps",
+        "likeName": "Taps (likes)",
         "followName": "Follow",
         "giftTriggerHint": "Usa la cantidad recibida de un regalo específico.",
         "likeTriggerHint": "Suma por separado los taps enviados por cada usuario durante la sesión.",
@@ -817,7 +825,27 @@
         "cooldownSummaryBoth": "Cada persona esperará {user} s y todos compartirán una espera de {global} s.",
         "cooldownAdvancedPrefix": "Estos tiempos también respetan la",
         "cooldownAdvancedLink": "configuración y distribución avanzada",
-        "cooldownAdvancedSuffix": "cuando está activa."
+        "cooldownAdvancedSuffix": "cuando está activa.",
+        "platform": "Plataforma",
+        "currencyName": "Bits",
+        "subscriptionName": "Suscripción nueva",
+        "subscription_giftName": "Suscripción regalada",
+        "resubscriptionName": "Resuscripción",
+        "redemptionName": "Canje de puntos del canal",
+        "currencyTriggerHint": "Acumula los Bits enviados con Cheers entre todas las personas. El sobrante se conserva.",
+        "subscriptionTriggerHint": "Cuenta suscripciones nuevas; las regaladas y resuscripciones tienen su propio activador.",
+        "subscription_giftTriggerHint": "Cuenta cada suscripción regalada. Un paquete de 5 cuenta como 5, incluidos los regalos anónimos.",
+        "resubscriptionTriggerHint": "Se activa cuando se comparte una resuscripción en el chat. Los meses acumulados no multiplican las activaciones.",
+        "redemptionTriggerHint": "Cuenta los canjes de una recompensa personalizada. Tu canal debe tener los puntos habilitados.",
+        "rewardName": "Nombre de la recompensa en Twitch",
+        "rewardNameHint": "Escribe el nombre tal como aparece en Twitch. Si lo renombras allí, actualízalo aquí también.",
+        "bitsEvery": "Bits acumulados",
+        "redemptionsEvery": "Cada cuántos canjes",
+        "executioncurrencySummary": "{every} Bits acumulados enviarán {quantity} {interaction} al juego.",
+        "executionsubscriptionSummary": "{every} suscripciones nuevas enviarán {quantity} {interaction} al juego.",
+        "executionsubscription_giftSummary": "{every} suscripciones regaladas enviarán {quantity} {interaction} al juego.",
+        "executionresubscriptionSummary": "{every} resuscripciones compartidas enviarán {quantity} {interaction} al juego.",
+        "executionredemptionSummary": "{every} canjes de «{trigger}» enviarán {quantity} {interaction} al juego."
       },
       "actions": {
         "label": "Acciones de la interacción",

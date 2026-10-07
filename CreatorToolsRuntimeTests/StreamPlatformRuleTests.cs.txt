@@ -1,0 +1,199 @@
+using System;
+using System.IO;
+using System.Reflection;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunStreamPlatformRuleTests()
+        {
+            Run("TikTok and Twitch rules isolate followers even with identical connection and user IDs", TestPlatformFollowIsolation);
+            Run("Twitch Bits accumulate value and preserve scheduled activations", TestTwitchBitsRules);
+            Run("Twitch new, gifted and shared repeat subscriptions have separate activators", TestTwitchSubscriptionRules);
+            Run("Twitch custom rewards count matching redemptions rather than point cost", TestTwitchRewardRules);
+            Run("Platform rules migrate legacy TikTok settings and preserve Twitch CRUD atomically", TestPlatformRulePersistence);
+            Run("Dashboard simulations carry Twitch subscription kinds and custom reward names", TestTwitchRuleSimulations);
+        }
+
+        private static long AddPlatformRule(CreatorToolsStreamRulesController rules, string platform,
+            string eventType, int every = 1, int quantity = 1, string rewardName = "", int cooldown = 0)
+        {
+            var state = rules.ProcessServerCommand("action=create&platform=" + platform +
+                "&eventType=" + eventType + "&name=" + Uri.EscapeDataString(eventType) +
+                "&rewardName=" + Uri.EscapeDataString(rewardName) + "&every=" + every +
+                "&quantity=" + quantity + "&interaction=test_attack&enabled=1&globalCooldownSeconds=" + cooldown);
+            using (var json = JsonDocument.Parse(state))
+            {
+                Equal("created", json.RootElement.GetProperty("feedback").GetString(), "platform rule created");
+                var rows = json.RootElement.GetProperty("rules");
+                return rows[rows.GetArrayLength() - 1].GetProperty("id").GetInt64();
+            }
+        }
+
+        private static CreatorToolsStreamEvent PlatformRuleEvent(string platform, string type, int count = 1,
+            decimal value = 0m, string rawType = "")
+        {
+            return new CreatorToolsStreamEvent {
+                Platform = platform, ConnectionId = "shared-connection", Type = type,
+                UserId = "42", UserName = "viewer", Count = count, TotalValue = value,
+                Unit = type == "currency" ? "bit" : "", RawEventType = rawType
+            };
+        }
+
+        private static void TestPlatformFollowIsolation()
+        {
+            using (var scope = new TestScope("platform-follow-isolation"))
+            {
+                var rules = scope.CreateRules(1);
+                AddPlatformRule(rules, "tiktok", "follow");
+                AddPlatformRule(rules, "twitch", "follow");
+                foreach (var platform in new[] { "tiktok", "twitch" })
+                {
+                    var entry = PlatformRuleEvent(platform, "follow");
+                    Equal(1, rules.Evaluate(entry, true).MatchedRules, "only matching platform receives first follow");
+                    Equal(0, rules.Evaluate(entry, true).MatchedRules, "repeat follow ignored on " + platform);
+                }
+                Equal(2L, rules.BacklogCount, "one activation from each platform");
+                Equal(0, rules.Evaluate(PlatformRuleEvent("twitch", "gift"), true).MatchedRules,
+                    "Twitch never activates the legacy TikTok gift");
+            }
+        }
+
+        private static void TestTwitchBitsRules()
+        {
+            using (var scope = new TestScope("twitch-bits"))
+            {
+                var now = new DateTime(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc);
+                var rules = scope.CreateRules(1, utcNow: delegate { return now; });
+                AddPlatformRule(rules, "twitch", "currency", 100, 1, cooldown: 4);
+                Equal(0, rules.Evaluate(PlatformRuleEvent("twitch", "currency", 1, 60m), true).MatchedRules, "60 Bits wait");
+                var second = PlatformRuleEvent("twitch", "currency", 1, 50m);
+                second.UserId = "different-viewer";
+                Equal(1L, rules.Evaluate(second, true).DeferredInteractions, "viewers accumulate 110 Bits together");
+                Equal(2L, rules.Evaluate(PlatformRuleEvent("twitch", "currency", 999, 190m), true).DeferredInteractions,
+                    "remainder produces two activations, independent of message count");
+                Equal(0, rules.Evaluate(PlatformRuleEvent("tiktok", "currency", 1, 1000m), true).MatchedRules, "other platform cannot add Bits");
+                var points = PlatformRuleEvent("twitch", "currency", 1, 1000m); points.Unit = "point";
+                Equal(0, rules.Evaluate(points, true).MatchedRules, "points cannot add Bits");
+                Equal(0, rules.Evaluate(PlatformRuleEvent("twitch", "currency", 999, 0m), true).MatchedRules, "zero Bits never use Count");
+                var gameplay = new CreatorToolsInteractionController(200);
+                Equal(3, rules.Update(null, gameplay, true), "all three Bits activations enter the gameplay queue");
+                True(Math.Abs(gameplay.LastDelaySeconds - 8f) < 0.01f, "Twitch honors configured cooldowns without dropping Bits");
+            }
+        }
+
+        private static void TestTwitchSubscriptionRules()
+        {
+            using (var scope = new TestScope("twitch-subscription-types"))
+            {
+                var rules = scope.CreateRules(1);
+                AddPlatformRule(rules, "twitch", "subscription");
+                AddPlatformRule(rules, "twitch", "subscription_gift", 2, 2);
+                AddPlatformRule(rules, "twitch", "resubscription", quantity: 3);
+                var fresh = rules.Evaluate(PlatformRuleEvent("twitch", "subscription", rawType: "channel.subscribe"), true);
+                Equal(1, fresh.MatchedRules, "new subscription matches only its own activator");
+                Equal(1L, fresh.DeferredInteractions, "new subscription produces one configured action");
+                var anonymous = PlatformRuleEvent("twitch", "subscription", 5, rawType: "channel.subscription.gift");
+                anonymous.UserId = ""; anonymous.UserName = "";
+                var gifted = rules.Evaluate(anonymous, true);
+                Equal(1, gifted.MatchedRules, "gift bundle does not count as a new or repeat subscription");
+                Equal(4L, gifted.DeferredInteractions, "five gifted subscriptions cross two thresholds with quantity two");
+                Equal(2L, rules.Evaluate(PlatformRuleEvent("twitch", "subscription", 1,
+                    rawType: "channel.subscription.gift"), true).DeferredInteractions, "gifted remainder persists");
+                Equal(3L, rules.Evaluate(PlatformRuleEvent("twitch", "subscription", 1, 48m,
+                    "channel.subscription.message"), true).DeferredInteractions, "resubscription months do not multiply actions");
+            }
+        }
+
+        private static void TestTwitchRewardRules()
+        {
+            using (var scope = new TestScope("twitch-custom-rewards"))
+            {
+                var rules = scope.CreateRules(1);
+                AddPlatformRule(rules, "twitch", "redemption", 2, rewardName: "Reto \"RGB\"");
+                var entry = PlatformRuleEvent("twitch", "redemption", 1, 10000m);
+                entry.Unit = "point"; entry.ItemName = "Otra recompensa";
+                Equal(0, rules.Evaluate(entry, true).MatchedRules, "unrelated reward cannot consume the threshold");
+                entry.ItemName = " Reto \"rgb\" ";
+                Equal(0, rules.Evaluate(entry, true).MatchedRules, "first redemption waits regardless of point cost");
+                Equal(1L, rules.Evaluate(entry, true).DeferredInteractions, "second matching redemption activates once");
+                entry.Platform = "tiktok";
+                Equal(0, rules.Evaluate(entry, true).MatchedRules, "TikTok cannot activate a Twitch reward");
+                var reloaded = scope.ReloadRules(rules);
+                entry.Platform = "twitch";
+                Equal(0, reloaded.Evaluate(entry, true).MatchedRules, "reload preserves quoted reward name");
+                Equal(1, reloaded.Evaluate(entry, true).MatchedRules, "saved reward remains operational");
+            }
+        }
+
+        private static void TestPlatformRulePersistence()
+        {
+            using (var scope = new TestScope("platform-rule-persistence"))
+            {
+                var rules = scope.CreateRules(2, 17, 23);
+                var path = (string)typeof(CreatorToolsStreamRulesController).GetField("settingsPath",
+                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(rules);
+                File.WriteAllText(path, File.ReadAllText(path).Replace("\"version\": 6", "\"version\": 5")
+                    .Replace(",\"rewardName\":\"\"", ""));
+                rules = scope.ReloadRules(rules);
+                using (var old = JsonDocument.Parse(SnapshotRules(rules)))
+                {
+                    var saved = old.RootElement.GetProperty("rules");
+                    Equal(1, saved.GetArrayLength(), "migration never duplicates old rules");
+                    Equal("tiktok", saved[0].GetProperty("platform").GetString(), "old rule remains TikTok");
+                    Equal(17, saved[0].GetProperty("userCooldownSeconds").GetInt32(), "old cooldown preserved");
+                }
+                var id = AddPlatformRule(rules, "twitch", "redemption", rewardName: "Mini jefe", cooldown: 5);
+                rules.ProcessServerCommand("action=duplicate&id=" + id);
+                rules = scope.ReloadRules(rules);
+                using (var saved = JsonDocument.Parse(SnapshotRules(rules)))
+                {
+                    var rows = saved.RootElement.GetProperty("rules");
+                    Equal(3, rows.GetArrayLength(), "legacy and Twitch copy persist together");
+                    Equal("twitch", rows[2].GetProperty("platform").GetString(), "copy retains Twitch platform");
+                    Equal("Mini jefe", rows[2].GetProperty("rewardName").GetString(), "copy retains reward");
+                }
+                foreach (var pair in new[] { "twitch:gift", "twitch:like", "tiktok:currency", "youtube:follow" })
+                {
+                    var parts = pair.Split(':');
+                    var rejected = rules.ProcessServerCommand("action=update&id=" + id + "&platform=" + parts[0] +
+                        "&eventType=" + parts[1] + "&name=Invalid&giftId=1&every=1&quantity=1&interaction=test_attack");
+                    True(rejected.Contains("\"feedback\":\"invalid_rule\""), "invalid platform trigger rejected " + pair);
+                }
+                rules.ProcessServerCommand("action=toggle&id=" + id + "&enabled=0");
+                rules = scope.ReloadRules(rules);
+                True(SnapshotRules(rules).Contains("\"enabled\":false,\"platform\":\"twitch\""), "Twitch toggle persists");
+                File.WriteAllText(path, File.ReadAllText(path).Replace("\"platform\":\"twitch\"", "\"platform\":\"unknown\""));
+                rules = scope.ReloadRules(rules);
+                using (var restored = JsonDocument.Parse(SnapshotRules(rules)))
+                    Equal(3, restored.RootElement.GetProperty("rules").GetArrayLength(), "malformed platform recovers complete backup without partial loss");
+            }
+        }
+
+        private static void TestTwitchRuleSimulations()
+        {
+            using (var scope = new TestScope("twitch-rule-simulation"))
+            {
+                var rules = scope.CreateRules(1);
+                AddPlatformRule(rules, "twitch", "subscription_gift");
+                AddPlatformRule(rules, "twitch", "resubscription");
+                AddPlatformRule(rules, "twitch", "redemption", rewardName: "Mini jefe");
+                var dashboard = new CreatorToolsDashboardController(null);
+                dashboard.ApplyConnectionUpdate(new CreatorToolsStreamConnectionUpdate {
+                    ConnectionId = "twitch", State = "connected"
+                });
+                var state = (string)typeof(CreatorToolsDashboardController).GetMethod("BuildState",
+                    BindingFlags.Instance | BindingFlags.NonPublic).Invoke(dashboard, null);
+                True(state.Contains("\"engineStatus\":\"running\""), "Twitch runs the engine while TikTok is unavailable");
+                Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation> evaluate = entry => rules.Evaluate(entry, true);
+                Equal("", dashboard.ScheduleSimulation("platform=twitch&type=subscription&subscriptionKind=subscription_gift&count=5&user=Test"), "gifted batch simulation accepted");
+                Equal("", dashboard.ScheduleSimulation("platform=twitch&type=subscription&subscriptionKind=resubscription&count=1&user=Test"), "resubscription simulation accepted");
+                Equal("", dashboard.ScheduleSimulation("platform=twitch&type=redemption&rewardName=Mini+jefe&count=1&user=Test"), "reward simulation accepted");
+                dashboard.Update(null, evaluate);
+                Equal(7L, rules.BacklogCount, "simulated gift, repeat subscription and reward reach matching rules");
+            }
+        }
+    }
+}

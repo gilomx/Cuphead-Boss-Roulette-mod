@@ -82,6 +82,18 @@ el catálogo y sólo transmite el `giftId`; tanto mock como mod derivan el nombr
 la imagen y las Coins. `delaySeconds` se agenda del lado del servidor para que
 recargar o cerrar el panel no cancele la prueba.
 
+Las reglas de Interacciones eligen plataforma y la tabla filtra Todas, TikTok o
+Twitch. TikTok conserva regalos, taps y follows. Twitch admite follows, Bits
+acumulados, suscripciones nuevas, suscripciones regaladas, renovaciones
+compartidas en el chat y canjes de una recompensa personalizada por su nombre.
+Las reglas anteriores siguen siendo de TikTok; no se duplican ni convierten.
+Los Bits conservan el sobrante entre Cheers; los regalos de suscripciones
+cuentan cada suscripción del lote, y las renovaciones cuentan un evento, no los
+meses de antigüedad. Un canje cuenta una vez, independientemente de su coste.
+Si se renombra la recompensa en Twitch, hay que actualizar su nombre en la regla.
+El simulador del Dashboard permite elegir el tipo de suscripción y el nombre
+de la recompensa para probar estas reglas sin transmitir ni realizar pagos.
+
 Después de `npm run build`, hay que instalar juntos `config.html`, `config.css`
 y `config.js` desde `assets/creator-tools`; copiar únicamente el DLL deja una
 versión anterior del panel en la instalación de Cuphead.

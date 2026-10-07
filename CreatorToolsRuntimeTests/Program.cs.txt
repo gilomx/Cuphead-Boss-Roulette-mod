@@ -21,6 +21,7 @@ namespace Gilomx.CupheadBossRoulette
         private static int Main()
         {
             RunTwitchConnectionTests();
+            RunStreamPlatformRuleTests();
             RunMiniBossSpawnPolicyTests();
             RunMiniBossArenaPolicyTests();
             RunTimedChallengeTests();
@@ -210,7 +211,7 @@ namespace Gilomx.CupheadBossRoulette
                 var reloaded = scope.ReloadRules(rules);
                 var state = reloaded.ProcessServerCommand(
                     "action=toggle&id=1&enabled=1");
-                True(state.Contains("\"schemaVersion\":5"),
+                True(state.Contains("\"schemaVersion\":6"),
                     "cooldown schema version");
                 True(state.Contains("\"maxCooldownSeconds\":3600"),
                     "cooldown limit published");

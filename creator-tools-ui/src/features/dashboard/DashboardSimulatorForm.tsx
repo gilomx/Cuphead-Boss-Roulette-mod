@@ -36,6 +36,8 @@ interface SimulationDraft {
   selectedItemId: string;
   delaySeconds: number;
   chatText: string;
+  rewardName: string;
+  subscriptionKind: "subscription" | "subscription_gift" | "resubscription";
 }
 
 interface DashboardSimulatorFormProps {
@@ -65,6 +67,8 @@ function createSimulationDraft(
     selectedItemId: source?.selectedItemId ?? "",
     delaySeconds: source?.delaySeconds ?? 0,
     chatText: source?.chatText ?? "1",
+    rewardName: source?.rewardName ?? "",
+    subscriptionKind: source?.subscriptionKind ?? "subscription",
   };
 }
 
@@ -101,6 +105,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
   const canSubmit = simulationStatus !== "sending" && simulations.every((simulation) =>
     Boolean(simulation.displayName.trim()) &&
     (simulation.type !== "chat" || /^[1-6]$/.test(simulation.chatText.trim())) &&
+    (simulation.platform !== "twitch" || simulation.type !== "redemption" || Boolean(simulation.rewardName.trim())) &&
     (!isCatalogGift(simulation) || Boolean(selectedGift(simulation))));
   const multiple = simulations.length > 1;
 
@@ -198,6 +203,10 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
         String(Math.max(0, Math.min(MAXIMUM_AMOUNT, simulation.amount || 0))),
       );
     }
+    if (simulation.platform === "twitch") {
+      if (simulation.type === "subscription") query.set("subscriptionKind", simulation.subscriptionKind);
+      if (simulation.type === "redemption") query.set("rewardName", simulation.rewardName.trim());
+    }
     return { query, delaySeconds };
   };
 
@@ -271,6 +280,8 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                         updateSimulation(simulation.key, (current) => ({
                           ...current,
                           platform,
+                          type: platform === "twitch" && (current.type === "gift" || current.type === "like")
+                            ? "follow" : current.type,
                           selectedItemId: platform === "tiktok" && current.type === "gift"
                             ? current.selectedItemId
                             : "",
@@ -298,12 +309,33 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                         }));
                       }}
                     >
-                      {EVENT_TYPES.map((type) => (
-                        <option key={type} value={type}>{t(`dashboard.eventTypes.${type}`)}</option>
+                      {EVENT_TYPES.filter((type) => simulation.platform !== "twitch" || (type !== "gift" && type !== "like")).map((type) => (
+                        <option key={type} value={type}>{t(simulation.platform === "twitch" && (type === "currency" || type === "redemption")
+                          ? `interactions.rules.editor.${type}Name` : `dashboard.eventTypes.${type}`)}</option>
                       ))}
                     </select>
                   </label>
                 </div>
+
+                {simulation.platform === "twitch" && simulation.type === "subscription" ? (
+                  <label>
+                    <span>{t("dashboard.simulator.subscriptionKind")}</span>
+                    <select value={simulation.subscriptionKind} disabled={simulationStatus === "sending"}
+                      onChange={(event) => updateSimulation(simulation.key, (current) => ({ ...current,
+                        subscriptionKind: event.target.value as SimulationDraft["subscriptionKind"] }))}>
+                      {(["subscription", "subscription_gift", "resubscription"] as const).map((kind) => (
+                        <option value={kind} key={kind}>{t(`interactions.rules.editor.${kind}Name`)}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                {simulation.platform === "twitch" && simulation.type === "redemption" ? (
+                  <label>
+                    <span>{t("interactions.rules.editor.rewardName")}</span>
+                    <input type="text" maxLength={64} value={simulation.rewardName} disabled={simulationStatus === "sending"}
+                      onChange={(event) => updateSimulation(simulation.key, (current) => ({ ...current, rewardName: event.target.value }))} />
+                  </label>
+                ) : null}
 
                 <fieldset className="dashboard-simulator-form__profiles" disabled={simulationStatus === "sending"}>
                   <legend>{t("dashboard.simulator.profile")}</legend>

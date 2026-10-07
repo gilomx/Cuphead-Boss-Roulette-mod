@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import type { StreamRuleDraft, StreamRuleTrigger, TikTokGift } from "../../model";
+import type { StreamRuleDraft, StreamRulePlatform, StreamRuleTrigger, TikTokGift } from "../../model";
+import { platformTriggers } from "./streamRuleDraft";
+import { StreamPlatformIcon, StreamTriggerIcon } from "./StreamRuleIcons";
 import { interactionItemFor } from "./interactionCatalog";
 import { InteractionPicker } from "./InteractionPicker";
 import { TikTokGiftPicker } from "./TikTokGiftPicker";
@@ -59,6 +61,7 @@ export function StreamRuleForm({
   const hasThreshold = draft.eventType !== "follow";
   const canSave = Boolean(
     (!needsGift || selectedGift) && selectedInteraction &&
+    (draft.eventType !== "redemption" || Boolean(draft.rewardName.trim())) &&
     (!hasThreshold || (draft.every >= 1 && draft.every <= maxEvery)) &&
     draft.quantity >= 1 && draft.quantity <= maxQuantity &&
     Number.isInteger(draft.userCooldownSeconds) &&
@@ -74,6 +77,7 @@ export function StreamRuleForm({
 
   const triggerName = draft.eventType === "gift"
     ? selectedGift?.name ?? ""
+    : draft.eventType === "redemption" ? draft.rewardName.trim()
     : t(`interactions.rules.editor.${draft.eventType}Name`);
   const interactionName = selectedInteraction
     ? t(selectedInteraction.titleKey)
@@ -84,7 +88,8 @@ export function StreamRuleForm({
       : "interactions.rules.editor.executionGiftSummaryMany"
     : draft.eventType === "like"
       ? "interactions.rules.editor.executionLikeSummary"
-      : "interactions.rules.editor.executionFollowSummary";
+      : draft.eventType === "follow" ? "interactions.rules.editor.executionFollowSummary"
+        : `interactions.rules.editor.execution${draft.eventType}Summary`;
   const executionSummary = fillTemplate(t(executionSummaryKey), {
     every: draft.every,
     trigger: triggerName,
@@ -119,7 +124,22 @@ export function StreamRuleForm({
       }}
     >
       <label className="stream-rule-form__wide">
-        <span>{t("interactions.rules.editor.triggerType")}</span>
+        <span>{t("interactions.rules.editor.platform")}</span>
+        <select disabled={saving} value={draft.platform} onChange={(event) => {
+          const platform = event.target.value as StreamRulePlatform;
+          const eventType = platformTriggers[platform].includes(draft.eventType) ? draft.eventType : platformTriggers[platform][0];
+          onChange({ ...draft, platform, eventType, every: 1,
+            giftId: platform === "tiktok" ? selectedGift?.giftId ?? gifts[0]?.giftId ?? "" : "",
+            rewardName: "" });
+        }}>
+          <option value="tiktok">TikTok</option>
+          <option value="twitch">Twitch</option>
+        </select>
+      </label>
+      <label className="stream-rule-form__wide">
+        <span className="stream-rule-trigger-label"><StreamPlatformIcon platform={draft.platform} />{t("interactions.rules.editor.triggerType")}</span>
+        <div className="stream-rule-trigger-select">
+        <StreamTriggerIcon eventType={draft.eventType} />
         <select
           disabled={saving}
           value={draft.eventType}
@@ -130,19 +150,29 @@ export function StreamRuleForm({
               ...draft,
               eventType,
               giftId: eventType === "gift" ? nextGift?.giftId ?? "" : draft.giftId,
-              every: eventType === "follow" ? 1 : draft.every,
+              every: eventType === "currency" ? 100 : 1,
               name: eventType === "gift"
                 ? nextGift?.name ?? ""
                 : t(`interactions.rules.editor.${eventType}Name`),
             });
           }}
         >
-          <option value="gift">{t("interactions.rules.editor.triggerGift")}</option>
-          <option value="like">{t("interactions.rules.editor.triggerLike")}</option>
-          <option value="follow">{t("interactions.rules.editor.triggerFollow")}</option>
+          {platformTriggers[draft.platform].map((eventType) => (
+            <option key={eventType} value={eventType}>{t(`interactions.rules.editor.${eventType}Name`)}</option>
+          ))}
         </select>
+        </div>
         <small>{t(`interactions.rules.editor.${draft.eventType}TriggerHint`)}</small>
       </label>
+
+      {draft.eventType === "redemption" ? (
+        <label className="stream-rule-form__wide">
+          <span>{t("interactions.rules.editor.rewardName")}</span>
+          <input type="text" maxLength={64} required value={draft.rewardName} disabled={saving}
+            onChange={(event) => onChange({ ...draft, rewardName: event.target.value })} />
+          <small>{t("interactions.rules.editor.rewardNameHint")}</small>
+        </label>
+      ) : null}
 
       {draft.eventType === "gift" ? (
         <TikTokGiftPicker
@@ -166,7 +196,9 @@ export function StreamRuleForm({
             <label>
               <span>{t(draft.eventType === "like"
                 ? "interactions.rules.editor.likeEvery"
-                : "interactions.rules.editor.every")}</span>
+                : draft.eventType === "currency" ? "interactions.rules.editor.bitsEvery"
+                  : draft.eventType === "redemption" ? "interactions.rules.editor.redemptionsEvery"
+                    : "interactions.rules.editor.every")}</span>
               <input
                 type="number"
                 min={1}

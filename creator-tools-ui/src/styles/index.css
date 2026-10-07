@@ -2801,6 +2801,42 @@ textarea:focus-visible {
   gap: 0.65rem;
 }
 
+.stream-platform-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: var(--space-3) var(--space-4);
+}
+.stream-platform-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-control);
+  color: var(--color-text-soft);
+  cursor: pointer;
+  font-weight: 800;
+}
+.stream-platform-filters button[aria-pressed="true"] {
+  background: var(--color-control-active);
+  border-color: transparent;
+  color: white;
+}
+.stream-platform-icon, .stream-trigger-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
+  color: var(--color-focus);
+}
+.stream-rule-trigger-label, .stream-rule-trigger-select {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.stream-rule-trigger-select select { flex: 1; min-width: 0; }
+
 .interaction-queue__title-row .dashboard-master-switch {
   min-width: 0;
   margin-left: auto;

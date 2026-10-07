@@ -1470,6 +1470,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         action: draft.id === undefined ? "create" : "update",
         name: draft.name.trim(),
         enabled: draft.enabled ? "1" : "0",
+        platform: draft.platform,
+        rewardName: draft.rewardName.trim(),
         eventType: draft.eventType,
         giftId: draft.giftId,
         every: String(draft.every),
