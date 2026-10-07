@@ -1167,8 +1167,8 @@
 
 .overlay-designer-callout > button {
   min-height: 2.6rem;
-  color: #291037;
-  background: var(--color-focus);
+  color: var(--color-text);
+  background: var(--color-control-active);
 }
 
 @media (max-width: 78rem) {

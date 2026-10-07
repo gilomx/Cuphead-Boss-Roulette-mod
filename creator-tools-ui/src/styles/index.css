@@ -2793,20 +2793,18 @@ textarea:focus-visible {
   min-height: 25rem;
 }
 
-.interaction-queue__master-control.dashboard-interaction-control {
-  margin: 0;
-  padding: 0.82rem var(--space-4);
-  border-width: 0 0 1px;
-  border-radius: 0;
-  box-shadow: none;
+.interaction-queue__title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 
-.interaction-queue__master-control .dashboard-interaction-control__copy > strong {
-  font-size: var(--font-size-body);
-}
-
-.interaction-queue__master-control .dashboard-interaction-control__copy > p:last-child {
-  font-size: var(--font-size-body);
+.interaction-queue__title-row .dashboard-master-switch {
+  min-width: 0;
+  gap: 0.45rem;
+  padding: 0.3rem 0.55rem;
+  font-size: var(--font-size-caption);
 }
 
 .interaction-queue__configure {
