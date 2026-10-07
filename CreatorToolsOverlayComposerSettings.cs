@@ -26,6 +26,19 @@ namespace Gilomx.CupheadBossRoulette
         internal string TextColor;
         internal string OutlineColor;
         internal string VoteOutlineColor = CreatorToolsOverlayComposerSettings.DefaultVoteOutlineColor;
+        internal string TextFont = "clean";
+        internal int TextWeight = 700;
+        internal string TextShadowColor = "#00000000";
+        internal int TextShadowX = 2;
+        internal int TextShadowY = 3;
+        internal int TextShadowBlur = 2;
+        // Legacy scene value retained for compatibility; rendering fits the container.
+        internal int RouletteSize = 100;
+        internal string RouletteAlignment = "center";
+        internal bool RouletteTextFirst;
+        internal bool RouletteLogo;
+        internal string RouletteRetry = "reappear";
+        internal bool RouletteImported;
 
         internal CreatorToolsOverlayComposerComponent Clone()
         {
@@ -74,6 +87,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string TapFarmingComponentId = "tap_farming";
         internal const string PeskyBattleComponentId = "pesky_battle";
         internal const string ChatChoosesComponentId = "chat_chooses";
+        internal const string RouletteComponentId = "roulette";
         internal const string DefaultLiquidColor = "#ff4f92";
         internal const string DefaultCollectingColor = "#f4c95d";
         internal const string DefaultTextColor = "#ffffff";
@@ -382,7 +396,8 @@ namespace Gilomx.CupheadBossRoulette
             value = (value ?? string.Empty).Trim().ToLowerInvariant();
             return value == TapFarmingComponentId ||
                 value == PeskyBattleComponentId ||
-                value == ChatChoosesComponentId ? value : string.Empty;
+                value == ChatChoosesComponentId ||
+                value == RouletteComponentId ? value : string.Empty;
         }
 
         internal static string NormalizeVariant(string value)
@@ -450,6 +465,20 @@ namespace Gilomx.CupheadBossRoulette
             var voteOutlineColor = NormalizeColor(component.VoteOutlineColor);
             component.VoteOutlineColor = voteOutlineColor.Length == 0
                 ? DefaultVoteOutlineColor : voteOutlineColor;
+            var textFont = NormalizeTextFont(component.TextFont);
+            component.TextFont = textFont.Length == 0 ? "clean" : textFont;
+            if (component.TextWeight != 400 && component.TextWeight != 700 && component.TextWeight != 900)
+                component.TextWeight = 700;
+            if (component.Id == RouletteComponentId)
+            {
+                component.TextFont = "clean";
+                component.TextWeight = 700;
+            }
+            var textShadowColor = NormalizeColor(component.TextShadowColor);
+            component.TextShadowColor = textShadowColor.Length == 0 ? "#00000000" : textShadowColor;
+            component.TextShadowX = Math.Max(-20, Math.Min(20, component.TextShadowX));
+            component.TextShadowY = Math.Max(-20, Math.Min(20, component.TextShadowY));
+            component.TextShadowBlur = Math.Max(0, Math.Min(20, component.TextShadowBlur));
         }
 
         private string BuildFileJson()
@@ -525,7 +554,21 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append("\",\"voteOutlineColor\":\"");
                 CreatorToolsJson.AppendEscaped(
                     builder, component.VoteOutlineColor);
-                builder.Append("\"}");
+                builder.Append("\",\"textFont\":\"");
+                CreatorToolsJson.AppendEscaped(builder, component.TextFont);
+                builder.Append("\",\"textWeight\":").Append(component.TextWeight)
+                    .Append(",\"textShadowColor\":\"");
+                CreatorToolsJson.AppendEscaped(builder, component.TextShadowColor);
+                builder.Append("\",\"textShadowX\":").Append(component.TextShadowX)
+                    .Append(",\"textShadowY\":").Append(component.TextShadowY)
+                    .Append(",\"textShadowBlur\":").Append(component.TextShadowBlur);
+                if (component.Id == RouletteComponentId)
+                    builder.Append(",\"rouletteSize\":").Append(component.RouletteSize)
+                        .Append(",\"rouletteAlignment\":\"").Append(component.RouletteAlignment)
+                        .Append("\",\"rouletteTextFirst\":").Append(component.RouletteTextFirst ? "true" : "false")
+                        .Append(",\"rouletteLogo\":").Append(component.RouletteLogo ? "true" : "false")
+                        .Append(",\"rouletteRetry\":\"").Append(component.RouletteRetry).Append('"');
+                builder.Append('}');
             }
             builder.Append("]}");
         }
@@ -601,6 +644,15 @@ namespace Gilomx.CupheadBossRoulette
                 TextColor = DefaultTextColor,
                 OutlineColor = DefaultChatOutlineColor
             });
+            profile.Components.Add(new CreatorToolsOverlayComposerComponent
+            {
+                Id = RouletteComponentId,
+                X = vertical ? 60 : 480, Y = vertical ? 540 : 330,
+                Width = 960, Height = 420, Layer = 40,
+                Enabled = false, Opacity = 100, Variant = "default", Motion = true,
+                LiquidColor = DefaultLiquidColor, CollectingColor = DefaultCollectingColor,
+                TextColor = DefaultTextColor, OutlineColor = DefaultOutlineColor
+            });
             return profile;
         }
 
@@ -632,6 +684,18 @@ namespace Gilomx.CupheadBossRoulette
             destination.TextColor = source.TextColor;
             destination.OutlineColor = source.OutlineColor;
             destination.VoteOutlineColor = source.VoteOutlineColor;
+            destination.TextFont = source.TextFont;
+            destination.TextWeight = source.TextWeight;
+            destination.TextShadowColor = source.TextShadowColor;
+            destination.TextShadowX = source.TextShadowX;
+            destination.TextShadowY = source.TextShadowY;
+            destination.TextShadowBlur = source.TextShadowBlur;
+            destination.RouletteSize = source.RouletteSize;
+            destination.RouletteAlignment = source.RouletteAlignment;
+            destination.RouletteTextFirst = source.RouletteTextFirst;
+            destination.RouletteLogo = source.RouletteLogo;
+            destination.RouletteRetry = source.RouletteRetry;
+            destination.RouletteImported = source.RouletteImported;
         }
 
         private static double ComponentFitScale(
@@ -727,7 +791,8 @@ namespace Gilomx.CupheadBossRoulette
                 if (seenProfiles.Count != candidate.Profiles.Count)
                     return false;
                 loaded = candidate;
-                if (migratedBounds && !candidatePath.EndsWith(
+                if (migratedBounds && candidate.Profiles.TrueForAll(p =>
+                        p.FindComponent(RouletteComponentId).RouletteImported) && !candidatePath.EndsWith(
                         ".bak", StringComparison.OrdinalIgnoreCase))
                     candidate.TrySave();
                 return true;
@@ -801,6 +866,25 @@ namespace Gilomx.CupheadBossRoulette
             JsonValue node,
             CreatorToolsOverlayComposerComponent component)
         {
+            if (component.Id == RouletteComponentId && node.Property("rouletteSize") != null)
+            {
+                int size;
+                bool textFirst, logo;
+                var alignment = node.String("rouletteAlignment");
+                var retry = node.String("rouletteRetry");
+                if (!node.TryInteger("rouletteSize", out size) ||
+                    (size != 100 && size != 150 && size != 200) ||
+                    (alignment != "left" && alignment != "center" && alignment != "right") ||
+                    (retry != "keep" && retry != "reappear") ||
+                    !node.TryBoolean("rouletteTextFirst", out textFirst) ||
+                    !node.TryBoolean("rouletteLogo", out logo)) return false;
+                component.RouletteSize = size;
+                component.RouletteAlignment = alignment;
+                component.RouletteRetry = retry;
+                component.RouletteTextFirst = textFirst;
+                component.RouletteLogo = logo;
+                component.RouletteImported = true;
+            }
             int x, y, width, height, layer, opacity;
             bool enabled, locked, showTitle, showDetails, motion;
             var variant = NormalizeVariant(node.String("variant"));
@@ -879,7 +963,43 @@ namespace Gilomx.CupheadBossRoulette
                 component.ShowTitle = false;
                 component.ShowDetails = false;
             }
+            if (node.Property("textFont") != null)
+            {
+                var font = NormalizeTextFont(node.String("textFont"));
+                if (font.Length == 0) return false;
+                component.TextFont = font;
+            }
+            if (node.Property("textWeight") != null)
+            {
+                int weight;
+                if (!node.TryInteger("textWeight", out weight) || (weight != 400 && weight != 700 && weight != 900)) return false;
+                component.TextWeight = weight;
+            }
+            if (node.Property("textShadowColor") != null)
+            {
+                var color = NormalizeColor(node.String("textShadowColor"));
+                if (color.Length == 0) return false;
+                component.TextShadowColor = color;
+            }
+            foreach (var key in new[] { "textShadowX", "textShadowY", "textShadowBlur" })
+            {
+                if (node.Property(key) == null) continue;
+                int number;
+                if (!node.TryInteger(key, out number) || number < (key == "textShadowBlur" ? 0 : -20) || number > 20) return false;
+                if (key == "textShadowX") component.TextShadowX = number;
+                else if (key == "textShadowY") component.TextShadowY = number;
+                else component.TextShadowBlur = number;
+            }
             return true;
+        }
+
+        internal static string NormalizeTextFont(string value)
+        {
+            value = (value ?? string.Empty).Trim().ToLowerInvariant();
+            // Accept saved native-font scenes without discarding their other settings.
+            if (value == "native") return "clean";
+            return value == "clean" || value == "system" || value == "rounded" || value == "serif"
+                ? value : string.Empty;
         }
 
         private static void Warn(Action<string> warning, string message)

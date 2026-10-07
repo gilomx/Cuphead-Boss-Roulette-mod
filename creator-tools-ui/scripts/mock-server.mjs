@@ -336,7 +336,15 @@ function defaultOverlayProfiles() {
     enabled: true, locked: false, layer: 30, opacity: 100, variant: "default",
     showTitle: true, showDetails: true, motion: true,
     liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#d3af93",
-  }].map(component => ({ ...component, voteOutlineColor: "#ffffff" })) }));
+  }, {
+    id: "roulette", x: profile.id === "vertical" ? 60 : 480,
+    y: profile.id === "vertical" ? 540 : 330, width: 960, height: 420,
+    enabled: true, locked: false, layer: 40, opacity: 100, variant: "default",
+    showTitle: false, showDetails: false, motion: true,
+    liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
+    rouletteSize: 100, rouletteAlignment: "center", rouletteTextFirst: false, rouletteLogo: false, rouletteRetry: "reappear",
+  }].map(component => ({ ...component, voteOutlineColor: "#ffffff", textFont: "clean", textWeight: 700,
+    textShadowColor: "#00000000", textShadowX: 2, textShadowY: 3, textShadowBlur: 2 })) }));
 }
 
 let overlayComposerProfiles = defaultOverlayProfiles();
@@ -992,6 +1000,13 @@ function normalizeOverlayComponent(component, canvas) {
   component.showDetails = component.showDetails !== false;
   component.motion = component.motion !== false;
   component.variant = "default";
+  component.textFont = component.id !== "roulette" && ["clean", "system", "rounded", "serif"].includes(component.textFont) ? component.textFont : "clean";
+  component.textWeight = component.id !== "roulette" && [400, 700, 900].includes(component.textWeight) ? component.textWeight : 700;
+  component.textShadowColor = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(String(component.textShadowColor ?? "")) ? component.textShadowColor.toLowerCase() : "#00000000";
+  for (const [key, fallback, minimum] of [["textShadowX", 2, -20], ["textShadowY", 3, -20], ["textShadowBlur", 2, 0]]) {
+    const value = Number(component[key] ?? fallback);
+    component[key] = Number.isFinite(value) ? Math.max(minimum, Math.min(20, Math.round(value))) : fallback;
+  }
   component.liquidColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.liquidColor ?? ""))
     ? String(component.liquidColor).toLowerCase()
     : "#ff4f92";
@@ -1068,7 +1083,18 @@ function applyOverlayComposerCommand(command, res) {
       json(res, { ok: false, error: "unknown_component" }, 400);
       return;
     }
-    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor"]) {
+    if (command.textFont != null && !["clean", "system", "rounded", "serif"].includes(command.textFont) ||
+        command.textWeight != null && ![400, 700, 900].includes(command.textWeight)) {
+      json(res, { ok: false, error: "invalid_text_style" }, 400);
+      return;
+    }
+    for (const key of ["textShadowX", "textShadowY", "textShadowBlur"]) {
+      if (command[key] != null && (!Number.isInteger(command[key]) || command[key] < (key === "textShadowBlur" ? 0 : -20) || command[key] > 20)) {
+        json(res, { ok: false, error: "invalid_text_shadow" }, 400);
+        return;
+      }
+    }
+    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor", "textShadowColor"]) {
       if (Object.prototype.hasOwnProperty.call(command, key) &&
           !/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(command[key] ?? ""))) {
         json(res, { ok: false, error: "invalid_color" }, 400);
@@ -1079,6 +1105,8 @@ function applyOverlayComposerCommand(command, res) {
       "x", "y", "width", "height", "enabled", "locked", "layer",
       "opacity",
       "variant", "showTitle", "showDetails", "motion",
+      "textFont", "textWeight", "textShadowColor", "textShadowX", "textShadowY", "textShadowBlur",
+      "rouletteSize", "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
       "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",
     ]) {
       if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];
@@ -1141,6 +1169,18 @@ createServer((req, res) => {
   if (url.pathname === "/api/config/chat-chooses/set") {
     const state = chatChooses.command(url.searchParams, tapFarmingPhase !== "off" || peskyBattleIsExclusive());
     json(res, state, state.error ? 409 : 202); return;
+  }
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    serveCreatorToolFile("overlay.html", "text/html; charset=utf-8", res); return;
+  }
+  if (url.pathname === "/overlay.css") {
+    serveCreatorToolFile("overlay.css", "text/css; charset=utf-8", res); return;
+  }
+  if (url.pathname === "/roulette-overlay") {
+    serveCreatorToolFile("roulette-overlay.html", "text/html; charset=utf-8", res); return;
+  }
+  if (url.pathname === "/api/roulette-overlay/state") {
+    json(res, { type: "state", active: false }); return;
   }
   if (url.pathname === "/chat-chooses-overlay" || url.pathname === "/chat-chooses-overlay/") {
     serveCreatorToolFile("chat-chooses-overlay.html", "text/html; charset=utf-8", res); return;
@@ -1411,7 +1451,7 @@ createServer((req, res) => {
         });
         return;
       }
-      if (!["tap_farming", "pesky_battle", "chat_chooses"].includes(command.componentId)) {
+      if (!["tap_farming", "pesky_battle", "chat_chooses", "roulette"].includes(command.componentId)) {
         json(res, { ok: false, error: "unknown_component" }, 400);
         return;
       }
@@ -1422,7 +1462,7 @@ createServer((req, res) => {
         layout = null;
       }
       if (!layout || layout.id !== profileId ||
-          !Array.isArray(layout.components) || layout.components.length !== 3) {
+          !Array.isArray(layout.components) || layout.components.length !== 4) {
         json(res, { ok: false, error: "invalid_preview_layout" }, 400);
         return;
       }

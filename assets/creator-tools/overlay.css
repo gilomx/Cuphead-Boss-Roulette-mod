@@ -218,7 +218,7 @@ body {
 }
 
 .result-icon.settled {
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .result-icon.reveal {
@@ -252,7 +252,7 @@ body {
 }
 
 .challenge.settled {
-  opacity: 0.7;
+  opacity: 1;
   transform: scale(1);
 }
 
@@ -311,11 +311,11 @@ body {
     transform: scale(1);
   }
   50% {
-    opacity: 0.7;
+    opacity: 1;
     transform: scale(1.075);
   }
   100% {
-    opacity: 0.7;
+    opacity: 1;
     transform: scale(1);
   }
 }
@@ -326,18 +326,18 @@ body {
     transform: scale(1.12);
   }
   to {
-    opacity: 0.7;
+    opacity: 1;
     transform: scale(1);
   }
 }
 
 @keyframes icon-exit {
   0% {
-    opacity: 0.7;
+    opacity: 1;
     transform: scale(1);
   }
   50% {
-    opacity: 0.7;
+    opacity: 1;
     transform: scale(1.075);
   }
   100% {
@@ -348,7 +348,7 @@ body {
 
 @keyframes challenge-exit {
   from {
-    opacity: 0.7;
+    opacity: 1;
     transform: scale(1);
   }
   to {

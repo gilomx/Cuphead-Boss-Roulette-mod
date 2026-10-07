@@ -13,7 +13,7 @@ namespace Gilomx.CupheadBossRoulette
     {
         private const int CreatorToolsPauseMenuIndex = 4;
         private const int CreatorToolsOverlayMenuItemCount = 10;
-        private const int CreatorToolsHubMenuItemCount = 3;
+        private const int CreatorToolsHubMenuItemCount = 2;
         private const string CreatorToolsPauseRowName =
             "Gilomx La Pichi Ruleta Pause Row";
 
@@ -1268,7 +1268,6 @@ namespace Gilomx.CupheadBossRoulette
                 case 3:
                     creatorToolsScaleSetting.Value =
                         1f + selection * 0.5f;
-                    creatorToolsLabelKey = null;
                     break;
                 case 4:
                     creatorToolsOrderSetting.Value =
@@ -1310,15 +1309,6 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
             {
                 if (index == 0)
-                {
-                    if (OptionsMenuSelectSoundMethod != null)
-                        OptionsMenuSelectSoundMethod.Invoke(
-                            creatorToolsNativeOptions, null);
-                    SwitchCreatorToolsMenuPage(
-                        CreatorToolsMenuPage.RouletteOverlay);
-                    return;
-                }
-                if (index == 1)
                 {
                     if (OptionsMenuSelectSoundMethod != null)
                         OptionsMenuSelectSoundMethod.Invoke(
@@ -1634,10 +1624,6 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub &&
                 creatorToolsMenuSelection == 0)
-                SwitchCreatorToolsMenuPage(
-                    CreatorToolsMenuPage.RouletteOverlay);
-            else if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub &&
-                     creatorToolsMenuSelection == 1)
                 OpenCreatorToolsConfigFromPauseMenu();
             else if (creatorToolsMenuSelection ==
                      CreatorToolsMenuItemCount - 1)
@@ -1690,7 +1676,6 @@ namespace Gilomx.CupheadBossRoulette
                     scaleIndex = Wrap(scaleIndex + direction, 3);
                     creatorToolsScaleSetting.Value =
                         1f + scaleIndex * 0.5f;
-                    creatorToolsLabelKey = null;
                     break;
                 case 4:
                     creatorToolsOrderSetting.Value =
@@ -1848,10 +1833,6 @@ namespace Gilomx.CupheadBossRoulette
                     creatorToolsMenuSelection = i;
                     if (creatorToolsMenuPage ==
                             CreatorToolsMenuPage.Hub && i == 0)
-                        SwitchCreatorToolsMenuPage(
-                            CreatorToolsMenuPage.RouletteOverlay);
-                    else if (creatorToolsMenuPage ==
-                                 CreatorToolsMenuPage.Hub && i == 1)
                         OpenCreatorToolsConfigFromPauseMenu();
                     else if (i == CreatorToolsMenuItemCount - 1)
                     {
@@ -1892,10 +1873,6 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsMenuPage == CreatorToolsMenuPage.Hub)
             {
                 if (index == 0)
-                    return CreatorToolsText(
-                        ModText.CreatorMenuRouletteOverlay,
-                        "STREAM OVERLAY");
-                if (index == 1)
                     return CreatorToolsText(
                         ModText.CreatorMenuControlPanel,
                         "CONTROL PANEL");

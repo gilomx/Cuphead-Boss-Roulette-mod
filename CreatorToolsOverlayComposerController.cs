@@ -64,6 +64,36 @@ namespace Gilomx.CupheadBossRoulette
                 return settings.BuildStateJson("ready", false);
         }
 
+        internal bool ImportRouletteSettings(bool enabled, int size, string alignment,
+            int opacity, bool textFirst, bool logo, string retry)
+        {
+            lock (stateLock)
+            {
+                var candidate = settings.Clone();
+                var changed = false;
+                foreach (var profile in candidate.Profiles)
+                {
+                    var component = profile.FindComponent(CreatorToolsOverlayComposerSettings.RouletteComponentId);
+                    if (component.RouletteImported) continue;
+                    component.Enabled = enabled;
+                    component.RouletteSize = size == 150 || size == 200 ? size : 100;
+                    component.RouletteAlignment = alignment == "left" || alignment == "right" ? alignment : "center";
+                    component.Opacity = opacity;
+                    component.RouletteTextFirst = textFirst;
+                    component.RouletteLogo = logo;
+                    component.RouletteRetry = retry == "keep" ? "keep" : "reappear";
+                    component.RouletteImported = true;
+                    CreatorToolsOverlayComposerSettings.NormalizeComponent(profile, component);
+                    changed = true;
+                }
+                if (!changed) return true;
+                candidate.Revision++;
+                if (!candidate.TrySave()) return false;
+                settings = candidate;
+                return true;
+            }
+        }
+
         internal CreatorToolsOverlayComposerResponse ProcessConfigCommand(
             string body)
         {
@@ -378,6 +408,37 @@ namespace Gilomx.CupheadBossRoulette
                 if (variant.Length == 0) return false;
                 component.Variant = variant; changed = true;
             }
+            if (component.Id == CreatorToolsOverlayComposerSettings.RouletteComponentId)
+            {
+                if (values.ContainsKey("rouletteSize"))
+                {
+                    if (!TryReadInt(values, "rouletteSize", out number) ||
+                        (number != 100 && number != 150 && number != 200)) return false;
+                    component.RouletteSize = number; changed = true;
+                }
+                if (values.ContainsKey("rouletteAlignment"))
+                {
+                    var alignment = Value(values, "rouletteAlignment");
+                    if (alignment != "left" && alignment != "center" && alignment != "right") return false;
+                    component.RouletteAlignment = alignment; changed = true;
+                }
+                if (values.ContainsKey("rouletteRetry"))
+                {
+                    var retry = Value(values, "rouletteRetry");
+                    if (retry != "keep" && retry != "reappear") return false;
+                    component.RouletteRetry = retry; changed = true;
+                }
+                if (values.ContainsKey("rouletteTextFirst"))
+                {
+                    if (!TryReadBoolean(values, "rouletteTextFirst", out boolean)) return false;
+                    component.RouletteTextFirst = boolean; changed = true;
+                }
+                if (values.ContainsKey("rouletteLogo"))
+                {
+                    if (!TryReadBoolean(values, "rouletteLogo", out boolean)) return false;
+                    component.RouletteLogo = boolean; changed = true;
+                }
+            }
             if (values.ContainsKey("liquidColor"))
             {
                 var color =
@@ -417,6 +478,35 @@ namespace Gilomx.CupheadBossRoulette
                         Value(values, "voteOutlineColor"));
                 if (color.Length == 0) return false;
                 component.VoteOutlineColor = color; changed = true;
+            }
+            if (values.ContainsKey("textFont"))
+            {
+                if (string.Equals(Value(values, "textFont").Trim(), "native", StringComparison.OrdinalIgnoreCase)) return false;
+                var font = CreatorToolsOverlayComposerSettings.NormalizeTextFont(Value(values, "textFont"));
+                if (font.Length == 0) return false;
+                component.TextFont = font; changed = true;
+            }
+            if (values.ContainsKey("textWeight"))
+            {
+                int weight;
+                if (!TryReadInt(values, "textWeight", out weight) || (weight != 400 && weight != 700 && weight != 900)) return false;
+                component.TextWeight = weight; changed = true;
+            }
+            if (values.ContainsKey("textShadowColor"))
+            {
+                var color = CreatorToolsOverlayComposerSettings.NormalizeColor(Value(values, "textShadowColor"));
+                if (color.Length == 0) return false;
+                component.TextShadowColor = color; changed = true;
+            }
+            foreach (var key in new[] { "textShadowX", "textShadowY", "textShadowBlur" })
+            {
+                if (!values.ContainsKey(key)) continue;
+                int shadowOffset;
+                if (!TryReadInt(values, key, out shadowOffset) || shadowOffset < (key == "textShadowBlur" ? 0 : -20) || shadowOffset > 20) return false;
+                if (key == "textShadowX") component.TextShadowX = shadowOffset;
+                else if (key == "textShadowY") component.TextShadowY = shadowOffset;
+                else component.TextShadowBlur = shadowOffset;
+                changed = true;
             }
             if (!changed) return false;
             CreatorToolsOverlayComposerSettings.NormalizeComponent(

@@ -1,6 +1,6 @@
 :root {
   color-scheme: only light;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--overlay-font-family, sans-serif);
   --liquid-color: #ff4f92;
   --collecting-color: #f4c95d;
   --collecting-fill-color: rgba(244, 201, 93, 0.2);
@@ -49,6 +49,8 @@ html[data-overlay-mode="embedded"] body {
 }
 
 .tap-farming {
+  font-family: var(--overlay-font-family, sans-serif);
+  font-weight: var(--overlay-font-weight, 700);
   position: relative;
   container-type: size;
   width: 100%;
@@ -91,14 +93,14 @@ html[data-overlay-mode="embedded"] body {
   gap: 1px;
   color: var(--text-color);
   text-align: center;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.68);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
 }
 
 .tap-farming__eyebrow {
   max-width: 100%;
   overflow: hidden;
   font-size: clamp(12px, 3.5vmin, 21px);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.18em;
   line-height: 1.1;
   opacity: 0.76;
@@ -110,7 +112,7 @@ html[data-overlay-mode="embedded"] body {
   max-width: 100%;
   overflow: hidden;
   font-size: clamp(26px, 8vmin, 52px);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.01em;
   line-height: 1.05;
   text-overflow: ellipsis;
@@ -119,7 +121,7 @@ html[data-overlay-mode="embedded"] body {
 
 .tap-farming__preview {
   font-size: clamp(9px, 2.4vmin, 14px);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.13em;
   line-height: 1.2;
   opacity: 0.62;
@@ -167,7 +169,6 @@ html[data-overlay-mode="embedded"] body {
   max-width: 100%;
   max-height: 100%;
   aspect-ratio: 320 / 300;
-  filter: drop-shadow(0 9px 8px rgba(0, 0, 0, 0.28));
   will-change: transform;
 }
 
@@ -179,6 +180,7 @@ html[data-overlay-mode="embedded"] body {
 }
 
 .tap-heart__visual {
+  filter: drop-shadow(0 9px 8px rgba(0, 0, 0, 0.28));
   transform: scale(1);
   transform-box: view-box;
   transform-origin: center;
@@ -231,11 +233,11 @@ html[data-overlay-mode="embedded"] body {
 
 .tap-heart__percent {
   fill: var(--metric-color);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--overlay-font-family, sans-serif);
   font-size: var(--metric-font-size);
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.42));
+  font-weight: var(--overlay-font-weight, 700);
+  filter: drop-shadow(var(--overlay-text-drop-shadow, 2px 3px 2px #00000000));
   transition:
     fill 560ms ease,
     opacity 560ms ease,
@@ -248,13 +250,13 @@ html[data-overlay-mode="embedded"] body {
 
 .tap-heart__remaining {
   fill: var(--text-color);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--overlay-font-family, sans-serif);
   font-size: 24px;
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.025em;
   opacity: 0.82;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.42));
+  filter: drop-shadow(var(--overlay-text-drop-shadow, 2px 3px 2px #00000000));
   transition: opacity 220ms ease;
 }
 
@@ -302,12 +304,12 @@ html[data-overlay-mode="embedded"] body {
   justify-self: start;
   color: var(--text-color);
   font-size: min(6.5cqw, 7.8cqh);
-  font-weight: 900;
+  font-weight: var(--overlay-font-weight, 700);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.045em;
   line-height: 1;
   text-align: center;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.58);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
   white-space: nowrap;
 }
 
@@ -329,7 +331,7 @@ html[data-overlay-mode="embedded"] body {
   border-radius: 50%;
   color: var(--collecting-color);
   background: var(--collecting-fill-color);
-  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.26));
+  box-shadow: 0 5px 7px rgba(0, 0, 0, 0.26);
 }
 
 .tap-collecting__signal::before {
@@ -363,9 +365,9 @@ html[data-overlay-mode="embedded"] body {
 
 .tap-collecting__signal b {
   font-size: min(9cqw, 11cqh);
-  font-weight: 950;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.04em;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.38);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
   transform-origin: center;
   animation: tap-collecting-word-tap 1050ms cubic-bezier(.2, .78, .25, 1) infinite;
 }
@@ -384,7 +386,7 @@ html[data-overlay-mode="embedded"] body {
   gap: min(1.2cqw, 1.4cqh);
   color: var(--text-color);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.58);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
 }
 
 .tap-collecting__metrics {
@@ -424,7 +426,7 @@ html[data-overlay-mode="embedded"] body {
   overflow: hidden;
   color: var(--collecting-color);
   font-size: min(10.1cqw, 14.2cqh);
-  font-weight: 950;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: -0.045em;
   line-height: 1;
   text-overflow: ellipsis;
@@ -434,7 +436,7 @@ html[data-overlay-mode="embedded"] body {
   min-width: 0;
   max-width: 100%;
   font-size: min(4.5cqw, 5.5cqh);
-  font-weight: 850;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.08em;
   line-height: 1;
   opacity: 1;
@@ -477,7 +479,7 @@ html[data-overlay-mode="embedded"] body {
   display: contents;
   color: var(--text-color);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.58);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
 }
 
 .tap-victory__title {
@@ -486,7 +488,7 @@ html[data-overlay-mode="embedded"] body {
   justify-self: center;
   color: var(--collecting-color);
   font-size: min(15cqw, 17cqh);
-  font-weight: 950;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.035em;
   line-height: 1;
 }
@@ -518,7 +520,7 @@ html[data-overlay-mode="embedded"] body {
   width: 100%;
   max-width: 100%;
   font-size: min(6.1cqw, 7.3cqh);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   line-height: 0.98;
   opacity: 1;
 }
@@ -527,7 +529,7 @@ html[data-overlay-mode="embedded"] body {
   margin: 0;
   color: var(--collecting-color);
   font-size: min(9.7cqw, 11.7cqh);
-  font-weight: 950;
+  font-weight: var(--overlay-font-weight, 700);
   line-height: 1;
   white-space: nowrap;
 }
@@ -585,13 +587,11 @@ html[data-overlay-mode="embedded"] body {
   right: 2%;
   color: var(--text-color);
   font-size: clamp(24px, 8vmin, 50px);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.01em;
   line-height: 1;
   opacity: 0;
-  text-shadow:
-    0 2px 3px rgba(0, 0, 0, 0.72),
-    0 0 11px var(--liquid-color);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
   transform: translateY(14px) scale(0.7);
   white-space: nowrap;
 }
@@ -613,7 +613,7 @@ html[data-overlay-mode="embedded"] body {
   color: var(--text-color);
   font-variant-numeric: tabular-nums;
   text-align: center;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
 }
 
 .tap-farming__details > span {
@@ -636,7 +636,7 @@ html[data-overlay-mode="embedded"] body {
 
 .tap-farming__details b {
   font-size: clamp(10px, 2.6vmin, 16px);
-  font-weight: 700;
+  font-weight: var(--overlay-font-weight, 700);
   letter-spacing: 0.09em;
   opacity: 0.68;
   text-transform: uppercase;
@@ -644,7 +644,7 @@ html[data-overlay-mode="embedded"] body {
 
 .tap-farming__details strong {
   font-size: clamp(14px, 3.6vmin, 22px);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
 }
 
 .tap-farming__state b {

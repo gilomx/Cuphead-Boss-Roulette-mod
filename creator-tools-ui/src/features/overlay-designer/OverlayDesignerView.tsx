@@ -1,3 +1,4 @@
+import type { RouletteScenario } from "./model";
 import {
   ArrowLeft,
   Check,
@@ -77,6 +78,12 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     initialSelection.componentId,
   );
   const [tapState, dispatchTap] = useReducer(tapSimulationReducer, createTapSimulation());
+  const [rouletteScenario, setRouletteScenario] = useState<RouletteScenario>("hud");
+  const rouletteScenarioRef = useRef(rouletteScenario);
+  rouletteScenarioRef.current = rouletteScenario;
+  const [rouletteReplay, setRouletteReplay] = useState(0);
+  const rouletteReplayRef = useRef(rouletteReplay);
+  rouletteReplayRef.current = rouletteReplay;
   const [chatState, dispatchChat] = useReducer(chatSimulationReducer, createChatSimulation(locale));
   useEffect(() => dispatchChat({ type: "locale", locale }), [locale]);
   const [battleState, dispatchBattle] = useReducer(
@@ -213,7 +220,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       currentProfile,
       false,
-      chatStateRef.current,
+      chatStateRef.current, rouletteScenarioRef.current, rouletteReplayRef.current,
     )).then((result) => {
       if (!viewMountedRef.current) return result;
       if (previewRef.current === active && result !== "error") {
@@ -253,7 +260,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
         battleStateRef.current,
         currentProfile,
         false,
-        chatStateRef.current,
+        chatStateRef.current, rouletteScenarioRef.current, rouletteReplayRef.current,
       ));
     };
     const handlePageHide = () => stopOwnedPreview(true);
@@ -297,7 +304,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       currentProfile,
       previewActiveRef.current,
-      chatStateRef.current,
+      chatStateRef.current, rouletteScenarioRef.current, rouletteReplayRef.current,
     )).then((result) => {
       if (viewMountedRef.current &&
           (result === "conflict" || result === "expired") &&
@@ -337,7 +344,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       profile,
       false,
-      chatStateRef.current,
+      chatStateRef.current, rouletteScenarioRef.current, rouletteReplayRef.current,
     )).then((result) => {
       if (!viewMountedRef.current || previewRef.current !== active) return;
       previewPendingRef.current = false;
@@ -356,7 +363,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
         battleStateRef.current,
         profileRef.current ?? profile,
         false,
-        chatStateRef.current,
+        chatStateRef.current, rouletteScenarioRef.current, rouletteReplayRef.current,
       ));
       previewRef.current = null;
       if (result !== "conflict") schedulePreviewRetry();
@@ -368,7 +375,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     if (!profile || previewPending || !previewRef.current) return;
     const timer = window.setTimeout(() => publishLatest(), 80);
     return () => window.clearTimeout(timer);
-  }, [battleState, chatState, previewActive, previewPending, profile, publishLatest,
+  }, [battleState, chatState, rouletteScenario, rouletteReplay, previewActive, previewPending, profile, publishLatest,
     selectedComponentId, tapState]);
 
   useEffect(() => {
@@ -466,7 +473,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
       battleStateRef.current,
       currentProfile,
       nextPreviewActive,
-      chatStateRef.current,
+      chatStateRef.current, rouletteScenarioRef.current, rouletteReplayRef.current,
     ));
     if (!viewMountedRef.current || previewRef.current !== active) return;
     previewPendingRef.current = false;
@@ -648,15 +655,20 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             tapState={tapState}
             battleState={battleState}
             chatState={chatState}
+            rouletteScenario={rouletteScenario}
+            rouletteReplay={rouletteReplay}
             disabled={busy}
             onChange={(componentId, update) => changeComponent(componentId, update)}
           />
           <OverlayDesignerInspector
+            onRouletteScenarioChange={setRouletteScenario}
+            onRouletteReplay={() => { setRouletteScenario("hud"); setRouletteReplay(replay => replay + 1); }}
             profile={profile}
             component={component}
             tapState={tapState}
             battleState={battleState}
             chatState={chatState}
+            rouletteScenario={rouletteScenario}
             previewActive={previewActive}
             previewPending={previewPending}
             previewError={previewError}

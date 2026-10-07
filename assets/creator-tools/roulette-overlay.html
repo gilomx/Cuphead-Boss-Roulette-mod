@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>La Pichi Ruleta Overlay</title>
+  <link rel="stylesheet" href="/overlay.css?v=hud-logo-gap-10">
+  <style>
+    #stage{padding:18px}
+    #content{flex:none;width:max-content}
+    #content,#result,.challenge,.brand{max-width:none}
+    #challenge-fallback{max-width:760px}
+    #challenge-fallback{overflow-wrap:anywhere}
+    #challenge-fallback{font-family:var(--overlay-font-family,sans-serif);font-weight:var(--overlay-font-weight,700);color:var(--overlay-text-color,#fff);text-shadow:var(--overlay-text-shadow,2px 3px 2px #00000000)}
+    .result-icon{flex-shrink:0}
+  </style>
+</head>
+<body>
+  <main id="stage" class="hidden align-center icons-first" aria-live="polite">
+    <div id="content">
+      <div id="result" hidden>
+        <div id="icons"></div>
+        <div id="challenge" class="challenge">
+          <span id="challenge-fallback"></span>
+        </div>
+      </div>
+      <div id="brand" class="brand" hidden aria-hidden="true">
+        <div class="brand-part mod-name-motion">
+          <img id="mod-name"
+               src="/assets/creator-tools/branding/modname.png" alt="">
+        </div>
+        <div class="brand-part mod-label-motion">
+          <img id="mod-label"
+               src="/assets/creator-tools/branding/modlabel.png" alt="">
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="/assets/creator-tools/overlay-text-style.js"></script>
+  <script src="/assets/creator-tools/live-event-overlay-runtime.js"></script>
+  <script src="/assets/creator-tools/roulette-overlay.js?v=roulette-container-2"></script>
+</body>
+</html>

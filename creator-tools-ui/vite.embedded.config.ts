@@ -60,6 +60,8 @@ export default defineConfig(({ mode }) => {
       "/live-overlay": proxyTarget,
       "/tap-farming-overlay": proxyTarget,
       "/pesky-battle-overlay": proxyTarget,
+      "/roulette-overlay": proxyTarget,
+      "/chat-chooses-overlay": proxyTarget,
     },
   },
   };

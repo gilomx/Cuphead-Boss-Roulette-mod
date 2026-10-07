@@ -479,7 +479,31 @@
         "description": "The {source} arrangement will replace {target}."
       }
     },
+      "roulette": {
+        "replay": "Replay entry animation",
+        "disabledPreviewHint": "This layer is disabled, but you can preview it here. OBS simulation is temporary and does not enable the layer.",
+        "logoPreviewHint": "Enable “Show logo outside combat” to see it in this scenario.",
+        "previewHint": "This sample does not change your game. Hidden and Retry show the moments when the overlay exits.",
+      "order": "Order",
+      "iconsAbove": "Icons above",
+      "textAbove": "Challenge above",
+      "alignment": "Content alignment",
+      "left": "Left",
+      "center": "Center",
+      "right": "Right",
+      "retry": "On retry",
+      "keep": "Keep visible",
+      "reappear": "Repeat animation",
+      "logo": "Show logo outside battle",
+      "scenarios": {
+        "hud": "Equipment and challenge",
+        "logo": "Outside battle",
+        "hidden": "Hidden",
+        "retry": "Retry"
+      }
+    },
     "components": {
+      "roulette": "Roulette",
       "tap_farming": "Tap Farming",
       "pesky_battle": "Pesky Battle",
       "chat_chooses": "Chat chooses"
@@ -525,6 +549,26 @@
         "vertical": "Vertically"
       },
       "opacity": "Overlay opacity",
+      "typography": {
+        "title": "Text",
+        "font": "Font",
+        "weight": "Weight",
+        "fonts": {
+          "clean": "Sans serif · preview",
+          "system": "System",
+          "rounded": "Trebuchet",
+          "serif": "Georgia"
+        },
+        "weights": {
+          "400": "Regular",
+          "700": "Bold",
+          "900": "Heavy"
+        },
+        "textColor": "Text color",
+        "textShadowColor": "Drop shadow",
+        "shadowHint": "The shadow is transparent by default. Increase its opacity to show it. Text fits its container.",
+        "fixedRouletteFont": "Fixed font: bold sans serif, matching the preview. All text is displayed in uppercase."
+      },
       "colors": {
         "title": "Heart colors",
         "liquidColor": "Liquid",

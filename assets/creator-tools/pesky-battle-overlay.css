@@ -1,6 +1,6 @@
 :root {
   color-scheme: only light;
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--overlay-font-family, sans-serif);
   --battle-text: #fbf8fc;
   --battle-border: #c48ae9;
   --battle-player-border: #c48ae9;
@@ -28,6 +28,8 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
 [hidden] { display: none !important; }
 
 .battle {
+  font-family: var(--overlay-font-family, sans-serif);
+  font-weight: var(--overlay-font-weight, 700);
   --battle-columns: 3;
   --battle-rows: 2;
   --battle-column-gap-count: 3;
@@ -95,10 +97,11 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
 .battle__status {
   display: block;
   font-size: var(--battle-heading-size);
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   line-height: 1.2;
   white-space: nowrap;
-  text-shadow: 0 2px 5px rgb(0 0 0 / 80%);
+  overflow: hidden;
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
 }
 .battle__roster-area {
   width: 100%;
@@ -212,7 +215,7 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
 }
 .battle-slot__gift, .battle-slot__coin { width: 62%; height: 62%; object-fit: contain; }
 .battle-slot__coin svg { width: 100%; height: 100%; }
-.battle-slot__initial { font-size: clamp(20px, 10vmin, 90px); font-weight: 800; line-height: 1; }
+.battle-slot__initial { font-size: clamp(20px, 10vmin, 90px); font-weight: var(--overlay-font-weight, 700); line-height: 1; }
 .battle-slot__name {
   position: relative;
   z-index: 3;
@@ -223,12 +226,13 @@ html[data-overlay-mode="embedded"] body { padding: 0; }
   padding: 0 2px;
   border-radius: 6px;
   background: transparent;
+  overflow: hidden;
   font-size: min(clamp(9px, 21cqw, 46px), var(--name-size-limit, 46px));
-  font-weight: 800;
+  font-weight: var(--overlay-font-weight, 700);
   line-height: 1.2;
   text-align: center;
   white-space: nowrap;
-  text-shadow: 2px 3px 1px rgb(0 0 0 / 95%), 0 0 4px rgb(0 0 0 / 90%);
+  text-shadow: var(--overlay-text-shadow, 2px 3px 2px #00000000);
 }
 .battle__status, .battle-slot__name {
   opacity: 0;

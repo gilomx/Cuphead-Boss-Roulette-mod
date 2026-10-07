@@ -1,8 +1,9 @@
 import type { ChatChoosesState } from "../../model";
 
 export type OverlayProfileId = "vertical" | "horizontal";
-export type OverlayComponentId = "tap_farming" | "pesky_battle" | "chat_chooses";
+export type OverlayComponentId = "tap_farming" | "pesky_battle" | "chat_chooses" | "roulette";
 export type OverlayVariant = "default" | "compact" | "minimal";
+export type OverlayTextFont = "clean" | "system" | "rounded" | "serif";
 
 export interface OverlayCanvasSize {
   width: number;
@@ -28,6 +29,16 @@ export interface OverlayComposerComponent {
   textColor: string;
   outlineColor: string;
   voteOutlineColor: string;
+  textFont?: OverlayTextFont;
+  textWeight?: number;
+  textShadowColor?: string;
+  textShadowX?: number;
+  textShadowY?: number;
+  textShadowBlur?: number;
+  rouletteAlignment?: "left" | "center" | "right";
+  rouletteTextFirst?: boolean;
+  rouletteLogo?: boolean;
+  rouletteRetry?: "keep" | "reappear";
 }
 
 export interface OverlayComposerProfile {
@@ -71,6 +82,16 @@ export interface OverlayComposerCommand {
   textColor?: string;
   outlineColor?: string;
   voteOutlineColor?: string;
+  textFont?: OverlayTextFont;
+  textWeight?: number;
+  textShadowColor?: string;
+  textShadowX?: number;
+  textShadowY?: number;
+  textShadowBlur?: number;
+  rouletteAlignment?: "left" | "center" | "right";
+  rouletteTextFirst?: boolean;
+  rouletteLogo?: boolean;
+  rouletteRetry?: "keep" | "reappear";
 }
 
 export interface OverlayPreviewCommand {
@@ -214,6 +235,7 @@ export interface OverlayComposerDesignMessage {
     tap_farming: TapFarmingPreviewSnapshot;
     pesky_battle: PeskyBattlePreviewSnapshot;
     chat_chooses: ChatChoosesState;
+    roulette: ReturnType<typeof roulettePreview>;
   };
   locale: string;
   background: "alpha" | "light" | "dark";
@@ -228,6 +250,7 @@ export const COMPONENT_IDS: OverlayComponentId[] = [
   "tap_farming",
   "pesky_battle",
   "chat_chooses",
+  "roulette",
 ];
 
 export function minimumComponentSize(
@@ -290,7 +313,19 @@ export function isOverlayProfileId(value: string | null): value is OverlayProfil
 }
 
 export function isOverlayComponentId(value: string | null): value is OverlayComponentId {
-  return value === "tap_farming" || value === "pesky_battle" || value === "chat_chooses";
+  return value === "tap_farming" || value === "pesky_battle" || value === "chat_chooses" || value === "roulette";
+}
+
+export type RouletteScenario = "hud" | "logo" | "hidden" | "retry";
+
+export function roulettePreview(scenario: RouletteScenario = "hud", replay = 0) {
+  return {
+    type: "state", active: scenario !== "hidden", battleActive: scenario === "hud" || scenario === "retry",
+    visible: scenario === "hud", preview: true, session: -1 - replay,
+    revealed: 5, textVisible: true, labelRevision: 0,
+    challengeText: "NO DASH", completeExit: scenario === "retry", fastRetryExit: scenario === "retry",
+    icons: ["weapons/lanzaguisantes.png", "weapons/rastreador.png", "supers/super1.png", "charms/bombadehumo.png", "modifiers/nodash_01.png"],
+  };
 }
 
 export function cloneProfiles(profiles: OverlayComposerProfile[]) {

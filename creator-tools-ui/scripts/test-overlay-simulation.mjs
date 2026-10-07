@@ -52,6 +52,16 @@ test("chat designer scenarios and votes travel to OBS independently of real even
   assert.ok(reset.sessionId > chat.sessionId);
 });
 
+test("roulette replay travels to OBS without changing the saved activation", () => {
+  const profile = { id: "horizontal", canvas: { width: 1920, height: 1080 },
+    components: [{ id: "roulette", enabled: false }] };
+  const command = previewCommand("update", "horizontal", "roulette", "preview-session",
+    exports.createTapSimulation(), createBattleSimulation(), profile, true, undefined, "hud", 3);
+  assert.equal(command.scenario, "hud");
+  assert.equal(command.eventEpoch, 3);
+  assert.equal(JSON.parse(command.layoutJson).components[0].enabled, false);
+});
+
 test("the selected entry gift survives scenario changes, capacity, joining and reset", () => {
   const trigger = { giftId: "1261956", giftName: "Fuego", giftImagePath: "/assets/creator-tools/gifts/images/1261956.webp" };
   let state = battleSimulationReducer(createBattleSimulation(), { type: "gift", trigger });

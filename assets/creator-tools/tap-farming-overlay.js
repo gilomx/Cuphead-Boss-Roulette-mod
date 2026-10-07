@@ -476,6 +476,7 @@
 
   const render = (state, context = {}) => {
     if (!state || typeof state !== "object") return;
+    window.CreatorToolsOverlayText?.apply(root, state.presentation || {});
     applyLocale(normalizeLocale(state.locale) || queryLocale || "es");
     const text = COPY[activeLocale];
     const snapshot = normalizedSnapshot(state);

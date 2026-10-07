@@ -993,7 +993,7 @@ namespace Gilomx.CupheadBossRoulette
                 long initialRevision;
                 lock (stateLock)
                 {
-                    initialMessage = latestMessage;
+                    initialMessage = "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}";
                     initialRevision = latestRevision;
                 }
                 client.SendText(initialMessage);
@@ -1028,7 +1028,7 @@ namespace Gilomx.CupheadBossRoulette
                 long revision;
                 lock (stateLock)
                 {
-                    message = latestMessage;
+                    message = "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}";
                     revision = latestRevision;
                 }
 
@@ -1215,6 +1215,21 @@ namespace Gilomx.CupheadBossRoulette
                 ServeFile(stream, Path.Combine(assetsDirectory,
                     "creator-tools\\overlay.css"),
                     "text/css; charset=utf-8", false);
+                return;
+            }
+            if (path == "/roulette-overlay" || path == "/roulette-overlay/")
+            {
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\roulette-overlay.html"),
+                    "text/html; charset=utf-8", false, true);
+                return;
+            }
+            if (path == "/api/roulette-overlay/state")
+            {
+                string message;
+                lock (stateLock) message = latestMessage;
+                WriteResponse(stream, 200, "OK", "application/json; charset=utf-8",
+                    Encoding.UTF8.GetBytes(message), false);
                 return;
             }
             if (path == "/overlay.js")

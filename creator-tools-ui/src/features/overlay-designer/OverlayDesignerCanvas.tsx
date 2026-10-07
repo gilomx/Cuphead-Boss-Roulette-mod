@@ -17,7 +17,7 @@ import type {
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
-import { proportionalComponentSize } from "./model";
+import { roulettePreview, type RouletteScenario, proportionalComponentSize } from "./model";
 import type { ChatChoosesState } from "../../model";
 
 type PreviewBackground = "alpha" | "light" | "dark";
@@ -30,6 +30,8 @@ interface OverlayDesignerCanvasProps {
   tapState: TapFarmingPreviewSnapshot;
   battleState: PeskyBattlePreviewSnapshot;
   chatState: ChatChoosesState;
+  rouletteScenario: RouletteScenario;
+  rouletteReplay: number;
   disabled?: boolean;
   onChange: (
     componentId: OverlayComponentId,
@@ -97,6 +99,8 @@ export function OverlayDesignerCanvas({
   tapState,
   battleState,
   chatState,
+  rouletteScenario,
+  rouletteReplay,
   disabled = false,
   onChange,
 }: OverlayDesignerCanvasProps) {
@@ -144,10 +148,11 @@ export function OverlayDesignerCanvas({
       tap_farming: tapState,
       pesky_battle: battleState,
       chat_chooses: chatState,
+      roulette: roulettePreview(rouletteScenario, rouletteReplay),
     },
     locale,
     background,
-  }), [background, battleState, chatState, locale, profile, selectedComponentId, tapState]);
+  }), [background, battleState, chatState, rouletteScenario, rouletteReplay, locale, profile, selectedComponentId, tapState]);
 
   const latestMessageRef = useRef(message);
   latestMessageRef.current = message;

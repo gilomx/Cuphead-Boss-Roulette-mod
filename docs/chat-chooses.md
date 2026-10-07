@@ -71,11 +71,11 @@ Las opciones y el resultado usan imágenes circulares sobre fondo transparente.
 El resumen final no muestra etiquetas. Su jefe mide 240 px frente a los
 280 px anteriores; el equipo mide 150 px por artículo. Entre las imágenes del
 jefe y del equipo quedan sólo 18 px, sin reservar alturas para los títulos
-eliminados. Armas, supers, amuletos y retos usan las mismas imágenes con marco
-de `creator-tools` que el overlay principal; los jefes y el hueco vacío conservan
-también sus imágenes originales. El marco circular es continuo y algo más grueso
-(7 unidades sobre una imagen de 82), para cubrir las irregularidades del borde
-incorporado al escalar. Los jefes usan el mismo marco en la votación y el resultado.
+eliminados. Armas, supers, amuletos y jefes conservan las imágenes originales
+del catálogo; el hueco vacío conserva su icono nativo. Los retos usan los PNG
+editados de `creator-tools/chat-chooses-modifiers`. Todos llevan el mismo borde
+circular fino: 2 px sobre un icono base de 72 px, que escala con el conjunto.
+El borde se aplica en la votación y en el resultado, también a los jefes.
 **Marco de la imagen** permite cambiar su color sin recolorear la ilustración
 ni añadir brillo difuso. El tono predeterminado es el original
 `#d3af93`; los colores personalizados guardados se conservan. El resumen usa
@@ -86,8 +86,25 @@ datos más recientes. Desactivar animaciones o preferir movimiento reducido
 oculta inmediatamente; la cancelación durante las rondas mantiene prioridad.
 El overlay no muestra nombres de artículos ni el título del evento; durante
 la votación muestra **Votaciones** (72 px) sobre la etapa actual (48 px).
-Los retos usan los iconos de `creator-tools/modifiers`, con el borde limpio
-del catálogo web; la tarjeta del juego conserva sus gráficos nativos.
+Los retos del overlay usan estos archivos editados; la tarjeta del juego
+conserva sus gráficos nativos:
+
+| Reto | PNG en `assets/creator-tools/chat-chooses-modifiers` |
+| --- | --- |
+| Blanco y negro | `blanco-y-negro.png` |
+| Pantalla invertida | `pantalla-invertida.png` |
+| Mamá escucho borroso / RGB | `pantalla-rgb.png` |
+| Sin Peashooter | `sin-peashooter.png` |
+| Sin miniavión (compatibilidad) | `sin-miniavion.png` |
+| NO EX | `sin-ex.png` |
+| NO DASH | `sin-dash.png` |
+| Sin bombas | `sin-bombas.png` |
+| Solo balas de miniavión | `solo-miniavion.png` |
+| Modo tieso | `modo-tieso.png` |
+| Lluvia de tinta | `lluvia-de-tinta.png` |
+| Una vida y te callas | `una-vida.png` |
+| Disparos rebajados | `mitad-de-dano.png` |
+
 Los círculos usan columnas de su
 mismo diámetro, separadas por un espacio pequeño. El marco deja 18 px de margen
 interno para las insignias y el movimiento, sin un segundo margen en el escalado.

@@ -75,9 +75,6 @@ namespace Gilomx.CupheadBossRoulette
         private int creatorToolsRevealedIcons;
         private bool creatorToolsTextVisible;
         private string creatorToolsLastPublishedState;
-        private string creatorToolsLabelKey;
-        private int creatorToolsLabelRevision;
-        private bool creatorToolsLabelRenderFailureLogged;
         private string creatorToolsServerError;
         private float creatorToolsServerRetryAt;
         private bool creatorToolsInteractionLevelStartObserved;
@@ -215,6 +212,14 @@ namespace Gilomx.CupheadBossRoulette
                 OnCreatorToolsInteractionUnpaused;
 
             NormalizeCreatorToolsSettings();
+            if (!creatorToolsOverlayComposer.ImportRouletteSettings(
+                    creatorToolsEnabledSetting.Value,
+                    (int)Math.Round(creatorToolsScaleSetting.Value * 100f),
+                    CreatorToolsAlignmentValue(), creatorToolsOpacitySetting.Value,
+                    creatorToolsOrderSetting.Value == CreatorToolsOrder.TextAbove,
+                    creatorToolsLogoSetting.Value,
+                    creatorToolsRetryBehaviorSetting.Value == CreatorToolsRetryBehavior.Keep ? "keep" : "reappear"))
+                Logger.LogWarning("No se pudieron importar los ajustes del overlay de ruleta al disenador; se reintentara en el proximo arranque.");
             // Preview is a temporary positioning aid, never a persisted
             // overlay state. Recover safely if the game closed while the
             // settings screen was still open.
@@ -1586,7 +1591,6 @@ namespace Gilomx.CupheadBossRoulette
                  Time.realtimeSinceStartup >= creatorToolsServerRetryAt))
                 StartCreatorToolsServer();
 
-            UpdateCreatorToolsChallengeLabel();
             UpdateCreatorToolsForceConfig();
             UpdateChatChooses();
             if (creatorToolsInteractions != null)
@@ -1737,7 +1741,6 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsBattleSessionId++;
             creatorToolsRevealedIcons = 0;
             creatorToolsTextVisible = false;
-            creatorToolsLabelKey = null;
             if (creatorToolsPreviewSetting != null &&
                 creatorToolsPreviewSetting.Value)
                 creatorToolsPreviewSetting.Value = false;
@@ -1819,9 +1822,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             get
             {
-                return creatorToolsRetryBehaviorSetting != null &&
-                       creatorToolsRetryBehaviorSetting.Value ==
-                       CreatorToolsRetryBehavior.Keep;
+                // Publish raw battle transitions; each designer profile owns its retry behavior.
+                return false;
             }
         }
 
@@ -1832,14 +1834,12 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsBattleVisible = false;
             creatorToolsRevealedIcons = 0;
             creatorToolsTextVisible = false;
-            creatorToolsLabelKey = null;
             PublishCreatorToolsState(true);
             PublishCreatorToolsForceConfig(true);
         }
 
         private void CreatorToolsLanguageChanged()
         {
-            creatorToolsLabelKey = null;
             PublishCreatorToolsState(true);
             PublishCreatorToolsForceConfig(true);
             RefreshCreatorToolsMenuLocalization();
@@ -1860,11 +1860,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private string BuildCreatorToolsStateJson()
         {
-            var enabled = creatorToolsEnabledSetting != null &&
-                          creatorToolsEnabledSetting.Value;
-            var preview = enabled &&
-                          !creatorToolsBattleSessionActive &&
-                          creatorToolsPreviewSetting.Value;
+            var enabled = true;
+            var preview = false;
             var visible = enabled && creatorToolsBattleSessionActive
                 ? creatorToolsBattleVisible && !creatorToolsBattleCompleted
                 : preview;
@@ -1882,18 +1879,13 @@ namespace Gilomx.CupheadBossRoulette
             var session = preview
                 ? -1
                 : creatorToolsBattleSessionId;
-            var labelRevision = preview
-                ? 0
-                : creatorToolsLabelRevision;
             var battleActive = creatorToolsBattleSessionActive &&
                                !creatorToolsBattleCompleted;
             var completeRetryExit =
                 battleActive &&
                 !creatorToolsBattleVisible &&
                 battleHudExplicitRestartRequested &&
-                creatorToolsRetryBehaviorSetting != null &&
-                creatorToolsRetryBehaviorSetting.Value ==
-                CreatorToolsRetryBehavior.Reappear;
+                !CreatorToolsKeepOverlayAcrossRetries;
             var fastRetryExit = completeRetryExit &&
                                 !BattleHudUsesPlaneLoadout();
 
@@ -1916,8 +1908,7 @@ namespace Gilomx.CupheadBossRoulette
                 textVisible ? "true" : "false");
             builder.Append(",\"challengeText\":\"")
                 .Append(EscapeJson(challengeText)).Append("\"");
-            builder.Append(",\"labelRevision\":")
-                .Append(labelRevision);
+            builder.Append(",\"labelRevision\":0");
             builder.Append(",\"icons\":[");
             for (var i = 0; i < icons.Count; i++)
             {
@@ -2047,154 +2038,5 @@ namespace Gilomx.CupheadBossRoulette
             return builder.ToString();
         }
 
-        private void UpdateCreatorToolsChallengeLabel()
-        {
-            if (creatorToolsServer == null ||
-                !creatorToolsServer.IsRunning ||
-                !creatorToolsBattleSessionActive ||
-                battleHudChallengeText == null)
-                return;
-
-            var label = CreatorToolsBattleChallengeText();
-            if (string.IsNullOrEmpty(label))
-            {
-                if (creatorToolsLabelKey != string.Empty)
-                {
-                    creatorToolsLabelKey = string.Empty;
-                    creatorToolsLabelRevision = 0;
-                    creatorToolsServer.SetChallengeLabel(null, 0);
-                    PublishCreatorToolsState(true);
-                }
-                return;
-            }
-
-            var sourceFont = battleHudChallengeText.font;
-            var key = label + "|" +
-                      (sourceFont == null ? 0 : sourceFont.GetInstanceID()) +
-                      "|" + creatorToolsScaleSetting.Value;
-            if (key == creatorToolsLabelKey)
-                return;
-
-            try
-            {
-                var png = RenderCreatorToolsLabelPng(
-                    battleHudChallengeText, label);
-                if (png == null || png.Length == 0)
-                    return;
-                creatorToolsLabelKey = key;
-                creatorToolsLabelRevision++;
-                creatorToolsServer.SetChallengeLabel(
-                    png, creatorToolsLabelRevision);
-                PublishCreatorToolsState(true);
-            }
-            catch (Exception exception)
-            {
-                if (!creatorToolsLabelRenderFailureLogged)
-                {
-                    creatorToolsLabelRenderFailureLogged = true;
-                    Logger.LogWarning(
-                        "Creator Tools could not render the native challenge " +
-                        "label: " + exception.Message);
-                }
-            }
-        }
-
-        private static byte[] RenderCreatorToolsLabelPng(
-            Text source, string label)
-        {
-            if (source == null || source.font == null ||
-                string.IsNullOrEmpty(label))
-                return null;
-
-            const int renderScale = 4;
-            const int renderLayer = 31;
-            source.font.RequestCharactersInTexture(
-                label, source.fontSize * renderScale, source.fontStyle);
-
-            GameObject cameraObject = null;
-            GameObject canvasObject = null;
-            RenderTexture renderTexture = null;
-            Texture2D texture = null;
-            var previousActive = RenderTexture.active;
-            try
-            {
-                canvasObject = new GameObject(
-                    "Gilomx Creator Tools Label Canvas",
-                    typeof(RectTransform), typeof(Canvas));
-                canvasObject.layer = renderLayer;
-                var canvas = canvasObject.GetComponent<Canvas>();
-                canvas.renderMode = RenderMode.WorldSpace;
-
-                var labelObject = UnityEngine.Object.Instantiate(
-                    source.gameObject);
-                labelObject.name = "Gilomx Creator Tools Label";
-                labelObject.layer = renderLayer;
-                labelObject.transform.SetParent(canvasObject.transform, false);
-                var text = labelObject.GetComponent<Text>();
-                text.text = label;
-                text.fontSize = source.fontSize * renderScale;
-                text.resizeTextForBestFit = false;
-                text.horizontalOverflow = HorizontalWrapMode.Overflow;
-                text.verticalOverflow = VerticalWrapMode.Overflow;
-                text.alignment = TextAnchor.MiddleCenter;
-                text.color = Color.white;
-                text.raycastTarget = false;
-
-                var width = Mathf.Clamp(
-                    Mathf.CeilToInt(text.preferredWidth + 24f), 16, 2048);
-                var height = Mathf.Clamp(
-                    Mathf.CeilToInt(text.preferredHeight + 24f), 16, 256);
-                var canvasRect = canvasObject.GetComponent<RectTransform>();
-                canvasRect.sizeDelta = new Vector2(width, height);
-                var textRect = text.rectTransform;
-                textRect.anchorMin = new Vector2(0.5f, 0.5f);
-                textRect.anchorMax = new Vector2(0.5f, 0.5f);
-                textRect.pivot = new Vector2(0.5f, 0.5f);
-                textRect.anchoredPosition = Vector2.zero;
-                textRect.sizeDelta = new Vector2(width, height);
-                textRect.localScale = Vector3.one;
-
-                cameraObject = new GameObject(
-                    "Gilomx Creator Tools Label Camera", typeof(Camera));
-                var camera = cameraObject.GetComponent<Camera>();
-                camera.enabled = false;
-                camera.clearFlags = CameraClearFlags.SolidColor;
-                camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
-                camera.orthographic = true;
-                camera.orthographicSize = height * 0.5f;
-                camera.aspect = width / (float)height;
-                camera.cullingMask = 1 << renderLayer;
-                camera.transform.position = new Vector3(0f, 0f, -10f);
-
-                renderTexture = new RenderTexture(
-                    width, height, 0, RenderTextureFormat.ARGB32);
-                renderTexture.Create();
-                camera.targetTexture = renderTexture;
-                Canvas.ForceUpdateCanvases();
-                camera.Render();
-
-                RenderTexture.active = renderTexture;
-                texture = new Texture2D(
-                    width, height, TextureFormat.ARGB32, false);
-                texture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
-                texture.Apply(false, false);
-                return texture.EncodeToPNG();
-            }
-            finally
-            {
-                RenderTexture.active = previousActive;
-                if (renderTexture != null)
-                {
-                    renderTexture.Release();
-                    UnityEngine.Object.DestroyImmediate(renderTexture);
-                }
-                if (texture != null)
-                    UnityEngine.Object.DestroyImmediate(texture);
-                if (canvasObject != null)
-                    UnityEngine.Object.DestroyImmediate(canvasObject);
-                if (cameraObject != null)
-                    UnityEngine.Object.DestroyImmediate(cameraObject);
-            }
-        }
     }
 }

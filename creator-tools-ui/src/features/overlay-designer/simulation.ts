@@ -1,3 +1,4 @@
+import type { RouletteScenario } from "./model";
 import type {
   OverlayComposerProfile,
   OverlayComponentId,
@@ -403,6 +404,8 @@ export function previewCommand(
   profile: OverlayComposerProfile,
   simulationActive: boolean,
   chat: ChatChoosesState = createChatSimulation(),
+  rouletteScenario: RouletteScenario = "hud",
+  rouletteReplay = 0,
 ): OverlayPreviewCommand {
   return {
     schemaVersion: 1,
@@ -412,7 +415,7 @@ export function previewCommand(
     sessionId,
     simulationActive,
     layoutJson: JSON.stringify(profile),
-    scenario: componentId === "chat_chooses" ? chat.phase : componentId === "tap_farming" ? tap.phase : battle.phase,
+    scenario: componentId === "roulette" ? rouletteScenario : componentId === "chat_chooses" ? chat.phase : componentId === "tap_farming" ? tap.phase : battle.phase,
     bossName: tap.bossName,
     levelId: tap.levelId,
     totalTaps: tap.counters.totalTaps,
@@ -433,7 +436,7 @@ export function previewCommand(
     attackName: battle.attack?.name ?? "",
     attackImagePath: battle.attack?.imagePath ?? "",
     attackStartedAt: battle.attack?.startedAt ?? 0,
-    eventEpoch: battle.eventEpoch,
+    eventEpoch: componentId === "roulette" ? rouletteReplay : battle.eventEpoch,
     battleSignalsJson: JSON.stringify({ attacks: battle.attacks ?? [], challenges: battle.challenges ?? [] }),
     chatStateJson: JSON.stringify(chat),
   };

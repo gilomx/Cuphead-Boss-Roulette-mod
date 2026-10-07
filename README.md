@@ -82,22 +82,24 @@ ruleta puede sustituirlo durante esa pelea sin modificar la selección guardada.
 
 ## Creator Tools y OBS
 
-Desde el mapa abre `Pausa > LA PICHI RULETA > STREAM OVERLAY`, activa el
-overlay y selecciona `COPIAR URL`. En OBS añade una Fuente de navegador, pega
-esa dirección y usa el mismo ancho y alto que tu lienzo, por ejemplo
-1920 × 1080. El fondo ya es transparente y no necesita CSS personalizado.
+Desde el mapa abre `Pausa > LA PICHI RULETA > PANEL DE CONTROL` y entra en
+`Overlays > Ruleta`. Activa la capa y selecciona `Copiar URL para OBS` en el
+perfil vertical (1080 × 1920) u horizontal (1920 × 1080). En OBS añade una Fuente
+de navegador con esa dirección y las dimensiones del perfil. El fondo es
+transparente y no necesita CSS personalizado.
 
-`VISTA PREVIA` permite colocar la fuente mientras configuras OBS y se apaga
-automáticamente al salir. Tamaño, orden, alineación, opacidad y logo se
-actualizan en vivo. El menú está localizado en los doce idiomas de Cuphead y
-conserva el formato nativo `ETIQUETA: VALOR`.
+El diseñador permite mover y redimensionar Ruleta junto a las demás capas.
+El contenido se ajusta al contenedor. Conserva orden, alineación, opacidad, logo y comportamiento
+al reintentar; los valores anteriores se importan una sola vez. La simulación
+permite revisar sus estados y mostrar datos de prueba en OBS temporalmente.
+La URL antigua muestra un aviso para actualizar la fuente de navegador.
+Detalles de la migración: [Overlay de Ruleta](docs/roulette-overlay.md).
 
 El servidor escucha únicamente en `127.0.0.1:18081`: no necesita internet ni
 una cuenta y nunca cambia de puerto. Si otra aplicación ya está usando `18081`,
 `PANEL DE CONTROL` abre una página local con instrucciones; después de liberar
 el puerto, el mod reintenta automáticamente cada cinco segundos. El servidor
-permanece disponible para `/config` aunque `ESTADO` esté desactivado; ese ajuste
-solo oculta o muestra el contenido de la fuente de OBS.
+permanece disponible para `/config` aunque la capa Ruleta esté oculta.
 
 `AL REINTENTAR` ofrece dos comportamientos; `REAPARECER` es el predeterminado:
 

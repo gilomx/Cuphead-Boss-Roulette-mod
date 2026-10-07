@@ -189,7 +189,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (!item.Selectable || (item.Id != ModifierId.None &&
                     (!ExperimentalFeatures.IsChallengeEnabled(item.Id) || !IsCreatorToolsChallengeEnabled(item.Id)))) continue;
                 catalog.Pools["modifier"].Add(new ChatChoice { Id = id, Name = item.Id == ModifierId.None ? L(ModText.CommonNone) : LocalizedModifierName(item.Id),
-                    Image = item.Id == ModifierId.None ? "creator-tools/empty.png" : "creator-tools/" + item.Image, None = item.Id == ModifierId.None,
+                    Image = item.Id == ModifierId.None ? "creator-tools/empty.png" : item.Image, None = item.Id == ModifierId.None,
                     Kind = item.Kind == ModifierKind.Plane ? "plane" : item.Kind == ModifierKind.Ground ? "ground" : "both" });
             }
             return catalog;

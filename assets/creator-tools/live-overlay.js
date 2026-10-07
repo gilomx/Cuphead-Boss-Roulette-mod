@@ -19,6 +19,8 @@
   const ownOrigin = window.location.origin;
 
   const registry = Object.freeze({
+    roulette: Object.freeze({ id: "roulette", overlay: "roulette",
+      endpoint: "/api/roulette-overlay/state", src: "/roulette-overlay" }),
     tap_farming: Object.freeze({
       id: "tap_farming",
       overlay: "tap-farming",
@@ -41,11 +43,13 @@
   let savedProfile = defaultProfile(profileId);
   let activeProfile = savedProfile;
   let realStates = {
+    roulette: { type: "state", active: false },
     tap_farming: initialTapState(),
     pesky_battle: initialPeskyState(),
     chat_chooses: initialChatState(),
   };
   let previewState = { active: false };
+  let designerComponentId = "";
   let previewGeneration = 0;
   let activeLocale = queryLocale || "es";
   let dataPollPending = false;
@@ -82,7 +86,7 @@
 
   function normalizeComponentId(value) {
     const id = String(value || "").trim().toLowerCase().replaceAll("-", "_");
-    if (id === "tap_farming" || id === "pesky_battle" || id === "chat_chooses") return id;
+    if (id === "tap_farming" || id === "pesky_battle" || id === "chat_chooses" || id === "roulette") return id;
     return "";
   }
 
@@ -102,11 +106,13 @@
     const vertical = id === "vertical";
     const placements = vertical
       ? {
+          roulette: { x: 60, y: 540, width: 960, height: 420, layer: 40 },
           tap_farming: { x: 360, y: 1220, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 60, y: 1260, width: 960, height: 560, layer: 10 },
           chat_chooses: { x: 60, y: 1040, width: 960, height: 760, layer: 30 },
         }
       : {
+          roulette: { x: 480, y: 330, width: 960, height: 420, layer: 40 },
           tap_farming: { x: 1395, y: 565, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 80, y: 720, width: 1760, height: 300, layer: 10 },
           chat_chooses: { x: 280, y: 540, width: 1360, height: 320, layer: 30 },
@@ -119,7 +125,7 @@
       components: Object.keys(registry).map((componentId, index) => ({
         id: componentId,
         ...placements[componentId],
-        enabled: true,
+        enabled: componentId !== "roulette",
         locked: false,
         layer: placements[componentId].layer ?? 20 + index,
         opacity: 100,
@@ -197,6 +203,16 @@
       textColor: normalizeHexColor(component.textColor, "#ffffff"),
       outlineColor: normalizeHexColor(component.outlineColor, component.id === "chat_chooses" ? "#d3af93" : "#f5f5f7"),
       voteOutlineColor: normalizeHexColor(component.voteOutlineColor, "#ffffff"),
+      textFont: component.textFont || "clean",
+      textWeight: component.textWeight ?? 700,
+      textShadowColor: normalizeHexColor(component.textShadowColor, "#00000000"),
+      textShadowX: component.textShadowX ?? 2,
+      textShadowY: component.textShadowY ?? 3,
+      textShadowBlur: component.textShadowBlur ?? 2,
+      rouletteAlignment: component.rouletteAlignment || "center",
+      rouletteTextFirst: component.rouletteTextFirst === true,
+      rouletteLogo: component.rouletteLogo === true,
+      rouletteRetry: component.rouletteRetry || "reappear",
     };
   }
 
@@ -229,7 +245,7 @@
   function embeddedUrl(definition) {
     const params = new URLSearchParams({ embedded: "1" });
     if (definition.id === "pesky_battle") params.set("v", "battle-icons-10");
-    if (definition.id === "chat_chooses") params.set("v", "chat-frame-11");
+    if (definition.id === "chat_chooses") params.set("v", "chat-artwork-13");
     if (activeLocale === "en") params.set("locale", "en");
     return `${definition.src}?${params}`;
   }
@@ -262,7 +278,12 @@
         String(clamp(finiteNumber(config.opacity, 100), 0, 100) / 100),
       );
       entry.host.style.zIndex = String(Math.round(finiteNumber(config.layer, 1)));
-      entry.host.dataset.enabled = String(config.enabled !== false);
+      const roulettePreviewActive = id === "roulette" && (
+        (designer && designerComponentId === id) ||
+        (!designer && previewState.active === true && previewState.simulationActive === true &&
+          normalizeComponentId(previewState.componentId) === id)
+      );
+      entry.host.dataset.enabled = String(config.enabled !== false || roulettePreviewActive);
       entry.host.dataset.configEnabled = String(config.enabled !== false);
       entry.host.dataset.locked = String(config.locked === true);
       entry.host.dataset.variant = presentationFor(config).variant;
@@ -435,6 +456,14 @@
     };
   }
 
+  function rouletteSnapshot(scenario = "hud", replay = 0) {
+    return { type: "state", active: scenario !== "hidden", preview: true,
+      visible: scenario === "hud", battleActive: scenario === "hud" || scenario === "retry",
+      session: -1 - Math.max(0, finiteNumber(replay)), revealed: 5, textVisible: true, labelRevision: 0, challengeText: "NO DASH",
+      completeExit: scenario === "retry", fastRetryExit: scenario === "retry",
+      icons: ["weapons/lanzaguisantes.png", "weapons/rastreador.png", "supers/super1.png", "charms/bombadehumo.png", "modifiers/nodash_01.png"] };
+  }
+
   function initialTapState() {
     return {
       revision: 0,
@@ -458,6 +487,7 @@
   function stateFor(id) {
     if (previewState?.active && previewState.simulationActive === true &&
         normalizeComponentId(previewState.componentId) === id) {
+      if (id === "roulette") return rouletteSnapshot(previewState.scenario, previewState.eventEpoch);
       if (id === "chat_chooses") return previewState.chatState || initialChatState();
       return id === "tap_farming"
         ? previewTapSnapshot(previewState)
@@ -567,6 +597,7 @@
         fetchJson(registry.tap_farming.endpoint),
         fetchJson(registry.pesky_battle.endpoint),
         fetchJson(registry.chat_chooses.endpoint),
+        fetchJson(registry.roulette.endpoint),
       ]);
       if (results[0].status === "fulfilled") {
         savedProfile = normalizedProfile(results[0].value);
@@ -575,6 +606,8 @@
       if (results[2].status === "fulfilled") realStates.pesky_battle = results[2].value;
       if (results[3].status === "fulfilled") realStates.chat_chooses = results[3].value;
       else realStates.chat_chooses = initialChatState();
+      realStates.roulette = results[4].status === "fulfilled"
+        ? results[4].value : { type: "state", active: false };
       syncActiveProfile();
       render();
     } finally {
@@ -635,8 +668,10 @@
     activeLocale = normalizeLocale(message.locale) || queryLocale || activeLocale;
     root.dataset.designerBackground = normalizeDesignerBackground(message.background);
     activeProfile = normalizedProfile(message.profile);
+    designerComponentId = normalizeComponentId(message.selectedComponentId);
     const states = message.states && typeof message.states === "object" ? message.states : {};
     realStates = {
+      roulette: states.roulette || rouletteSnapshot(),
       tap_farming: states.tap_farming && typeof states.tap_farming === "object"
         ? states.tap_farming
         : previewTapSnapshot({ scenario: "active" }),

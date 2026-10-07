@@ -479,7 +479,31 @@
         "description": "La distribución de {source} reemplazará la de {target}."
       }
     },
+      "roulette": {
+        "replay": "Repetir animación de entrada",
+        "disabledPreviewHint": "La capa está desactivada, pero puedes previsualizarla aquí. La simulación en OBS es temporal y no cambia su activación.",
+        "logoPreviewHint": "Activa «Mostrar logo cuando no hay combate» para verlo en este escenario.",
+        "previewHint": "La muestra no cambia tu partida. Oculto y Reintento muestran los momentos en los que el overlay se retira.",
+      "order": "Orden",
+      "iconsAbove": "Iconos arriba",
+      "textAbove": "Reto arriba",
+      "alignment": "Alineación del contenido",
+      "left": "Izquierda",
+      "center": "Centro",
+      "right": "Derecha",
+      "retry": "Al reintentar",
+      "keep": "Mantener visible",
+      "reappear": "Repetir animación",
+      "logo": "Mostrar logo cuando no hay combate",
+      "scenarios": {
+        "hud": "Equipo y reto",
+        "logo": "Fuera de combate",
+        "hidden": "Oculto",
+        "retry": "Reintento"
+      }
+    },
     "components": {
+      "roulette": "Ruleta",
       "tap_farming": "Farmeando taps",
       "pesky_battle": "Batalla Molestosa",
       "chat_chooses": "El chat elige"
@@ -525,6 +549,26 @@
         "vertical": "Verticalmente"
       },
       "opacity": "Opacidad del overlay",
+      "typography": {
+        "title": "Texto",
+        "font": "Fuente",
+        "weight": "Grosor",
+        "fonts": {
+          "clean": "Sans serif · vista previa",
+          "system": "Sistema",
+          "rounded": "Trebuchet",
+          "serif": "Georgia"
+        },
+        "weights": {
+          "400": "Normal",
+          "700": "Negrita",
+          "900": "Muy gruesa"
+        },
+        "textColor": "Color del texto",
+        "textShadowColor": "Sombra paralela",
+        "shadowHint": "La sombra es transparente por defecto. Aumenta su opacidad para mostrarla. El texto se ajusta al contenedor.",
+        "fixedRouletteFont": "Fuente fija: sans serif en negrita, igual que la vista previa. Todos los textos se muestran en mayúsculas."
+      },
       "colors": {
         "title": "Colores del corazón",
         "liquidColor": "Líquido",

@@ -5,7 +5,7 @@ export function createChatChoosesMock({ developmentTools = true, clock = Date.no
     weapon1: [['Lanzaguisantes', 'weapons/lanzaguisantes.png'], ['Expansión', 'weapons/expansion.png'], ['Rastreador', 'weapons/rastreador.png'], ['Globero', 'weapons/globero.png'], ['Carga', 'weapons/carga.png'], ['Rodeo', 'weapons/rodeo.png'], ['Tiro certero', 'weapons/tirocertero.png'], ['Nada', 'creator-tools/empty.png', 'none']],
     super: [['Super I', 'supers/super1.png'], ['Super II', 'supers/super2.png'], ['Super III', 'supers/super3.png'], ['Nada', 'creator-tools/empty.png', 'none']],
     charm: [['Corazón', 'charms/corazon.png'], ['Café', 'charms/cafe.png'], ['Bomba de humo', 'charms/bombadehumo.png'], ['Desvío dulce', 'charms/desviodulce.png'], ['Corazón doble', 'charms/corazondoble.png'], ['Galletita Astral', 'charms/galletitaastral.png'], ['Nada', 'creator-tools/empty.png', 'none']],
-    modifier: [['No Dash', 'creator-tools/modifiers/nodash_01.png', 'ground'], ['No miniavión', 'creator-tools/modifiers/nomini_01.png', 'plane'], ['No EX', 'creator-tools/modifiers/noex_01.png'], ['RGB', 'creator-tools/modifiers/rgb_01.png'], ['HP. 1', 'creator-tools/modifiers/hp1_01.png'], ['Lluvia de tinta', 'creator-tools/modifiers/inkrain_01.png'], ['Nada', 'creator-tools/empty.png', 'none']],
+    modifier: [['No Dash', 'modifiers/nodash_01.png', 'ground'], ['No miniavión', 'modifiers/nomini_01.png', 'plane'], ['No EX', 'modifiers/noex_01.png'], ['RGB', 'modifiers/rgb_01.png'], ['HP. 1', 'modifiers/hp1_01.png'], ['Lluvia de tinta', 'modifiers/inkrain_01.png'], ['Nada', 'creator-tools/empty.png', 'none']],
   };
   pools.weapon2 = pools.weapon1;
   const keys = ['boss', 'weapon1', 'weapon2', 'super', 'charm', 'modifier'];

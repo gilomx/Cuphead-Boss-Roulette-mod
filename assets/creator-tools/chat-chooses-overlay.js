@@ -9,6 +9,12 @@
   const result = document.getElementById('result');
   const heading = document.getElementById('heading');
   const stages = ['boss', 'weapon1', 'weapon2', 'super', 'charm', 'modifier'];
+  const challengeArtwork = {
+    blacknwhite: 'blanco-y-negro', upside_down: 'pantalla-invertida', rgb: 'pantalla-rgb',
+    nopeashooter: 'sin-peashooter', nomini: 'sin-miniavion', noex: 'sin-ex', nodash: 'sin-dash',
+    nobombs: 'sin-bombas', mini: 'solo-miniavion', locked: 'modo-tieso', inkrain: 'lluvia-de-tinta',
+    hp1: 'una-vida', halfdamage: 'mitad-de-dano',
+  };
   let labels;
   let allLabels;
   let latestState;
@@ -34,12 +40,13 @@
     // Catalog paths are plugin-local; never load viewer-controlled URLs.
     let path = typeof image === 'string' && !image.includes('..') && !image.includes(':') &&
       !image.includes('\\') && !image.startsWith('/') ? image.toLowerCase() : 'weapons/vacio.png';
-    // Match the main roulette overlay's framed artwork, including its empty slot.
+    // Keep raw equipment portraits; this overlay has its own edited challenge artwork.
     if (path === 'weapons/vacio.png') path = 'creator-tools/empty.png';
-    else if (/^(weapons|supers|charms|modifiers)\//.test(path)) path = `creator-tools/${path}`;
+    else if (/^creator-tools\/(weapons|supers|charms|modifiers)\//.test(path)) path = path.slice('creator-tools/'.length);
+    const challenge = /^modifiers\/([a-z0-9_]+)_01\.png$/.exec(path);
+    if (challenge && Object.hasOwn(challengeArtwork, challenge[1]))
+      path = `creator-tools/chat-chooses-modifiers/${challengeArtwork[challenge[1]]}.png`;
     const artwork = element('div', 'artwork');
-    artwork.dataset.boss = String(/^bosses\//.test(path));
-    artwork.dataset.framed = String(artwork.dataset.boss === 'true' || /^creator-tools\/(weapons|supers|charms|modifiers)\//.test(path));
     const node = element('img'); node.alt = ''; node.src = `/assets/${path}`;
     artwork.append(node);
     return artwork;
@@ -114,6 +121,7 @@
   }
   function presentation(state) {
     const view = state.presentation || {};
+    window.CreatorToolsOverlayText?.apply(root, view);
     const color = (value, fallback) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(String(value)) ? value : fallback;
     root.style.setProperty('--choice-color', color(view.liquidColor, '#ff4f92'));
     root.style.setProperty('--winner-color', color(view.collectingColor, '#f4c95d'));

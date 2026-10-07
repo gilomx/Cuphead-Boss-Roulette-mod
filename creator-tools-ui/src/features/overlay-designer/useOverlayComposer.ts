@@ -32,6 +32,8 @@ const EDITABLE_KEYS = [
   "textColor",
   "outlineColor",
   "voteOutlineColor",
+  "textFont", "textWeight", "textShadowColor",
+  "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
 ] as const;
 
 function sameComponent(
@@ -67,6 +69,15 @@ function updateCommand(
     textColor: component.textColor,
     outlineColor: component.outlineColor,
     voteOutlineColor: component.voteOutlineColor,
+    textFont: component.id === "roulette" ? "clean" : component.textFont ?? "clean",
+    textWeight: component.id === "roulette" ? 700 : component.textWeight ?? 700,
+    textShadowColor: component.textShadowColor ?? "#00000000",
+    ...(component.id === "roulette" ? {
+      rouletteAlignment: component.rouletteAlignment ?? "center",
+      rouletteTextFirst: component.rouletteTextFirst ?? false,
+      rouletteLogo: component.rouletteLogo ?? false,
+      rouletteRetry: component.rouletteRetry ?? "reappear",
+    } : {}),
   };
 }
 

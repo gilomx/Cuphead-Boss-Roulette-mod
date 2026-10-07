@@ -5,6 +5,7 @@ import { interactionItems } from "../interactions/interactionCatalog";
 import type {
   OverlayComposerComponent,
   OverlayComposerProfile,
+  OverlayTextFont,
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
@@ -12,6 +13,7 @@ import { minimumComponentSize, proportionalComponentSize } from "./model";
 import type { BattleSimulationAction, TapSimulationAction } from "./simulation";
 import type { ChatChoosesState, ChatChoosesStage } from "../../model";
 import type { ChatSimulationAction } from "./chatSimulation";
+import type { RouletteScenario } from "./model";
 
 const battleAttacks = interactionItems.filter(item => item.category === "attack" || item.category === "mini_boss");
 
@@ -21,6 +23,9 @@ interface OverlayDesignerInspectorProps {
   tapState: TapFarmingPreviewSnapshot;
   battleState: PeskyBattlePreviewSnapshot;
   chatState: ChatChoosesState;
+  rouletteScenario: RouletteScenario;
+  onRouletteScenarioChange: (scenario: RouletteScenario) => void;
+  onRouletteReplay: () => void;
   previewActive: boolean;
   previewPending: boolean;
   previewError: boolean;
@@ -207,6 +212,9 @@ export function OverlayDesignerInspector({
   tapState,
   battleState,
   chatState,
+  rouletteScenario,
+  onRouletteScenarioChange,
+  onRouletteReplay,
   previewActive,
   previewPending,
   previewError,
@@ -225,8 +233,8 @@ export function OverlayDesignerInspector({
   const targetSlot = battleState.participants.some(player => player.slot === attackPlayer) ? attackPlayer : 0;
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
   const geometryDisabled = disabled || component.locked;
-  const colorKeys = ["liquidColor", "collectingColor", "textColor", "outlineColor",
-    ...(component.id === "chat_chooses" ? ["voteOutlineColor" as const] : [])] as const;
+  const colorKeys = ["liquidColor", "collectingColor",
+    "outlineColor", ...(component.id === "chat_chooses" ? ["voteOutlineColor" as const] : [])] as const;
   const colorLabel = (key: typeof colorKeys[number]) =>
     t(`overlayDesigner.inspector.${colorGroup}.${key}`);
   const maximumSize = {
@@ -248,7 +256,9 @@ export function OverlayDesignerInspector({
   ] as const;
   const switchKeys: Array<
     "enabled" | "locked" | "showTitle" | "showDetails" | "motion"
-  > = component.id === "tap_farming"
+  > = component.id === "roulette"
+    ? ["enabled", "locked"]
+    : component.id === "tap_farming"
     ? ["enabled", "locked", "motion"]
     : component.id === "chat_chooses"
     ? ["enabled", "locked", "showTitle", "motion"]
@@ -354,7 +364,36 @@ export function OverlayDesignerInspector({
           </span>
         </label>
 
-        {(
+        <div className="overlay-designer-simulation__body" role="group" aria-label={t("overlayDesigner.inspector.typography.title")}>
+          <strong>{t("overlayDesigner.inspector.typography.title")}</strong>
+          {component.id === "roulette" ? <small>{t("overlayDesigner.inspector.typography.fixedRouletteFont")}</small> : <>
+          <label><span>{t("overlayDesigner.inspector.typography.font")}</span>
+            <select disabled={disabled} value={component.textFont ?? "clean"} onChange={event => onChange({ textFont: event.target.value as OverlayTextFont })}>
+              {["clean", "system", "rounded", "serif"].map(font =>
+                <option key={font} value={font}>{t(`overlayDesigner.inspector.typography.fonts.${font}`)}</option>)}
+            </select>
+          </label>
+          <label><span>{t("overlayDesigner.inspector.typography.weight")}</span>
+            <select disabled={disabled} value={component.textWeight ?? 700} onChange={event => onChange({ textWeight: Number(event.target.value) })}>
+              {[400, 700, 900].map(weight => <option key={weight} value={weight}>{t(`overlayDesigner.inspector.typography.weights.${weight}`)}</option>)}
+            </select>
+          </label>
+          </>}
+          {(["textColor", "textShadowColor"] as const).map(key => <OverlayColorPicker
+            key={key}
+            label={t(`overlayDesigner.inspector.typography.${key}`)}
+            value={component[key] ?? (key === "textColor" ? "#ffffff" : "#00000000")}
+            disabled={disabled}
+            alphaLabel={t("overlayDesigner.inspector.colors.alpha")}
+            hexLabel={t("overlayDesigner.inspector.colors.hex")}
+            openLabel={t("overlayDesigner.inspector.colors.open")}
+            closeLabel={t("overlayDesigner.inspector.colors.close")}
+            onChange={value => onChange({ [key]: value })}
+          />)}
+          <small>{t("overlayDesigner.inspector.typography.shadowHint")}</small>
+        </div>
+
+        {component.id !== "roulette" ? (
           <div className="overlay-designer-properties__colors">
             <strong>{t(`overlayDesigner.inspector.${colorGroup}.title`)}</strong>
             {colorKeys.map((key) => (
@@ -370,6 +409,29 @@ export function OverlayDesignerInspector({
                 onChange={(value) => onChange({ [key]: value })}
               />
             ))}
+          </div>
+        ) : (
+          <div className="overlay-designer-simulation__body">
+            <label><span>{t("overlayDesigner.roulette.order")}</span>
+              <select disabled={disabled} value={String(component.rouletteTextFirst ?? false)} onChange={event => onChange({ rouletteTextFirst: event.target.value === "true" })}>
+                <option value="false">{t("overlayDesigner.roulette.iconsAbove")}</option>
+                <option value="true">{t("overlayDesigner.roulette.textAbove")}</option>
+              </select>
+            </label>
+            <label><span>{t("overlayDesigner.roulette.alignment")}</span>
+              <select disabled={disabled} value={component.rouletteAlignment ?? "center"} onChange={event => onChange({ rouletteAlignment: event.target.value as "left" | "center" | "right" })}>
+                {["left", "center", "right"].map(value => <option key={value} value={value}>{t(`overlayDesigner.roulette.${value}`)}</option>)}
+              </select>
+            </label>
+            <label><span>{t("overlayDesigner.roulette.retry")}</span>
+              <select disabled={disabled} value={component.rouletteRetry ?? "reappear"} onChange={event => onChange({ rouletteRetry: event.target.value as "keep" | "reappear" })}>
+                {["keep", "reappear"].map(value => <option key={value} value={value}>{t(`overlayDesigner.roulette.${value}`)}</option>)}
+              </select>
+            </label>
+            <label className="overlay-designer-properties__checkbox">
+              <input type="checkbox" disabled={disabled} checked={component.rouletteLogo ?? false} onChange={event => onChange({ rouletteLogo: event.target.checked })} />
+              <span>{t("overlayDesigner.roulette.logo")}</span>
+            </label>
           </div>
         )}
 
@@ -400,7 +462,21 @@ export function OverlayDesignerInspector({
           <h2 id="overlay-designer-simulation-title">{t("overlayDesigner.simulation.title")}</h2>
         </header>
 
-        {component.id === "chat_chooses" ? (
+        {component.id === "roulette" ? (
+          <div className="overlay-designer-simulation__body">
+            <label><span>{t("overlayDesigner.simulation.scenario")}</span>
+              <select value={rouletteScenario} onChange={event => onRouletteScenarioChange(event.target.value as RouletteScenario)}>
+                {["hud", "logo", "hidden", "retry"].map(value => <option key={value} value={value}>{t(`overlayDesigner.roulette.scenarios.${value}`)}</option>)}
+              </select>
+            </label>
+            <button className="overlay-designer-simulation__reset" type="button" onClick={onRouletteReplay}>
+              <RotateCcw aria-hidden="true" />{t("overlayDesigner.roulette.replay")}
+            </button>
+            <small>{t(!component.enabled ? "overlayDesigner.roulette.disabledPreviewHint"
+              : rouletteScenario === "logo" && !component.rouletteLogo ? "overlayDesigner.roulette.logoPreviewHint"
+              : "overlayDesigner.roulette.previewHint")}</small>
+          </div>
+        ) : component.id === "chat_chooses" ? (
           <div className="overlay-designer-simulation__body">
             <label><span>{t("overlayDesigner.simulation.scenario")}</span>
               <select value={chatState.phase} onChange={event => dispatchChat({ type: "scenario", phase: event.target.value as ChatChoosesState["phase"] })}>

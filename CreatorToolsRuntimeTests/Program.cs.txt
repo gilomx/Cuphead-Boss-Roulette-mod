@@ -88,10 +88,16 @@ namespace Gilomx.CupheadBossRoulette
                 TestOverlayComposerPreservesProportionsAcrossProfiles);
             Run("Overlay composer serves POST config and preview routes",
                 TestOverlayComposerHttpRoutes);
+            Run("Overlay components allow same-origin embedding in the designer",
+                TestOverlayComposerFramePolicy);
+            Run("Roulette settings migrate once, retain saved scenes, and validate atomically",
+                TestRouletteOverlayMigration);
             Run("Chat overlay joins saved scenes without losing positions and validates preview transport",
                 TestChatOverlayMigrationAndPreview);
             Run("Chat vote borders persist, migrate, copy and reset independently of image frames",
                 TestChatVoteBorderSettings);
+            Run("Overlay typography defaults migrate, persist per profile, copy and reject invalid styles atomically",
+                TestOverlayTextStyleSettings);
             Run("Chat overlay compacts only the original unlocked horizontal bounds",
                 TestChatOverlayCompactsDefaultBounds);
             Run("Chat chooses HTTP commands and companion ballots preserve identity",
@@ -1637,7 +1643,9 @@ namespace Gilomx.CupheadBossRoulette
                 var catalog = new ChatChoosesCatalog();
                 catalog.Pools["boss"] = new List<ChatChoice> {
                     new ChatChoice { Id = 0, Name = "Boss", Image = "bosses/test.png" } };
-                var controller = new CreatorToolsChatChoosesController(new CreatorToolsLiveEventsCoordinator(), true);
+                var ballotTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var controller = new CreatorToolsChatChoosesController(new CreatorToolsLiveEventsCoordinator(), true,
+                    clock: delegate { return ballotTime; });
                 controller.SetCatalog(catalog, true);
                 server.SetChatChoosesController(controller, controller.Command);
                 Equal(HttpStatusCode.OK, GetStatusCode(server, "/config/chat-chooses"), "event SPA route");
@@ -1649,7 +1657,7 @@ namespace Gilomx.CupheadBossRoulette
                     True(!state.RootElement.GetProperty("withChallenge").GetBoolean(), "HTTP mode");
                 }
                 CreatorToolsStreamMessage message;
-                True(TikFinityCompanionProtocol.TryParse("{\"protocolVersion\":1,\"kind\":\"event\",\"type\":\"chat\",\"eventId\":\"ballot\",\"platform\":\"tiktok\",\"userId\":\"viewer\",\"chatText\":\"1\",\"receivedAt\":\"" + DateTime.UtcNow.ToString("O") + "\"}", out message), "parse chat ballot");
+                True(TikFinityCompanionProtocol.TryParse("{\"protocolVersion\":1,\"kind\":\"event\",\"type\":\"chat\",\"eventId\":\"ballot\",\"platform\":\"tiktok\",\"userId\":\"viewer\",\"chatText\":\"1\",\"receivedAt\":\"" + ballotTime.AddSeconds(1).ToString("O", CultureInfo.InvariantCulture) + "\"}", out message), "parse chat ballot");
                 Equal("1", message.Event.ChatText, "preserve chat text");
                 Equal("chat_vote_counted", controller.Observe(message.Event), "protocol ballot reaches voting");
                 Equal("chat_vote_unchanged", controller.Observe(message.Event), "duplicate identity does not add votes");
@@ -1673,9 +1681,13 @@ namespace Gilomx.CupheadBossRoulette
                     "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
                 var legacy = JsonNode.Parse(File.ReadAllText(path));
                 foreach (var profile in legacy["profiles"].AsArray())
+                {
+                    profile["components"].AsArray().RemoveAt(3);
                     profile["components"].AsArray().RemoveAt(2);
+                }
                 File.WriteAllText(path, legacy.ToJsonString());
                 var migrated = scope.CreateOverlayComposer(null);
+                True(migrated.ImportRouletteSettings(false, 100, "center", 100, false, false, "reappear"), "migrate roulette settings before saving extended scenes");
                 using (var json = JsonDocument.Parse(migrated.GetConfigState()))
                 {
                     Equal(99, FindComposerComponent(json.RootElement, "vertical", "pesky_battle").GetProperty("x").GetInt32(), "saved battle position retained");
@@ -1694,7 +1706,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     Equal("chat_chooses", json.RootElement.GetProperty("componentId").GetString(), "selected simulation component");
                     Equal(7, json.RootElement.GetProperty("chatState").GetProperty("options")[0].GetProperty("votes").GetInt32(), "chat preview votes delivered to OBS");
-                    Equal(3, json.RootElement.GetProperty("layout").GetProperty("components").GetArrayLength(), "legacy preview adds chat layer");
+                    Equal(4, json.RootElement.GetProperty("layout").GetProperty("components").GetArrayLength(), "legacy preview adds chat and roulette layers");
                 }
                 request = JsonSerializer.Serialize(new { operation = "update", profileId = "vertical", sessionId = "chat-design-test", componentId = "chat_chooses",
                     chatStateJson = ballot.Replace("bosses/pandillaraiz.png", "../private.png") });
@@ -1762,6 +1774,101 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private static void TestOverlayTextStyleSettings()
+        {
+            using (var scope = new TestScope("overlay-text-style"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 0, profileId = "vertical",
+                    componentId = "roulette", x = 73 })).StatusCode, "save existing scene");
+                var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                    foreach (var component in profile["components"].AsArray())
+                        foreach (var key in new[] { "textFont", "textWeight", "textShadowColor", "textShadowX", "textShadowY", "textShadowBlur" })
+                            component.AsObject().Remove(key);
+                File.WriteAllText(path, legacy.ToJsonString());
+                controller = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    foreach (var profile in json.RootElement.GetProperty("profiles").EnumerateArray())
+                        foreach (var component in profile.GetProperty("components").EnumerateArray())
+                        {
+                            Equal("clean", component.GetProperty("textFont").GetString(), "legacy scene uses designer font");
+                            Equal(700, component.GetProperty("textWeight").GetInt32(), "legacy scene uses bold weight");
+                            Equal("#00000000", component.GetProperty("textShadowColor").GetString(), "legacy shadow is transparent");
+                        }
+                    Equal(73, FindComposerComponent(json.RootElement, "vertical", "roulette").GetProperty("x").GetInt32(), "migration preserves geometry");
+                }
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "roulette",
+                    textFont = "serif", textWeight = 900, textColor = "#12345680", textShadowColor = "#ABCDEF80",
+                    textShadowX = -7, textShadowY = 9, textShadowBlur = 11 })).StatusCode, "save full text style");
+                controller = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var component = FindComposerComponent(json.RootElement, "vertical", "roulette");
+                    Equal("clean", component.GetProperty("textFont").GetString(), "roulette keeps its fixed designer font");
+                    Equal(700, component.GetProperty("textWeight").GetInt32(), "roulette keeps its fixed bold weight");
+                    Equal("#abcdef80", component.GetProperty("textShadowColor").GetString(), "shadow alpha persists");
+                    Equal(-7, component.GetProperty("textShadowX").GetInt32(), "negative offset persists");
+                    Equal(11, component.GetProperty("textShadowBlur").GetInt32(), "blur persists");
+                    Equal("#00000000", FindComposerComponent(json.RootElement, "horizontal", "roulette").GetProperty("textShadowColor").GetString(), "profiles remain independent");
+                }
+                foreach (var invalid in new Dictionary<string, object>[] {
+                    new Dictionary<string, object> { { "textFont", "url(invalid)" } },
+                    new Dictionary<string, object> { { "textWeight", 650 } },
+                    new Dictionary<string, object> { { "textShadowColor", "red; background:url(invalid)" } },
+                    new Dictionary<string, object> { { "textShadowX", 21 } },
+                    new Dictionary<string, object> { { "textShadowBlur", -1 } } })
+                {
+                    invalid["operation"] = "update"; invalid["expectedRevision"] = 2;
+                    invalid["profileId"] = "vertical"; invalid["componentId"] = "roulette";
+                    invalid["textColor"] = "#ff0000";
+                    Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(invalid)).StatusCode, "invalid style rejected");
+                }
+                using (var json = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    Equal(2, json.RootElement.GetProperty("revision").GetInt32(), "invalid styles preserve revision");
+                    Equal("#12345680", FindComposerComponent(json.RootElement, "vertical", "roulette").GetProperty("textColor").GetString(), "invalid styles preserve whole appearance");
+                }
+                var copied = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "copy", expectedRevision = 2, profileId = "horizontal", sourceProfileId = "vertical" }));
+                Equal(200, copied.StatusCode, "copy typography");
+                using (var json = JsonDocument.Parse(copied.Json))
+                    Equal("#abcdef80", FindComposerComponent(json.RootElement, "horizontal", "roulette").GetProperty("textShadowColor").GetString(), "copy retains shadow");
+                var reset = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "reset", expectedRevision = 3, profileId = "horizontal", componentId = "roulette" }));
+                Equal(200, reset.StatusCode, "reset typography");
+                using (var json = JsonDocument.Parse(reset.Json))
+                {
+                    Equal("#00000000", FindComposerComponent(json.RootElement, "horizontal", "roulette").GetProperty("textShadowColor").GetString(), "reset restores transparent shadow");
+                    Equal("clean", FindComposerComponent(json.RootElement, "vertical", "roulette").GetProperty("textFont").GetString(), "reset preserves fixed font in other profile");
+                }
+                Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 4, profileId = "horizontal", componentId = "tap_farming", textFont = "native" })).StatusCode,
+                    "native raster font is no longer configurable");
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 4, profileId = "vertical", componentId = "chat_chooses",
+                    textFont = "serif", textWeight = 900 })).StatusCode, "other overlays retain editable typography");
+                controller = scope.CreateOverlayComposer(null);
+                using (var json = JsonDocument.Parse(controller.GetConfigState()))
+                    Equal("serif", FindComposerComponent(json.RootElement, "vertical", "chat_chooses").GetProperty("textFont").GetString(), "other overlay font survives reload");
+                var oldNative = JsonNode.Parse(File.ReadAllText(path));
+                oldNative["profiles"].AsArray().First(profile => profile["id"].GetValue<string>() == "vertical")["components"].AsArray()
+                    .First(component => component["id"].GetValue<string>() == "roulette")["textFont"] = "native";
+                File.WriteAllText(path, oldNative.ToJsonString());
+                using (var json = JsonDocument.Parse(scope.CreateOverlayComposer(null).GetConfigState()))
+                {
+                    var component = FindComposerComponent(json.RootElement, "vertical", "roulette");
+                    Equal("clean", component.GetProperty("textFont").GetString(), "old native font migrates to fixed web font");
+                    Equal("#12345680", component.GetProperty("textColor").GetString(), "font migration retains text alpha");
+                    Equal(73, component.GetProperty("x").GetInt32(), "font migration retains placement");
+                }
+            }
+        }
+
         private static void TestChatOverlayCompactsDefaultBounds()
         {
             foreach (var mode in new[] { "default", "custom", "locked" })
@@ -1793,6 +1900,61 @@ namespace Gilomx.CupheadBossRoulette
                 if (mode == "default")
                 using (var backup = JsonDocument.Parse(File.ReadAllText(path + ".bak")))
                     Equal(460, FindComposerComponent(backup.RootElement, "horizontal", "chat_chooses").GetProperty("height").GetInt32(), "original dimensions remain in backup");
+            }
+        }
+
+        private static void TestRouletteOverlayMigration()
+        {
+            using (var scope = new TestScope("roulette-overlay-migration"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand("{\"operation\":\"update\",\"expectedRevision\":0,\"profileId\":\"vertical\",\"componentId\":\"pesky_battle\",\"x\":99}").StatusCode, "customize existing scene");
+                var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                    profile["components"].AsArray().RemoveAt(3);
+                File.WriteAllText(path, legacy.ToJsonString());
+                controller = scope.CreateOverlayComposer(null);
+                True(controller.ImportRouletteSettings(true, 150, "right", 75, true, true, "keep"), "import legacy values");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    Equal(99, FindComposerComponent(state.RootElement, "vertical", "pesky_battle").GetProperty("x").GetInt32(), "other scene retains its position");
+                    foreach (var id in new[] { "vertical", "horizontal" })
+                    {
+                        var component = FindComposerComponent(state.RootElement, id, "roulette");
+                        True(component.GetProperty("enabled").GetBoolean(), "old activation retained");
+                        Equal(150, component.GetProperty("rouletteSize").GetInt32(), "old size retained");
+                        Equal(75, component.GetProperty("opacity").GetInt32(), "old opacity retained");
+                        Equal("right", component.GetProperty("rouletteAlignment").GetString(), "old alignment retained");
+                        True(component.GetProperty("rouletteTextFirst").GetBoolean(), "old order retained");
+                        True(component.GetProperty("rouletteLogo").GetBoolean(), "old logo retained");
+                        Equal("keep", component.GetProperty("rouletteRetry").GetString(), "old retry retained");
+                    }
+                }
+                using (var backup = JsonDocument.Parse(File.ReadAllText(path + ".bak")))
+                    Equal(3, backup.RootElement.GetProperty("profiles")[0].GetProperty("components").GetArrayLength(), "pre-migration scene backed up");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var revision = state.RootElement.GetProperty("revision").GetInt32();
+                    Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new { operation = "update", expectedRevision = revision, profileId = "vertical", componentId = "roulette", rouletteSize = 200, rouletteRetry = "reappear", rouletteLogo = false })).StatusCode, "edit imported component");
+                    Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(new { operation = "update", expectedRevision = revision + 1, profileId = "vertical", componentId = "roulette", rouletteSize = 123, rouletteLogo = true })).StatusCode, "reject invalid size atomically");
+                }
+                controller = scope.CreateOverlayComposer(null);
+                True(controller.ImportRouletteSettings(false, 100, "left", 25, false, true, "keep"), "subsequent launch skips legacy import");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var component = FindComposerComponent(state.RootElement, "vertical", "roulette");
+                    Equal(200, component.GetProperty("rouletteSize").GetInt32(), "designer edit survives restart");
+                    True(!component.GetProperty("rouletteLogo").GetBoolean(), "invalid update changed no field");
+                    Equal("reappear", component.GetProperty("rouletteRetry").GetString(), "profile owns retry");
+                    Equal("keep", FindComposerComponent(state.RootElement, "horizontal", "roulette").GetProperty("rouletteRetry").GetString(), "profiles stay independent");
+                }
+                using (var server = scope.StartServer())
+                {
+                    server.Publish("{\"type\":\"state\",\"active\":true,\"visible\":true,\"session\":42}");
+                    using (var state = GetJson(server, "/api/roulette-overlay/state"))
+                        Equal(42, state.RootElement.GetProperty("session").GetInt32(), "new widget receives native state");
+                }
             }
         }
 
@@ -1879,6 +2041,28 @@ namespace Gilomx.CupheadBossRoulette
                         .GetProperty("levelId").GetString(),
                         "preview boss image key through GET");
                 }
+            }
+        }
+
+        private static void TestOverlayComposerFramePolicy()
+        {
+            using (var scope = new TestScope("overlay-frame-policy"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                foreach (var path in new[] { "/roulette-overlay?embedded=1", "/roulette-overlay/",
+                    "/overlay/vertical", "/overlay/horizontal", "/chat-chooses-overlay" })
+                using (var response = client.GetAsync("http://127.0.0.1:" + server.Port + path)
+                    .GetAwaiter().GetResult())
+                {
+                    Equal(HttpStatusCode.OK, response.StatusCode, path + " response");
+                    Equal("SAMEORIGIN", response.Headers.GetValues("X-Frame-Options").Single(), path + " embedding policy");
+                    Equal("frame-ancestors 'self'", response.Headers.GetValues("Content-Security-Policy").Single(), path + " ancestor policy");
+                    True(response.Headers.CacheControl.NoStore, path + " must bypass cached pages");
+                }
+                using (var response = client.GetAsync("http://127.0.0.1:" + server.Port + "/config/overlay-designer")
+                    .GetAwaiter().GetResult())
+                    Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single(), "configuration page keeps its frame policy");
             }
         }
 
@@ -2576,6 +2760,9 @@ namespace Gilomx.CupheadBossRoulette
                 File.WriteAllText(Path.Combine(
                     assetsDirectory, "creator-tools", "chat-chooses-overlay.html"),
                     "<!doctype html><title>Chat chooses</title>");
+                File.WriteAllText(Path.Combine(
+                    assetsDirectory, "creator-tools", "roulette-overlay.html"),
+                    "<!doctype html><title>Roulette overlay</title>");
             }
 
             internal CreatorToolsStreamRulesController CreateRules(

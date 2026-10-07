@@ -121,7 +121,7 @@
     const preferred = Math.max(9, Math.min(46, slot.item.clientWidth * .21));
     const style = window.getComputedStyle(slot.name);
     nameMeasure.font = `${style.fontWeight} ${preferred}px ${style.fontFamily}`;
-    const width = nameMeasure.measureText(slot.name.textContent).width;
+    const width = nameMeasure.measureText(slot.name.textContent.toUpperCase()).width;
     // Fit fourteen wide letters without overlapping adjacent players.
     slot.name.style.setProperty("--name-size-limit", `${Math.min(preferred,
       preferred * Math.max(1, slot.name.clientWidth - 4) / Math.max(1, width))}px`);
@@ -282,6 +282,7 @@
     const capacity = Number.isInteger(requestedCapacity) && requestedCapacity >= 2 && requestedCapacity <= 5
       ? requestedCapacity : 5;
     const presentation = state.presentation && typeof state.presentation === "object" ? state.presentation : {};
+    window.CreatorToolsOverlayText?.apply(root, presentation);
     const visible = ["recruiting", "ready", "waiting_level", "active", "won"].includes(phase);
     const animated = presentation.motion !== false && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches !== true;
     root.dataset.phase = phase;
@@ -339,7 +340,10 @@
       for (let index = 0; index < capacity; index += 1) slots.push(createSlot());
     }
     const showNames = presentation.showDetails !== false;
-    slots.forEach((slot, index) => updateSlot(slot, index + 1, bySlot.get(index + 1), giftUrl, giftName, text, showNames, animated));
+    slots.forEach((slot, index) => {
+      updateSlot(slot, index + 1, bySlot.get(index + 1), giftUrl, giftName, text, showNames, animated);
+      fitName(slot);
+    });
     if (phase === "active") {
       const scope = JSON.stringify([state.sessionId ?? 0, state.attempt ?? 0, state.eventEpoch ?? 0,
         capacity, participants.map(player => [player?.slot, player?.userId || player?.userName || player?.displayName])]);

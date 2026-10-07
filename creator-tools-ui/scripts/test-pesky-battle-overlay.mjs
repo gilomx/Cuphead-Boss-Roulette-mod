@@ -22,7 +22,7 @@ class Element {
   append(fragment) { this.children.push(fragment.querySelector(".battle-slot")); }
   replaceChildren() { this.children = []; }
 }
-function harness(reducedMotion = false) {
+function harness(reducedMotion = false, nameMetrics = null) {
   const timers = new Map();
   let timerId = 0;
   let now = Date.now();
@@ -42,9 +42,15 @@ function harness(reducedMotion = false) {
   elements["battle-slot-template"] = { content: { cloneNode() {
     const nodes = Object.fromEntries(["battle-slot", "battle-slot__avatar", "battle-slot__gift", "battle-slot__coin", "battle-slot__initial", "battle-slot__name", "battle-slot__attack", "battle-slot__attack-visual", "battle-slot__attack-image", "battle-slot__challenge", "battle-slot__challenge-visual", "battle-slot__challenge-image"].map(name => [name, new Element()]));
     nodes["battle-slot"].nodes = nodes;
+    if (nameMetrics) {
+      nodes["battle-slot"].clientWidth = nameMetrics.slotWidth;
+      nodes["battle-slot__name"].clientWidth = nameMetrics.nameWidth;
+    }
     return { querySelector: selector => nodes[selector.slice(1)] };
   } } };
-  const document = { documentElement: {}, getElementById: id => elements[id] };
+  const measuredNames = [];
+  const measure = { font: '', measureText(text) { measuredNames.push(text); return { width: [...text].length * Number.parseFloat(this.font.split(' ')[1]) }; } };
+  const document = { documentElement: {}, getElementById: id => elements[id], createElement: () => ({ getContext: () => measure }) };
   let config;
   runInNewContext(catalogSource + source, { document, URL, URLSearchParams, Date: Clock, window: {
     location: { origin: "http://localhost:18091", search: "" },
@@ -52,13 +58,32 @@ function harness(reducedMotion = false) {
     setTimeout(callback, delay) { timers.set(++timerId, { callback, at: now + delay }); return timerId; },
     clearTimeout(id) { timers.delete(id); },
     matchMedia() { return { matches: reducedMotion }; },
+    getComputedStyle() { return { fontWeight: '700', fontFamily: 'sans-serif' }; },
   } });
   return { render: config.render, root: elements.battle, status: elements["battle-status"],
-    roster: elements["battle-roster"], document, timers, advance, now: () => now };
+    roster: elements["battle-roster"], document, timers, measuredNames, advance, now: () => now };
 }
 const entry = { giftName: "Rosa", giftImagePath: "/assets/creator-tools/gifts/images/5655.webp" };
 const state = (capacity, participants = []) => ({ phase: "recruiting", capacity, trigger: entry, participants });
 const player = (slot, name = "Test Player") => ({ slot, displayName: name, avatarUrl: "/avatar.webp" });
+
+test("uppercase names fit their allotted width, including letters that expand when capitalized", () => {
+  const h = harness(false, { slotWidth: 80, nameWidth: 92 });
+  const snapshot = { ...state(2, [player(1, 'ßßßßßßßßßßßßßß')]), presentation: { motion: false } };
+  h.render(snapshot);
+  const name = h.roster.children[0].nodes['battle-slot__name'];
+  const rendered = name.textContent.toUpperCase();
+  assert.equal(rendered, 'SS'.repeat(14));
+  assert.equal(h.measuredNames.at(-1), rendered, 'measure the displayed uppercase letters');
+  const size = Number.parseFloat(name.style.values['--name-size-limit']);
+  assert.ok([...rendered].length * size <= 92 - 4 + 0.001, 'wide names stay within their frame');
+  h.roster.children[0].clientWidth = 40;
+  name.clientWidth = 48;
+  h.render(snapshot);
+  const resized = Number.parseFloat(name.style.values['--name-size-limit']);
+  assert.ok(resized < size, 'unchanged names refit after a smaller frame or font change');
+  assert.ok([...rendered].length * resized <= 48 - 4 + 0.001);
+});
 
 test("batches queue three native attacks per player, run different players concurrently and deduplicate polls", () => {
   const h = harness();

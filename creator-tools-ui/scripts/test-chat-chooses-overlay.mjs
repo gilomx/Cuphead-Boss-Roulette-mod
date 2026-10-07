@@ -149,12 +149,12 @@ test('final preview keeps compatible plane equipment, no challenge, and safe loc
   assert.equal(view.nodes.equipment.children[1].children.length, 1, 'slot labels and selected names are absent');
 });
 
-test('final result contains only portraits and retains the designer normal outline color', async () => {
+test('final result uses the shared image border color and retains the independent vote border color', async () => {
   const view = await boot('?embedded=1');
   const state = finalSelection();
   state.presentation = { outlineColor: '#12345680', voteOutlineColor: '#abcdef80', collectingColor: '#ff0000', showDetails: true };
   view.send(state);
-  assert.equal(view.nodes.event.style['--outline-color'], '#12345680');
+  assert.equal(view.nodes.event.style['--outline-color'], '#12345680', 'image border preserves the saved color and alpha');
   assert.equal(view.nodes.event.style['--vote-outline-color'], '#abcdef80', 'vote border has its own color and alpha');
   assert.equal(view.nodes.heading.hidden, true);
   assert.equal(view.nodes.boss.children.length, 1);
@@ -162,28 +162,26 @@ test('final result contains only portraits and retains the designer normal outli
   assert.ok(view.nodes.equipment.children.every(card => card.children.length === 1));
   assert.equal(view.nodes.equipment.children[0].attributes['aria-label'], labels.es.stages.weapon1, 'slot remains accessible without visible labels');
   state.presentation.voteOutlineColor = 'url(https://invalid.test)';
+  state.presentation.outlineColor = 'url(https://invalid.test)';
   view.send(state);
   assert.equal(view.nodes.event.style['--vote-outline-color'], '#ffffff', 'invalid vote border falls back to white');
-  assert.equal(view.nodes.event.style['--outline-color'], '#12345680', 'vote border does not change the image frame');
+  assert.equal(view.nodes.event.style['--outline-color'], '#d3af93', 'invalid image border falls back to its original color');
 });
 
-test('voting and results use the main roulette framed assets and native empty slot', async () => {
+test('voting and results use raw equipment and edited challenges, including old framed paths and the empty slot', async () => {
   const view = await boot('?embedded=1');
-  const paths = ['bosses/hoscoytosco.png', 'weapons/lanzaguisantes.png', 'supers/super1.png',
-    'charms/corazon.png', 'creator-tools/modifiers/nodash_01.png', 'weapons/vacio.png'];
-  const expected = ['bosses/hoscoytosco.png', 'creator-tools/weapons/lanzaguisantes.png',
-    'creator-tools/supers/super1.png', 'creator-tools/charms/corazon.png',
-    'creator-tools/modifiers/nodash_01.png', 'creator-tools/empty.png'];
+  const paths = ['bosses/hoscoytosco.png', 'creator-tools/weapons/lanzaguisantes.png', 'creator-tools/supers/super1.png',
+    'creator-tools/charms/corazon.png', 'creator-tools/modifiers/nodash_01.png', 'weapons/vacio.png'];
+  const expected = ['bosses/hoscoytosco.png', 'weapons/lanzaguisantes.png',
+    'supers/super1.png', 'charms/corazon.png', 'creator-tools/chat-chooses-modifiers/sin-dash.png', 'creator-tools/empty.png'];
   const state = ballot(); state.presentation = { motion: false };
   state.options = state.options.map((option, index) => ({ ...option, image: paths[index] }));
   view.send(state);
-  assert.equal(view.nodes.event.style['--outline-color'], '#d3af93', 'default matches the native frame');
   assert.equal(view.nodes.event.style['--vote-outline-color'], '#ffffff', 'older presentation defaults to a white vote border');
   const portraits = view.nodes.options.children.map(card => card.children[0].children[0]);
   portraits.forEach((artwork, index) => {
     assert.equal(artwork.children[0].src, `/assets/${expected[index]}`);
-    assert.equal(artwork.dataset.framed, String(index < 5), 'equipment and bosses share the configurable frame');
-    assert.equal(artwork.dataset.boss, String(index === 0), 'boss portraits fit inside the frame');
+    assert.equal(artwork.children.length, 1, 'the subtle shared CSS border does not replace the original artwork');
     assert.ok(readFileSync(new URL(`../../assets/${expected[index]}`, import.meta.url)).length > 0);
   });
   state.phase = 'result';
@@ -192,10 +190,33 @@ test('voting and results use the main roulette framed assets and native empty sl
   view.send(state);
   const finalPortraits = [view.nodes.boss.children[0], ...view.nodes.equipment.children.map(card => card.children[0])];
   finalPortraits.forEach((artwork, index) => assert.equal(artwork.children[0].src, `/assets/${expected[index]}`));
-  assert.equal(finalPortraits[0].dataset.framed, 'true', 'the selected boss keeps its frame in the result');
+  assert.equal(finalPortraits[0].className, 'artwork', 'the selected boss uses the same bordered artwork container');
 });
 
-test('unsafe image paths always use the native empty slot without a frame tint', async () => {
+test('every challenge resolves to the renamed edited PNG in ballots and final results', async () => {
+  const view = await boot('?embedded=1');
+  const artwork = {
+    blacknwhite: 'blanco-y-negro', upside_down: 'pantalla-invertida', rgb: 'pantalla-rgb',
+    nopeashooter: 'sin-peashooter', nomini: 'sin-miniavion', noex: 'sin-ex', nodash: 'sin-dash',
+    nobombs: 'sin-bombas', mini: 'solo-miniavion', locked: 'modo-tieso', inkrain: 'lluvia-de-tinta',
+    hp1: 'una-vida', halfdamage: 'mitad-de-dano',
+  };
+  for (const [original, edited] of Object.entries(artwork)) {
+    const expected = `/assets/creator-tools/chat-chooses-modifiers/${edited}.png`;
+    const state = { ...ballot(), stage: 'modifier', presentation: { motion: false },
+      options: [{ ...option(1), image: `modifiers/${original}_01.png` }] };
+    view.send(state);
+    assert.equal(view.nodes.options.children[0].children[0].children[0].children[0].src, expected);
+    state.phase = 'result'; state.selected = { modifier: state.options[0] };
+    view.send(state);
+    assert.equal(view.nodes.equipment.children.at(-1).children[0].children[0].src, expected);
+    const png = readFileSync(new URL(`../..${expected}`, import.meta.url));
+    assert.equal(png.readUInt32BE(16), 72, 'the user artwork retains its original width');
+    assert.equal(png.readUInt32BE(20), 72, 'the user artwork retains its original height');
+  }
+});
+
+test('unsafe image paths always use the native empty slot', async () => {
   const view = await boot('?embedded=1');
   const state = ballot(); state.presentation = { motion: false };
   const paths = ['../private.png', 'https://external.test/icon.png', '/private.png', 'weapons\\private.png', null, 'weapons/vacio.png'];
@@ -204,7 +225,7 @@ test('unsafe image paths always use the native empty slot without a frame tint',
   for (const card of view.nodes.options.children) {
     const artwork = card.children[0].children[0];
     assert.equal(artwork.children[0].src, '/assets/creator-tools/empty.png');
-    assert.equal(artwork.dataset.framed, 'false');
+    assert.equal(artwork.dataset.framed, undefined);
   }
 });
 

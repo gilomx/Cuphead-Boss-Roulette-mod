@@ -133,8 +133,8 @@ export default function App() {
       return;
     }
     const component = new URLSearchParams(window.location.search).get("component");
-    const next: AppView = component === "chat_chooses" ? "chatChooses" : component === "pesky_battle" ? "peskyBattle" : "tapFarming";
-    const path = next === "chatChooses" ? "/config/chat-chooses" : next === "peskyBattle" ? "/config/pesky-battle" : "/config/tap-farming";
+    const next: AppView = component === "roulette" ? "dashboard" : component === "chat_chooses" ? "chatChooses" : component === "pesky_battle" ? "peskyBattle" : "tapFarming";
+    const path = next === "dashboard" ? "/dashboard" : next === "chatChooses" ? "/config/chat-chooses" : next === "peskyBattle" ? "/config/pesky-battle" : "/config/tap-farming";
     window.history.pushState(null, "", path);
     setView(next);
     window.scrollTo({ top: 0 });
@@ -153,7 +153,7 @@ export default function App() {
         view === "chatChooses" ||
         view === "overlayDesigner" ? null : activeSection}
       workspace={view === "overlayDesigner"}
-      onOpenOverlays={() => openOverlayDesigner("tap_farming")}
+      onOpenOverlays={() => openOverlayDesigner("roulette")}
       onSectionChange={(section) => navigate(section)}
     >
       {view === "dashboard"
