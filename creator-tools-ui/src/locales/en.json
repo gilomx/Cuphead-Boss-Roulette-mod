@@ -70,6 +70,7 @@
       "title": "Live Events",
       "description": "Choose an activity to configure it and follow its status during the live stream.",
       "back": "Back to Live Events",
+      "status": { "active": "Active", "inactive": "Inactive" },
       "peskyBattleDescription": "Recruit 2 to 5 participants and face their attacks and temporary challenges for a full level.",
       "tapFarmingDescription": "Turn the whole community's taps into extra resistance that makes the boss last longer.",
       "participants": "{count}/{capacity} participants",

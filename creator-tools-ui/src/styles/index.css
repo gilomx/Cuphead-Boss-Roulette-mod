@@ -3326,7 +3326,7 @@ textarea:focus-visible {
   width: 100%;
   min-height: 8.2rem;
   grid-template-columns: 3rem minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
+  grid-template-rows: 1fr auto;
   align-items: center;
   gap: 0.65rem 0.85rem;
   padding: 1rem;
@@ -3361,17 +3361,6 @@ textarea:focus-visible {
   outline-offset: 0.18rem;
 }
 
-.dashboard-live-event-card[data-phase="recruiting"],
-.dashboard-live-event-card[data-phase="ready"],
-.dashboard-live-event-card[data-phase="waiting_level"],
-.dashboard-live-event-card[data-phase="active"] {
-  border-color: rgb(196 138 233 / 38%);
-}
-
-.dashboard-live-event-card[data-phase="won"] {
-  border-color: rgb(120 217 171 / 38%);
-}
-
 .dashboard-live-event-card__icon {
   display: grid;
   width: 3rem;
@@ -3395,7 +3384,7 @@ textarea:focus-visible {
   min-width: 0;
   grid-column: 2;
   grid-row: 1;
-  align-self: end;
+  align-self: start;
   gap: 0.22rem;
 }
 
@@ -3415,7 +3404,7 @@ textarea:focus-visible {
   min-width: 0;
   grid-column: 2;
   grid-row: 2;
-  align-self: start;
+  align-self: end;
   flex-wrap: wrap;
   gap: 0.38rem;
 }
@@ -3432,24 +3421,6 @@ textarea:focus-visible {
   font-weight: 900;
   letter-spacing: 0.035em;
   background: rgb(255 255 255 / 5%);
-}
-
-.dashboard-live-event-card__meta > span[data-phase="recruiting"],
-.dashboard-live-event-card__meta > span[data-phase="ready"],
-.dashboard-live-event-card__meta > span[data-phase="waiting_level"] {
-  color: var(--color-warning);
-  background: rgb(244 199 111 / 9%);
-}
-
-.dashboard-live-event-card__meta > span[data-phase="active"],
-.dashboard-live-event-card__meta > span[data-phase="won"] {
-  color: var(--color-success);
-  background: rgb(120 217 171 / 9%);
-}
-
-.dashboard-live-event-card__meta svg {
-  width: 0.7rem;
-  height: 0.7rem;
 }
 
 .dashboard-live-event-card__arrow {
@@ -4114,65 +4085,33 @@ textarea:focus-visible {
   opacity: 0.48;
 }
 
-.dashboard-live-event-card[data-active="true"]::after {
-  position: absolute;
-  top: 0.65rem;
-  right: 0.65rem;
-  width: 0.46rem;
-  height: 0.46rem;
-  border: 0.12rem solid var(--color-background-raised);
-  border-radius: 50%;
-  background: var(--color-success);
-  box-shadow: 0 0 0.8rem rgb(120 217 171 / 75%);
-  content: "";
-}
-
-.dashboard-live-event-card--taps {
+.dashboard-live-event-card[data-active="true"] {
+  border-color: rgb(120 217 171 / 45%);
   background:
-    radial-gradient(circle at 0 0, rgb(116 222 196 / 15%), transparent 10rem),
+    radial-gradient(circle at 0 0, rgb(120 217 171 / 15%), transparent 10rem),
     var(--color-background-raised);
 }
 
-.dashboard-live-event-card--taps:hover {
-  border-color: rgb(116 222 196 / 42%);
+.dashboard-live-event-card[data-active="true"]:hover {
+  border-color: rgb(120 217 171 / 65%);
   background:
-    radial-gradient(circle at 0 0, rgb(116 222 196 / 22%), transparent 11rem),
+    radial-gradient(circle at 0 0, rgb(120 217 171 / 22%), transparent 11rem),
     var(--color-control-hover);
 }
 
-.dashboard-live-event-card--taps .dashboard-live-event-card__icon {
-  border-color: rgb(116 222 196 / 25%);
-  color: #73dec4;
-  background: rgb(16 91 78 / 26%);
-}
-
-.dashboard-live-event-card[data-phase="collecting"],
-.dashboard-live-event-card[data-phase="transition"],
-.dashboard-live-event-card[data-phase="stopping"] {
-  border-color: rgb(244 199 111 / 38%);
-}
-
-.dashboard-live-event-card[data-phase="completed"] {
-  border-color: rgb(120 217 171 / 38%);
-}
-
-.dashboard-live-event-card--taps[data-phase="collecting"],
-.dashboard-live-event-card--taps[data-phase="active"],
-.dashboard-live-event-card--taps[data-phase="transition"],
-.dashboard-live-event-card--taps[data-phase="stopping"] {
-  border-color: rgb(116 222 196 / 40%);
-}
-
-.dashboard-live-event-card__meta > span[data-phase="collecting"],
-.dashboard-live-event-card__meta > span[data-phase="transition"],
-.dashboard-live-event-card__meta > span[data-phase="stopping"] {
-  color: var(--color-warning);
-  background: rgb(244 199 111 / 9%);
-}
-
-.dashboard-live-event-card__meta > span[data-phase="completed"] {
+.dashboard-live-event-card[data-active="true"] .dashboard-live-event-card__icon {
+  border-color: rgb(120 217 171 / 35%);
   color: var(--color-success);
-  background: rgb(120 217 171 / 9%);
+  background: rgb(120 217 171 / 12%);
+}
+
+.dashboard-live-event-card[data-active="true"] .dashboard-live-event-card__meta > span {
+  color: var(--color-success);
+  background: rgb(120 217 171 / 12%);
+}
+
+.dashboard-live-event-card[data-active="true"] .dashboard-live-event-card__arrow {
+  color: var(--color-success);
 }
 
 .dashboard-live-event-conflict {

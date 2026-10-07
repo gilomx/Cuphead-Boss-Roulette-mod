@@ -1,4 +1,4 @@
-import { ChevronRight, MousePointerClick, Swords, Users, Vote } from "lucide-react";
+import { ChevronRight, MessageCircleCheck, MousePointerClick, Swords } from "lucide-react";
 import type { Ref } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
@@ -20,17 +20,17 @@ export function LiveEventsSection({
   peskyBattleCardRef,
   tapFarmingCardRef,
 }: LiveEventsSectionProps) {
-  const { liveEvents, peskyBattle, tapFarming, chatChooses } = useConfig();
-  const { locale, t } = useLocalization();
-  const phase = peskyBattle?.phase ?? "off";
-  const tapPhase = tapFarming?.phase ?? "off";
-  const capacity = Math.max(1, peskyBattle?.capacity ?? 5);
-  const participantCount = Math.min(
-    capacity,
-    Math.max(0, peskyBattle?.participants.length ?? 0),
-  );
-  const totalTaps = Math.max(0, tapFarming?.counters?.totalTaps ?? 0);
+  const { liveEvents } = useConfig();
+  const { t } = useLocalization();
   const activeEvent = liveEvents?.activeEvent ?? null;
+  const cards = [
+    { id: "chat_chooses", Icon: MessageCircleCheck, title: "dashboard.chatChooses.title",
+      description: "dashboard.chatChooses.description", ref: chatChoosesCardRef, onOpen: onOpenChatChooses },
+    { id: "pesky_battle", Icon: Swords, title: "dashboard.peskyBattle.title",
+      description: "dashboard.liveEvents.peskyBattleDescription", ref: peskyBattleCardRef, onOpen: onOpenPeskyBattle },
+    { id: "tap_farming", Icon: MousePointerClick, title: "dashboard.tapFarming.title",
+      description: "dashboard.liveEvents.tapFarmingDescription", ref: tapFarmingCardRef, onOpen: onOpenTapFarming },
+  ];
 
   return (
     <section
@@ -46,94 +46,25 @@ export function LiveEventsSection({
       </div>
 
       <div className="dashboard-live-event-grid">
-        <button ref={chatChoosesCardRef} className="dashboard-live-event-card" type="button"
-          data-active={activeEvent === "chat_chooses"} onClick={onOpenChatChooses}>
-          <span className="dashboard-live-event-card__icon" aria-hidden="true"><Vote /></span>
-          <span className="dashboard-live-event-card__copy">
-            <strong>{t("dashboard.chatChooses.title")}</strong>
-            <small>{t("dashboard.chatChooses.description")}</small>
-          </span>
-          <span className="dashboard-live-event-card__meta">
-            <span>{t(`dashboard.chatChooses.phase.${chatChooses?.phase ?? "off"}`)}</span>
-          </span>
-          <ChevronRight className="dashboard-live-event-card__arrow" aria-hidden="true" />
-        </button>
-        <button
-          ref={peskyBattleCardRef}
-          className="dashboard-live-event-card"
-          type="button"
-          data-phase={phase}
-          data-active={activeEvent === "pesky_battle"}
-          aria-labelledby="dashboard-live-event-pesky-title"
-          aria-describedby="dashboard-live-event-pesky-description dashboard-live-event-pesky-phase dashboard-live-event-pesky-participants"
-          onClick={onOpenPeskyBattle}
-        >
-          <span className="dashboard-live-event-card__icon" aria-hidden="true">
-            <Swords />
-          </span>
-          <span className="dashboard-live-event-card__copy">
-            <strong id="dashboard-live-event-pesky-title">
-              {t("dashboard.peskyBattle.title")}
-            </strong>
-            <small id="dashboard-live-event-pesky-description">
-              {t("dashboard.liveEvents.peskyBattleDescription")}
-            </small>
-          </span>
-          <span className="dashboard-live-event-card__meta">
-            <span id="dashboard-live-event-pesky-phase" data-phase={phase}>
-              {t(`dashboard.peskyBattle.phase.${phase}`)}
+        {cards.map(({ id, Icon, title, description, ref, onOpen }) => (
+          <button key={id} ref={ref} className="dashboard-live-event-card" type="button"
+            data-active={activeEvent === id}
+            aria-labelledby={`dashboard-live-event-${id}-title`}
+            aria-describedby={`dashboard-live-event-${id}-description dashboard-live-event-${id}-status`}
+            onClick={onOpen}>
+            <span className="dashboard-live-event-card__icon" aria-hidden="true"><Icon /></span>
+            <span className="dashboard-live-event-card__copy">
+              <strong id={`dashboard-live-event-${id}-title`}>{t(title)}</strong>
+              <small id={`dashboard-live-event-${id}-description`}>{t(description)}</small>
             </span>
-            <span id="dashboard-live-event-pesky-participants">
-              <Users aria-hidden="true" />
-              {t("dashboard.liveEvents.participants")
-                .replace("{count}", String(participantCount))
-                .replace("{capacity}", String(capacity))}
+            <span className="dashboard-live-event-card__meta">
+              <span id={`dashboard-live-event-${id}-status`}>
+                {t(`dashboard.liveEvents.status.${activeEvent === id ? "active" : "inactive"}`)}
+              </span>
             </span>
-          </span>
-          <ChevronRight
-            className="dashboard-live-event-card__arrow"
-            aria-hidden="true"
-          />
-        </button>
-
-        <button
-          ref={tapFarmingCardRef}
-          className="dashboard-live-event-card dashboard-live-event-card--taps"
-          type="button"
-          data-phase={tapPhase}
-          data-active={activeEvent === "tap_farming"}
-          aria-labelledby="dashboard-live-event-taps-title"
-          aria-describedby="dashboard-live-event-taps-description dashboard-live-event-taps-phase dashboard-live-event-taps-count"
-          onClick={onOpenTapFarming}
-        >
-          <span className="dashboard-live-event-card__icon" aria-hidden="true">
-            <MousePointerClick />
-          </span>
-          <span className="dashboard-live-event-card__copy">
-            <strong id="dashboard-live-event-taps-title">
-              {t("dashboard.tapFarming.title")}
-            </strong>
-            <small id="dashboard-live-event-taps-description">
-              {t("dashboard.liveEvents.tapFarmingDescription")}
-            </small>
-          </span>
-          <span className="dashboard-live-event-card__meta">
-            <span id="dashboard-live-event-taps-phase" data-phase={tapPhase}>
-              {t(`dashboard.tapFarming.phase.${tapPhase}`)}
-            </span>
-            <span id="dashboard-live-event-taps-count">
-              <MousePointerClick aria-hidden="true" />
-              {t("dashboard.liveEvents.taps")
-                .replace("{count}", totalTaps.toLocaleString(
-                  locale === "es" ? "es-MX" : "en-US",
-                ))}
-            </span>
-          </span>
-          <ChevronRight
-            className="dashboard-live-event-card__arrow"
-            aria-hidden="true"
-          />
-        </button>
+            <ChevronRight className="dashboard-live-event-card__arrow" aria-hidden="true" />
+          </button>
+        ))}
       </div>
     </section>
   );

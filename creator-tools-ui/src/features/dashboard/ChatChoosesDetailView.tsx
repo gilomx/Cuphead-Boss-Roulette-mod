@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Vote } from "lucide-react";
+import { ArrowLeft, Check, MessageCircleCheck } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
@@ -48,7 +48,7 @@ export function ChatChoosesDetailView({ onBack, onOpenOverlayDesigner }: { onBac
     <section className="dashboard-pesky-battle chat-chooses__panel" data-phase={phase} aria-labelledby="chat-chooses-title">
     <header className="dashboard-pesky-battle__heading">
       <div><p className="dashboard-eyebrow">{t("dashboard.liveEvents.title")}</p>
-        <h1 id="chat-chooses-title"><Vote aria-hidden="true" />{t("dashboard.chatChooses.title")}</h1>
+        <h1 id="chat-chooses-title"><MessageCircleCheck aria-hidden="true" />{t("dashboard.chatChooses.title")}</h1>
         <p>{t("dashboard.chatChooses.description")}</p></div>
       <div className="dashboard-pesky-battle__heading-actions">
         <span className="dashboard-pesky-battle__status" data-phase={phase}>{t(`dashboard.chatChooses.phase.${phase}`)}</span>

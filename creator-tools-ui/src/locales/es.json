@@ -70,6 +70,7 @@
       "title": "Eventos Live",
       "description": "Elige una dinámica para configurarla y seguir su estado durante el live.",
       "back": "Volver a Eventos Live",
+      "status": { "active": "Activo", "inactive": "Inactivo" },
       "peskyBattleDescription": "Reúne de 2 a 5 participantes y enfrenta sus ataques y retos temporales durante un nivel completo.",
       "tapFarmingDescription": "Convierte los taps de toda la comunidad en resistencia adicional para alargar al jefe.",
       "participants": "{count}/{capacity} participantes",
