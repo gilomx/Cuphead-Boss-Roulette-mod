@@ -11,7 +11,7 @@ internal interface ITwitchEventReceiver
         Func<bool, Task> connected, CancellationToken cancellationToken);
 }
 
-internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwitchEventReceiver
+internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output, bool localTest = false) : ITwitchEventReceiver
 {
     internal static readonly Uri Address = new("wss://eventsub.wss.twitch.tv/ws");
 
@@ -19,14 +19,16 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
         Func<bool, Task> connected, CancellationToken cancellationToken)
     {
         var tokens = await getTokens(cancellationToken);
-        var session = await OpenAsync(Address, cancellationToken);
+        var session = await OpenAsync(localTest ? TwitchLocalTestApi.WebSocketAddress : Address, cancellationToken);
         var limited = false;
         try
         {
             var user = tokens.UserId;
             var broadcaster = new Dictionary<string, string> { ["broadcaster_user_id"] = user };
             var chat = new Dictionary<string, string>(broadcaster) { ["user_id"] = user };
-            if (!await api.SubscribeAsync("channel.chat.message", "1", chat, session.Id, tokens.AccessToken, cancellationToken))
+            // Twitch CLI 1.1.24 generates the six interaction events, but does
+            // not implement chat messages. Real Twitch still requires chat.
+            if (!localTest && !await api.SubscribeAsync("channel.chat.message", "1", chat, session.Id, tokens.AccessToken, cancellationToken))
                 throw new TwitchAuthorizationException();
             var follows = new Dictionary<string, string>(broadcaster) { ["moderator_user_id"] = user };
             limited |= !await api.SubscribeAsync("channel.follow", "2", follows, session.Id, tokens.AccessToken, cancellationToken);
@@ -45,7 +47,7 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
                 if (kind == "session_reconnect")
                 {
                     var address = TwitchApi.Text(root.GetProperty("payload").GetProperty("session"), "reconnect_url");
-                    if (!IsReconnectAddress(address)) throw new InvalidDataException("Invalid EventSub handoff address.");
+                    if (!IsReconnectAddress(address, localTest)) throw new InvalidDataException("Invalid EventSub handoff address.");
                     // Keep consuming the old connection until the replacement welcomes us.
                     using var handoffCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     var opening = OpenAsync(new Uri(address), handoffCancellation.Token);
@@ -95,13 +97,14 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
             throw new IOException("Twitch event subscription revoked.");
         }
         if (kind != "notification") return;
-        var entry = TwitchEventNormalizer.Normalize(root, user, message.ReceivedAt);
+        var entry = TwitchEventNormalizer.Normalize(root, user, message.ReceivedAt, localTest);
         if (entry != null) await output.WriteEventAsync(entry, cancellationToken);
     }
 
-    internal static bool IsReconnectAddress(string address) =>
-        Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.Scheme == "wss" &&
-        uri.Host == Address.Host && uri.Port == 443 && uri.AbsolutePath == "/ws" && uri.UserInfo.Length == 0;
+    internal static bool IsReconnectAddress(string address, bool localTest = false) =>
+        Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.AbsolutePath == "/ws" && uri.UserInfo.Length == 0 &&
+        (localTest ? uri.Scheme == "ws" && uri.Host == "127.0.0.1" && uri.Port == 8080
+            : uri.Scheme == "wss" && uri.Host == Address.Host && uri.Port == 443);
 
     private static string Kind(JsonElement root) => TwitchApi.Text(root.GetProperty("metadata"), "message_type");
 

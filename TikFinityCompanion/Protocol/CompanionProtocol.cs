@@ -43,6 +43,7 @@ internal sealed class CompanionStatus
     public string Account { get; init; } = "";
     public string MessageCode { get; init; } = "";
     public bool Authorized { get; init; }
+    public bool TestMode { get; init; }
     public string UserCode { get; init; } = "";
     public string VerificationUri { get; init; } = "";
     public string ExpiresAt { get; init; } = "";

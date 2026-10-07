@@ -80,6 +80,20 @@ internal sealed class TwitchApi(HttpClient http) : ITwitchApi
     public async Task<bool> SubscribeAsync(string type, string version, Dictionary<string, string> condition,
         string sessionId, string accessToken, CancellationToken cancellationToken)
     {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.twitch.tv/helix/eventsub/subscriptions") {
+            Content = new StringContent(SubscriptionPayload(type, version, condition, sessionId), Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Headers.Add("Client-Id", TwitchApplication.ClientId);
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Unauthorized) throw new TwitchAuthorizationException();
+        if (response.StatusCode == HttpStatusCode.Forbidden) return false;
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
+    internal static string SubscriptionPayload(string type, string version, Dictionary<string, string> condition, string sessionId)
+    {
         // Build from fixed event types and authenticated identity, never from browser input.
         var payload = new StringBuilder("{\"type\":").Append(Quote(type))
             .Append(",\"version\":").Append(Quote(version)).Append(",\"condition\":{");
@@ -91,16 +105,7 @@ internal sealed class TwitchApi(HttpClient http) : ITwitchApi
         }
         payload.Append("},\"transport\":{\"method\":\"websocket\",\"session_id\":")
             .Append(Quote(sessionId)).Append("}}");
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.twitch.tv/helix/eventsub/subscriptions") {
-            Content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json"),
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("Client-Id", TwitchApplication.ClientId);
-        using var response = await http.SendAsync(request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.Unauthorized) throw new TwitchAuthorizationException();
-        if (response.StatusCode == HttpStatusCode.Forbidden) return false;
-        response.EnsureSuccessStatusCode();
-        return true;
+        return payload.ToString();
     }
 
     private async Task<JsonDocument> PostFormAsync(string endpoint, Dictionary<string, string> fields, CancellationToken cancellationToken)

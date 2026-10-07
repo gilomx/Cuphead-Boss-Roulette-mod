@@ -117,6 +117,44 @@ internal static partial class Program
         Equal(3, harness.Receiver.Starts);
     }
 
+    private static async Task TwitchLocalModeAsync()
+    {
+        var api = new FakeTwitchApi();
+        var store = new FakeTwitchStore { Value = TestTokens };
+        var local = new FakeTwitchReceiver();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var statuses = Channel.CreateUnbounded<CompanionStatus>();
+        var service = new TwitchConnectionService(api, store, new FakeTwitchReceiver(),
+            (status, token) => statuses.Writer.WriteAsync(status, token).AsTask(), local);
+        var running = service.RunAsync(cancellation.Token);
+        async Task<CompanionStatus> Wait(string code) {
+            while (true) { var next = await statuses.Reader.ReadAsync(cancellation.Token); if (next.MessageCode == code) return next; }
+        }
+        try {
+            await Wait("connected");
+            Equal(true, service.TryCommand("test:1"));
+            var connected = await Wait("test_connected");
+            Equal(true, connected.TestMode); Equal(false, connected.Authorized);
+            Equal("twitch_cli", connected.Account); Equal(1, local.Starts);
+            Equal(TestTokens, store.Value); Equal(0, store.Writes); Equal(0, api.Revokes);
+            service.TryCommand("cancel:2");
+            var restored = await Wait("connected");
+            Equal(false, restored.TestMode); Equal(true, restored.Authorized);
+            Equal(TestTokens, store.Value); Equal(0, store.Writes); Equal(0, api.Revokes);
+            Equal(true, TwitchEventSub.IsReconnectAddress("ws://127.0.0.1:8080/ws?reconnect=abc", true));
+            Equal(false, TwitchEventSub.IsReconnectAddress("ws://evil.invalid:8080/ws", true));
+            Equal(false, TwitchEventSub.IsReconnectAddress("ws://127.0.0.1:8080/ws"));
+            var handler = new TwitchHttpHandler(); using var http = new HttpClient(handler);
+            await new TwitchLocalTestApi(http).SubscribeAsync("channel.follow", "2", new() { ["broadcaster_user_id"] = "42" }, "session", "PRIVATE", default);
+            Equal(false, handler.Body.Contains("PRIVATE"));
+            Equal(false, handler.Body.Contains(TwitchApplication.ClientId));
+            Equal("Bearer local-test", handler.Authorization);
+            Equal("pichi-cli-tests", handler.ClientId);
+            Equal("http://127.0.0.1:8080/eventsub/subscriptions", handler.Address);
+        }
+        finally { cancellation.Cancel(); await running; }
+    }
+
     private static async Task TwitchCancelAsync()
     {
         var api = new FakeTwitchApi { DelayedPoll = true };
@@ -173,9 +211,13 @@ internal static partial class Program
     private sealed class TwitchHttpHandler : HttpMessageHandler
     {
         internal string Body = "", Response = "";
+        internal string Authorization = "", ClientId = "", Address = "";
         internal HttpStatusCode Status = HttpStatusCode.OK;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            Authorization = request.Headers.Authorization?.ToString() ?? "";
+            ClientId = request.Headers.TryGetValues("Client-Id", out var ids) ? ids.Single() : "";
+            Address = request.RequestUri?.ToString() ?? "";
             Body = request.Content == null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             return new(Status) { Content = new StringContent(Response) };
         }

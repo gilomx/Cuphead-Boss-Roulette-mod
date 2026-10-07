@@ -17,16 +17,20 @@ namespace Gilomx.CupheadBossRoulette
         private string pendingCommand;
         private string sentCommand;
         private bool acceptsEvents;
+        private readonly bool testAvailable;
+
+        internal TwitchConnectionBridge(bool testAvailable = false) { this.testAvailable = testAvailable; }
 
         internal string GetState()
         {
             lock (gate) return state.Substring(0, state.Length - 1) +
+                ",\"testAvailable\":" + (testAvailable ? "true" : "false") +
                 ",\"commandPending\":" + (pendingCommand == null ? "false" : "true") + "}";
         }
 
         internal string Command(string action)
         {
-            if (action != "connect" && action != "disconnect" && action != "cancel") return "invalid_command";
+            if (action != "connect" && action != "disconnect" && action != "cancel" && !(action == "test" && testAvailable)) return "invalid_command";
             lock (gate)
             {
                 acceptsEvents = false;
@@ -80,10 +84,14 @@ namespace Gilomx.CupheadBossRoulette
             lock (gate)
             {
                 if (revision < minimumRevision) return false;
-                acceptsEvents = CreatorToolsFlatJson.Boolean(values, "authorized");
+                var testMode = CreatorToolsFlatJson.Boolean(values, "testMode");
+                if (testMode && !testAvailable) return false;
+                var authorized = CreatorToolsFlatJson.Boolean(values, "authorized");
+                acceptsEvents = authorized || testMode && status == "connected";
                 if (revision == minimumRevision) pendingCommand = null;
                 var builder = new StringBuilder("{\"ready\":true,\"authorized\":")
-                    .Append(acceptsEvents ? "true" : "false");
+                    .Append(authorized ? "true" : "false")
+                    .Append(",\"testMode\":").Append(testMode ? "true" : "false");
                 var fields = new[] { "state", "account", "messageCode", "userCode", "verificationUri", "expiresAt" };
                 foreach (var field in fields)
                 {

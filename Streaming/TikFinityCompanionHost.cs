@@ -29,7 +29,11 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
         private readonly object queueLock = new object();
+#if PICHI_LAUNCHER_DEV
+        private readonly TwitchConnectionBridge twitch = new TwitchConnectionBridge(testAvailable: true);
+#else
         private readonly TwitchConnectionBridge twitch = new TwitchConnectionBridge();
+#endif
         private readonly LinkedList<CreatorToolsStreamMessage> pending =
             new LinkedList<CreatorToolsStreamMessage>();
         private readonly LinkedList<LikeAccumulator> overflowLikes =

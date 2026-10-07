@@ -1207,7 +1207,7 @@ namespace Gilomx.CupheadBossRoulette
             if (request.Method == "POST" &&
                 path != "/api/overlay-composer/config/set" &&
                 path != "/api/overlay-composer/preview/set" &&
-                path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel")
+                path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel" && path != "/api/twitch/test")
             {
                 WriteMethodNotAllowed(stream, "GET");
                 return;
@@ -1720,7 +1720,7 @@ namespace Gilomx.CupheadBossRoulette
                 WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
                 return;
             }
-            if (path == "/api/twitch/connect" || path == "/api/twitch/disconnect" || path == "/api/twitch/cancel")
+            if (path == "/api/twitch/connect" || path == "/api/twitch/disconnect" || path == "/api/twitch/cancel" || path == "/api/twitch/test")
             {
                 if (request.Method != "POST") { WriteMethodNotAllowed(stream, "POST"); return; }
                 string origin, proof;

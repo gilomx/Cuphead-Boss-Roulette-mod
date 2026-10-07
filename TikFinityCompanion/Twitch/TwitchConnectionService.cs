@@ -5,7 +5,7 @@ namespace LaPichiRuleta.TikFinity.Twitch;
 
 internal sealed class TwitchConnectionService(
     ITwitchApi api, ITwitchCredentialStore store, ITwitchEventReceiver receiver,
-    Func<CompanionStatus, CancellationToken, Task> publish)
+    Func<CompanionStatus, CancellationToken, Task> publish, ITwitchEventReceiver? testReceiver = null)
 {
     private readonly Channel<(string Action, long Revision)> commands = Channel.CreateBounded<(string, long)>(16);
     private long controlRevision;
@@ -14,11 +14,12 @@ internal sealed class TwitchConnectionService(
     private DateTimeOffset nextValidation;
     private CancellationTokenSource? activityCancellation;
     private Task? activity;
+    private bool testing;
 
     internal bool TryCommand(string command)
     {
         var parts = command.Split(':');
-        return parts.Length == 2 && parts[0] is "connect" or "disconnect" or "cancel" &&
+        return parts.Length == 2 && (parts[0] is "connect" or "disconnect" or "cancel" || parts[0] == "test" && testReceiver != null) &&
             long.TryParse(parts[1], out var revision) && revision > 0 &&
             commands.Writer.TryWrite((parts[0], revision));
     }
@@ -37,6 +38,21 @@ internal sealed class TwitchConnectionService(
                 if (command.Revision <= controlRevision) continue;
                 await StopActivityAsync();
                 controlRevision = command.Revision;
+                var wasTesting = testing;
+                testing = command.Action == "test";
+                if (testing)
+                {
+                    activityCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    activity = TestActivityAsync(activityCancellation.Token);
+                    continue;
+                }
+                // Leaving local tests restores the saved account without revoking it.
+                if (wasTesting)
+                {
+                    if (tokens != null) StartActivity(false, cancellationToken);
+                    else await StatusAsync("disconnected", "not_connected", cancellationToken);
+                    continue;
+                }
                 if (command.Action == "connect")
                 {
                     // Switching is explicit: forget the former account before authorizing another.
@@ -56,6 +72,32 @@ internal sealed class TwitchConnectionService(
     {
         activityCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         activity = ActivityAsync(authorize, activityCancellation.Token);
+    }
+
+    private async Task TestActivityAsync(CancellationToken cancellationToken)
+    {
+        var attempts = 0;
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await StatusAsync("connecting", "test_connecting", cancellationToken);
+                    await testReceiver!.RunAsync(_ => Task.FromResult(TwitchLocalTestApi.Identity), async _ => {
+                        attempts = 0;
+                        await StatusAsync("connected", "test_connected", cancellationToken);
+                    }, cancellationToken);
+                }
+                catch (Exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    await StatusAsync("reconnecting", "test_retry", cancellationToken);
+                    attempts++;
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, Math.Min(attempts, 5)))), cancellationToken);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
     private async Task StopActivityAsync()
@@ -197,7 +239,8 @@ internal sealed class TwitchConnectionService(
 
     private Task StatusAsync(string state, string messageCode, CancellationToken cancellationToken) => publish(new CompanionStatus {
         ConnectionId = "twitch", State = state, Message = "", MessageCode = messageCode,
-        Account = tokens?.Login ?? "", Authorized = tokens != null, OccurredAt = DateTimeOffset.UtcNow,
+        Account = testing ? "twitch_cli" : tokens?.Login ?? "", Authorized = !testing && tokens != null,
+        TestMode = testing, OccurredAt = DateTimeOffset.UtcNow,
         ControlRevision = controlRevision,
     }, cancellationToken);
 }

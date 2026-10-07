@@ -10,8 +10,10 @@ internal static partial class Program
     private static readonly DateTimeOffset FixedTime =
         new(2026, 8, 26, 18, 30, 0, TimeSpan.Zero);
 
-    private static int Main()
+    private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--twitch-cli-smoke")
+            return TwitchCliSmokeAsync().GetAwaiter().GetResult();
         var tests = new (string Name, Action Run)[]
         {
             ("flat gift progress", FlatGiftProgress),
@@ -41,6 +43,7 @@ internal static partial class Program
             ("Twitch monetary and subscription events", TwitchEventValues),
             ("Twitch API public client and safe device URL", TwitchPublicApi),
             ("Twitch restore and rotating refresh", () => TwitchRestoreAsync().GetAwaiter().GetResult()),
+            ("Twitch CLI test mode keeps saved credentials and restores real reception", () => TwitchLocalModeAsync().GetAwaiter().GetResult()),
             ("Twitch cancel rejects late authorization", () => TwitchCancelAsync().GetAwaiter().GetResult()),
             ("Twitch disconnect clears offline and retries failed vault delete", () => TwitchDisconnectAsync().GetAwaiter().GetResult()),
             ("Twitch vault errors and wrong account reject startup", () => TwitchStartupErrorsAsync().GetAwaiter().GetResult()),

@@ -5,6 +5,8 @@ interface TwitchConnectionState {
   ready: boolean;
   status: string;
   authorized: boolean;
+  testAvailable?: boolean;
+  testMode?: boolean;
   account?: string;
   messageCode?: string;
   userCode?: string;
@@ -58,7 +60,7 @@ export function TwitchConnectionControls() {
     return () => { controller.abort(); window.clearInterval(timer); };
   }, [load]);
 
-  const command = async (action: "connect" | "disconnect" | "cancel") => {
+  const command = async (action: "connect" | "disconnect" | "cancel" | "test") => {
     pendingSince.current = Date.now();
     setBusy(true); setError(false); setConfirmingDisconnect(false);
     const deadline = new AbortController();
@@ -84,7 +86,7 @@ export function TwitchConnectionControls() {
         : t(`dashboard.twitch.messages.${state.ready ? state.messageCode ?? "companion_starting" : "companion_starting"}`,
           t("dashboard.twitch.messages.connection_error"))}</p>
       {timedOut ? <p role="alert">{t("dashboard.twitch.commandTimeout")}</p> : null}
-      {state.account ? <strong className="twitch-connection-controls__account">@{state.account}</strong> : null}
+      {state.account ? <strong className="twitch-connection-controls__account">{state.testMode ? t("dashboard.twitch.localTestAccount") : `@${state.account}`}</strong> : null}
       {authorizing ? (
         <div className="twitch-connection-controls__authorization">
           <p>{t("dashboard.twitch.authorizationInstructions")}</p>
@@ -95,7 +97,9 @@ export function TwitchConnectionControls() {
         </div>
       ) : null}
       <div className="twitch-connection-controls__actions">
-        {authorizing || state.messageCode === "requesting_code" ? (
+        {state.testMode ? (
+          <button type="button" disabled={disabled} onClick={() => void command("cancel")}>{t("dashboard.twitch.stopLocalTest")}</button>
+        ) : authorizing || state.messageCode === "requesting_code" ? (
           <button type="button" disabled={disabled} onClick={() => void command("cancel")}>{t("dashboard.twitch.cancel")}</button>
         ) : state.authorized ? (
           <>
@@ -105,6 +109,9 @@ export function TwitchConnectionControls() {
         ) : (
           <button type="button" disabled={disabled} onClick={() => void command("connect")}>{t("dashboard.twitch.connect")}</button>
         )}
+        {state.testAvailable && !state.testMode ? (
+          <button type="button" disabled={disabled || authorizing} onClick={() => void command("test")}>{t("dashboard.twitch.startLocalTest")}</button>
+        ) : null}
       </div>
       {confirmingDisconnect ? (
         <div className="twitch-connection-controls__confirmation" role="group" aria-label={t("dashboard.twitch.disconnect")}>
@@ -115,6 +122,7 @@ export function TwitchConnectionControls() {
       ) : null}
       {error ? <p role="alert">{t("dashboard.twitch.commandError")}</p> : null}
       <small>{t("dashboard.twitch.storageHint")}</small>
+      {state.testAvailable ? <small>{t("dashboard.twitch.localTestHint")}</small> : null}
     </div>
   );
 }

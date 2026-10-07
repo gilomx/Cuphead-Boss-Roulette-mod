@@ -54,7 +54,7 @@ Platform-rule tests cover independent TikTok/Twitch follows, accumulated Bits,
 separate new/gifted/shared repeat subscriptions, custom reward names, legacy
 TikTok migration, full backup recovery and dashboard simulations. They use
 normalized fixtures and recording queues; no Twitch account or payment is used.
-The current harness has 162 test groups.
+The current harness has 163 test groups.
 
 `tools/verify_native_loading_contract.ps1` reads the installed game's IL and the
 compiled mod. It checks the covered loading window and verifies that all ten

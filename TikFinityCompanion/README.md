@@ -25,8 +25,9 @@ pipe de salida roto también hace que termine en el siguiente intento de
 escritura; el PID padre es la garantía activa incluso si el socket está ocioso.
 
 `--twitch-control` habilita Twitch y la entrada estándar redirigida. El host
-envía únicamente `twitch:connect:<revisión>`, `twitch:cancel:<revisión>` y
-`twitch:disconnect:<revisión>`. Revisiones antiguas se ignoran. Cerrar el pipe
+envía `twitch:connect:<revisión>`, `twitch:cancel:<revisión>` y
+`twitch:disconnect:<revisión>`. Dev también admite `twitch:test:<revisión>`
+para el servidor local de pruebas. Revisiones antiguas se ignoran. Cerrar el pipe
 de entrada termina el companion. Sin esa opción conserva el transporte de
 TikFinity y no accede al almacén de credenciales.
 
@@ -56,11 +57,16 @@ Reconexiones indicadas por Twitch transfieren el socket sin recrear
 suscripciones; una caída completa abre sesión nueva y las recrea.
 
 Los estados de Twitch agregan `account`, `authorized`, `messageCode`,
-`userCode`, `verificationUri`, `expiresAt` y `controlRevision`. Sólo el código
+`userCode`, `verificationUri`, `expiresAt`, `controlRevision` y `testMode`. Sólo el código
 público de autorización se envía al panel; nunca tokens ni el `device_code`.
 Los errores usan claves constantes, sin cuerpos de respuesta OAuth.
 Las pruebas usan API, almacén y receptor falsos: no autorizan cuentas reales.
 El mock del panel identifica siempre la conexión como una simulación local.
+
+En Dev, **Probar con Twitch CLI (Dev)** usa el servidor fijo de este equipo
+con una identidad ficticia y eventos marcados como simulados. Al terminar
+restaura la recepción de la cuenta guardada sin borrarla ni revocarla.
+El procedimiento y los seis comandos están en [Pruebas con Twitch CLI](../docs/twitch-cli-testing.md).
 
 ## Transporte
 

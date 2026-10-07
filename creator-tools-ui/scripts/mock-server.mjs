@@ -57,7 +57,7 @@ const followedViewers = new Set();
 const twitchControlToken = "local-mock-twitch-control";
 const twitchStalledCommand = process.env.CREATOR_TOOLS_MOCK_TWITCH_STALL === "1";
 let twitchAuthorizationTimer;
-let twitchConnection = { ready: true, status: "disconnected", authorized: false, account: "",
+let twitchConnection = { ready: true, status: "disconnected", authorized: false, account: "", testAvailable: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0", testMode: false,
   messageCode: "not_connected", userCode: "", verificationUri: "", expiresAt: "", commandPending: false,
   controlToken: twitchControlToken };
 
@@ -1194,7 +1194,7 @@ setInterval(() => {
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
   if (url.pathname === "/api/twitch") { json(res, twitchConnection); return; }
-  if (["/api/twitch/connect", "/api/twitch/cancel", "/api/twitch/disconnect"].includes(url.pathname)) {
+  if (["/api/twitch/connect", "/api/twitch/cancel", "/api/twitch/disconnect", "/api/twitch/test"].includes(url.pathname)) {
     if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }
     if (req.headers["x-pichi-twitch-control"] !== twitchControlToken ||
         ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(req.headers.origin)) {
@@ -1202,10 +1202,13 @@ createServer((req, res) => {
     }
     clearTimeout(twitchAuthorizationTimer);
     const action = url.pathname.split("/").at(-1);
-    twitchConnection = { ...twitchConnection, commandPending: false, authorized: false, account: "", userCode: "",
+    if (action === "test" && !twitchConnection.testAvailable) { json(res, { error: "dev_only" }, 403); return; }
+    twitchConnection = { ...twitchConnection, testMode: false, commandPending: false, authorized: false, account: "", userCode: "",
       verificationUri: "", expiresAt: "", status: "disconnected", messageCode: "not_connected" };
     const connection = dashboardConnections.find((entry) => entry.id === "twitch");
-    if (action === "connect" && twitchStalledCommand) {
+    if (action === "test") {
+      Object.assign(twitchConnection, { testMode: true, status: "connected", messageCode: "test_connected", account: "twitch_cli" });
+    } else if (action === "connect" && twitchStalledCommand) {
       twitchConnection.commandPending = true;
     } else if (action === "connect") {
       Object.assign(twitchConnection, { status: "connecting", messageCode: "mock_authorization_pending",

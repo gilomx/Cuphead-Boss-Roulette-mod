@@ -34,8 +34,12 @@ internal sealed class CompanionHost
         var connectorTask = connector.RunAsync(lifetimeCancellation.Token);
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         var twitchApi = new TwitchApi(http);
+        using var localHttp = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false }) {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
         var twitch = new TwitchConnectionService(twitchApi, new WindowsTwitchCredentialStore(),
-            new TwitchEventSub(twitchApi, output), output.WriteStatusAsync);
+            new TwitchEventSub(twitchApi, output), output.WriteStatusAsync,
+            new TwitchEventSub(new TwitchLocalTestApi(localHttp), output, localTest: true));
         var twitchTask = twitchControl ? twitch.RunAsync(lifetimeCancellation.Token)
             : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
         var inputTask = twitchControl ? ReadCommandsAsync(Console.OpenStandardInput(), twitch, lifetimeCancellation.Token)

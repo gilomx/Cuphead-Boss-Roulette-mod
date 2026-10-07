@@ -16,6 +16,7 @@ namespace Gilomx.CupheadBossRoulette
             Run("Twitch controls fence old events and replay only unacknowledged commands", TestTwitchControlFence);
             Run("Twitch browser state allows only public fields and official activation links", TestTwitchPublicState);
             Run("Twitch HTTP controls require POST, same origin and local proof", TestTwitchHttpControls);
+            Run("Twitch CLI tests are gated by Dev and preserve public authorization state", TestTwitchLocalMode);
         }
 
         private static void TestTwitchCommandBytes()
@@ -28,6 +29,27 @@ namespace Gilomx.CupheadBossRoulette
                 TwitchConnectionBridge.WriteCommand(buffered, "twitch:cancel:2");
                 Equal("twitch:connect:1\ntwitch:cancel:2\n", Encoding.ASCII.GetString(destination.ToArray()), "each command has its own line without preamble");
             }
+        }
+
+        private static void TestTwitchLocalMode()
+        {
+            var production = new TwitchConnectionBridge();
+            Equal("invalid_command", production.Command("test"), "production rejects local tests");
+            var fields = TwitchStatus(0, false); fields["testMode"] = "true";
+            False(production.AcceptStatus(fields), "production rejects test statuses");
+            var dev = new TwitchConnectionBridge(testAvailable: true);
+            Equal("", dev.Command("test"), "Dev accepts explicit local test command");
+            Equal("twitch:test:1", dev.TakeCommand(), "local mode uses revision fence");
+            fields["controlRevision"] = "1";
+            True(dev.AcceptStatus(fields), "local test acknowledged");
+            True(dev.AcceptsEvents, "Dev receives CLI events without OAuth");
+            using (var state = JsonDocument.Parse(dev.GetState()))
+            {
+                False(state.RootElement.GetProperty("authorized").GetBoolean(), "synthetic channel never claims OAuth authorization");
+                True(state.RootElement.GetProperty("testMode").GetBoolean(), "test mode visible");
+            }
+            dev.Command("cancel"); False(dev.AcceptsEvents, "leaving tests immediately fences events");
+            False(dev.AcceptStatus(fields), "old test status cannot reopen reception");
         }
 
         private static Dictionary<string, string> TwitchStatus(long revision, bool authorized)
@@ -86,7 +108,7 @@ namespace Gilomx.CupheadBossRoulette
                 using (var state = JsonDocument.Parse(client.GetStringAsync(origin + "/api/twitch").GetAwaiter().GetResult()))
                     proof = state.RootElement.GetProperty("controlToken").GetString();
                 Equal(HttpStatusCode.MethodNotAllowed, client.GetAsync(origin + "/api/twitch/connect").GetAwaiter().GetResult().StatusCode, "GET cannot connect");
-                foreach (var action in new[] { "connect", "cancel", "disconnect" })
+                foreach (var action in new[] { "connect", "cancel", "disconnect", "test" })
                 {
                     using (var denied = new HttpRequestMessage(HttpMethod.Post, origin + "/api/twitch/" + action))
                         Equal(HttpStatusCode.Forbidden, client.SendAsync(denied).GetAwaiter().GetResult().StatusCode, "missing proof denied");
@@ -101,7 +123,7 @@ namespace Gilomx.CupheadBossRoulette
                         Equal(HttpStatusCode.Accepted, client.SendAsync(accepted).GetAwaiter().GetResult().StatusCode, "local control accepted");
                     }
                 }
-                Equal("connect,cancel,disconnect", string.Join(",", commands), "only authorized requests reach companion");
+                Equal("connect,cancel,disconnect,test", string.Join(",", commands), "only authorized requests reach companion");
             }
         }
     }

@@ -5,7 +5,7 @@ namespace LaPichiRuleta.TikFinity.Twitch;
 
 internal static class TwitchEventNormalizer
 {
-    internal static CompanionEvent? Normalize(JsonElement root, string broadcasterId, DateTimeOffset receivedAt)
+    internal static CompanionEvent? Normalize(JsonElement root, string broadcasterId, DateTimeOffset receivedAt, bool localTest = false)
     {
         var metadata = root.GetProperty("metadata");
         var payload = root.GetProperty("payload");
@@ -53,7 +53,8 @@ internal static class TwitchEventNormalizer
         if (!DateTimeOffset.TryParse(timestamp, out _)) return null;
         return new CompanionEvent {
             EventId = messageId, IdempotencyKey = "twitch:" + broadcasterId + ":" + messageId,
-            ConnectionId = "twitch", Platform = "twitch", Connector = "twitch-eventsub",
+            ConnectionId = "twitch", Platform = "twitch", Connector = localTest ? "twitch-cli" : "twitch-eventsub",
+            Simulated = localTest,
             Type = eventType, UserId = ProtocolText.Clean(userId, 160), UserName = ProtocolText.Clean(login, 80),
             UserDisplayName = ProtocolText.Clean(name, 160), ChatText = chatText,
             ItemId = ProtocolText.Clean(itemId, 160), ItemName = ProtocolText.Clean(itemName, 160),
