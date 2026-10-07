@@ -74,12 +74,15 @@ test('supers keep their numbering and the final selection waits indefinitely for
       assert.deepEqual(state.options.map(o => o.image), ['supers/super1.png', 'supers/super2.png', 'supers/super3.png', 'creator-tools/empty.png']);
       assert.deepEqual(state.options.map(o => o.number), [1, 2, 3, 4]);
     }
-    if (state.stage === 'modifier') assert.ok(state.options.every(o => o.none || o.image.startsWith('creator-tools/modifiers/')));
+    if (state.stage === 'modifier') assert.ok(state.options.every(o => o.none || o.image.startsWith('creator-tools/chat-chooses-modifiers/')));
     const option = state.options.find(o => o.flag !== 'plane');
     chat.vote({ platform: 'tiktok', userId: 'viewer', chatText: String(option.number) });
     command('next'); advance(2000);
   }
   assert.equal(chat.snapshot().phase, 'result');
+  assert.ok(chat.snapshot().selected.modifier.none ||
+    chat.snapshot().selected.modifier.image.startsWith('creator-tools/chat-chooses-modifiers/'),
+    'the final selection retains the same edited challenge artwork as the panel ballot');
   const selection = JSON.stringify(chat.snapshot().selected);
   advance(3600000);
   assert.equal(chat.snapshot().phase, 'result');

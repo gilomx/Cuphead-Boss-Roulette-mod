@@ -86,7 +86,8 @@ datos más recientes. Desactivar animaciones o preferir movimiento reducido
 oculta inmediatamente; la cancelación durante las rondas mantiene prioridad.
 El overlay no muestra nombres de artículos ni el título del evento; durante
 la votación muestra **Votaciones** (72 px) sobre la etapa actual (48 px).
-Los retos del overlay usan estos archivos editados; la tarjeta del juego
+Los retos del evento live en el panel y del overlay usan los mismos archivos
+editados, tanto en las opciones de votación como en la selección final. La tarjeta del juego
 conserva sus gráficos nativos:
 
 | Reto | PNG en `assets/creator-tools/chat-chooses-modifiers` |

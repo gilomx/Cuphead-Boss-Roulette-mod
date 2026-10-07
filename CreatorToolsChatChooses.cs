@@ -189,10 +189,34 @@ namespace Gilomx.CupheadBossRoulette
                 if (!item.Selectable || (item.Id != ModifierId.None &&
                     (!ExperimentalFeatures.IsChallengeEnabled(item.Id) || !IsCreatorToolsChallengeEnabled(item.Id)))) continue;
                 catalog.Pools["modifier"].Add(new ChatChoice { Id = id, Name = item.Id == ModifierId.None ? L(ModText.CommonNone) : LocalizedModifierName(item.Id),
-                    Image = item.Id == ModifierId.None ? "creator-tools/empty.png" : item.Image, None = item.Id == ModifierId.None,
+                    Image = ChatChoosesModifierImage(item), None = item.Id == ModifierId.None,
                     Kind = item.Kind == ModifierKind.Plane ? "plane" : item.Kind == ModifierKind.Ground ? "ground" : "both" });
             }
             return catalog;
+        }
+
+        private static string ChatChoosesModifierImage(ModifierEntry item)
+        {
+            string name;
+            switch (item.Id)
+            {
+                case ModifierId.None: return "creator-tools/empty.png";
+                case ModifierId.BlackAndWhite: name = "blanco-y-negro"; break;
+                case ModifierId.UpsideDown: name = "pantalla-invertida"; break;
+                case ModifierId.RgbShift: name = "pantalla-rgb"; break;
+                case ModifierId.NoPeashooter: name = "sin-peashooter"; break;
+                case ModifierId.NoMiniPlane: name = "sin-miniavion"; break;
+                case ModifierId.NoEx: name = "sin-ex"; break;
+                case ModifierId.NoDash: name = "sin-dash"; break;
+                case ModifierId.NoBombs: name = "sin-bombas"; break;
+                case ModifierId.MiniPlaneOnly: name = "solo-miniavion"; break;
+                case ModifierId.StiffMode: name = "modo-tieso"; break;
+                case ModifierId.InkRain: name = "lluvia-de-tinta"; break;
+                case ModifierId.HpOne: name = "una-vida"; break;
+                case ModifierId.HalfDamage: name = "mitad-de-dano"; break;
+                default: return item.Image;
+            }
+            return "creator-tools/chat-chooses-modifiers/" + name + ".png";
         }
 
     }

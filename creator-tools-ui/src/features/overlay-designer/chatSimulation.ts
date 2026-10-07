@@ -41,11 +41,11 @@ const POOLS: Record<Exclude<ChatChoosesStage, "result">, ChoiceSeed[]> = {
     ["Nada", "None", "creator-tools/empty.png"],
   ],
   modifier: [
-    ["No Dash", "No Dash", "modifiers/nodash_01.png"],
-    ["No EX", "No EX", "modifiers/noex_01.png"],
-    ["RGB", "RGB", "modifiers/rgb_01.png"],
-    ["HP. 1", "HP. 1", "modifiers/hp1_01.png"],
-    ["Lluvia de tinta", "Ink Rain", "modifiers/inkrain_01.png"],
+    ["No Dash", "No Dash", "creator-tools/chat-chooses-modifiers/sin-dash.png"],
+    ["No EX", "No EX", "creator-tools/chat-chooses-modifiers/sin-ex.png"],
+    ["RGB", "RGB", "creator-tools/chat-chooses-modifiers/pantalla-rgb.png"],
+    ["HP. 1", "HP. 1", "creator-tools/chat-chooses-modifiers/una-vida.png"],
+    ["Lluvia de tinta", "Ink Rain", "creator-tools/chat-chooses-modifiers/lluvia-de-tinta.png"],
     ["Nada", "None", "creator-tools/empty.png"],
   ],
 };

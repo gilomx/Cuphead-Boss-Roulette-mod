@@ -15,7 +15,7 @@ estos valores de forma independiente. Las imágenes se ajustan al espacio
 disponible sin recortar los iconos.
 
 El chat elige usa las imágenes originales del catálogo para el equipo y los
-jefes. Los retos usan los PNG editados de `creator-tools/chat-chooses-modifiers`,
+jefes. Los retos, también en el evento live del panel, usan los PNG editados de `creator-tools/chat-chooses-modifiers`,
 con nombres descriptivos y fondo transparente. Todos los artículos y jefes
 llevan un borde circular fino de 2 px sobre un icono base de 72 px, que escala
 con el conjunto. **Marco de la imagen** controla su color y transparencia;
