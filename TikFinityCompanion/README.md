@@ -112,7 +112,10 @@ Semántica principal:
   incluye evento, racha, conteo y estado para deduplicar reenvíos idénticos sin
   confundir una actualización provisional con el cierre.
 - `receivedAt` es la hora UTC en que el acompañante recibió el mensaje, no una
-  hora prometida por TikFinity.
+  hora prometida por TikFinity o Twitch. Se captura al recibir el mensaje y se
+  conserva durante las colas y los cambios de socket. «El chat elige» compara
+  esta hora local con la apertura de la ronda: un desfase del reloj de Twitch
+  no bloquea los primeros votos, y los recibidos antes de la ronda se descartan.
 - `type` traduce `subscribe` a `subscription`. Los mensajes que el contrato
   actual puede accionar son `gift`, `like`, `follow`, `subscription` y `chat`.
   `chat` (o `comment`) sólo transmite un número de `1` a `6`, sin otro texto,

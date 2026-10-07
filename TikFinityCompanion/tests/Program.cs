@@ -37,6 +37,7 @@ internal static partial class Program
             ("reconnect backoff", Backoff),
             ("long image URL", LongImageUrl),
             ("Twitch ballot and channel filtering", TwitchBallots),
+            ("Twitch local receipt time ignores server clock skew and survives queues", TwitchLocalReceiptTime),
             ("Twitch monetary and subscription events", TwitchEventValues),
             ("Twitch API public client and safe device URL", TwitchPublicApi),
             ("Twitch restore and rotating refresh", () => TwitchRestoreAsync().GetAwaiter().GetResult()),

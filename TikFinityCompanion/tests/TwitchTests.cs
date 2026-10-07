@@ -14,7 +14,7 @@ internal static partial class Program
     {
         using var json = JsonDocument.Parse("{\"metadata\":{\"message_id\":\"m1\",\"message_timestamp\":\"2026-10-07T12:00:00Z\"}," +
             "\"payload\":{\"subscription\":{\"type\":\"" + type + "\"},\"event\":{\"broadcaster_user_id\":\"" + broadcaster + "\"," + fields + "}}}");
-        return TwitchEventNormalizer.Normalize(json.RootElement, "42");
+        return TwitchEventNormalizer.Normalize(json.RootElement, "42", FixedTime);
     }
 
     private static void TwitchBallots()
@@ -42,6 +42,26 @@ internal static partial class Program
         Equal(5, TwitchEvent("channel.subscription.gift", "\"total\":5")!.Count);
         Equal(null, TwitchEvent("channel.subscribe", "\"is_gift\":true"));
         Equal("subscription", TwitchEvent("channel.subscribe", "\"is_gift\":false")!.Type);
+    }
+
+    private static void TwitchLocalReceiptTime()
+    {
+        foreach (var serverSkew in new[] { -40, -5, 5, 40 })
+        {
+            var serverTime = FixedTime.AddSeconds(serverSkew).ToString("O");
+            using var json = JsonDocument.Parse("{\"metadata\":{\"message_id\":\"vote\",\"message_timestamp\":\"" + serverTime + "\"}," +
+                "\"payload\":{\"subscription\":{\"type\":\"channel.chat.message\"},\"event\":{\"broadcaster_user_id\":\"42\"," +
+                "\"chatter_user_id\":\"123\",\"message\":{\"text\":\"1\"}}}}");
+            var vote = TwitchEventNormalizer.Normalize(json.RootElement, "42", FixedTime)!;
+            Equal(FixedTime, vote.ReceivedAt);
+            Equal("1", vote.ChatText);
+
+            // A queued message keeps its original receipt time through serialization.
+            using var stream = new MemoryStream();
+            new NdjsonWriter(stream).WriteEventAsync(vote, default).GetAwaiter().GetResult();
+            using var wire = JsonDocument.Parse(Encoding.UTF8.GetString(stream.ToArray()));
+            Equal(FixedTime, wire.RootElement.GetProperty("receivedAt").GetDateTimeOffset());
+        }
     }
 
     private static void TwitchPublicApi()

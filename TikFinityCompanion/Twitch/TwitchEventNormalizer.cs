@@ -5,7 +5,7 @@ namespace LaPichiRuleta.TikFinity.Twitch;
 
 internal static class TwitchEventNormalizer
 {
-    internal static CompanionEvent? Normalize(JsonElement root, string broadcasterId)
+    internal static CompanionEvent? Normalize(JsonElement root, string broadcasterId, DateTimeOffset receivedAt)
     {
         var metadata = root.GetProperty("metadata");
         var payload = root.GetProperty("payload");
@@ -50,7 +50,7 @@ internal static class TwitchEventNormalizer
             default: return null;
         }
         var timestamp = TwitchApi.Text(metadata, "message_timestamp");
-        if (!DateTimeOffset.TryParse(timestamp, out var received)) return null;
+        if (!DateTimeOffset.TryParse(timestamp, out _)) return null;
         return new CompanionEvent {
             EventId = messageId, IdempotencyKey = "twitch:" + broadcasterId + ":" + messageId,
             ConnectionId = "twitch", Platform = "twitch", Connector = "twitch-eventsub",
@@ -58,7 +58,8 @@ internal static class TwitchEventNormalizer
             UserDisplayName = ProtocolText.Clean(name, 160), ChatText = chatText,
             ItemId = ProtocolText.Clean(itemId, 160), ItemName = ProtocolText.Clean(itemName, 160),
             Count = count, UnitValue = value, TotalValue = value, Unit = unit,
-            ReceivedAt = received, RawEventType = type,
+            // Round boundaries use the PC clock, not Twitch's server clock.
+            ReceivedAt = receivedAt.ToUniversalTime(), RawEventType = type,
         };
     }
 }

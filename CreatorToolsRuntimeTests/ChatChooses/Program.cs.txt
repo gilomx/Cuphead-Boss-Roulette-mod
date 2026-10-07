@@ -148,6 +148,27 @@ static class Program
         entrance.Begin(); entrance.ShouldOpen(true, true, 0); entrance.Begin();
         Assert(!entrance.ShouldOpen(true, true, 100), "new result cannot inherit the old presentation deadline");
     }
+    static void TestRoundReceiptFence()
+    {
+        var c = New();
+        CreatorToolsStreamEvent queued = null;
+        foreach (var stage in new[] { "boss", "weapon1", "weapon2", "super", "charm", "modifier" })
+        {
+            Assert(State(c).GetProperty("stage").GetString() == stage, "receipt fence stage " + stage);
+            if (queued != null)
+                Assert(c.Observe(queued) == "", "previous round's queued Twitch vote rejected in " + stage);
+            var first = Vote("twitch-voter", "1");
+            first.Platform = "twitch";
+            Assert(c.Observe(first) == "chat_vote_counted", "first local receipt accepted at opening of " + stage);
+            first.ChatText = "2";
+            Assert(c.Observe(first) == "chat_vote_counted", "immediate Twitch vote change accepted in " + stage);
+            Assert(State(c).GetProperty("totalVotes").GetInt32() == 1, "one Twitch ballot in " + stage);
+            queued = Vote("queued-twitch-voter", "1");
+            queued.Platform = "twitch";
+            Close(c); Advance(c);
+        }
+        Assert(State(c).GetProperty("phase").GetString() == "result", "all receipt-fenced rounds complete");
+    }
     static void Main()
     {
         var c = New();
@@ -275,6 +296,7 @@ static class Program
         invalid.ReceivedAt = "2026-10-05T11:59:59.999Z";
         Assert(c.Observe(invalid) == "", "old millisecond timestamp remains rejected");
         TestDevVotes();
+        TestRoundReceiptFence();
         TestCardEntrance();
         Console.WriteLine($"Chat chooses: {assertions} assertions passed.");
     }

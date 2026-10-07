@@ -49,7 +49,7 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
                     // Keep consuming the old connection until the replacement welcomes us.
                     using var handoffCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     var opening = OpenAsync(new Uri(address), handoffCancellation.Token);
-                    Task<JsonDocument>? pending = null;
+                    Task<ReceivedMessage>? pending = null;
                     try
                     {
                         while (!opening.IsCompleted)
@@ -58,13 +58,13 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
                             if (await Task.WhenAny(opening, pending) == opening) break;
                             using var oldMessage = await pending;
                             pending = null;
-                            await ObserveAsync(oldMessage.RootElement, user, cancellationToken);
+                            await ObserveAsync(oldMessage, user, cancellationToken);
                         }
                         var replacement = await opening;
                         handoffCancellation.Cancel();
                         if (pending != null)
                         {
-                            try { using var last = await pending; await ObserveAsync(last.RootElement, user, cancellationToken); }
+                            try { using var last = await pending; await ObserveAsync(last, user, cancellationToken); }
                             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
                         }
                         session.Socket.Dispose();
@@ -78,14 +78,15 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
                         throw;
                     }
                 }
-                else await ObserveAsync(root, user, cancellationToken);
+                else await ObserveAsync(message, user, cancellationToken);
             }
         }
         finally { session.Socket.Dispose(); }
     }
 
-    private async Task ObserveAsync(JsonElement root, string user, CancellationToken cancellationToken)
+    private async Task ObserveAsync(ReceivedMessage message, string user, CancellationToken cancellationToken)
     {
+        var root = message.RootElement;
         var kind = Kind(root);
         if (kind == "revocation")
         {
@@ -94,7 +95,7 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
             throw new IOException("Twitch event subscription revoked.");
         }
         if (kind != "notification") return;
-        var entry = TwitchEventNormalizer.Normalize(root, user);
+        var entry = TwitchEventNormalizer.Normalize(root, user, message.ReceivedAt);
         if (entry != null) await output.WriteEventAsync(entry, cancellationToken);
     }
 
@@ -125,7 +126,7 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
         catch { socket.Dispose(); throw; }
     }
 
-    private static async Task<JsonDocument> ReadAsync(ClientWebSocket socket, int seconds, CancellationToken cancellationToken)
+    private static async Task<ReceivedMessage> ReadAsync(ClientWebSocket socket, int seconds, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
@@ -139,7 +140,16 @@ internal sealed class TwitchEventSub(ITwitchApi api, NdjsonWriter output) : ITwi
             if (buffer.Length + result.Count > 1024 * 1024) throw new InvalidDataException("EventSub message too large.");
             buffer.Write(chunk, 0, result.Count);
         } while (!result.EndOfMessage);
-        return JsonDocument.Parse(Encoding.UTF8.GetString(buffer.ToArray()));
+        // Capture arrival before parsing or awaiting a reconnect handoff. A message
+        // waiting for processing must retain its original round-fencing timestamp.
+        var receivedAt = DateTimeOffset.UtcNow;
+        return new(JsonDocument.Parse(Encoding.UTF8.GetString(buffer.ToArray())), receivedAt);
+    }
+
+    private sealed record ReceivedMessage(JsonDocument Document, DateTimeOffset ReceivedAt) : IDisposable
+    {
+        internal JsonElement RootElement => Document.RootElement;
+        public void Dispose() => Document.Dispose();
     }
 
     private sealed record Session(ClientWebSocket Socket, string Id, int TimeoutSeconds);
