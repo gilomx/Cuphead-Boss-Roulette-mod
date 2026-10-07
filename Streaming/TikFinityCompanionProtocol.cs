@@ -49,6 +49,7 @@ namespace Gilomx.CupheadBossRoulette
                         values, "message"), string.Empty, MaximumTextLength),
                     MessageCode = Identifier(CreatorToolsFlatJson.Value(
                         values, "messageCode")),
+                    Account = Text(CreatorToolsFlatJson.Value(values, "account"), string.Empty, 80),
                     OccurredAt = Timestamp(CreatorToolsFlatJson.Value(
                         values, "occurredAt")),
                     RetryAttempt = CreatorToolsFlatJson.Integer(

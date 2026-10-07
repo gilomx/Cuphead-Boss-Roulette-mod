@@ -36,7 +36,7 @@ internal static class Program
         {
             try
             {
-                var host = new CompanionHost(output, parentLifetime!);
+                var host = new CompanionHost(output, parentLifetime!, options.TwitchControl);
                 return await host.RunAsync().ConfigureAwait(false);
             }
             catch (OutputClosedException)

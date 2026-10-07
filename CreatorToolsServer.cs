@@ -75,6 +75,9 @@ namespace Gilomx.CupheadBossRoulette
         private volatile bool running;
         private Func<string, string> streamRuleCommandHandler;
         private Func<string, string> dashboardSimulationHandler;
+        private Func<string> twitchStateHandler;
+        private Func<string, string> twitchCommandHandler;
+        private readonly string twitchControlToken = Guid.NewGuid().ToString("N");
         private Func<string, long, bool> interactionControlObserver;
         private Func<string, bool> peskyBattleCommandHandler;
         private Func<string, bool> tapFarmingCommandHandler;
@@ -604,6 +607,11 @@ namespace Gilomx.CupheadBossRoulette
         {
             lock (dashboardLock)
                 dashboardSimulationHandler = handler;
+        }
+
+        internal void SetTwitchHandlers(Func<string> state, Func<string, string> command)
+        {
+            lock (dashboardLock) { twitchStateHandler = state; twitchCommandHandler = command; }
         }
 
         internal void SetPeskyState(string json)
@@ -1198,7 +1206,8 @@ namespace Gilomx.CupheadBossRoulette
             var path = request.Path;
             if (request.Method == "POST" &&
                 path != "/api/overlay-composer/config/set" &&
-                path != "/api/overlay-composer/preview/set")
+                path != "/api/overlay-composer/preview/set" &&
+                path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel")
             {
                 WriteMethodNotAllowed(stream, "GET");
                 return;
@@ -1698,6 +1707,38 @@ namespace Gilomx.CupheadBossRoulette
                           "{\"ok\":false,\"error\":" +
                           "\"rules_queue_full\"}"),
                     false);
+                return;
+            }
+            if (path == "/api/twitch")
+            {
+                Func<string> handler;
+                lock (dashboardLock) handler = twitchStateHandler;
+                var json = handler == null ? "{\"ready\":false,\"status\":\"disconnected\",\"authorized\":false}" : handler();
+                json = json.Substring(0, json.Length - 1) + ",\"controlToken\":\"" + twitchControlToken + "\"}";
+                WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
+            if (path == "/api/twitch/connect" || path == "/api/twitch/disconnect" || path == "/api/twitch/cancel")
+            {
+                if (request.Method != "POST") { WriteMethodNotAllowed(stream, "POST"); return; }
+                string origin, proof;
+                Uri parsedOrigin;
+                if (!request.Headers.TryGetValue("X-Pichi-Twitch-Control", out proof) || proof != twitchControlToken ||
+                    !request.Headers.TryGetValue("Origin", out origin) ||
+                    !Uri.TryCreate(origin, UriKind.Absolute, out parsedOrigin) ||
+                    parsedOrigin.Scheme != "http" || parsedOrigin.Port != Port ||
+                    (parsedOrigin.Host != "127.0.0.1" && parsedOrigin.Host != "localhost"))
+                {
+                    WriteResponse(stream, 403, "Forbidden", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"invalid_origin\"}"), false);
+                    return;
+                }
+                Func<string, string> handler;
+                lock (dashboardLock) handler = twitchCommandHandler;
+                var error = handler == null ? "companion_unavailable" : handler(path.Substring("/api/twitch/".Length));
+                WriteResponse(stream, error.Length == 0 ? 202 : 503, error.Length == 0 ? "Accepted" : "Service Unavailable",
+                    "application/json; charset=utf-8", Encoding.UTF8.GetBytes(error.Length == 0
+                        ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"companion_unavailable\"}"), false);
                 return;
             }
             if (path == "/api/dashboard")

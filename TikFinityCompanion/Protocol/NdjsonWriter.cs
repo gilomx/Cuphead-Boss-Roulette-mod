@@ -46,6 +46,9 @@ internal sealed class NdjsonWriter : IAsyncDisposable
             cancellationToken);
     }
 
+    internal Task WriteStatusAsync(CompanionStatus status, CancellationToken cancellationToken) =>
+        WriteAsync(status, CompanionJsonContext.Default.CompanionStatus, cancellationToken);
+
     internal static string Serialize(CompanionStatus status)
     {
         return JsonSerializer.Serialize(

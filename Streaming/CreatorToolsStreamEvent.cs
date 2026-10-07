@@ -46,6 +46,7 @@ namespace Gilomx.CupheadBossRoulette
         internal string State = "disconnected";
         internal string Message = string.Empty;
         internal string MessageCode = string.Empty;
+        internal string Account = string.Empty;
         internal string OccurredAt = string.Empty;
         internal int RetryAttempt;
     }

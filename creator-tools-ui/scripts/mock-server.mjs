@@ -54,6 +54,12 @@ const streamRuleUserCooldowns = new Map();
 const streamRuleGlobalCooldowns = new Map();
 const followedViewers = new Set();
 
+const twitchControlToken = "local-mock-twitch-control";
+let twitchAuthorizationTimer;
+let twitchConnection = { ready: true, status: "disconnected", authorized: false, account: "",
+  messageCode: "not_connected", userCode: "", verificationUri: "", expiresAt: "", commandPending: false,
+  controlToken: twitchControlToken };
+
 function streamRulesState() {
   return {
     ready: true,
@@ -1165,6 +1171,30 @@ setInterval(() => {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
+  if (url.pathname === "/api/twitch") { json(res, twitchConnection); return; }
+  if (["/api/twitch/connect", "/api/twitch/cancel", "/api/twitch/disconnect"].includes(url.pathname)) {
+    if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }
+    if (req.headers["x-pichi-twitch-control"] !== twitchControlToken ||
+        ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(req.headers.origin)) {
+      json(res, { error: "invalid_local_control" }, 403); return;
+    }
+    clearTimeout(twitchAuthorizationTimer);
+    const action = url.pathname.split("/").at(-1);
+    twitchConnection = { ...twitchConnection, authorized: false, account: "", userCode: "",
+      verificationUri: "", expiresAt: "", status: "disconnected", messageCode: "not_connected" };
+    const connection = dashboardConnections.find((entry) => entry.id === "twitch");
+    if (action === "connect") {
+      Object.assign(twitchConnection, { status: "connecting", messageCode: "mock_authorization_pending",
+        userCode: "MOCK-ONLY", verificationUri: "https://www.twitch.tv/activate", expiresAt: new Date(Date.now() + 300000).toISOString() });
+      twitchAuthorizationTimer = setTimeout(() => {
+        Object.assign(twitchConnection, { status: "simulated", messageCode: "simulated", authorized: true,
+          account: "cuenta_de_prueba", userCode: "", verificationUri: "", expiresAt: "" });
+        Object.assign(connection, { status: "simulated", account: "cuenta_de_prueba" }); dashboardRevision++;
+      }, 8000);
+    } else if (action === "cancel") twitchConnection.messageCode = "authorization_cancelled";
+    Object.assign(connection, { status: twitchConnection.status, account: twitchConnection.account }); dashboardRevision++;
+    json(res, { accepted: true }, 202); return;
+  }
   if (url.pathname === "/api/config/chat-chooses") { json(res, chatChooses.snapshot()); return; }
   if (url.pathname === "/api/config/chat-chooses/set") {
     const state = chatChooses.command(url.searchParams, tapFarmingPhase !== "off" || peskyBattleIsExclusive());

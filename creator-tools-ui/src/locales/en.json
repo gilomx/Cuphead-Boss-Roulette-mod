@@ -349,6 +349,40 @@
       "disconnected": "Disconnected",
       "error": "Error"
     },
+    "twitch": {
+      "title": "Twitch account",
+      "connect": "Connect Twitch",
+      "disconnect": "Disconnect account",
+      "changeAccount": "Change account",
+      "cancel": "Cancel connection",
+      "openTwitch": "Authorize on Twitch",
+      "authorizationInstructions": "Open Twitch and confirm this code with the account you want to connect.",
+      "expires": "Code expires in {minutes} min.",
+      "storageHint": "The account is remembered for your Windows user on this PC.",
+      "disconnectConfirmation": "Events will stop and this account will be forgotten on this PC.",
+      "keepAccount": "Keep account",
+      "confirmDisconnect": "Disconnect",
+      "commandError": "The request could not be completed. Please try again.",
+      "messages": {
+        "companion_starting": "Waiting for the mod companion.",
+        "not_connected": "Connect your channel to receive Twitch events and votes.",
+        "requesting_code": "Preparing Twitch authorization…",
+        "authorization_pending": "Waiting for your authorization on Twitch.",
+        "mock_authorization_pending": "Local authorization test. No real account will be connected.",
+        "simulated": "Local simulation: no real account is connected.",
+        "authorization_cancelled": "Connection cancelled.",
+        "authorization_expired": "Code expired. Press Connect Twitch to get another.",
+        "authorization_required": "Twitch permission expired or was revoked. Connect your account again.",
+        "connecting": "Connecting to your channel events…",
+        "connected": "Receiving events and votes. You can test chat without starting a live stream.",
+        "connected_limited": "Chat connected. Some events are unavailable for this account or its permissions.",
+        "network_retry": "Connection lost. Retrying automatically…",
+        "revocation_unconfirmed": "Account forgotten on this PC. Revocation could not be confirmed; you can remove it in Twitch connections.",
+        "storage_error": "The account saved in Windows could not be read.",
+        "storage_delete_error": "The Windows account credential could not be deleted. Retry disconnecting.",
+        "connection_error": "The account could not be connected or saved. Please try again."
+      }
+    },
     "connectionDescriptions": {
       "tikfinity": {
         "connecting": "Looking for the local TikFinity API…",

@@ -1,0 +1,92 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunTwitchConnectionTests()
+        {
+            Run("Twitch controls fence old events and replay only unacknowledged commands", TestTwitchControlFence);
+            Run("Twitch browser state allows only public fields and official activation links", TestTwitchPublicState);
+            Run("Twitch HTTP controls require POST, same origin and local proof", TestTwitchHttpControls);
+        }
+
+        private static Dictionary<string, string> TwitchStatus(long revision, bool authorized)
+        {
+            Dictionary<string, string> fields;
+            True(CreatorToolsFlatJson.TryParse("{\"protocolVersion\":1,\"kind\":\"status\",\"state\":\"connected\"," +
+                "\"controlRevision\":" + revision + ",\"authorized\":" + (authorized ? "true" : "false") +
+                ",\"account\":\"channel\",\"accessToken\":\"SECRET-ACCESS\",\"refreshToken\":\"SECRET-REFRESH\",\"deviceCode\":\"SECRET-DEVICE\"}", out fields), "status parsed");
+            return fields;
+        }
+
+        private static void TestTwitchControlFence()
+        {
+            var bridge = new TwitchConnectionBridge();
+            True(bridge.AcceptStatus(TwitchStatus(0, true)), "startup account restored");
+            True(bridge.AcceptsEvents, "restored account can receive");
+            bridge.Command("disconnect"); False(bridge.AcceptsEvents, "click immediately blocks events");
+            Equal("twitch:disconnect:1", bridge.TakeCommand(), "versioned command");
+            Equal(null, bridge.TakeCommand(), "command sent once");
+            False(bridge.AcceptStatus(TwitchStatus(0, true)), "late connected status rejected");
+            bridge.Restarting(); Equal("twitch:disconnect:1", bridge.TakeCommand(), "pending disconnect replayed");
+            False(bridge.AcceptStatus(TwitchStatus(0, true)), "restart cannot restore a pending disconnect");
+            True(bridge.AcceptStatus(TwitchStatus(1, false)), "disconnect acknowledged");
+            bridge.Restarting(); Equal(null, bridge.TakeCommand(), "acknowledged command not replayed");
+            True(bridge.AcceptStatus(TwitchStatus(0, false)), "new process revision zero accepted");
+            Equal("invalid_command", bridge.Command("evil"), "unknown command rejected");
+        }
+
+        private static void TestTwitchPublicState()
+        {
+            var bridge = new TwitchConnectionBridge();
+            var fields = TwitchStatus(0, true); fields["verificationUri"] = "https://evil.invalid/activate";
+            bridge.AcceptStatus(fields);
+            var json = bridge.GetState();
+            False(json.Contains("SECRET"), "no tokens or private device code exported");
+            using (var state = JsonDocument.Parse(json))
+                Equal("", state.RootElement.GetProperty("verificationUri").GetString(), "unsafe URL removed");
+            True(TwitchConnectionBridge.IsVerificationUri("https://www.twitch.tv/activate?public=true"), "official link allowed");
+            False(TwitchConnectionBridge.IsVerificationUri("https://www.twitch.tv:444/activate"), "nonstandard port rejected");
+            fields["protocolVersion"] = "99";
+            False(bridge.AcceptStatus(fields), "unsupported protocol rejected");
+        }
+
+        private static void TestTwitchHttpControls()
+        {
+            using (var scope = new TestScope("twitch-http"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                var commands = new List<string>();
+                server.SetTwitchHandlers(delegate { return "{\"ready\":true,\"authorized\":false}"; },
+                    delegate(string action) { commands.Add(action); return string.Empty; });
+                var origin = "http://127.0.0.1:" + server.Port;
+                string proof;
+                using (var state = JsonDocument.Parse(client.GetStringAsync(origin + "/api/twitch").GetAwaiter().GetResult()))
+                    proof = state.RootElement.GetProperty("controlToken").GetString();
+                Equal(HttpStatusCode.MethodNotAllowed, client.GetAsync(origin + "/api/twitch/connect").GetAwaiter().GetResult().StatusCode, "GET cannot connect");
+                foreach (var action in new[] { "connect", "cancel", "disconnect" })
+                {
+                    using (var denied = new HttpRequestMessage(HttpMethod.Post, origin + "/api/twitch/" + action))
+                        Equal(HttpStatusCode.Forbidden, client.SendAsync(denied).GetAwaiter().GetResult().StatusCode, "missing proof denied");
+                    using (var foreign = new HttpRequestMessage(HttpMethod.Post, origin + "/api/twitch/" + action))
+                    {
+                        foreign.Headers.Add("X-Pichi-Twitch-Control", proof); foreign.Headers.Add("Origin", "https://evil.invalid");
+                        Equal(HttpStatusCode.Forbidden, client.SendAsync(foreign).GetAwaiter().GetResult().StatusCode, "foreign origin denied");
+                    }
+                    using (var accepted = new HttpRequestMessage(HttpMethod.Post, origin + "/api/twitch/" + action))
+                    {
+                        accepted.Headers.Add("X-Pichi-Twitch-Control", proof); accepted.Headers.Add("Origin", origin);
+                        Equal(HttpStatusCode.Accepted, client.SendAsync(accepted).GetAwaiter().GetResult().StatusCode, "local control accepted");
+                    }
+                }
+                Equal("connect,cancel,disconnect", string.Join(",", commands), "only authorized requests reach companion");
+            }
+        }
+    }
+}

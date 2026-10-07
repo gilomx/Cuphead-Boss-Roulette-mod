@@ -5,7 +5,7 @@ using LaPichiRuleta.TikFinity.TikFinity;
 
 namespace LaPichiRuleta.TikFinity.Tests;
 
-internal static class Program
+internal static partial class Program
 {
     private static readonly DateTimeOffset FixedTime =
         new(2026, 8, 26, 18, 30, 0, TimeSpan.Zero);
@@ -36,6 +36,14 @@ internal static class Program
             ("argument parsing", ArgumentParsing),
             ("reconnect backoff", Backoff),
             ("long image URL", LongImageUrl),
+            ("Twitch ballot and channel filtering", TwitchBallots),
+            ("Twitch monetary and subscription events", TwitchEventValues),
+            ("Twitch API public client and safe device URL", TwitchPublicApi),
+            ("Twitch restore and rotating refresh", () => TwitchRestoreAsync().GetAwaiter().GetResult()),
+            ("Twitch cancel rejects late authorization", () => TwitchCancelAsync().GetAwaiter().GetResult()),
+            ("Twitch disconnect clears offline and retries failed vault delete", () => TwitchDisconnectAsync().GetAwaiter().GetResult()),
+            ("Twitch vault errors and wrong account reject startup", () => TwitchStartupErrorsAsync().GetAwaiter().GetResult()),
+            ("Twitch protocol excludes credentials", TwitchPublicProtocol),
         };
 
         var failed = 0;
@@ -351,6 +359,11 @@ internal static class Program
             out var options,
             out _));
         Equal(123, options!.ParentProcessId);
+        Equal(false, options.TwitchControl);
+
+        True(CompanionOptions.TryParse(new[] { "--parent-pid", "123", "--twitch-control" }, out options, out _));
+        Equal(true, options!.TwitchControl);
+        Equal(false, CompanionOptions.TryParse(new[] { "--parent-pid", "123", "--twitch-control", "--twitch-control" }, out _, out _));
 
         True(CompanionOptions.TryParse(
             new[] { "--parent-pid=456" },

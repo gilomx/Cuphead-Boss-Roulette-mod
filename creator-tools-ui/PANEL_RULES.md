@@ -6,6 +6,25 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 
 ## Comportamiento actual
 
+- Dashboard permite conectar Twitch con autorización de dispositivo de una
+  aplicación pública compartida. Cada usuario autoriza su propio canal, sin
+  introducir Client Secret ni tokens. `/api/twitch` expone sólo el estado
+  público; conectar, cancelar y desconectar requieren POST, origen local y
+  `X-Pichi-Twitch-Control` obtenido de ese estado. Los comandos se numeran
+  para rechazar respuestas tardías tras cancelar o cambiar de cuenta.
+- Los tokens de Twitch pertenecen al companion y al Administrador de
+  credenciales de Windows, por usuario y PC; no al navegador ni al ZIP. La
+  sesión se valida al restaurar, cada hora y al reconectar; el refresh rotado
+  se guarda antes de continuar. Desconectar para la recepción inmediatamente,
+  elimina la credencial y solicita revocación. Si falla la eliminación se
+  muestra error; si falla la revocación remota se informa que sólo se confirmó
+  la desconexión local. YouTube sigue pendiente de integración.
+- EventSub recibe votos exactos `1`–`6`, follows, suscripciones, Bits y canjes
+  de recompensas; el texto restante del chat se descarta. Los votos alimentan
+  «El chat elige»; los demás eventos llegan al dashboard. Las reglas de
+  interacciones conservan por ahora sus disparadores de TikTok. El servidor
+  mock identifica expresamente su autorización y cuenta como simuladas.
+
 - La barra lateral y sus proveedores permanecen montados. Cambiar de sección
   sustituye únicamente la vista central, sin navegar a otra página ni reiniciar
   conexiones que deban seguir funcionando.

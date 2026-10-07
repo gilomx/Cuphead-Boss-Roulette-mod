@@ -1,4 +1,4 @@
-# Acompañante local de TikFinity
+# Acompañante local de TikFinity y Twitch
 
 `LaPichiRuleta.TikFinity.exe` mantiene la conexión WebSocket local con
 TikFinity fuera del runtime antiguo de Unity. No tiene ventana ni consola y el
@@ -16,13 +16,51 @@ El artefacto publicado se instala junto al plugin en:
 El mod debe iniciarlo con salida estándar redirigida y pasar su PID:
 
 ```text
-LaPichiRuleta.TikFinity.exe --parent-pid <pid-de-cuphead>
+LaPichiRuleta.TikFinity.exe --parent-pid <pid-de-cuphead> --twitch-control
 ```
 
 `--parent-pid=<pid>` también es válido. El proceso rechaza argumentos
 desconocidos, valida que el padre exista y termina cuando ese proceso sale. Un
 pipe de salida roto también hace que termine en el siguiente intento de
 escritura; el PID padre es la garantía activa incluso si el socket está ocioso.
+
+`--twitch-control` habilita Twitch y la entrada estándar redirigida. El host
+envía únicamente `twitch:connect:<revisión>`, `twitch:cancel:<revisión>` y
+`twitch:disconnect:<revisión>`. Revisiones antiguas se ignoran. Cerrar el pipe
+de entrada termina el companion. Sin esa opción conserva el transporte de
+TikFinity y no accede al almacén de credenciales.
+
+## Cuenta de Twitch
+
+Una única aplicación pública usa el Client ID incluido en `TwitchApplication`.
+El flujo [Device Code Grant](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow)
+solicita `user:read:chat`, `moderator:read:followers`,
+`channel:read:subscriptions`, `bits:read` y `channel:read:redemptions`.
+No necesita Client Secret, servidor público ni callback local. Sólo se conecta
+el canal de la persona que autoriza; no se envían mensajes al chat.
+
+Access token y refresh token permanecen en el companion y en Windows
+Credential Manager (`LaPichiRuleta/Twitch/<Client ID>`, persistencia local).
+La sesión se restaura por usuario de Windows y PC; no viaja en configuraciones
+ni paquetes. Se valida al iniciar, al reconectar y cada hora, y se guarda el
+refresh rotado. Una revocación o identidad inválida requiere autorizar de nuevo.
+Desconectar cancela la recepción, elimina la credencial y revoca el access
+token; si Twitch no responde, informa que la revocación no pudo confirmarse.
+
+[EventSub WebSocket](https://dev.twitch.tv/docs/eventsub/handling-websocket-events/)
+recibe votos exactos `1`–`6`, follows, suscripciones, Bits y canjes de puntos
+del propio canal. El resto del texto de chat se descarta. Eventos opcionales
+no disponibles para la cuenta dejan conectado el chat con un aviso. La
+identidad de un evento usa su `message_id` para deduplicar reintentos.
+Reconexiones indicadas por Twitch transfieren el socket sin recrear
+suscripciones; una caída completa abre sesión nueva y las recrea.
+
+Los estados de Twitch agregan `account`, `authorized`, `messageCode`,
+`userCode`, `verificationUri`, `expiresAt` y `controlRevision`. Sólo el código
+público de autorización se envía al panel; nunca tokens ni el `device_code`.
+Los errores usan claves constantes, sin cuerpos de respuesta OAuth.
+Las pruebas usan API, almacén y receptor falsos: no autorizan cuentas reales.
+El mock del panel identifica siempre la conexión como una simulación local.
 
 ## Transporte
 
@@ -166,6 +204,10 @@ morir el proceso padre:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
+
+Repetir con `-TwitchControl` comprueba también que el padre termina el
+ejecutable mientras el lector de comandos está esperando en stdin. Esa
+variante lee la credencial existente; no inicia una autorización ni la borra.
 
 Las pruebas usan fixtures representativos de ambos esquemas. Son muestras de
 compatibilidad, no capturas declaradas como oficiales de TikFinity.

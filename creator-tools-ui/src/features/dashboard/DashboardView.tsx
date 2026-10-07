@@ -3,6 +3,7 @@ import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
 import { LiveEventsSection } from "./LiveEventsSection";
+import { TwitchConnectionControls } from "./TwitchConnectionControls";
 import type {
   DashboardConnection,
   DashboardCounters,
@@ -240,9 +241,9 @@ export function DashboardView({
                   {t(`dashboard.connectionStatus.${connection.status}`, connection.status)}
                 </span>
               </div>
-              <div className="dashboard-connection-card__copy">
+              {connection.platform === "twitch" ? <TwitchConnectionControls /> : <div className="dashboard-connection-card__copy">
                 <span>{connectionDescription(connection)}</span>
-              </div>
+              </div>}
               <div className="dashboard-connection-card__footer">
                 <span>{t("dashboard.connections.lastEvent")}</span>
                 <strong>{formatDate(connection.lastEventAt)}</strong>

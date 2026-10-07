@@ -1409,6 +1409,8 @@ namespace Gilomx.CupheadBossRoulette
                 delegate(string message) { Logger.LogWarning(message); });
             creatorToolsServer.SetDashboardSimulationHandler(
                 creatorToolsStreamWorker.ScheduleSimulation);
+            creatorToolsServer.SetTwitchHandlers(creatorToolsTikFinityCompanion.GetTwitchState,
+                creatorToolsTikFinityCompanion.CommandTwitch);
             creatorToolsStreamWorker.Start();
         }
 
@@ -1692,6 +1694,7 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsServer != null)
             {
                 creatorToolsServer.SetDashboardSimulationHandler(null);
+                creatorToolsServer.SetTwitchHandlers(null, null);
                 creatorToolsServer.SetStreamRuleCommandHandler(null);
                 creatorToolsServer.SetInteractionControlObserver(null);
                 creatorToolsServer.SetPeskyBattleCommandHandler(null);

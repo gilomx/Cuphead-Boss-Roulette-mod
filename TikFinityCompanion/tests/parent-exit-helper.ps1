@@ -1,17 +1,20 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Executable
+    [string]$Executable,
+    [switch]$TwitchControl
 )
 
 $ErrorActionPreference = "Stop"
 $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = (Resolve-Path -LiteralPath $Executable).Path
 $startInfo.Arguments = "--parent-pid $PID"
+if ($TwitchControl) { $startInfo.Arguments += ' --twitch-control' }
 $startInfo.UseShellExecute = $false
 $startInfo.CreateNoWindow = $true
 $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
 $startInfo.RedirectStandardOutput = $true
 $startInfo.RedirectStandardError = $true
+$startInfo.RedirectStandardInput = [bool]$TwitchControl
 
 $companionProcess = [System.Diagnostics.Process]::Start($startInfo)
 if ($null -eq $companionProcess) {

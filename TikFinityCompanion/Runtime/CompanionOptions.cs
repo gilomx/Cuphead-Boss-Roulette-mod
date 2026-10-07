@@ -4,12 +4,14 @@ namespace LaPichiRuleta.TikFinity.Runtime;
 
 internal sealed class CompanionOptions
 {
-    private CompanionOptions(int parentProcessId)
+    private CompanionOptions(int parentProcessId, bool twitchControl)
     {
         ParentProcessId = parentProcessId;
+        TwitchControl = twitchControl;
     }
 
     internal int ParentProcessId { get; }
+    internal bool TwitchControl { get; }
 
     internal static bool TryParse(
         IReadOnlyList<string> arguments,
@@ -19,11 +21,19 @@ internal sealed class CompanionOptions
         options = null;
         error = string.Empty;
         int? parentProcessId = null;
+        var twitchControl = false;
 
         for (var index = 0; index < arguments.Count; index++)
         {
             var argument = arguments[index] ?? string.Empty;
             string? value = null;
+
+            if (argument == "--twitch-control")
+            {
+                if (twitchControl) { error = "--twitch-control can only be provided once."; return false; }
+                twitchControl = true;
+                continue;
+            }
 
             if (argument.Equals("--parent-pid", StringComparison.OrdinalIgnoreCase))
             {
@@ -71,7 +81,7 @@ internal sealed class CompanionOptions
             return false;
         }
 
-        options = new CompanionOptions(parentProcessId.Value);
+        options = new CompanionOptions(parentProcessId.Value, twitchControl);
         return true;
     }
 }

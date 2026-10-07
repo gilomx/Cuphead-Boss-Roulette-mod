@@ -5221,6 +5221,37 @@ textarea:focus-visible {
   gap: 0.68rem;
 }
 
+.twitch-connection-controls {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.6rem 0;
+  font-size: var(--font-size-body);
+}
+
+.twitch-connection-controls p { margin: 0; color: var(--color-text-muted); }
+.twitch-connection-controls small { color: var(--color-text-muted); line-height: 1.35; }
+.twitch-connection-controls__account { overflow-wrap: anywhere; }
+.twitch-connection-controls__actions,
+.twitch-connection-controls__confirmation { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.twitch-connection-controls__confirmation p { flex-basis: 100%; }
+.twitch-connection-controls button,
+.twitch-connection-controls__authorization a {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  background: var(--color-control-active);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  text-decoration: none;
+}
+.twitch-connection-controls button:hover,
+.twitch-connection-controls__authorization a:hover { background: var(--color-control-hover); }
+.twitch-connection-controls button:disabled { opacity: 0.45; cursor: default; }
+.twitch-connection-controls__authorization { display: grid; gap: 0.65rem; }
+.twitch-connection-controls__authorization code { font-size: 1.4rem; font-weight: 850; letter-spacing: 0.1em; }
+
 .dashboard-simulator-form__row[data-chat="true"] {
   grid-template-columns: minmax(0, 1fr);
 }

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Executable
+    [string]$Executable,
+    [switch]$TwitchControl
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,8 +13,10 @@ if ([string]::IsNullOrWhiteSpace($Executable)) {
 $resolvedExecutable = (Resolve-Path -LiteralPath $Executable).Path
 $helper = Join-Path $projectRoot "tests\parent-exit-helper.ps1"
 
-$record = & powershell.exe -NoProfile -ExecutionPolicy Bypass `
-    -File $helper -Executable $resolvedExecutable
+$helperArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $helper,
+    '-Executable', $resolvedExecutable)
+if ($TwitchControl) { $helperArguments += '-TwitchControl' }
+$record = & powershell.exe @helperArguments
 if ($LASTEXITCODE -ne 0) {
     throw "The parent-lifetime helper failed with exit code $LASTEXITCODE"
 }
@@ -69,4 +72,5 @@ if ($null -ne $remainingProcess -and
     StartingStatus = $starting.state
     ConnectingStatus = $connecting.state
     ExitedWithParent = $true
+    TwitchControl = [bool]$TwitchControl
 } | ConvertTo-Json -Compress

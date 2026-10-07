@@ -187,8 +187,14 @@ de usuario a restaurar. `BepInEx/config/BepInEx.cfg` es configuración del
 cargador compartido; el launcher deberá decidir su gestión por separado, sin
 mezclarla con los datos exclusivos de esta ruleta.
 
-El companion **no escribe ajustes, credenciales ni bases de datos propios en
-disco**. Se comunica con TikFinity en `ws://localhost:21213/` y transmite eventos
+El companion guarda exclusivamente los tokens de Twitch en una credencial
+genérica del Administrador de credenciales de Windows, por usuario y PC,
+con destino `LaPichiRuleta/Twitch/<Client ID>`. No se incluye en el ZIP ni se
+migra con los archivos del mod. «Desconectar» detiene la recepción, elimina
+esa credencial e intenta revocar el acceso en Twitch. El panel sólo recibe
+estado público, nombre de cuenta y código temporal de autorización.
+
+TikFinity se comunica en `ws://localhost:21213/` y transmite eventos
 al mod por stdout. Su estado de conexión, colas y contadores en memoria son
 transitorios; no hay una carpeta de datos del companion que migrar. La
 configuración de la aplicación externa TikFinity queda fuera de este paquete.

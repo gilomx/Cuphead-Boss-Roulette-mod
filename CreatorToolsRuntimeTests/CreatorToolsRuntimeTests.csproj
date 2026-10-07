@@ -15,6 +15,7 @@
        discovering the harness fakes through its recursive *.cs glob. -->
   <ItemGroup>
     <Compile Include="Program.cs.txt" Link="Program.cs" />
+    <Compile Include="TwitchConnectionTests.cs.txt" Link="TwitchConnectionTests.cs" />
     <Compile Include="TimedChallengeTests.cs.txt" Link="TimedChallengeTests.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallenge.cs" Link="Product\Interactions\CreatorToolsTimedChallenge.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallengeHudState.cs" Link="Product\Interactions\CreatorToolsTimedChallengeHudState.cs" />
@@ -103,5 +104,7 @@
              Link="Product\Streaming\TikFinityCompanionProtocol.cs" />
     <Compile Include="..\Streaming\TikFinityCompanionHost.cs"
              Link="Product\Streaming\TikFinityCompanionHost.cs" />
+    <Compile Include="..\Streaming\TwitchConnectionBridge.cs"
+             Link="Product\Streaming\TwitchConnectionBridge.cs" />
   </ItemGroup>
 </Project>

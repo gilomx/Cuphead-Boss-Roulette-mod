@@ -29,6 +29,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
         private readonly object queueLock = new object();
+        private readonly TwitchConnectionBridge twitch = new TwitchConnectionBridge();
         private readonly LinkedList<CreatorToolsStreamMessage> pending =
             new LinkedList<CreatorToolsStreamMessage>();
         private readonly LinkedList<LikeAccumulator> overflowLikes =
@@ -96,7 +97,10 @@ namespace Gilomx.CupheadBossRoulette
                 try
                 {
                     if (!process.HasExited)
+                    {
+                        SendTwitchCommand();
                         return;
+                    }
                     var exitCode = process.ExitCode;
                     if (!WaitForRedirectedOutput(process))
                         return;
@@ -142,6 +146,33 @@ namespace Gilomx.CupheadBossRoulette
             return message != null;
         }
 
+        internal string GetTwitchState() { return twitch.GetState(); }
+
+        internal string CommandTwitch(string action)
+        {
+            if (disposed) return "companion_unavailable";
+            lock (queueLock)
+            {
+                var result = twitch.Command(action);
+                // Drop pending Twitch messages before the worker observes the disconnect fence.
+                var node = pending.First;
+                while (node != null)
+                {
+                    var next = node.Next;
+                    if (node.Value.Event != null && node.Value.Event.Platform == "twitch" ||
+                        node.Value.Connection != null && node.Value.Connection.ConnectionId == "twitch") pending.Remove(node);
+                    node = next;
+                }
+                return result;
+            }
+        }
+
+        private void SendTwitchCommand()
+        {
+            var command = twitch.TakeCommand();
+            if (command != null) process.StandardInput.WriteLine(command);
+        }
+
         private void TryStart()
         {
             if (!File.Exists(executablePath))
@@ -159,13 +190,14 @@ namespace Gilomx.CupheadBossRoulette
                     FileName = executablePath,
                     Arguments = "--parent-pid " +
                         Process.GetCurrentProcess().Id.ToString(
-                            CultureInfo.InvariantCulture),
+                            CultureInfo.InvariantCulture) + " --twitch-control",
                     WorkingDirectory = workingDirectory,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true
                 };
                 var candidate = new Process { StartInfo = info };
                 candidate.OutputDataReceived += OnOutputDataReceived;
@@ -177,6 +209,7 @@ namespace Gilomx.CupheadBossRoulette
                     throw new InvalidOperationException(
                         "El proceso no pudo iniciarse.");
                 process = candidate;
+                twitch.Restarting();
                 PublishLocalStatus("starting", "companion_starting",
                     "Iniciando el acompañante de TikFinity.");
                 candidate.BeginOutputReadLine();
@@ -205,6 +238,22 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (disposed || args.Data.Length == 0)
                 return;
+            Dictionary<string, string> twitchValues;
+            if (CreatorToolsFlatJson.TryParse(args.Data, out twitchValues) &&
+                CreatorToolsFlatJson.Value(twitchValues, "connectionId") == "twitch")
+            {
+                lock (queueLock)
+                {
+                    if (CreatorToolsFlatJson.Value(twitchValues, "kind") == "status")
+                    {
+                        if (!twitch.AcceptStatus(twitchValues)) return;
+                    }
+                    else if (!twitch.AcceptsEvents) return;
+                    CreatorToolsStreamMessage twitchMessage;
+                    if (TikFinityCompanionProtocol.TryParse(args.Data, out twitchMessage)) Enqueue(twitchMessage);
+                }
+                return;
+            }
             CreatorToolsStreamMessage message;
             if (!TikFinityCompanionProtocol.TryParse(args.Data, out message))
             {
@@ -242,6 +291,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ScheduleRestart(string code, string message)
         {
+            twitch.Restarting();
             restartAttempt = Math.Min(MaximumRestarts, restartAttempt + 1);
             var delaySeconds = Math.Min(30,
                 (int)Math.Pow(2d, Math.Min(5, restartAttempt - 1)));

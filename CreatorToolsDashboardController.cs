@@ -154,11 +154,14 @@ namespace Gilomx.CupheadBossRoulette
                 var messageCode = NormalizeIdentifier(
                     update.MessageCode, 64);
                 var retryAttempt = Math.Max(0, update.RetryAttempt);
+                var account = NormalizeText(update.Account, string.Empty, 80);
                 var changed = connection.Status != status ||
+                    connection.Account != account ||
                     connection.Message != message ||
                     connection.MessageCode != messageCode ||
                     connection.RetryAttempt != retryAttempt;
                 connection.Status = status;
+                connection.Account = account;
                 connection.Message = message;
                 connection.MessageCode = messageCode;
                 connection.RetryAttempt = retryAttempt;

@@ -39,6 +39,14 @@ internal sealed class CompanionStatus
     public DateTimeOffset OccurredAt { get; init; }
 
     public int RetryAttempt { get; init; }
+
+    public string Account { get; init; } = "";
+    public string MessageCode { get; init; } = "";
+    public bool Authorized { get; init; }
+    public string UserCode { get; init; } = "";
+    public string VerificationUri { get; init; } = "";
+    public string ExpiresAt { get; init; } = "";
+    public long ControlRevision { get; init; }
 }
 
 internal sealed class CompanionEvent

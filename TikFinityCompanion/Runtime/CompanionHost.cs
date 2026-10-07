@@ -1,5 +1,6 @@
 using LaPichiRuleta.TikFinity.Protocol;
 using LaPichiRuleta.TikFinity.TikFinity;
+using LaPichiRuleta.TikFinity.Twitch;
 
 namespace LaPichiRuleta.TikFinity.Runtime;
 
@@ -7,13 +8,15 @@ internal sealed class CompanionHost
 {
     private readonly NdjsonWriter output;
     private readonly ParentProcessLifetime parentLifetime;
+    private readonly bool twitchControl;
 
     internal CompanionHost(
         NdjsonWriter output,
-        ParentProcessLifetime parentLifetime)
+        ParentProcessLifetime parentLifetime, bool twitchControl = false)
     {
         this.output = output;
         this.parentLifetime = parentLifetime;
+        this.twitchControl = twitchControl;
     }
 
     internal async Task<int> RunAsync()
@@ -29,61 +32,57 @@ internal sealed class CompanionHost
             output,
             new TikFinityEventNormalizer());
         var connectorTask = connector.RunAsync(lifetimeCancellation.Token);
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        var twitchApi = new TwitchApi(http);
+        var twitch = new TwitchConnectionService(twitchApi, new WindowsTwitchCredentialStore(),
+            new TwitchEventSub(twitchApi, output), output.WriteStatusAsync);
+        var twitchTask = twitchControl ? twitch.RunAsync(lifetimeCancellation.Token)
+            : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
+        var inputTask = twitchControl ? ReadCommandsAsync(twitch, lifetimeCancellation.Token)
+            : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
         var parentExitTask = parentLifetime.WaitForExitAsync(
             lifetimeCancellation.Token);
 
         var completedTask = await Task.WhenAny(
             connectorTask,
-            parentExitTask).ConfigureAwait(false);
+            parentExitTask, twitchTask, inputTask).ConfigureAwait(false);
 
-        if (completedTask == parentExitTask)
+        try { await completedTask.ConfigureAwait(false); }
+        finally
         {
-            try
-            {
-                await parentExitTask.ConfigureAwait(false);
-            }
-            catch
-            {
-                lifetimeCancellation.Cancel();
-                try
-                {
-                    await connectorTask.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // The connector was stopped after its parent monitor
-                    // failed, before propagating that monitor failure.
-                }
-
-                throw;
-            }
-
+            // Never wait on a console pipe while shutting down its owning process.
             lifetimeCancellation.Cancel();
-            try
-            {
-                await connectorTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected shutdown after Cuphead exits.
-            }
-
-            return ExitCodes.Success;
+            try { await Task.WhenAll(connectorTask, twitchTask, parentExitTask).ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
         }
+        return completedTask == parentExitTask || completedTask == inputTask
+            ? ExitCodes.Success : ExitCodes.FatalError;
+    }
 
-        lifetimeCancellation.Cancel();
-        try
+    private static async Task ReadCommandsAsync(TwitchConnectionService twitch, CancellationToken cancellationToken)
+    {
+        using var input = Console.OpenStandardInput();
+        var line = new System.Text.StringBuilder();
+        var buffer = new byte[256];
+        while (!cancellationToken.IsCancellationRequested)
         {
-            await parentExitTask.ConfigureAwait(false);
+            var read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (read == 0) return;
+            for (var index = 0; index < read; index++)
+            {
+                var value = buffer[index];
+                if (value == '\n')
+                {
+                    var command = line.ToString().Trim(); line.Clear();
+                    if (command.StartsWith("twitch:", StringComparison.Ordinal)) twitch.TryCommand(command[7..]);
+                }
+                else if (value != '\r')
+                {
+                    if (line.Length >= 128) throw new InvalidDataException("Companion command too long.");
+                    line.Append((char)value);
+                }
+            }
         }
-        catch (OperationCanceledException)
-        {
-            // The connector stopped first, so its pending parent wait is no
-            // longer needed.
-        }
-
-        await connectorTask.ConfigureAwait(false);
-        return ExitCodes.FatalError;
     }
 }
 

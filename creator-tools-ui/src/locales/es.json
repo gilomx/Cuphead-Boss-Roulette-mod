@@ -349,6 +349,40 @@
       "disconnected": "Desconectada",
       "error": "Error"
     },
+    "twitch": {
+      "title": "Cuenta de Twitch",
+      "connect": "Conectar Twitch",
+      "disconnect": "Desconectar cuenta",
+      "changeAccount": "Cambiar cuenta",
+      "cancel": "Cancelar conexión",
+      "openTwitch": "Autorizar en Twitch",
+      "authorizationInstructions": "Abre Twitch y confirma este código con la cuenta que quieres conectar.",
+      "expires": "El código vence en {minutes} min.",
+      "storageHint": "La cuenta se recuerda para tu usuario de Windows en esta PC.",
+      "disconnectConfirmation": "Se dejarán de recibir eventos y se olvidará esta cuenta en esta PC.",
+      "keepAccount": "Conservar cuenta",
+      "confirmDisconnect": "Desconectar",
+      "commandError": "No se pudo completar la solicitud. Inténtalo nuevamente.",
+      "messages": {
+        "companion_starting": "Esperando al acompañante del mod.",
+        "not_connected": "Conecta tu canal para recibir eventos y votos de Twitch.",
+        "requesting_code": "Preparando la autorización en Twitch…",
+        "authorization_pending": "Esperando tu autorización en Twitch.",
+        "mock_authorization_pending": "Prueba local de autorización. No se conectará ninguna cuenta real.",
+        "simulated": "Simulación local: no hay una cuenta real conectada.",
+        "authorization_cancelled": "Conexión cancelada.",
+        "authorization_expired": "El código venció. Pulsa Conectar Twitch para obtener otro.",
+        "authorization_required": "El permiso de Twitch venció o se retiró. Conecta tu cuenta nuevamente.",
+        "connecting": "Conectando con los eventos de tu canal…",
+        "connected": "Recibiendo eventos y votos. Puedes probar el chat sin iniciar un live.",
+        "connected_limited": "Chat conectado. Algunos eventos no están disponibles para esta cuenta o sus permisos.",
+        "network_retry": "Se perdió la conexión. Reintentando automáticamente…",
+        "revocation_unconfirmed": "Cuenta olvidada en esta PC. No se pudo confirmar la revocación; puedes retirarla en las conexiones de Twitch.",
+        "storage_error": "No se pudo leer la cuenta guardada en Windows.",
+        "storage_delete_error": "No se pudo borrar la cuenta de Windows. Reintenta la desconexión.",
+        "connection_error": "No se pudo conectar o guardar la cuenta. Inténtalo nuevamente."
+      }
+    },
     "connectionDescriptions": {
       "tikfinity": {
         "connecting": "Buscando la API local de TikFinity…",
