@@ -15,7 +15,16 @@
     "roulette": "Ruleta",
     "interactions": "Interacciones",
     "overlays": "Overlays",
-    "pesky": "Modo Molestoso"
+    "pesky": "Modo Molestoso",
+    "settings": "Configuración"
+  },
+  "settings": {
+    "title": "Configuración",
+    "description": "Administra las conexiones y cuentas que usa el mod.",
+    "configure": "Configurar",
+    "platforms": { "twitch": "Twitch", "youtube": "YouTube", "tiktok": "TikTok / TikFinity" },
+    "youtubePending": "La conexión con YouTube todavía no está disponible. Se configurará desde esta página cuando esté habilitada.",
+    "tikfinity": "Abre TikFinity en esta PC y conecta tu cuenta desde esa aplicación. El mod detecta su API local automáticamente."
   },
   "dashboard": {
     "chatChooses": {
@@ -363,6 +372,8 @@
       "keepAccount": "Conservar cuenta",
       "confirmDisconnect": "Desconectar",
       "commandError": "No se pudo completar la solicitud. Inténtalo nuevamente.",
+      "waitingCommand": "Enviando la solicitud…",
+      "commandTimeout": "El acompañante no confirmó la solicitud. Puedes reintentar; si continúa, carga el paquete Dev actualizado en el próximo arranque.",
       "messages": {
         "companion_starting": "Esperando al acompañante del mod.",
         "not_connected": "Conecta tu canal para recibir eventos y votos de Twitch.",

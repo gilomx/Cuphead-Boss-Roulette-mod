@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 
 namespace Gilomx.CupheadBossRoulette
@@ -44,6 +45,15 @@ namespace Gilomx.CupheadBossRoulette
                 sentCommand = pendingCommand;
                 return pendingCommand;
             }
+        }
+
+        internal static void WriteCommand(Stream input, string command)
+        {
+            // Legacy Mono can buffer StreamWriter output or prepend an encoding
+            // preamble. The command pipe accepts only ASCII lines without BOM.
+            var bytes = Encoding.ASCII.GetBytes(command + "\n");
+            input.Write(bytes, 0, bytes.Length);
+            input.Flush();
         }
 
         internal void Restarting()

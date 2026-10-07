@@ -3,11 +3,11 @@ import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
 import { LiveEventsSection } from "./LiveEventsSection";
-import { TwitchConnectionControls } from "./TwitchConnectionControls";
 import type {
   DashboardConnection,
   DashboardCounters,
   DashboardState,
+  StreamPlatform,
 } from "../../model";
 
 const EMPTY_COUNTERS: DashboardCounters = {
@@ -83,6 +83,7 @@ function normalizedCounter(value: number | undefined) {
 }
 
 interface DashboardViewProps {
+  onOpenSettings: (connection: StreamPlatform) => void;
   onOpenInteractions: () => void;
   onOpenPeskyBattle: () => void;
   onOpenTapFarming: () => void;
@@ -90,6 +91,7 @@ interface DashboardViewProps {
 }
 
 export function DashboardView({
+  onOpenSettings,
   onOpenInteractions,
   onOpenPeskyBattle,
   onOpenTapFarming,
@@ -167,24 +169,6 @@ export function DashboardView({
     ["bits", counters.bits ?? 0],
   ] as const;
 
-  const formatDate = (value?: string | null) => {
-    if (!value) return t("dashboard.time.never");
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return t("dashboard.time.never");
-    return new Intl.DateTimeFormat(locale === "es" ? "es-MX" : "en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(date);
-  };
-
-  const connectionDescription = (connection: DashboardConnection) => {
-    const fallback = connection.message || connection.account || t("dashboard.connections.notConfigured");
-    return connection.connector === "tikfinity"
-      ? t(`dashboard.connectionDescriptions.tikfinity.${connection.status}`, fallback)
-      : fallback;
-  };
-
   return (
     <div className="page page--dashboard">
       <header className="page-header dashboard-page-header">
@@ -241,12 +225,13 @@ export function DashboardView({
                   {t(`dashboard.connectionStatus.${connection.status}`, connection.status)}
                 </span>
               </div>
-              {connection.platform === "twitch" ? <TwitchConnectionControls /> : <div className="dashboard-connection-card__copy">
-                <span>{connectionDescription(connection)}</span>
-              </div>}
-              <div className="dashboard-connection-card__footer">
-                <span>{t("dashboard.connections.lastEvent")}</span>
-                <strong>{formatDate(connection.lastEventAt)}</strong>
+              <div className="dashboard-connection-card__actions">
+                <a href={`/config/settings?connection=${connection.platform}`}
+                  aria-label={`${t("settings.configure")} ${connection.label}`}
+                  onClick={(event) => {
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault(); onOpenSettings(connection.platform as StreamPlatform);
+                  }}>{t("settings.configure")}</a>
               </div>
             </article>
           ))}

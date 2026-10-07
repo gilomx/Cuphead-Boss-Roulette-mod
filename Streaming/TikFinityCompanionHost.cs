@@ -170,7 +170,7 @@ namespace Gilomx.CupheadBossRoulette
         private void SendTwitchCommand()
         {
             var command = twitch.TakeCommand();
-            if (command != null) process.StandardInput.WriteLine(command);
+            if (command != null) TwitchConnectionBridge.WriteCommand(process.StandardInput.BaseStream, command);
         }
 
         private void TryStart()

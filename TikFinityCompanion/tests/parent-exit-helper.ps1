@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Executable,
-    [switch]$TwitchControl
+    [switch]$TwitchControl,
+    [switch]$LegacyPreamble
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,6 +35,21 @@ function Read-ProtocolLine {
 try {
     $starting = Read-ProtocolLine -Reader $companionProcess.StandardOutput
     $connecting = Read-ProtocolLine -Reader $companionProcess.StandardOutput
+    $controlAcknowledged = $false
+    if ($TwitchControl) {
+        # Match the legacy host: ASCII, no BOM, one flushed line per command.
+        $commandBytes = [Text.Encoding]::ASCII.GetBytes("twitch:cancel:1`n")
+        if ($LegacyPreamble) { $commandBytes = [Text.Encoding]::UTF8.GetPreamble() + $commandBytes }
+        $companionProcess.StandardInput.BaseStream.Write($commandBytes, 0, $commandBytes.Length)
+        $companionProcess.StandardInput.BaseStream.Flush()
+        $controlDeadline = [DateTime]::UtcNow.AddSeconds(15)
+        do {
+            $controlStatus = (Read-ProtocolLine -Reader $companionProcess.StandardOutput) | ConvertFrom-Json
+            if ($controlStatus.kind -eq 'status' -and $controlStatus.connectionId -eq 'twitch' -and
+                $controlStatus.controlRevision -eq 1) { $controlAcknowledged = $true; break }
+        } while ([DateTime]::UtcNow -lt $controlDeadline)
+        if (!$controlAcknowledged) { throw 'Published companion did not acknowledge its control pipe.' }
+    }
 }
 catch {
     if (-not $companionProcess.HasExited) {
@@ -51,7 +67,7 @@ if ([string]::IsNullOrWhiteSpace($starting) -or
 
 $startedAtTicks = $companionProcess.StartTime.ToUniversalTime().Ticks
 [Console]::Out.WriteLine(
-    "$($companionProcess.Id)`t$startedAtTicks`t$starting`t$connecting")
+    "$($companionProcess.Id)`t$startedAtTicks`t$starting`t$connecting`t$controlAcknowledged")
 [Console]::Out.Flush()
 
 # Returning from this helper ends the process whose PID was passed to the

@@ -44,6 +44,7 @@ internal static partial class Program
             ("Twitch disconnect clears offline and retries failed vault delete", () => TwitchDisconnectAsync().GetAwaiter().GetResult()),
             ("Twitch vault errors and wrong account reject startup", () => TwitchStartupErrorsAsync().GetAwaiter().GetResult()),
             ("Twitch protocol excludes credentials", TwitchPublicProtocol),
+            ("Twitch command pipe accepts ASCII and legacy UTF-8 preambles", () => TwitchCommandPipeAsync().GetAwaiter().GetResult()),
         };
 
         var failed = 0;

@@ -1267,6 +1267,8 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (path == "/config" || path == "/config/" ||
                 path == "/config.html" ||
+                path == "/config/settings" ||
+                path == "/config/settings/" ||
                 path == "/config/roulette" ||
                 path == "/config/roulette/" ||
                 path == "/config/roulette.html" ||

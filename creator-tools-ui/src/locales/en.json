@@ -15,7 +15,16 @@
     "roulette": "Roulette",
     "interactions": "Interactions",
     "overlays": "Overlays",
-    "pesky": "Pesky Mode"
+    "pesky": "Pesky Mode",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage the connections and accounts used by the mod.",
+    "configure": "Configure",
+    "platforms": { "twitch": "Twitch", "youtube": "YouTube", "tiktok": "TikTok / TikFinity" },
+    "youtubePending": "YouTube connection is not available yet. You will configure it here once it is enabled.",
+    "tikfinity": "Open TikFinity on this PC and connect your account in that application. The mod detects its local API automatically."
   },
   "dashboard": {
     "chatChooses": {
@@ -363,6 +372,8 @@
       "keepAccount": "Keep account",
       "confirmDisconnect": "Disconnect",
       "commandError": "The request could not be completed. Please try again.",
+      "waitingCommand": "Sending the request…",
+      "commandTimeout": "The companion did not confirm the request. You can retry; if it continues, load the updated Dev package on the next launch.",
       "messages": {
         "companion_starting": "Waiting for the mod companion.",
         "not_connected": "Connect your channel to receive Twitch events and votes.",

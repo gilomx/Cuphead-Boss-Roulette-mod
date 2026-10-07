@@ -32,6 +32,7 @@ export function TwitchConnectionControls() {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [now, setNow] = useState(Date.now());
   const latestRequest = useRef(0);
+  const pendingSince = useRef(0);
   const load = useCallback(async (signal?: AbortSignal) => {
     const request = ++latestRequest.current;
     try {
@@ -39,7 +40,11 @@ export function TwitchConnectionControls() {
       if (!response.ok) throw new Error("Unavailable");
       const data = await response.json() as TwitchConnectionState;
       if (typeof data.ready !== "boolean" || typeof data.authorized !== "boolean") throw new Error("Invalid state");
-      if (request === latestRequest.current) { setNow(Date.now()); setState(data); }
+      if (request === latestRequest.current) {
+        if (data.commandPending && !pendingSince.current) pendingSince.current = Date.now();
+        if (!data.commandPending) pendingSince.current = 0;
+        setNow(Date.now()); setState(data);
+      }
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === "AbortError") return;
       if (request === latestRequest.current) setState((current) => ({ ...current, ready: false }));
@@ -54,24 +59,31 @@ export function TwitchConnectionControls() {
   }, [load]);
 
   const command = async (action: "connect" | "disconnect" | "cancel") => {
+    pendingSince.current = Date.now();
     setBusy(true); setError(false); setConfirmingDisconnect(false);
+    const deadline = new AbortController();
+    const timer = window.setTimeout(() => deadline.abort(), 10000);
     try {
       const response = await fetch(`/api/twitch/${action}`, {
-        method: "POST", headers: { "X-Pichi-Twitch-Control": state.controlToken ?? "" }, body: "",
+        method: "POST", headers: { "X-Pichi-Twitch-Control": state.controlToken ?? "" }, body: "", signal: deadline.signal,
       });
       if (!response.ok) throw new Error("Command rejected");
-      await load();
+      await load(deadline.signal);
     } catch { setError(true); }
-    finally { setBusy(false); }
+    finally { window.clearTimeout(timer); setBusy(false); }
   };
 
-  const disabled = !state.ready || busy || state.commandPending;
+  const timedOut = Boolean(state.commandPending && pendingSince.current && now - pendingSince.current >= 10000);
+  const disabled = !state.ready || busy || (state.commandPending && !timedOut);
   const url = verificationUrl(state.verificationUri);
-  const authorizing = Boolean(state.userCode && url && Date.parse(state.expiresAt ?? "") > now);
+  const authorizing = Boolean(state.ready && state.userCode && url && Date.parse(state.expiresAt ?? "") > now);
   return (
     <div className="twitch-connection-controls" aria-label={t("dashboard.twitch.title")}>
-      <p role="status">{t(`dashboard.twitch.messages.${state.messageCode ?? "companion_starting"}`,
-        t("dashboard.twitch.messages.connection_error"))}</p>
+      <p role="status">{busy || (state.commandPending && !timedOut)
+        ? t("dashboard.twitch.waitingCommand")
+        : t(`dashboard.twitch.messages.${state.ready ? state.messageCode ?? "companion_starting" : "companion_starting"}`,
+          t("dashboard.twitch.messages.connection_error"))}</p>
+      {timedOut ? <p role="alert">{t("dashboard.twitch.commandTimeout")}</p> : null}
       {state.account ? <strong className="twitch-connection-controls__account">@{state.account}</strong> : null}
       {authorizing ? (
         <div className="twitch-connection-controls__authorization">

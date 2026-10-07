@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Executable,
-    [switch]$TwitchControl
+    [switch]$TwitchControl,
+    [switch]$LegacyPreamble
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,15 +17,17 @@ $helper = Join-Path $projectRoot "tests\parent-exit-helper.ps1"
 $helperArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $helper,
     '-Executable', $resolvedExecutable)
 if ($TwitchControl) { $helperArguments += '-TwitchControl' }
+if ($LegacyPreamble) { $helperArguments += '-LegacyPreamble' }
 $record = & powershell.exe @helperArguments
 if ($LASTEXITCODE -ne 0) {
     throw "The parent-lifetime helper failed with exit code $LASTEXITCODE"
 }
 
-$parts = @($record -split "`t", 4)
-if ($parts.Count -ne 4) {
+$parts = @($record -split "`t", 5)
+if ($parts.Count -ne 5) {
     throw "The parent-lifetime helper returned an invalid record."
 }
+if ($TwitchControl -and $parts[4] -ne 'True') { throw 'Twitch command pipe was not acknowledged.' }
 
 $childProcessId = 0
 if (-not [int]::TryParse($parts[0], [ref]$childProcessId) -or
@@ -73,4 +76,6 @@ if ($null -ne $remainingProcess -and
     ConnectingStatus = $connecting.state
     ExitedWithParent = $true
     TwitchControl = [bool]$TwitchControl
+    ControlAcknowledged = $parts[4] -eq 'True'
+    LegacyPreamble = [bool]$LegacyPreamble
 } | ConvertTo-Json -Compress

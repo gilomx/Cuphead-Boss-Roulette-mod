@@ -55,6 +55,7 @@ const streamRuleGlobalCooldowns = new Map();
 const followedViewers = new Set();
 
 const twitchControlToken = "local-mock-twitch-control";
+const twitchStalledCommand = process.env.CREATOR_TOOLS_MOCK_TWITCH_STALL === "1";
 let twitchAuthorizationTimer;
 let twitchConnection = { ready: true, status: "disconnected", authorized: false, account: "",
   messageCode: "not_connected", userCode: "", verificationUri: "", expiresAt: "", commandPending: false,
@@ -1180,10 +1181,12 @@ createServer((req, res) => {
     }
     clearTimeout(twitchAuthorizationTimer);
     const action = url.pathname.split("/").at(-1);
-    twitchConnection = { ...twitchConnection, authorized: false, account: "", userCode: "",
+    twitchConnection = { ...twitchConnection, commandPending: false, authorized: false, account: "", userCode: "",
       verificationUri: "", expiresAt: "", status: "disconnected", messageCode: "not_connected" };
     const connection = dashboardConnections.find((entry) => entry.id === "twitch");
-    if (action === "connect") {
+    if (action === "connect" && twitchStalledCommand) {
+      twitchConnection.commandPending = true;
+    } else if (action === "connect") {
       Object.assign(twitchConnection, { status: "connecting", messageCode: "mock_authorization_pending",
         userCode: "MOCK-ONLY", verificationUri: "https://www.twitch.tv/activate", expiresAt: new Date(Date.now() + 300000).toISOString() });
       twitchAuthorizationTimer = setTimeout(() => {

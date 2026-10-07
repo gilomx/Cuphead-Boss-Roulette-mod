@@ -6,12 +6,20 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 
 ## Comportamiento actual
 
-- Dashboard permite conectar Twitch con autorización de dispositivo de una
+- Configuración es la última opción de la barra lateral y agrupa las
+  conexiones en `/config/settings`. Las tarjetas del dashboard conservan sólo
+  nombre, estado y «Configurar», que abre esa página enfocando la plataforma.
+  Allí se gestiona Twitch, se informa el estado de TikFinity y se reserva el
+  lugar de YouTube hasta habilitar su integración. Cambiar de página mantiene
+  las conexiones en el companion.
+- Configuración permite conectar Twitch con autorización de dispositivo de una
   aplicación pública compartida. Cada usuario autoriza su propio canal, sin
   introducir Client Secret ni tokens. `/api/twitch` expone sólo el estado
   público; conectar, cancelar y desconectar requieren POST, origen local y
   `X-Pichi-Twitch-Control` obtenido de ese estado. Los comandos se numeran
   para rechazar respuestas tardías tras cancelar o cambiar de cuenta.
+  La espera de confirmación se muestra explícitamente y, tras diez segundos
+  sin respuesta del companion, permite reintentar con un aviso visible.
 - Los tokens de Twitch pertenecen al companion y al Administrador de
   credenciales de Windows, por usuario y PC; no al navegador ni al ZIP. La
   sesión se valida al restaurar, cada hora y al reconectar; el refresh rotado

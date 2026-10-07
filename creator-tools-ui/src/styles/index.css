@@ -5221,6 +5221,45 @@ textarea:focus-visible {
   gap: 0.68rem;
 }
 
+.dashboard-connection-card__actions { padding-top: 0.75rem; }
+
+.dashboard-connection-card__actions a {
+  display: inline-flex;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-text);
+  background: var(--color-control-active);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dashboard-connection-card__actions a:hover { filter: brightness(1.12); }
+
+.settings-connections { max-width: 58rem; margin-top: var(--space-5); }
+.settings-connection-list { display: grid; gap: var(--space-3); }
+.settings-connection {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-background-raised);
+}
+
+.settings-connection__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.settings-connection__header h3 { margin: 0; }
+.settings-connection > p,
+.settings-connection > small { margin: 0; color: var(--color-text-muted); line-height: 1.5; }
+.settings-connection > small { display: block; margin-top: var(--space-2); }
+
 .twitch-connection-controls {
   display: grid;
   gap: 0.65rem;

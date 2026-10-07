@@ -9,12 +9,15 @@ import type { OverlayComponentId } from "./features/overlay-designer/model";
 import { InteractionsView } from "./features/interactions/InteractionsView";
 import { PeskyModeView } from "./features/pesky/PeskyModeView";
 import { RouletteView } from "./features/roulette/RouletteView";
+import { SettingsView } from "./features/settings/SettingsView";
+import type { StreamPlatform } from "./model";
 import { useLocalization } from "./i18n/LocalizationContext";
 
-export type ConfigSection = "dashboard" | "roulette" | "interactions" | "pesky";
+export type ConfigSection = "dashboard" | "roulette" | "interactions" | "pesky" | "settings";
 type AppView = ConfigSection | "peskyBattle" | "tapFarming" | "chatChooses" | "overlayDesigner";
 
 function viewFromPath(): AppView {
+  if (window.location.pathname.startsWith("/config/settings")) return "settings";
   if (window.location.pathname.startsWith("/config/chat-chooses")) return "chatChooses";
   if (window.location.pathname.startsWith("/config/overlay-designer")) {
     return "overlayDesigner";
@@ -99,6 +102,12 @@ export default function App() {
     navigate("chatChooses", { fromLiveEvents: true });
   };
 
+  const openSettings = (connection: StreamPlatform) => {
+    window.history.pushState(null, "", `/config/settings?connection=${connection}`);
+    setView("settings");
+    window.scrollTo({ top: 0 });
+  };
+
   const returnToLiveEvents = (focusLiveEvent: "peskyBattle" | "tapFarming" | "chatChooses") => {
     const currentState = window.history.state as {
       fromLiveEvents?: boolean;
@@ -162,6 +171,7 @@ export default function App() {
             onOpenPeskyBattle={openPeskyBattle}
             onOpenTapFarming={openTapFarming}
             onOpenChatChooses={openChatChooses}
+            onOpenSettings={openSettings}
           />
         : view === "chatChooses"
           ? <ChatChoosesDetailView onBack={() => returnToLiveEvents("chatChooses")} onOpenOverlayDesigner={() => openOverlayDesigner("chat_chooses")} />
@@ -177,6 +187,8 @@ export default function App() {
             />
         : view === "overlayDesigner"
           ? <OverlayDesignerView onBack={closeOverlayDesigner} />
+        : view === "settings"
+          ? <SettingsView />
         : view === "interactions"
         ? <InteractionsView />
         : view === "pesky"

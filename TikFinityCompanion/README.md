@@ -205,9 +205,16 @@ morir el proceso padre:
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-Repetir con `-TwitchControl` comprueba también que el padre termina el
-ejecutable mientras el lector de comandos está esperando en stdin. Esa
-variante lee la credencial existente; no inicia una autorización ni la borra.
+Repetir con `-TwitchControl` envía una línea ASCII sin BOM, exige que el
+companion confirme su revisión y comprueba su cierre mientras el lector de
+comandos espera en stdin. Esa variante lee la credencial existente; no inicia
+una autorización ni la borra. El host escribe directamente al pipe y lo
+vacía después de cada comando para evitar el búfer y el preámbulo de Mono.
+El lector también tolera un BOM inicial de UTF-8, conservando el límite de
+128 caracteres por línea. La prueba de regresión cubre ambos formatos.
+`-TwitchControl -LegacyPreamble` comprueba ese formato antiguo contra el
+ejecutable publicado, con un pipe real que permanece abierto hasta recibir
+la confirmación.
 
 Las pruebas usan fixtures representativos de ambos esquemas. Son muestras de
 compatibilidad, no capturas declaradas como oficiales de TikFinity.

@@ -38,7 +38,7 @@ internal sealed class CompanionHost
             new TwitchEventSub(twitchApi, output), output.WriteStatusAsync);
         var twitchTask = twitchControl ? twitch.RunAsync(lifetimeCancellation.Token)
             : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
-        var inputTask = twitchControl ? ReadCommandsAsync(twitch, lifetimeCancellation.Token)
+        var inputTask = twitchControl ? ReadCommandsAsync(Console.OpenStandardInput(), twitch, lifetimeCancellation.Token)
             : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
         var parentExitTask = parentLifetime.WaitForExitAsync(
             lifetimeCancellation.Token);
@@ -59,14 +59,16 @@ internal sealed class CompanionHost
             ? ExitCodes.Success : ExitCodes.FatalError;
     }
 
-    private static async Task ReadCommandsAsync(TwitchConnectionService twitch, CancellationToken cancellationToken)
+    internal static async Task ReadCommandsAsync(Stream input, TwitchConnectionService twitch, CancellationToken cancellationToken)
     {
-        using var input = Console.OpenStandardInput();
+        // Older Mono StreamWriters can prepend UTF-8 BOM bytes before the first
+        // command. Decode the pipe before validating bounded command lines.
+        using var reader = new StreamReader(input, new System.Text.UTF8Encoding(false, true), true, 256);
         var line = new System.Text.StringBuilder();
-        var buffer = new byte[256];
+        var buffer = new char[256];
         while (!cancellationToken.IsCancellationRequested)
         {
-            var read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            var read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
             if (read == 0) return;
             for (var index = 0; index < read; index++)
             {
@@ -79,7 +81,7 @@ internal sealed class CompanionHost
                 else if (value != '\r')
                 {
                     if (line.Length >= 128) throw new InvalidDataException("Companion command too long.");
-                    line.Append((char)value);
+                    line.Append(value);
                 }
             }
         }

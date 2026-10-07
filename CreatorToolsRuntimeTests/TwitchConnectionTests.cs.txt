@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text;
 
 namespace Gilomx.CupheadBossRoulette
 {
@@ -10,9 +12,22 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static void RunTwitchConnectionTests()
         {
+            Run("Twitch commands leave buffered pipes immediately without a BOM", TestTwitchCommandBytes);
             Run("Twitch controls fence old events and replay only unacknowledged commands", TestTwitchControlFence);
             Run("Twitch browser state allows only public fields and official activation links", TestTwitchPublicState);
             Run("Twitch HTTP controls require POST, same origin and local proof", TestTwitchHttpControls);
+        }
+
+        private static void TestTwitchCommandBytes()
+        {
+            using (var destination = new MemoryStream())
+            using (var buffered = new BufferedStream(destination, 256))
+            {
+                TwitchConnectionBridge.WriteCommand(buffered, "twitch:connect:1");
+                Equal("twitch:connect:1\n", Encoding.ASCII.GetString(destination.ToArray()), "command delivered before disposal");
+                TwitchConnectionBridge.WriteCommand(buffered, "twitch:cancel:2");
+                Equal("twitch:connect:1\ntwitch:cancel:2\n", Encoding.ASCII.GetString(destination.ToArray()), "each command has its own line without preamble");
+            }
         }
 
         private static Dictionary<string, string> TwitchStatus(long revision, bool authorized)
@@ -66,6 +81,7 @@ namespace Gilomx.CupheadBossRoulette
                 server.SetTwitchHandlers(delegate { return "{\"ready\":true,\"authorized\":false}"; },
                     delegate(string action) { commands.Add(action); return string.Empty; });
                 var origin = "http://127.0.0.1:" + server.Port;
+                Equal(HttpStatusCode.OK, client.GetAsync(origin + "/config/settings?connection=twitch").GetAwaiter().GetResult().StatusCode, "settings direct link served");
                 string proof;
                 using (var state = JsonDocument.Parse(client.GetStringAsync(origin + "/api/twitch").GetAwaiter().GetResult()))
                     proof = state.RootElement.GetProperty("controlToken").GetString();

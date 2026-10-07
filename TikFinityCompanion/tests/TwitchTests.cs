@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using LaPichiRuleta.TikFinity.Protocol;
+using LaPichiRuleta.TikFinity.Runtime;
 using LaPichiRuleta.TikFinity.Twitch;
 
 namespace LaPichiRuleta.TikFinity.Tests;
@@ -65,6 +66,21 @@ internal static partial class Program
     }
 
     private static readonly TwitchTokens TestTokens = new("ACCESS-PRIVATE", "REFRESH-PRIVATE", "42", "channel");
+
+    private static async Task TwitchCommandPipeAsync()
+    {
+        foreach (var preamble in new[] { Array.Empty<byte>(), Encoding.UTF8.GetPreamble() })
+        {
+            var store = new FakeTwitchStore();
+            await using var harness = new TwitchHarness(new FakeTwitchApi(), store);
+            await harness.WaitAsync("not_connected");
+            using var pipe = new MemoryStream(preamble.Concat(Encoding.ASCII.GetBytes("twitch:connect:1\r\n")).ToArray());
+            await CompanionHost.ReadCommandsAsync(pipe, harness.Service, default);
+            var status = await harness.WaitAsync("authorization_pending");
+            Equal(1L, status.ControlRevision); Equal("PUBLIC-CODE", status.UserCode);
+            Equal(0, store.Writes); // The command requests authorization without authorizing an account.
+        }
+    }
 
     private static async Task TwitchRestoreAsync()
     {
