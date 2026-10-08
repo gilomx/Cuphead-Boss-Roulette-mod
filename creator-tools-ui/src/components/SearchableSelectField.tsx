@@ -148,7 +148,7 @@ export function SearchableSelectField<T>({
     setOpen(false);
     setQuery("");
     setActiveKey(null);
-    window.requestAnimationFrame(() => inputRef.current?.select());
+    window.requestAnimationFrame(() => inputRef.current?.blur());
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
