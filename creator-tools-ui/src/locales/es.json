@@ -20,11 +20,31 @@
   },
   "settings": {
     "title": "Configuración",
-    "description": "Administra las conexiones y cuentas que usa el mod.",
+    "description": "Administra tus conexiones y lleva tu configuración a otra instalación.",
+    "connectionsDescription": "Conecta tus cuentas por separado en cada instalación.",
     "configure": "Configurar",
     "platforms": { "twitch": "Twitch", "youtube": "YouTube", "tiktok": "TikTok / TikFinity" },
     "youtubePending": "La conexión con YouTube todavía no está disponible. Se configurará desde esta página cuando esté habilitada.",
-    "tikfinity": "Abre TikFinity en esta PC y conecta tu cuenta desde esa aplicación. El mod detecta su API local automáticamente."
+    "tikfinity": "Abre TikFinity en esta PC y conecta tu cuenta desde esa aplicación. El mod detecta su API local automáticamente.",
+    "transfer": {
+      "title": "Exportar e importar configuraciones",
+      "description": "Guarda una copia de tus ajustes o restaura una copia en esta instalación.",
+      "includes": "Incluye Ruleta, controles, retos, reglas de Interacciones, Modo Molestoso, Eventos Live, overlays e idioma del panel.",
+      "connectionsExcluded": "Las conexiones y credenciales quedan fuera. Autoriza tus cuentas en cada instalación; importar ajustes conserva las conexiones de esta PC.",
+      "export": "Exportar configuraciones",
+      "selectFile": "Seleccionar archivo para importar",
+      "import": "Importar y reemplazar ajustes",
+      "cancel": "Cancelar",
+      "confirmImport": "Esta copia reemplazará todos los ajustes al reiniciar el juego. Se conservará un respaldo de la configuración anterior.",
+      "restartRequired": "Importación preparada. Reinicia el juego desde el launcher para aplicar los ajustes. Las conexiones de esta instalación se conservarán.",
+      "cancelPending": "Cancelar importación pendiente",
+      "unavailable": "Esperando la conexión con Cuphead para exportar o importar.",
+      "exported": "Copia de configuración descargada.",
+      "imported": "Copia validada y preparada para el próximo arranque.",
+      "cancelled": "Importación cancelada. Tus ajustes actuales se conservan.",
+      "invalidFile": "El archivo no es una copia compatible de La Pichi Ruleta o contiene ajustes inválidos. No se modificó la configuración.",
+      "requestError": "No se pudo completar la operación. Comprueba la conexión con Cuphead e inténtalo de nuevo."
+    }
   },
   "dashboard": {
     "chatChooses": {
@@ -362,7 +382,6 @@
       "title": "Cuenta de Twitch",
       "connect": "Conectar Twitch",
       "disconnect": "Desconectar cuenta",
-      "changeAccount": "Cambiar cuenta",
       "cancel": "Cancelar conexión",
       "openTwitch": "Autorizar en Twitch",
       "authorizationInstructions": "Abre Twitch y confirma este código con la cuenta que quieres conectar.",

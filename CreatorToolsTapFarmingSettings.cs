@@ -162,7 +162,7 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private string BuildJson()
+        internal string BuildJson()
         {
             return "{\n  \"version\": " +
                 CurrentVersion.ToString(CultureInfo.InvariantCulture) +

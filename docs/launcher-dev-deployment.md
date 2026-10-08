@@ -187,6 +187,12 @@ de usuario a restaurar. `BepInEx/config/BepInEx.cfg` es configuración del
 cargador compartido; el launcher deberá decidir su gestión por separado, sin
 mezclarla con los datos exclusivos de esta ruleta.
 
+Las copias del panel también usan `.community-gift.json` para recuperar reglas
+de regalos personalizados. Conserva ese archivo, su `.bak`, una posible
+`.pending-import.json` y `BepInEx/config/pichi-settings-backups/`; son datos del
+usuario, externos al ZIP. El panel nunca exporta ni importa conexiones o tokens.
+Consulta [copias de configuración](settings-transfer.md).
+
 El companion guarda exclusivamente los tokens de Twitch en una credencial
 genérica del Administrador de credenciales de Windows, por usuario y PC,
 con destino `LaPichiRuleta/Twitch/<Client ID>`. No se incluye en el ZIP ni se

@@ -432,6 +432,9 @@ namespace Gilomx.CupheadBossRoulette
         private void Awake()
         {
             var startupClock = System.Diagnostics.Stopwatch.StartNew();
+            creatorToolsSettingsTransfer = new CreatorToolsSettingsTransfer(Config.ConfigFilePath,
+                delegate(string message) { Logger.LogWarning(message); });
+            if (creatorToolsSettingsTransfer.ApplyPending()) Config.Reload();
             modLocalization = new ModLocalization();
             modLocalization.LanguageChanged += OnModLanguageChanged;
             InitializeManualChallengeEquipment();

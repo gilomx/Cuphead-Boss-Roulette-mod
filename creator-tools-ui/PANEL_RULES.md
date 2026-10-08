@@ -12,12 +12,18 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   Allí se gestiona Twitch, se informa el estado de TikFinity y se reserva el
   lugar de YouTube hasta habilitar su integración. Cambiar de página mantiene
   las conexiones en el companion.
+- Configuración separa **Conexiones** de **Exportar e importar configuraciones**.
+  Una cuenta Twitch autorizada ofrece sólo Desconectar cuenta como acción de
+  cuenta. La copia portable reúne los ajustes guardados de todos los módulos y
+  el idioma, sin conexiones ni credenciales. Importar valida la copia, mantiene
+  las conexiones locales y prepara los ajustes para el próximo arranque, con
+  respaldo previo y opción de cancelar. Contrato: [copias de configuración](../docs/settings-transfer.md).
 - Configuración permite conectar Twitch con autorización de dispositivo de una
   aplicación pública compartida. Cada usuario autoriza su propio canal, sin
   introducir Client Secret ni tokens. `/api/twitch` expone sólo el estado
   público; conectar, cancelar y desconectar requieren POST, origen local y
   `X-Pichi-Twitch-Control` obtenido de ese estado. Los comandos se numeran
-  para rechazar respuestas tardías tras cancelar o cambiar de cuenta.
+  para rechazar respuestas tardías tras cancelar o desconectar una cuenta.
   La espera de confirmación se muestra explícitamente y, tras diez segundos
   sin respuesta del companion, permite reintentar con un aviso visible.
 - Los tokens de Twitch pertenecen al companion y al Administrador de

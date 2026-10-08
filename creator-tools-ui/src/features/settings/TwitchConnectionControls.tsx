@@ -102,10 +102,7 @@ export function TwitchConnectionControls() {
         ) : authorizing || state.messageCode === "requesting_code" ? (
           <button type="button" disabled={disabled} onClick={() => void command("cancel")}>{t("dashboard.twitch.cancel")}</button>
         ) : state.authorized ? (
-          <>
-            <button type="button" disabled={disabled} onClick={() => void command("connect")}>{t("dashboard.twitch.changeAccount")}</button>
-            <button type="button" disabled={disabled} onClick={() => setConfirmingDisconnect(true)}>{t("dashboard.twitch.disconnect")}</button>
-          </>
+          <button type="button" disabled={disabled} onClick={() => setConfirmingDisconnect(true)}>{t("dashboard.twitch.disconnect")}</button>
         ) : (
           <button type="button" disabled={disabled} onClick={() => void command("connect")}>{t("dashboard.twitch.connect")}</button>
         )}

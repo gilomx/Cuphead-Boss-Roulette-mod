@@ -5272,8 +5272,17 @@ textarea:focus-visible {
 
 .dashboard-connection-card__actions a:hover { filter: brightness(1.12); }
 
-.settings-connections { max-width: 58rem; margin-top: var(--space-5); }
-.settings-connection-list { display: grid; gap: var(--space-3); }
+.settings-panels { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: var(--space-4); max-width: 82rem; margin-top: var(--space-5); }
+.settings-connection-list { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.settings-transfer__content { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.settings-transfer__content p { margin: 0; color: var(--color-text-muted); line-height: 1.5; }
+.settings-transfer__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.settings-transfer__actions button { display: inline-flex; align-items: center; gap: var(--space-2); }
+.settings-transfer__confirmation,
+.settings-transfer__pending { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-small); }
+.settings-transfer__confirmation strong { overflow-wrap: anywhere; }
+.settings-transfer__pending button { justify-self: start; }
+@media (max-width: 1100px) { .settings-panels { grid-template-columns: minmax(0, 1fr); } }
 .settings-connection {
   min-width: 0;
   padding: var(--space-4);
@@ -5309,6 +5318,7 @@ textarea:focus-visible {
 .twitch-connection-controls__actions,
 .twitch-connection-controls__confirmation { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .twitch-connection-controls__confirmation p { flex-basis: 100%; }
+.settings-transfer button,
 .twitch-connection-controls button,
 .twitch-connection-controls__authorization a {
   padding: 0.55rem 0.7rem;
@@ -5321,9 +5331,11 @@ textarea:focus-visible {
   cursor: pointer;
   text-decoration: none;
 }
+.settings-transfer button:hover,
 .twitch-connection-controls button:hover,
 .twitch-connection-controls__authorization a:hover { background: var(--color-control-hover); }
-.twitch-connection-controls button:disabled { opacity: 0.45; cursor: default; }
+.twitch-connection-controls button:disabled,
+.settings-transfer button:disabled { opacity: 0.45; cursor: default; }
 .twitch-connection-controls__authorization { display: grid; gap: 0.65rem; }
 .twitch-connection-controls__authorization code { font-size: 1.4rem; font-weight: 850; letter-spacing: 0.1em; }
 

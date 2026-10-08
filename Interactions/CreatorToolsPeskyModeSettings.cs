@@ -427,7 +427,7 @@ namespace Gilomx.CupheadBossRoulette
                 value >= minimum && value <= maximum && (!integer || value == Math.Floor(value));
         }
 
-        private string BuildJson()
+        internal string BuildJson()
         {
             var builder = new StringBuilder(1024);
             builder.Append("{\n  \"version\": ")

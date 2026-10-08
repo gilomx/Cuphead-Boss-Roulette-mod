@@ -10,6 +10,7 @@ const port = Number.isInteger(configuredPort) && configuredPort > 0
   : 18091;
 const host = process.argv[3] ?? "127.0.0.1";
 const assetsRoot = resolve(process.cwd(), "../assets") + sep;
+const previewUiRoot = process.env.CREATOR_TOOLS_UI_OUTPUT ? resolve(process.cwd(), process.env.CREATOR_TOOLS_UI_OUTPUT) + sep : null;
 const giftCatalog = JSON.parse(readFileSync(
   resolve(assetsRoot, "creator-tools/gifts/catalog.json"),
   "utf8",
@@ -55,6 +56,8 @@ const streamRuleGlobalCooldowns = new Map();
 const followedViewers = new Set();
 
 const twitchControlToken = "local-mock-twitch-control";
+const settingsControlToken = "local-mock-settings-control";
+let settingsPendingImport = false;
 const twitchStalledCommand = process.env.CREATOR_TOOLS_MOCK_TWITCH_STALL === "1";
 let twitchAuthorizationTimer;
 let twitchConnection = { ready: true, status: "disconnected", authorized: false, account: "", testAvailable: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0", testMode: false,
@@ -973,12 +976,12 @@ function json(res, body, status = 200) {
   res.end(value);
 }
 
-function readJsonBody(req, res, callback) {
+function readJsonBody(req, res, callback, maximumBytes = 65536) {
   const chunks = [];
   let length = 0;
   req.on("data", (chunk) => {
     length += chunk.length;
-    if (length > 65536) {
+    if (length > maximumBytes) {
       json(res, { ok: false, error: "payload_too_large" }, 413);
       req.destroy();
       return;
@@ -1175,8 +1178,9 @@ function serveAsset(pathname, res) {
 }
 
 function serveCreatorToolFile(fileName, contentType, res) {
-  const file = resolve(assetsRoot, "creator-tools", fileName);
-  if (!file.startsWith(assetsRoot) || !existsSync(file)) {
+  const root = previewUiRoot && ["config.html", "config.css", "config.js"].includes(fileName) ? previewUiRoot : resolve(assetsRoot, "creator-tools") + sep;
+  const file = resolve(root, fileName);
+  if (!file.startsWith(root) || !existsSync(file)) {
     res.writeHead(404).end();
     return;
   }
@@ -1191,8 +1195,39 @@ setInterval(() => {
   for (const entry of chatChooses.takeDueTestVotes()) executeDashboardSimulation(entry);
 }, 50).unref();
 
+function portableMockSettings() {
+  const prefix = "mx.gilomx.cuphead.bossroulette";
+  const overlay = overlayComposerState();
+  const rules = streamRules.map(({ connectionId: _connection, ...rule }) => rule);
+  return { format: "la-pichi-ruleta-settings", schemaVersion: 1, panelLocale: "es", files: {
+    [prefix + ".cfg"]: `[Creator Tools]\nInteraccionesActivadas = ${interactionsEnabled}\nInteraccionesMaximasEnPantalla = ${interactionMaxActive}\nMiniJefesMaximosEnPantalla = ${interactionMaxMiniBosses}\n`,
+    [prefix + ".stream-rules.json"]: JSON.stringify({ version: 6, nextId: streamRulesNextId, rules }),
+    [prefix + ".pesky-mode.json"]: JSON.stringify({ version: 23, enabled: peskyEnabled, ...peskyIntervals, allowConcurrentStrongInteractions: peskyAllowConcurrentStrongInteractions, maxActive: peskyMaxActive, names: peskyNames, disabledItems: peskyDisabledItems, challengeDurationSeconds: peskyChallengeDurationSeconds, challengeCountdownSeconds: peskyChallengeCountdownSeconds, challengeWaitSeconds: peskyChallengeWaitSeconds }),
+    [prefix + ".interaction-pacing.json"]: JSON.stringify(interactionPacing),
+    [prefix + ".pesky-battle.json"]: JSON.stringify({ version: 2, giftId: peskyBattleGiftId, capacity: peskyBattleCapacity, allowStreamAttacks: peskyBattleAllowStreamAttacks, disabledItems: peskyBattleDisabledItems }),
+    [prefix + ".tap-farming.json"]: JSON.stringify({ version: 2, tapsPerConversion: tapFarmingTapsPerConversion, healthPointsPerConversion: tapFarmingHealthPointsPerConversion }),
+    [prefix + ".overlay-composer.json"]: JSON.stringify({ schemaVersion: 1, revision: overlay.revision, profiles: overlay.profiles }),
+    [prefix + ".community-gift.json"]: JSON.stringify({ version: 1, giftId: "", previousGiftId: "", name: "Community Gift", imagePath: "/assets/creator-tools/gifts/images/0.webp", coinsPerUnit: 0, observedAt: "" }),
+  } };
+}
+
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:" + port);
+  if (url.pathname === "/api/settings") { json(res, { ready: true, pendingImport: settingsPendingImport, controlToken: settingsControlToken }); return; }
+  if (["/api/settings/export", "/api/settings/import", "/api/settings/cancel-import"].includes(url.pathname)) {
+    if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }
+    if (req.headers["x-pichi-settings-control"] !== settingsControlToken ||
+      ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(req.headers.origin)) { json(res, { error: "invalid_origin" }, 403); return; }
+    if (url.pathname === "/api/settings/export") { json(res, portableMockSettings()); return; }
+    if (url.pathname === "/api/settings/cancel-import") { settingsPendingImport = false; json(res, { ready: true, pendingImport: false }); return; }
+    readJsonBody(req, res, (copy) => {
+      const expected = Object.keys(portableMockSettings().files);
+      if (copy.format !== "la-pichi-ruleta-settings" || copy.schemaVersion !== 1 ||
+        !["es", "en"].includes(copy.panelLocale) || !copy.files || Object.keys(copy.files).length !== expected.length ||
+        expected.some((name) => typeof copy.files[name] !== "string")) { json(res, { error: "invalid_configuration" }, 400); return; }
+      settingsPendingImport = true; json(res, { ready: true, pendingImport: true });
+    }, 1024 * 1024); return;
+  }
   if (url.pathname === "/api/twitch") { json(res, twitchConnection); return; }
   if (["/api/twitch/connect", "/api/twitch/cancel", "/api/twitch/disconnect", "/api/twitch/test"].includes(url.pathname)) {
     if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }

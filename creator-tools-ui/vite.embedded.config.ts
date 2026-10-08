@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
           const isConfigRoute = pathname === "/config" ||
             pathname === "/config/" ||
             pathname.startsWith("/config/roulette") ||
+            pathname.startsWith("/config/settings") ||
             pathname.startsWith("/config/interactions") ||
             pathname.startsWith("/config/pesky") ||
             pathname.startsWith("/config/tap-farming") ||

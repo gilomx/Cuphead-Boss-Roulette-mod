@@ -1,0 +1,248 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private const string SettingsPrefix = "mx.gilomx.cuphead.bossroulette";
+
+        private static void RunSettingsTransferTests()
+        {
+            Run("Portable settings include every saved category and exclude account data", TestSettingsExportPrivacy);
+            Run("Portable stream rules retain their behavior without an account or connection ID", TestSettingsRuleTransfer);
+            Run("Settings import waits for restart, preserves connections and backs up previous files", TestSettingsRoundTrip);
+            Run("Importing default settings replaces destination customizations", TestSettingsDefaultReplacement);
+            Run("Invalid settings cannot replace a valid pending import", TestSettingsInvalidImports);
+            Run("A failed import rolls back every changed file and retains the pending copy", TestSettingsRollback);
+            Run("Pending imports can be cancelled without changing settings", TestSettingsCancel);
+            Run("Settings HTTP transfer enforces local proof, methods and bounded large bodies", TestSettingsHttp);
+        }
+
+        private static CreatorToolsSettingsTransfer Transfer(TestScope scope)
+        { return new CreatorToolsSettingsTransfer(Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg"), null); }
+
+        private static void TestSettingsExportPrivacy()
+        {
+            using (var scope = new TestScope("settings-export"))
+            {
+                var config = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg");
+                File.WriteAllText(config, "# account-secret-in-comment\n[Juego]\nReto = true\n[Conexiones]\nToken = account-secret-in-config\n[Creator Tools]\nTwitchClientId = private-client-id\n");
+                File.WriteAllText(Path.Combine(scope.ConfigDirectory, "connections.json"), "account-secret-in-file");
+                var exported = Transfer(scope).Export();
+                True(!exported.Contains("account-secret") && !exported.Contains("private-client-id"), "connections are not serialized");
+                using (var document = JsonDocument.Parse(exported))
+                {
+                    Equal(8, document.RootElement.GetProperty("files").EnumerateObject().Count(), "all eight persistent settings categories");
+                    True(document.RootElement.GetProperty("files").GetProperty(SettingsPrefix + ".cfg").GetString().Contains("Reto = true"), "roulette values survive filtering");
+                }
+            }
+        }
+
+        private static void TestSettingsRoundTrip()
+        {
+            using (var scope = new TestScope("settings-roundtrip"))
+            {
+                var transfer = Transfer(scope);
+                var document = JsonNode.Parse(transfer.Export());
+                var files = document["files"].AsObject();
+                files[SettingsPrefix + ".cfg"] = "[Juego]\nReto = true\n[El chat elige]\nCon reto = false\n";
+                var pesky = JsonNode.Parse(files[SettingsPrefix + ".pesky-mode.json"].GetValue<string>());
+                pesky["names"] = new JsonArray(Enumerable.Range(0, 200).Select(index => JsonValue.Create("Jugador " + index)).ToArray());
+                pesky["disabledItems"] = new JsonArray();
+                files[SettingsPrefix + ".pesky-mode.json"] = pesky.ToJsonString();
+                var overlay = JsonNode.Parse(files[SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
+                overlay["profiles"][0]["components"][0]["opacity"] = 43;
+                files[SettingsPrefix + ".overlay-composer.json"] = overlay.ToJsonString();
+                files[SettingsPrefix + ".tap-farming.json"] = "{\"version\":2,\"tapsPerConversion\":17,\"healthPointsPerConversion\":9}";
+                var path = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg");
+                File.WriteAllText(path, "[Juego]\nReto = false\n");
+                File.WriteAllText(path + ".bak", "old recovery config");
+                var accounts = Path.Combine(scope.ConfigDirectory, "connections.json");
+                File.WriteAllText(accounts, "existing-installation-connection");
+                Equal("", transfer.StageImport(document.ToJsonString()), "valid import staged");
+                True(File.ReadAllText(path).Contains("Reto = false"), "running settings untouched");
+                // A running controller may save later; that cannot replace the pending copy.
+                File.WriteAllText(path, "[Juego]\nReto = false\n# later save\n");
+                True(transfer.ApplyPending(), "restart applies pending copy");
+                True(File.ReadAllText(path).Contains("Reto = true"), "import wins over later runtime save");
+                Equal("existing-installation-connection", File.ReadAllText(accounts), "connections unchanged");
+                var restored = CreatorToolsPeskyModeSettings.Load(path, null);
+                Equal(200, restored.Names.Count, "maximum names retained");
+                Equal(0, restored.DisabledItems.Count, "enabled items retained");
+                var taps = CreatorToolsTapFarmingSettings.Load(path, null);
+                Equal(17, taps.TapsPerConversion, "tap settings applied");
+                Equal(9, taps.HealthPointsPerConversion, "health conversion applied");
+                var savedOverlay = CreatorToolsOverlayComposerSettings.Load(path, null);
+                Equal(43, savedOverlay.Profiles[0].Components[0].Opacity, "overlay presentation applied");
+                var backup = Directory.GetDirectories(Path.Combine(scope.ConfigDirectory, "pichi-settings-backups")).Single();
+                True(File.ReadAllText(Path.Combine(backup, SettingsPrefix + ".cfg")).Contains("later save"), "previous primary backed up");
+                Equal("old recovery config", File.ReadAllText(Path.Combine(backup, SettingsPrefix + ".cfg.bak")), "previous recovery copy retained");
+                True(!transfer.ApplyPending(), "applies only once");
+            }
+        }
+
+        private static void TestSettingsRuleTransfer()
+        {
+            using (var scope = new TestScope("settings-rules"))
+            {
+                var rules = scope.CreateRules(3);
+                var settingsPath = (string)typeof(CreatorToolsStreamRulesController)
+                    .GetField("settingsPath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(rules);
+                var transfer = new CreatorToolsSettingsTransfer(Path.Combine(Path.GetDirectoryName(settingsPath), "plugin.cfg"), null);
+                var exported = transfer.Export();
+                True(!exported.Contains("connectionId"), "rules export no saved connection identifier");
+                Equal("", transfer.StageImport(exported), "real rule settings accepted");
+                rules.ProcessServerCommand("action=toggle&id=1&enabled=false");
+                True(transfer.ApplyPending(), "rule copy applies on restart");
+                using (var restored = JsonDocument.Parse(scope.ReloadRules(rules).ProcessServerCommand("")))
+                {
+                    var rule = restored.RootElement.GetProperty("rules")[0];
+                    Equal(3, rule.GetProperty("quantity").GetInt32(), "rule amount survives");
+                    True(rule.GetProperty("enabled").GetBoolean(), "rule activation survives");
+                    Equal("tiktok", rule.GetProperty("platform").GetString(), "platform survives");
+                }
+            }
+        }
+
+        private static void TestSettingsDefaultReplacement()
+        {
+            using (var scope = new TestScope("settings-defaults"))
+            {
+                var transfer = Transfer(scope);
+                var defaults = transfer.Export();
+                var path = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".tap-farming.json");
+                File.WriteAllText(path, "{\"version\":2,\"tapsPerConversion\":99,\"healthPointsPerConversion\":7}");
+                File.WriteAllText(path + ".bak", File.ReadAllText(path));
+                Equal("", transfer.StageImport(defaults), "missing source files exported as defaults");
+                True(transfer.ApplyPending(), "defaults apply");
+                var settings = CreatorToolsTapFarmingSettings.Load(Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg"), null);
+                Equal(CreatorToolsTapFarmingSettings.DefaultTapsPerConversion, settings.TapsPerConversion, "destination custom value replaced");
+            }
+            foreach (var legacyLimit in new[] { 17, 30 })
+            using (var scope = new TestScope("settings-legacy-defaults"))
+            {
+                var configPath = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg");
+                var peskyPath = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".pesky-mode.json");
+                File.WriteAllText(configPath, "[Creator Tools]\nInteraccionesMaximasEnPantalla = " + legacyLimit + "\n");
+                var transfer = Transfer(scope);
+                var exported = transfer.Export();
+                True(!File.Exists(peskyPath), "export does not create a legacy source file");
+                Equal("", transfer.StageImport(exported), "effective legacy defaults accepted");
+                True(transfer.ApplyPending(), "legacy defaults apply on restart");
+                Equal(Math.Min(legacyLimit, CreatorToolsPeskyModeSettings.MaximumActiveLimit),
+                    CreatorToolsPeskyModeSettings.Load(configPath, null).MaximumActive, "effective inherited Pesky limit retained");
+            }
+        }
+
+        private static void TestSettingsInvalidImports()
+        {
+            using (var scope = new TestScope("settings-invalid"))
+            {
+                var transfer = Transfer(scope);
+                var valid = transfer.Export();
+                Equal("", transfer.StageImport(valid), "valid pending copy");
+                var path = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".pending-import.json");
+                var before = File.ReadAllText(path);
+                var cases = new List<string> { "{", valid.Replace("\"schemaVersion\":1", "\"schemaVersion\":999"), valid.Replace("\"schemaVersion\":1", "\"schemaVersion\":1,\"schemaVersion\":1"), new string('x', CreatorToolsSettingsTransfer.MaximumBundleBytes + 1) };
+                var extra = JsonNode.Parse(valid); extra["files"]["../../credentials.json"] = "private"; cases.Add(extra.ToJsonString());
+                var tokens = JsonNode.Parse(valid); tokens["files"][SettingsPrefix + ".cfg"] = "[Twitch]\nToken = private\n"; cases.Add(tokens.ToJsonString());
+                var typed = JsonNode.Parse(valid); typed["files"][SettingsPrefix + ".tap-farming.json"] = "{\"version\":2,\"tapsPerConversion\":\"bad\",\"healthPointsPerConversion\":1}"; cases.Add(typed.ToJsonString());
+                var limits = JsonNode.Parse(valid); limits["files"][SettingsPrefix + ".tap-farming.json"] = "{\"version\":2,\"tapsPerConversion\":0,\"healthPointsPerConversion\":1}"; cases.Add(limits.ToJsonString());
+                var boolean = JsonNode.Parse(valid); boolean["files"][SettingsPrefix + ".cfg"] = "[Juego]\nReto = invalid\n"; cases.Add(boolean.ToJsonString());
+                var hidden = JsonNode.Parse(valid);
+                var overlay = JsonNode.Parse(hidden["files"][SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
+                overlay["profiles"][0]["components"][0]["accessToken"] = "private";
+                hidden["files"][SettingsPrefix + ".overlay-composer.json"] = overlay.ToJsonString(); cases.Add(hidden.ToJsonString());
+                foreach (var invalid in cases)
+                {
+                    Equal("invalid_configuration", transfer.StageImport(invalid), "malformed or nonportable copy rejected");
+                    Equal(before, File.ReadAllText(path), "valid pending copy survives failure");
+                }
+            }
+        }
+
+        private static void TestSettingsRollback()
+        {
+            using (var scope = new TestScope("settings-rollback"))
+            {
+                var transfer = Transfer(scope);
+                var valid = transfer.Export();
+                var originals = JsonNode.Parse(valid)["files"].AsObject().ToDictionary(pair => Path.Combine(scope.ConfigDirectory, pair.Key), pair => pair.Value.GetValue<string>());
+                foreach (var pair in originals) { File.WriteAllText(pair.Key, pair.Value); File.WriteAllText(pair.Key + ".bak", "previous recovery " + Path.GetFileName(pair.Key)); }
+                Equal("", transfer.StageImport(valid), "import staged");
+                var configPath = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg");
+                File.WriteAllText(configPath, "[Juego]\nReto = true\n"); originals[configPath] = File.ReadAllText(configPath);
+                using (var blocked = new FileStream(Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".tap-farming.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+                    True(!transfer.ApplyPending(), "locked file rejects import");
+                foreach (var pair in originals)
+                {
+                    Equal(pair.Value, File.ReadAllText(pair.Key), "previous primary preserved");
+                    Equal("previous recovery " + Path.GetFileName(pair.Key), File.ReadAllText(pair.Key + ".bak"), "previous backup preserved");
+                }
+                True(transfer.GetStateJson().Contains("true"), "copy remains available for retry");
+            }
+        }
+
+        private static void TestSettingsCancel()
+        {
+            using (var scope = new TestScope("settings-cancel"))
+            {
+                var transfer = Transfer(scope); var valid = transfer.Export();
+                Equal("", transfer.StageImport(valid), "staged");
+                Equal("", transfer.CancelImport(), "cancelled");
+                True(!transfer.ApplyPending(), "nothing applies after cancellation");
+                True(!File.Exists(Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg")), "current files untouched");
+            }
+        }
+
+        private static void TestSettingsHttp()
+        {
+            using (var scope = new TestScope("settings-http"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                server.SetSettingsTransfer(Transfer(scope));
+                var origin = "http://127.0.0.1:" + server.Port;
+                var state = JsonNode.Parse(client.GetStringAsync(origin + "/api/settings").GetAwaiter().GetResult());
+                var token = state["controlToken"].GetValue<string>();
+                Equal(HttpStatusCode.MethodNotAllowed, client.GetAsync(origin + "/api/settings/export").GetAwaiter().GetResult().StatusCode, "export requires POST");
+                Func<string, string, string, HttpResponseMessage> post = (operation, body, proof) => {
+                    var request = new HttpRequestMessage(HttpMethod.Post, origin + "/api/settings/" + operation);
+                    request.Headers.Add("Origin", origin); request.Headers.Add("X-Pichi-Settings-Control", proof);
+                    request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    return client.SendAsync(request).GetAwaiter().GetResult();
+                };
+                Equal(HttpStatusCode.Forbidden, post("export", "", "wrong-proof").StatusCode, "local proof required");
+                using (var response = post("export", "", token))
+                {
+                    Equal(HttpStatusCode.OK, response.StatusCode, "export accepted");
+                    var text = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    True(!text.Contains("controlToken"), "local proof excluded from portable copy");
+                    Equal(HttpStatusCode.BadRequest, post("import", "{", token).StatusCode, "invalid import rejected");
+                    var large = JsonNode.Parse(text);
+                    large["files"][SettingsPrefix + ".cfg"] = "# " + new string('a', 80000) + "\n[Juego]\nReto = true\n";
+                    Equal(HttpStatusCode.OK, post("import", large.ToJsonString(), token).StatusCode, "valid import larger than old 64 KB limit");
+                    using (var socket = new System.Net.Sockets.TcpClient("127.0.0.1", server.Port))
+                    using (var network = socket.GetStream())
+                    {
+                        var header = Encoding.ASCII.GetBytes("POST /api/settings/import HTTP/1.1\r\nHost: 127.0.0.1:" + server.Port + "\r\nContent-Length: " + (CreatorToolsSettingsTransfer.MaximumBundleBytes + 1) + "\r\n\r\n");
+                        network.Write(header, 0, header.Length);
+                        using (var reader = new StreamReader(network)) True(reader.ReadLine().Contains("413"), "body bound enforced before upload");
+                    }
+                    Equal(HttpStatusCode.OK, post("cancel-import", "", token).StatusCode, "cancel accepted");
+                }
+                var foreign = new HttpRequestMessage(HttpMethod.Post, origin + "/api/settings/import");
+                foreign.Headers.Add("Origin", "https://example.invalid"); foreign.Headers.Add("X-Pichi-Settings-Control", token); foreign.Content = new StringContent("{}");
+                Equal(HttpStatusCode.Forbidden, client.SendAsync(foreign).GetAwaiter().GetResult().StatusCode, "foreign origin rejected even with proof");
+            }
+        }
+    }
+}

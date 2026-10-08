@@ -1254,7 +1254,7 @@ namespace Gilomx.CupheadBossRoulette
                     "\\\"name\\\":\\\"(?<name>(?:\\\\.|[^\\\"])*)\\\"," +
                     "\\\"enabled\\\":(?<enabled>true|false)," +
                     "\\\"platform\\\":\\\"(?<platform>tiktok|twitch)\\\"," +
-                    "\\\"connectionId\\\":\\\"all\\\"," +
+                    "(?:\\\"connectionId\\\":\\\"all\\\",)?" +
                     "\\\"eventType\\\":\\\"(?<eventType>[a-z_]+)\\\"," +
                     "\\\"giftId\\\":\\\"(?<giftId>\\d*)\\\"," +
                     "\\\"giftName\\\":\\\"(?<giftName>(?:\\\\.|[^\\\"])*)\\\"," +

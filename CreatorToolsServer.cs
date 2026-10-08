@@ -78,6 +78,9 @@ namespace Gilomx.CupheadBossRoulette
         private Func<string> twitchStateHandler;
         private Func<string, string> twitchCommandHandler;
         private readonly string twitchControlToken = Guid.NewGuid().ToString("N");
+        private readonly object settingsTransferLock = new object();
+        private readonly string settingsControlToken = Guid.NewGuid().ToString("N");
+        private CreatorToolsSettingsTransfer settingsTransfer;
         private Func<string, long, bool> interactionControlObserver;
         private Func<string, bool> peskyBattleCommandHandler;
         private Func<string, bool> tapFarmingCommandHandler;
@@ -164,6 +167,9 @@ namespace Gilomx.CupheadBossRoulette
             "\"engineActive\":false,\"rules\":[]}";
 
         internal int Port { get; private set; }
+
+        internal void SetSettingsTransfer(CreatorToolsSettingsTransfer controller)
+        { lock (settingsTransferLock) settingsTransfer = controller; }
 
         internal void SetChatChoosesController(CreatorToolsChatChoosesController controller, Func<string, bool> handler)
         {
@@ -1149,7 +1155,9 @@ namespace Gilomx.CupheadBossRoulette
                         "invalid_content_length");
                     return request;
                 }
-                if (contentLength > MaximumHttpBodyBytes)
+                var maximumBody = request.Path == "/api/settings/import"
+                    ? CreatorToolsSettingsTransfer.MaximumBundleBytes : MaximumHttpBodyBytes;
+                if (contentLength > maximumBody)
                 {
                     request.SetError(413, "Payload Too Large",
                         "body_too_large");
@@ -1201,15 +1209,75 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
+        private void ServeSettingsTransfer(NetworkStream stream, HttpRequest request)
+        {
+            var stateRequest = request.Path == "/api/settings";
+            if (request.Method != (stateRequest ? "GET" : "POST"))
+            { WriteMethodNotAllowed(stream, stateRequest ? "GET" : "POST"); return; }
+            if (!stateRequest)
+            {
+                string proof, origin;
+                Uri parsed;
+                if (!request.Headers.TryGetValue("X-Pichi-Settings-Control", out proof) || proof != settingsControlToken ||
+                    !request.Headers.TryGetValue("Origin", out origin) || !Uri.TryCreate(origin, UriKind.Absolute, out parsed) ||
+                    parsed.Scheme != "http" || parsed.Port != Port || (parsed.Host != "localhost" && parsed.Host != "127.0.0.1"))
+                {
+                    WriteResponse(stream, 403, "Forbidden", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"error\":\"invalid_origin\"}"), false);
+                    return;
+                }
+            }
+            lock (settingsTransferLock)
+            {
+                if (settingsTransfer == null)
+                {
+                    WriteResponse(stream, 503, "Service Unavailable", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"ready\":false}"), false);
+                    return;
+                }
+                try
+                {
+                    if (stateRequest)
+                    {
+                        var json = settingsTransfer.GetStateJson();
+                        json = json.Substring(0, json.Length - 1) + ",\"controlToken\":\"" + settingsControlToken + "\"}";
+                        WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
+                        return;
+                    }
+                    if (request.Path == "/api/settings/export")
+                    {
+                        WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(settingsTransfer.Export()), false);
+                        return;
+                    }
+                    var error = request.Path == "/api/settings/import" ? settingsTransfer.StageImport(request.Body) : settingsTransfer.CancelImport();
+                    var code = error.Length == 0 ? 200 : error == "invalid_configuration" ? 400 : 500;
+                    WriteResponse(stream, code, code == 200 ? "OK" : code == 400 ? "Bad Request" : "Internal Server Error",
+                        "application/json; charset=utf-8", Encoding.UTF8.GetBytes(error.Length == 0 ? settingsTransfer.GetStateJson() : "{\"error\":\"" + error + "\"}"), false);
+                }
+                catch (Exception exception)
+                {
+                    if (logWarning != null) logWarning("Configuration transfer failed: " + exception.Message);
+                    WriteResponse(stream, 500, "Internal Server Error", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"error\":\"configuration_unavailable\"}"), false);
+                }
+            }
+        }
+
         private void ServeHttp(NetworkStream stream, HttpRequest request)
         {
             var path = request.Path;
             if (request.Method == "POST" &&
+                path != "/api/settings/export" && path != "/api/settings/import" && path != "/api/settings/cancel-import" &&
                 path != "/api/overlay-composer/config/set" &&
                 path != "/api/overlay-composer/preview/set" &&
                 path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel" && path != "/api/twitch/test")
             {
                 WriteMethodNotAllowed(stream, "GET");
+                return;
+            }
+            if (path == "/api/settings" || path == "/api/settings/export" || path == "/api/settings/import" || path == "/api/settings/cancel-import")
+            {
+                ServeSettingsTransfer(stream, request);
                 return;
             }
             if (path == "/" || path == "/index.html")

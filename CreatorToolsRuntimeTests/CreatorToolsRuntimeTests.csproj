@@ -15,6 +15,10 @@
        discovering the harness fakes through its recursive *.cs glob. -->
   <ItemGroup>
     <Compile Include="Program.cs.txt" Link="Program.cs" />
+    <Compile Include="SettingsTransferTests.cs.txt" Link="SettingsTransferTests.cs" />
+    <Compile Include="..\CreatorToolsSettingsTransfer.cs" Link="Product\CreatorToolsSettingsTransfer.cs" />
+    <Compile Include="..\Streaming\CreatorToolsJsonParser.cs" Link="Product\Streaming\CreatorToolsJsonParser.cs" />
+    <Compile Include="..\CreatorToolsPeskyBattleSettings.cs" Link="Product\CreatorToolsPeskyBattleSettings.cs" />
     <Compile Include="TwitchConnectionTests.cs.txt" Link="TwitchConnectionTests.cs" />
     <Compile Include="StreamPlatformRuleTests.cs.txt" Link="StreamPlatformRuleTests.cs" />
     <Compile Include="TimedChallengeTests.cs.txt" Link="TimedChallengeTests.cs" />

@@ -343,8 +343,8 @@ namespace Gilomx.CupheadBossRoulette
                 json.Length > 8192)
                 return false;
 
-            JsonValue root;
-            if (!JsonParser.TryParse(json, out root) ||
+            CreatorToolsJsonValue root;
+            if (!CreatorToolsJsonParser.TryParse(json, out root) ||
                 root == null || root.ObjectValue == null ||
                 NormalizeProfileId(root.String("id")) != expectedProfileId)
                 return false;
@@ -481,7 +481,7 @@ namespace Gilomx.CupheadBossRoulette
             component.TextShadowBlur = Math.Max(0, Math.Min(20, component.TextShadowBlur));
         }
 
-        private string BuildFileJson()
+        internal string BuildFileJson()
         {
             var builder = new StringBuilder(2048);
             builder.Append("{\n  \"schemaVersion\": ")
@@ -720,8 +720,8 @@ namespace Gilomx.CupheadBossRoulette
             try
             {
                 var json = File.ReadAllText(candidatePath, Encoding.UTF8);
-                JsonValue root;
-                if (!JsonParser.TryParse(json, out root) ||
+                CreatorToolsJsonValue root;
+                if (!CreatorToolsJsonParser.TryParse(json, out root) ||
                     root.ObjectValue == null)
                     return false;
                 var version = root.Integer("schemaVersion",
@@ -863,7 +863,7 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private static bool TryLoadComponent(
-            JsonValue node,
+            CreatorToolsJsonValue node,
             CreatorToolsOverlayComposerComponent component)
         {
             if (component.Id == RouletteComponentId && node.Property("rouletteSize") != null)
@@ -1012,8 +1012,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             normalized = null;
             if (string.IsNullOrEmpty(json) || json.Length > 8192) return false;
-            JsonValue root;
-            if (!JsonParser.TryParse(json, out root) || root.ObjectValue == null) return false;
+            CreatorToolsJsonValue root;
+            if (!CreatorToolsJsonParser.TryParse(json, out root) || root.ObjectValue == null) return false;
             var phases = new[] { "off", "voting", "reveal", "result", "countdown", "waiting_map", "loading", "active", "completed" };
             var stages = new[] { "boss", "weapon1", "weapon2", "super", "charm", "modifier", "result" };
             var phase = root.String("phase");
@@ -1061,7 +1061,7 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
-        private static bool AppendChatPreviewChoice(StringBuilder builder, JsonValue option, bool ballot)
+        private static bool AppendChatPreviewChoice(StringBuilder builder, CreatorToolsJsonValue option, bool ballot)
         {
             if (option == null || option.ObjectValue == null) return false;
             int id;
@@ -1088,8 +1088,8 @@ namespace Gilomx.CupheadBossRoulette
         internal static bool TryParseBattleSignalsJson(string json, out string normalized)
         {
             normalized = null;
-            JsonValue root;
-            if (!JsonParser.TryParse(json, out root) || root.ObjectValue == null) return false;
+            CreatorToolsJsonValue root;
+            if (!CreatorToolsJsonParser.TryParse(json, out root) || root.ObjectValue == null) return false;
             var builder = new StringBuilder("{");
             foreach (var key in new[] { "attacks", "challenges" })
             {
@@ -1143,227 +1143,5 @@ namespace Gilomx.CupheadBossRoulette
             return true;
         }
 
-        private sealed class JsonValue
-        {
-            internal Dictionary<string, JsonValue> ObjectValue;
-            internal List<JsonValue> ArrayValue;
-            internal string StringValue;
-            internal decimal? NumberValue;
-            internal bool? BooleanValue;
-
-            internal JsonValue Property(string name)
-            {
-                JsonValue value;
-                return ObjectValue != null &&
-                    ObjectValue.TryGetValue(name, out value) ? value : null;
-            }
-
-            internal string String(string name)
-            {
-                var value = Property(name);
-                return value == null ? string.Empty :
-                    value.StringValue ?? string.Empty;
-            }
-
-            internal int Integer(string name, int fallback)
-            {
-                int value;
-                return TryInteger(name, out value) ? value : fallback;
-            }
-
-            internal bool TryInteger(string name, out int result)
-            {
-                result = 0;
-                var value = Property(name);
-                if (value == null || !value.NumberValue.HasValue ||
-                    value.NumberValue.Value !=
-                        decimal.Truncate(value.NumberValue.Value) ||
-                    value.NumberValue.Value < int.MinValue ||
-                    value.NumberValue.Value > int.MaxValue)
-                    return false;
-                result = decimal.ToInt32(value.NumberValue.Value);
-                return true;
-            }
-
-            internal bool TryBoolean(string name, out bool result)
-            {
-                result = false;
-                var value = Property(name);
-                if (value == null || !value.BooleanValue.HasValue)
-                    return false;
-                result = value.BooleanValue.Value;
-                return true;
-            }
-        }
-
-        private sealed class JsonParser
-        {
-            private readonly string json;
-            private int position;
-
-            private JsonParser(string json)
-            {
-                this.json = json;
-            }
-
-            internal static bool TryParse(string json, out JsonValue value)
-            {
-                value = null;
-                if (string.IsNullOrEmpty(json) || json.Length > 65536)
-                    return false;
-                try
-                {
-                    var parser = new JsonParser(json);
-                    value = parser.ReadValue(0);
-                    parser.SkipWhitespace();
-                    return value != null && parser.position == json.Length;
-                }
-                catch
-                {
-                    value = null;
-                    return false;
-                }
-            }
-
-            private JsonValue ReadValue(int depth)
-            {
-                if (depth > 16)
-                    throw new FormatException();
-                SkipWhitespace();
-                if (position >= json.Length)
-                    throw new FormatException();
-                if (json[position] == '{') return ReadObject(depth + 1);
-                if (json[position] == '[') return ReadArray(depth + 1);
-                if (json[position] == '"')
-                    return new JsonValue { StringValue = ReadString() };
-                if (Match("true"))
-                    return new JsonValue { BooleanValue = true };
-                if (Match("false"))
-                    return new JsonValue { BooleanValue = false };
-                if (Match("null")) return new JsonValue();
-                return ReadNumber();
-            }
-
-            private JsonValue ReadObject(int depth)
-            {
-                position++;
-                var values = new Dictionary<string, JsonValue>(
-                    StringComparer.Ordinal);
-                SkipWhitespace();
-                if (Consume('}'))
-                    return new JsonValue { ObjectValue = values };
-                while (values.Count < 128)
-                {
-                    SkipWhitespace();
-                    var key = ReadString();
-                    SkipWhitespace();
-                    if (!Consume(':') || values.ContainsKey(key))
-                        throw new FormatException();
-                    values[key] = ReadValue(depth);
-                    SkipWhitespace();
-                    if (Consume('}'))
-                        return new JsonValue { ObjectValue = values };
-                    if (!Consume(',')) throw new FormatException();
-                }
-                throw new FormatException();
-            }
-
-            private JsonValue ReadArray(int depth)
-            {
-                position++;
-                var values = new List<JsonValue>();
-                SkipWhitespace();
-                if (Consume(']'))
-                    return new JsonValue { ArrayValue = values };
-                while (values.Count < 128)
-                {
-                    values.Add(ReadValue(depth));
-                    SkipWhitespace();
-                    if (Consume(']'))
-                        return new JsonValue { ArrayValue = values };
-                    if (!Consume(',')) throw new FormatException();
-                }
-                throw new FormatException();
-            }
-
-            private JsonValue ReadNumber()
-            {
-                var start = position;
-                while (position < json.Length &&
-                    "-+0123456789.eE".IndexOf(json[position]) >= 0)
-                    position++;
-                decimal number;
-                if (position == start || !decimal.TryParse(
-                        json.Substring(start, position - start),
-                        NumberStyles.Float, CultureInfo.InvariantCulture,
-                        out number))
-                    throw new FormatException();
-                return new JsonValue { NumberValue = number };
-            }
-
-            private string ReadString()
-            {
-                if (!Consume('"')) throw new FormatException();
-                var builder = new StringBuilder();
-                while (position < json.Length && builder.Length <= 8192)
-                {
-                    var character = json[position++];
-                    if (character == '"') return builder.ToString();
-                    if (character < 32) throw new FormatException();
-                    if (character != '\\')
-                    {
-                        builder.Append(character);
-                        continue;
-                    }
-                    if (position >= json.Length) throw new FormatException();
-                    character = json[position++];
-                    if (character == '"' || character == '\\' ||
-                        character == '/') builder.Append(character);
-                    else if (character == 'b') builder.Append('\b');
-                    else if (character == 'f') builder.Append('\f');
-                    else if (character == 'n') builder.Append('\n');
-                    else if (character == 'r') builder.Append('\r');
-                    else if (character == 't') builder.Append('\t');
-                    else if (character == 'u')
-                    {
-                        if (position + 4 > json.Length)
-                            throw new FormatException();
-                        int code;
-                        if (!int.TryParse(json.Substring(position, 4),
-                                NumberStyles.HexNumber,
-                                CultureInfo.InvariantCulture, out code))
-                            throw new FormatException();
-                        builder.Append((char)code);
-                        position += 4;
-                    }
-                    else throw new FormatException();
-                }
-                throw new FormatException();
-            }
-
-            private bool Match(string value)
-            {
-                if (position + value.Length > json.Length ||
-                    string.CompareOrdinal(json, position, value, 0,
-                        value.Length) != 0)
-                    return false;
-                position += value.Length;
-                return true;
-            }
-
-            private bool Consume(char value)
-            {
-                if (position >= json.Length || json[position] != value)
-                    return false;
-                position++;
-                return true;
-            }
-
-            private void SkipWhitespace()
-            {
-                while (position < json.Length &&
-                    char.IsWhiteSpace(json[position])) position++;
-            }
-        }
     }
 }

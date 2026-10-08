@@ -20,11 +20,31 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Manage the connections and accounts used by the mod.",
+    "description": "Manage your connections and move your settings to another installation.",
+    "connectionsDescription": "Connect your accounts separately on each installation.",
     "configure": "Configure",
     "platforms": { "twitch": "Twitch", "youtube": "YouTube", "tiktok": "TikTok / TikFinity" },
     "youtubePending": "YouTube connection is not available yet. You will configure it here once it is enabled.",
-    "tikfinity": "Open TikFinity on this PC and connect your account in that application. The mod detects its local API automatically."
+    "tikfinity": "Open TikFinity on this PC and connect your account in that application. The mod detects its local API automatically.",
+    "transfer": {
+      "title": "Export and import settings",
+      "description": "Save a copy of your settings or restore a copy on this installation.",
+      "includes": "Includes Roulette, controls, challenges, Interaction rules, Pesky Mode, Live Events, overlays and panel language.",
+      "connectionsExcluded": "Connections and credentials are excluded. Authorize your accounts on each installation; importing settings preserves this PC's connections.",
+      "export": "Export settings",
+      "selectFile": "Select a file to import",
+      "import": "Import and replace settings",
+      "cancel": "Cancel",
+      "confirmImport": "This copy will replace all settings when you restart the game. A backup of the previous configuration will be kept.",
+      "restartRequired": "Import prepared. Restart the game from the launcher to apply the settings. This installation's connections will be preserved.",
+      "cancelPending": "Cancel pending import",
+      "unavailable": "Waiting for the connection to Cuphead to export or import.",
+      "exported": "Settings copy downloaded.",
+      "imported": "Copy validated and prepared for the next launch.",
+      "cancelled": "Import cancelled. Your current settings are preserved.",
+      "invalidFile": "The file is not a compatible La Pichi Ruleta backup or contains invalid settings. The configuration was not modified.",
+      "requestError": "The operation could not be completed. Check the connection to Cuphead and try again."
+    }
   },
   "dashboard": {
     "chatChooses": {
@@ -362,7 +382,6 @@
       "title": "Twitch account",
       "connect": "Connect Twitch",
       "disconnect": "Disconnect account",
-      "changeAccount": "Change account",
       "cancel": "Cancel connection",
       "openTwitch": "Authorize on Twitch",
       "authorizationInstructions": "Open Twitch and confirm this code with the account you want to connect.",

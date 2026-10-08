@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { DashboardConnection, DashboardState, StreamPlatform } from "../../model";
 import { TwitchConnectionControls } from "./TwitchConnectionControls";
+import { SettingsTransferPanel } from "./SettingsTransferPanel";
 
 const PLATFORMS: StreamPlatform[] = ["twitch", "youtube", "tiktok"];
 
@@ -37,8 +38,9 @@ export function SettingsView() {
       <header className="page-header">
         <div><h1>{t("settings.title")}</h1><p>{t("settings.description")}</p></div>
       </header>
-      <section className="settings-connections" aria-labelledby="settings-connections-title">
-        <div className="dashboard-section-heading"><h2 id="settings-connections-title">{t("dashboard.connections.title")}</h2></div>
+      <div className="settings-panels">
+      <section className="interaction-panel settings-connections" aria-labelledby="settings-connections-title">
+        <header className="interaction-panel__heading"><div><h2 id="settings-connections-title">{t("dashboard.connections.title")}</h2><p>{t("settings.connectionsDescription")}</p></div></header>
         <div className="settings-connection-list">
           {PLATFORMS.map((platform) => {
             const connection = connections.find((entry) => entry.platform === platform);
@@ -62,6 +64,8 @@ export function SettingsView() {
           })}
         </div>
       </section>
+      <SettingsTransferPanel />
+      </div>
     </div>
   );
 }

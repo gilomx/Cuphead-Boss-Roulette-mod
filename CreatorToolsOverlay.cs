@@ -55,6 +55,7 @@ namespace Gilomx.CupheadBossRoulette
             creatorToolsInteractionsEnabledSetting;
 
         private CreatorToolsServer creatorToolsServer;
+        private CreatorToolsSettingsTransfer creatorToolsSettingsTransfer;
         private CreatorToolsInteractionController creatorToolsInteractions;
         private CreatorToolsDashboardController creatorToolsDashboard;
         private CreatorToolsStreamRulesController creatorToolsStreamRules;
@@ -1351,6 +1352,7 @@ namespace Gilomx.CupheadBossRoulette
             if (creatorToolsStreamRules != null)
                 creatorToolsServer.SetStreamRuleCommandHandler(
                     creatorToolsStreamRules.ProcessServerCommand);
+            creatorToolsServer.SetSettingsTransfer(creatorToolsSettingsTransfer);
             creatorToolsServer.SetOverlayComposerController(
                 creatorToolsOverlayComposer);
             creatorToolsServer.SetInteractionControlObserver(

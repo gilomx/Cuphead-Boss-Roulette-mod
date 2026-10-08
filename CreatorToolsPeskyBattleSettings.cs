@@ -169,7 +169,7 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
-        private string BuildJson()
+        internal string BuildJson()
         {
             var builder = new StringBuilder(512);
             builder.Append("{\n  \"version\": ")
