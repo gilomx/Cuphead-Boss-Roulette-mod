@@ -1,11 +1,17 @@
 import { useMemo } from "react";
+import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { StreamRuleDraft, StreamRulePlatform, StreamRuleTrigger, TikTokGift } from "../../model";
 import { platformTriggers } from "./streamRuleDraft";
-import { StreamPlatformIcon, StreamTriggerIcon } from "./StreamRuleIcons";
+import { StreamPlatformIcon } from "./StreamRuleIcons";
 import { interactionItemFor } from "./interactionCatalog";
 import { InteractionPicker } from "./InteractionPicker";
 import { TikTokGiftPicker } from "./TikTokGiftPicker";
+
+const streamTriggerOptions = (Object.entries(platformTriggers) as [StreamRulePlatform, StreamRuleTrigger[]][])
+  .flatMap(([platform, eventTypes]) => eventTypes.map((eventType) => ({
+    platform, eventType, key: `${platform}:${eventType}`,
+  })));
 
 interface StreamRuleFormProps {
   draft: StreamRuleDraft;
@@ -123,47 +129,38 @@ export function StreamRuleForm({
         }
       }}
     >
-      <label className="stream-rule-form__wide">
-        <span>{t("interactions.rules.editor.platform")}</span>
-        <select disabled={saving} value={draft.platform} onChange={(event) => {
-          const platform = event.target.value as StreamRulePlatform;
-          const eventType = platformTriggers[platform].includes(draft.eventType) ? draft.eventType : platformTriggers[platform][0];
-          onChange({ ...draft, platform, eventType, every: 1,
-            giftId: platform === "tiktok" ? selectedGift?.giftId ?? gifts[0]?.giftId ?? "" : "",
-            rewardName: "" });
-        }}>
-          <option value="tiktok">TikTok</option>
-          <option value="twitch">Twitch</option>
-        </select>
-      </label>
-      <label className="stream-rule-form__wide">
-        <span className="stream-rule-trigger-label"><StreamPlatformIcon platform={draft.platform} />{t("interactions.rules.editor.triggerType")}</span>
-        <div className="stream-rule-trigger-select">
-        <StreamTriggerIcon eventType={draft.eventType} />
-        <select
+      <div className="stream-rule-form__wide stream-rule-trigger">
+        <SearchableSelectField
+          id="stream-rule-trigger"
+          label={t("interactions.rules.editor.triggerType")}
+          options={streamTriggerOptions}
+          selectedKey={`${draft.platform}:${draft.eventType}`}
+          placeholder={t("interactions.rules.editor.triggerPlaceholder")}
+          noResults={t("interactions.rules.editor.noTriggerResults")}
           disabled={saving}
-          value={draft.eventType}
-          onChange={(event) => {
-            const eventType = event.target.value as StreamRuleTrigger;
+          getKey={(option) => option.key}
+          getLabel={(option) => `${t(`dashboard.platforms.${option.platform}`)} · ${t(`interactions.rules.editor.${option.eventType}Name`)}`}
+          getIcon={(option) => <StreamPlatformIcon platform={option.platform} />}
+          onSelect={({ platform, eventType }) => {
+            if (platform === draft.platform && eventType === draft.eventType) return;
             const nextGift = selectedGift ?? gifts[0];
             onChange({
               ...draft,
+              platform,
               eventType,
-              giftId: eventType === "gift" ? nextGift?.giftId ?? "" : draft.giftId,
+              giftId: platform === "tiktok"
+                ? eventType === "gift" ? nextGift?.giftId ?? "" : draft.giftId
+                : "",
+              rewardName: platform === draft.platform ? draft.rewardName : "",
               every: eventType === "currency" ? 100 : 1,
               name: eventType === "gift"
                 ? nextGift?.name ?? ""
                 : t(`interactions.rules.editor.${eventType}Name`),
             });
           }}
-        >
-          {platformTriggers[draft.platform].map((eventType) => (
-            <option key={eventType} value={eventType}>{t(`interactions.rules.editor.${eventType}Name`)}</option>
-          ))}
-        </select>
-        </div>
+        />
         <small>{t(`interactions.rules.editor.${draft.eventType}TriggerHint`)}</small>
-      </label>
+      </div>
 
       {draft.eventType === "redemption" ? (
         <label className="stream-rule-form__wide">

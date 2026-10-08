@@ -36,8 +36,12 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 - EventSub recibe votos exactos `1`–`6`, follows, suscripciones, Bits y canjes
   de recompensas; el texto restante del chat se descarta. Los votos alimentan
   «El chat elige»; los demás eventos llegan al dashboard. Las reglas de
-  interacciones conservan por ahora sus disparadores de TikTok. El servidor
-  mock identifica expresamente su autorización y cuenta como simuladas.
+  interacciones admiten regalos, taps y follows de TikTok, y follows, Bits,
+  suscripciones nuevas, regaladas, resuscripciones compartidas y canjes de Twitch.
+  Los formularios de creación y edición usan un único selector «Se activa con»:
+  cada opción reúne
+  plataforma y activador, con el icono de plataforma dentro del control y la lista.
+  El servidor mock identifica expresamente su autorización y cuenta como simuladas.
 
 - La barra lateral y sus proveedores permanecen montados. Cambiar de sección
   sustituye únicamente la vista central, sin navegar a otra página ni reiniciar

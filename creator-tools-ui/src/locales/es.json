@@ -813,6 +813,8 @@
         "giftResults": "{count} resultados",
         "noGiftResults": "No hay regalos que coincidan con esta búsqueda.",
         "triggerType": "Se activa con",
+        "triggerPlaceholder": "Buscar un activador",
+        "noTriggerResults": "No hay activadores que coincidan.",
         "triggerGift": "Regalo",
         "triggerLike": "Taps (likes)",
         "triggerFollow": "Follow",

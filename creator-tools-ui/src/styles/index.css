@@ -1068,6 +1068,18 @@ textarea:focus-visible {
   object-fit: contain;
 }
 
+.searchable-select-control > .searchable-select-icon,
+.searchable-select-option > .searchable-select-icon {
+  display: flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-focus);
+  pointer-events: none;
+}
+
 .searchable-select-control input {
   min-width: 0;
   width: 100%;
@@ -1170,6 +1182,10 @@ textarea:focus-visible {
   width: 2.35rem;
   height: 2.35rem;
   object-fit: contain;
+}
+
+.searchable-select-option[data-has-icon="true"] {
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
 }
 
 .searchable-select-option > span {
@@ -1729,7 +1745,8 @@ textarea:focus-visible {
   color-scheme: dark;
 }
 
-.stream-rule-form label small {
+.stream-rule-form label small,
+.stream-rule-trigger > small {
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   line-height: 1.35;
@@ -1971,6 +1988,17 @@ textarea:focus-visible {
 .stream-rule-form .searchable-select-menu {
   top: auto;
   bottom: calc(100% + 0.35rem);
+}
+
+.stream-rule-trigger {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.stream-rule-trigger .searchable-select-menu {
+  top: calc(100% + 0.35rem);
+  bottom: auto;
 }
 
 .stream-rule-form__actions {
@@ -2830,12 +2858,6 @@ textarea:focus-visible {
   flex: 0 0 1.25rem;
   color: var(--color-focus);
 }
-.stream-rule-trigger-label, .stream-rule-trigger-select {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-.stream-rule-trigger-select select { flex: 1; min-width: 0; }
 
 .interaction-queue__title-row .dashboard-master-switch {
   min-width: 0;

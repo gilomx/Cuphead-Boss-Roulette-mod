@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
@@ -21,6 +22,7 @@ interface SearchableSelectFieldProps<T> {
   getKey: (option: T) => SearchableSelectKey;
   getLabel: (option: T) => string;
   getImage?: (option: T) => string | undefined;
+  getIcon?: (option: T) => ReactNode;
   getMeta?: (option: T) => string | undefined;
   getSearchTerms?: (option: T) => string[];
   onSelect: (option: T) => void;
@@ -54,6 +56,7 @@ export function SearchableSelectField<T>({
   getKey,
   getLabel,
   getImage,
+  getIcon,
   getMeta,
   getSearchTerms,
   onSelect,
@@ -211,6 +214,7 @@ export function SearchableSelectField<T>({
   };
 
   const selectedImage = selected ? getImage?.(selected) : undefined;
+  const selectedIcon = selected ? getIcon?.(selected) : undefined;
   const activeDescendant = open && activeIndex >= 0
     ? `${listboxId}-option-${activeIndex}`
     : undefined;
@@ -219,6 +223,7 @@ export function SearchableSelectField<T>({
     <div className="searchable-select-field" ref={rootRef}>
       <label htmlFor={id}>{label}</label>
       <div className="searchable-select-control" data-open={open} data-disabled={disabled}>
+        {selectedIcon ? <span className="searchable-select-icon" aria-hidden="true">{selectedIcon}</span> : null}
         {selectedImage ? (
           <img
             src={selectedImage}
@@ -278,6 +283,7 @@ export function SearchableSelectField<T>({
           ) : filteredOptions.map((option, index) => {
             const optionKey = getKey(option);
             const image = getImage?.(option);
+            const icon = getIcon?.(option);
             const meta = getMeta?.(option);
             return (
               <button
@@ -289,6 +295,7 @@ export function SearchableSelectField<T>({
                 aria-selected={optionKey === selectedKey}
                 data-active={index === activeIndex}
                 data-option-index={index}
+                data-has-icon={Boolean(icon)}
                 key={optionKey}
                 onPointerDown={(event) => {
                   if (event.pointerType === "mouse") event.preventDefault();
@@ -296,6 +303,7 @@ export function SearchableSelectField<T>({
                 onPointerMove={() => setActiveKey(optionKey)}
                 onClick={() => choose(option)}
               >
+                {icon ? <span className="searchable-select-icon" aria-hidden="true">{icon}</span> : null}
                 {image ? (
                   <img
                     src={image}

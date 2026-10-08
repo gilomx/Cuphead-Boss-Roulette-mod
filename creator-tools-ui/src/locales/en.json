@@ -813,6 +813,8 @@
         "giftResults": "{count} results",
         "noGiftResults": "No gifts match this search.",
         "triggerType": "Triggered by",
+        "triggerPlaceholder": "Search triggers",
+        "noTriggerResults": "No matching triggers.",
         "triggerGift": "Gift",
         "triggerLike": "Taps (likes)",
         "triggerFollow": "Follow",
