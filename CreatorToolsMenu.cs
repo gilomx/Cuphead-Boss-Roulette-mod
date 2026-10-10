@@ -1725,7 +1725,7 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
             }
-            Application.OpenURL(CreatorToolsUrl + "config");
+            Application.OpenURL(CreatorToolsUrl + "dashboard");
         }
 
         private void OpenCreatorToolsConfigFromPauseMenu()

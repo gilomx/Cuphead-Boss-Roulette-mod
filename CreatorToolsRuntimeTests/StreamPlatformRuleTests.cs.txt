@@ -15,6 +15,9 @@ namespace Gilomx.CupheadBossRoulette
             Run("Twitch custom rewards count matching redemptions rather than point cost", TestTwitchRewardRules);
             Run("Platform rules migrate legacy TikTok settings and preserve Twitch CRUD atomically", TestPlatformRulePersistence);
             Run("Dashboard simulations carry Twitch subscription kinds and custom reward names", TestTwitchRuleSimulations);
+            Run("YouTube gifts accumulate Jewels across viewers and gift types without using message count", TestYouTubeJewelsRules);
+            Run("YouTube Jewel rules have independent cooldowns instead of a shared gift cooldown", TestYouTubeJewelsCooldowns);
+            Run("YouTube Jewel rules preserve CRUD and dashboard simulations need no gift catalog", TestYouTubeJewelsPersistenceAndSimulation);
         }
 
         private static long AddPlatformRule(CreatorToolsStreamRulesController rules, string platform,
@@ -135,7 +138,7 @@ namespace Gilomx.CupheadBossRoulette
                 var rules = scope.CreateRules(2, 17, 23);
                 var path = (string)typeof(CreatorToolsStreamRulesController).GetField("settingsPath",
                     BindingFlags.Instance | BindingFlags.NonPublic).GetValue(rules);
-                File.WriteAllText(path, File.ReadAllText(path).Replace("\"version\": 6", "\"version\": 5")
+                File.WriteAllText(path, File.ReadAllText(path).Replace("\"version\": 7", "\"version\": 5")
                     .Replace(",\"rewardName\":\"\"", ""));
                 rules = scope.ReloadRules(rules);
                 using (var old = JsonDocument.Parse(SnapshotRules(rules)))
@@ -193,6 +196,88 @@ namespace Gilomx.CupheadBossRoulette
                 Equal("", dashboard.ScheduleSimulation("platform=twitch&type=redemption&rewardName=Mini+jefe&count=1&user=Test"), "reward simulation accepted");
                 dashboard.Update(null, evaluate);
                 Equal(7L, rules.BacklogCount, "simulated gift, repeat subscription and reward reach matching rules");
+            }
+        }
+
+        private static CreatorToolsStreamEvent JewelRuleEvent(decimal value, int count = 1, string gift = "")
+        {
+            var entry = PlatformRuleEvent("youtube", "gift", count, value, "giftEvent");
+            entry.Unit = "jewel";
+            entry.ItemId = gift;
+            return entry;
+        }
+
+        private static void TestYouTubeJewelsRules()
+        {
+            using (var scope = new TestScope("youtube-jewels"))
+            {
+                var rules = scope.CreateRules(1);
+                AddPlatformRule(rules, "youtube", "jewels", 100, 2);
+                Equal(0, rules.Evaluate(JewelRuleEvent(60m, 1, "Rose"), true).MatchedRules, "60 gems wait");
+                var next = JewelRuleEvent(50m, 1, "Heart"); next.UserId = "another-viewer";
+                Equal(2L, rules.Evaluate(next, true).DeferredInteractions, "different gifts and viewers total 110 gems");
+                Equal(4L, rules.Evaluate(JewelRuleEvent(190m, 999), true).DeferredInteractions,
+                    "saved remainder and total value produce two more activations without a gift ID");
+                Equal(6L, rules.BacklogCount, "three threshold crossings send configured quantity");
+                Equal(0, rules.Evaluate(JewelRuleEvent(0m, 999), true).MatchedRules, "zero value cannot use combo count");
+                Equal(0, rules.Evaluate(JewelRuleEvent(-100m), true).MatchedRules, "negative values ignored");
+                var money = JewelRuleEvent(1000m); money.Unit = "money";
+                Equal(0, rules.Evaluate(money, true).MatchedRules, "money is not jewels");
+                money = JewelRuleEvent(1000m); money.Type = "currency";
+                Equal(0, rules.Evaluate(money, true).MatchedRules, "Super Chats cannot add gems");
+                money = JewelRuleEvent(1000m); money.Platform = "twitch";
+                Equal(0, rules.Evaluate(money, true).MatchedRules, "other platforms cannot add gems");
+                var gameplay = new CreatorToolsInteractionController(200);
+                Equal(6, rules.Update(null, gameplay, true), "every gem activation reaches gameplay");
+            }
+        }
+
+        private static void TestYouTubeJewelsCooldowns()
+        {
+            using (var scope = new TestScope("youtube-jewel-cooldowns"))
+            {
+                var now = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+                var rules = scope.CreateRules(1, utcNow: delegate { return now; });
+                AddPlatformRule(rules, "youtube", "jewels", 100, cooldown: 5);
+                AddPlatformRule(rules, "youtube", "jewels", 50);
+                Equal(3L, rules.Evaluate(JewelRuleEvent(100m), true).DeferredInteractions, "both rules cross independently");
+                var gameplay = new CreatorToolsInteractionController(200);
+                Equal(3, rules.Update(null, gameplay, true), "all initial activations dispatched");
+                Equal(0f, gameplay.LastDelaySeconds, "fast rule does not inherit slow rule interval");
+                Equal(1L, rules.Evaluate(JewelRuleEvent(50m), true).DeferredInteractions, "only the fast rule crosses again");
+                Equal(1, rules.Update(null, gameplay, true), "fast activation dispatched immediately");
+                Equal(0f, gameplay.LastDelaySeconds, "fast rule does not inherit another rule's global cooldown");
+            }
+        }
+
+        private static void TestYouTubeJewelsPersistenceAndSimulation()
+        {
+            using (var scope = new TestScope("youtube-jewel-persistence"))
+            {
+                var rules = scope.CreateRules(1);
+                var id = AddPlatformRule(rules, "youtube", "jewels", 100, 2);
+                rules.ProcessServerCommand("action=duplicate&id=" + id);
+                rules.ProcessServerCommand("action=update&id=" + id + "&name=Gemas&platform=youtube&eventType=jewels&every=250&quantity=3&interaction=test_attack&enabled=0");
+                rules = scope.ReloadRules(rules);
+                using (var saved = JsonDocument.Parse(SnapshotRules(rules)))
+                {
+                    var rows = saved.RootElement.GetProperty("rules");
+                    Equal(3, rows.GetArrayLength(), "TikTok rule and two gem rules coexist");
+                    Equal("youtube", rows[1].GetProperty("platform").GetString(), "YouTube platform persisted");
+                    Equal(250, rows[1].GetProperty("every").GetInt32(), "edited gem threshold persisted");
+                    True(!rows[1].GetProperty("enabled").GetBoolean(), "disabled gem rule persisted");
+                    Equal(100, rows[2].GetProperty("every").GetInt32(), "duplicated rule preserves original threshold");
+                }
+                rules.ProcessServerCommand("action=delete&id=" + id);
+                rules = scope.ReloadRules(rules);
+                var dashboard = new CreatorToolsDashboardController(null);
+                Equal("", dashboard.ScheduleSimulation("platform=youtube&type=gift&amount=60&count=10&user=One"), "gem simulation needs no gift ID");
+                Equal("", dashboard.ScheduleSimulation("platform=youtube&type=gift&amount=50&count=1&user=Two"), "second gem simulation accepted");
+                dashboard.Update(null, entry => {
+                    Equal("jewel", entry.Unit, "simulated YouTube gift defaults to gem units");
+                    return rules.Evaluate(entry, true);
+                });
+                Equal(2L, rules.BacklogCount, "simulated total values accumulate and ignore count");
             }
         }
     }

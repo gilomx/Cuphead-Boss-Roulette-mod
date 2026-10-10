@@ -1,0 +1,85 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunYouTubeConnectionTests()
+        {
+            Run("YouTube disconnect fences late events and survives companion restart", TestYouTubeControlFence);
+            Run("YouTube browser state excludes credentials and validates Google links", TestYouTubePublicState);
+            Run("YouTube HTTP controls require independent proof, POST and local origin", TestYouTubeHttpControls);
+        }
+        private static Dictionary<string, string> YouTubeStatus(long revision, bool authorized)
+        {
+            var fields = TwitchStatus(revision, authorized);
+            fields["connectionId"] = "youtube";
+            fields["verificationUri"] = "https://accounts.google.com/o/oauth2/v2/auth?client_id=public&state=public";
+            return fields;
+        }
+        private static void TestYouTubeControlFence()
+        {
+            var bridge = new YouTubeConnectionBridge();
+            True(bridge.AcceptStatus(YouTubeStatus(0, true)), "restored account accepted");
+            True(bridge.AcceptsEvents, "connected account receives");
+            bridge.Command("disconnect"); False(bridge.AcceptsEvents, "immediate disconnect fence");
+            Equal("youtube:disconnect:1", bridge.TakeCommand(), "versioned provider command");
+            False(bridge.AcceptStatus(YouTubeStatus(0, true)), "late account status ignored");
+            bridge.Restarting(); Equal("youtube:disconnect:1", bridge.TakeCommand(), "pending command retried after crash");
+            True(bridge.AcceptStatus(YouTubeStatus(1, false)), "disconnect acknowledged");
+            bridge.Restarting(); Equal(null, bridge.TakeCommand(), "acknowledged command not repeated");
+            Equal("invalid_command", bridge.Command("test"), "no unimplemented test mode");
+            var error = YouTubeStatus(0, true); error["state"] = "error";
+            bridge.AcceptStatus(error); False(bridge.AcceptsEvents, "error status does not reopen events");
+        }
+        private static void TestYouTubePublicState()
+        {
+            var bridge = new YouTubeConnectionBridge();
+            bridge.AcceptStatus(YouTubeStatus(0, true));
+            var json = bridge.GetState();
+            False(json.Contains("SECRET"), "private tokens never exposed");
+            using (var state = JsonDocument.Parse(json))
+                True(state.RootElement.GetProperty("verificationUri").GetString().StartsWith("https://accounts.google.com/"), "official login retained");
+            foreach (var url in new[] { "https://evil.invalid/", "https://accounts.google.com.evil.invalid/o/oauth2/v2/auth",
+                "http://accounts.google.com/o/oauth2/v2/auth", "https://user@accounts.google.com/o/oauth2/v2/auth", "https://accounts.google.com:444/o/oauth2/v2/auth" })
+                False(YouTubeConnectionBridge.IsAuthorizationUri(url), "unsafe login rejected");
+        }
+        private static void TestYouTubeHttpControls()
+        {
+            using (var scope = new TestScope("youtube-http"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                var commands = new List<string>();
+                server.SetYouTubeHandlers(delegate { return "{\"ready\":true,\"authorized\":false}"; },
+                    delegate(string action) { commands.Add(action); return string.Empty; });
+                var origin = "http://127.0.0.1:" + server.Port;
+                string proof, twitchProof;
+                using (var state = JsonDocument.Parse(client.GetStringAsync(origin + "/api/youtube").GetAwaiter().GetResult()))
+                    proof = state.RootElement.GetProperty("controlToken").GetString();
+                using (var state = JsonDocument.Parse(client.GetStringAsync(origin + "/api/twitch").GetAwaiter().GetResult()))
+                    twitchProof = state.RootElement.GetProperty("controlToken").GetString();
+                foreach (var action in new[] { "connect", "cancel", "disconnect" })
+                {
+                    Equal(HttpStatusCode.MethodNotAllowed, client.GetAsync(origin + "/api/youtube/" + action).GetAwaiter().GetResult().StatusCode, "GET does not mutate account");
+                    foreach (var attempt in new[] { new[] { proof, "https://evil.invalid" }, new[] { twitchProof, origin }, new[] { "", origin } })
+                        using (var request = new HttpRequestMessage(HttpMethod.Post, origin + "/api/youtube/" + action))
+                        {
+                            request.Headers.Add("X-Pichi-YouTube-Control", attempt[0]); request.Headers.Add("Origin", attempt[1]);
+                            Equal(HttpStatusCode.Forbidden, client.SendAsync(request).GetAwaiter().GetResult().StatusCode, "foreign origin or wrong proof rejected");
+                        }
+                    using (var request = new HttpRequestMessage(HttpMethod.Post, origin + "/api/youtube/" + action))
+                    {
+                        request.Headers.Add("X-Pichi-YouTube-Control", proof); request.Headers.Add("Origin", origin);
+                        Equal(HttpStatusCode.Accepted, client.SendAsync(request).GetAwaiter().GetResult().StatusCode, "local request accepted");
+                    }
+                }
+                Equal("connect,cancel,disconnect", string.Join(",", commands), "only valid provider commands forwarded");
+            }
+        }
+    }
+}

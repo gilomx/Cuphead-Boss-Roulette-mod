@@ -23,9 +23,50 @@
     "description": "Manage your connections and move your settings to another installation.",
     "connectionsDescription": "Connect your accounts separately on each installation.",
     "configure": "Configure",
-    "platforms": { "twitch": "Twitch", "youtube": "YouTube", "tiktok": "TikTok / TikFinity" },
-    "youtubePending": "YouTube connection is not available yet. You will configure it here once it is enabled.",
-    "tikfinity": "Open TikFinity on this PC and connect your account in that application. The mod detects its local API automatically.",
+    "platforms": {
+      "twitch": "Twitch",
+      "youtube": "YouTube",
+      "tiktok": "TikTok / TikFinity"
+    },
+    "youtube": {
+      "title": "YouTube account",
+      "connect": "Connect YouTube",
+      "openGoogle": "Continue in Google",
+      "authorizationInstructions": "Choose the account and channel for your live stream. If the browser did not open, continue from this link.",
+      "expires": "Authorization expires in {minutes} min.",
+      "disconnectConfirmation": "Events will stop, this PC will forget the channel, and Google will revoke La Pichi Ruleta's permission.",
+      "messages": {
+        "companion_starting": "Waiting for the mod companion.",
+        "application_not_configured": "Connection will be available once La Pichi Ruleta's Google application registration is complete.",
+        "not_connected": "Connect your channel to receive YouTube chat and events.",
+        "requesting_authorization": "Preparing Google authorization…",
+        "authorization_pending": "Waiting for your Google authorization.",
+        "authorization_cancelled": "Connection cancelled.",
+        "authorization_denied": "Permission was not granted. You can connect your channel again.",
+        "authorization_expired": "Authorization expired. Click Connect YouTube to try again.",
+        "authorization_required": "Google permission expired or was removed. Connect your channel again.",
+        "connecting": "Connecting to your channel…",
+        "waiting_live": "Account connected. Waiting for an active stream with chat enabled.",
+        "chat_live": "Receiving votes and events from your stream's chat.",
+        "network_retry": "Connection lost. Retrying automatically…",
+        "quota_exceeded": "The YouTube API quota was reached. Retrying automatically.",
+        "live_not_enabled": "Live streaming is not enabled for this YouTube channel yet.",
+        "api_not_enabled": "Enable YouTube Data API v3 for the Google Cloud application.",
+        "permission_required": "Google did not grant the required permissions. Disconnect the channel and authorize it again.",
+        "channel_required": "The selected account has no available YouTube channel.",
+        "oauth_error": "Google could not authorize the application. Check its registration and try again.",
+        "oauth_client_error": "Google rejected the application configuration. Update the mod to connect YouTube.",
+        "api_error": "YouTube did not respond correctly. Retrying automatically.",
+        "revocation_unconfirmed": "Channel forgotten on this PC. Revocation could not be confirmed; you can remove access from your Google account.",
+        "storage_error": "The saved Windows account could not be read.",
+        "storage_delete_error": "The Windows account could not be deleted. Try disconnecting again.",
+        "connection_error": "The channel could not be connected or saved. Try again.",
+        "simulated": "Local simulation: no real channel is connected.",
+        "mock_authorization_pending": "Local authorization test. No real account will be connected."
+      }
+    },
+    "tikfinityDesktopTitle": "Use the TikFinity desktop application",
+    "tikfinity": "The web version of TikFinity does not work with the mod. Open the application installed on this PC, connect your account and keep it open; the mod detects the connection automatically.",
     "transfer": {
       "title": "Export and import settings",
       "description": "Save a copy of your settings or restore a copy on this installation.",
@@ -73,10 +114,43 @@
       "copied": "URL copied",
       "openOverlay": "Open overlay",
       "overlayHelp": "Add this URL as an OBS browser source at 1920 × 1080. The preview shows the event's current state.",
-      "stages": { "boss": "Boss", "weapon1": "Weapon 1", "weapon2": "Weapon 2", "super": "Super", "charm": "Charm", "modifier": "Challenge", "result": "Result" },
-      "phase": { "off": "Ready to start", "voting": "Voting open", "reveal": "Winner selected", "result": "Ready to play", "waiting_map": "Waiting for the map", "countdown": "Countdown", "loading": "Starting match", "active": "Match in progress", "completed": "Event finished" },
-      "outcome": { "tie": "Tie: the system picked randomly among the top options.", "no_votes": "No votes: the system picked randomly among all presented options.", "most_votes": "The option with the most votes won." },
-      "feedback": { "already_running": "The event is already running.", "development_only": "This test is only available in the Dev package.", "test_votes_running": "Test votes are already being sent in this round.", "invalid_action": "Could not apply that configuration.", "map_required": "Return to a save's map before starting.", "blocked_by_live_event": "Another Live Event is running.", "stale_round": "This round has already closed. Wait for the next round.", "no_options": "No compatible options are available.", "load_failed": "Could not start the chosen boss. Return to the map and start a new event.", "request_failed": "Could not confirm the action. Check the connection to the game." }
+      "stages": {
+        "boss": "Boss",
+        "weapon1": "Weapon 1",
+        "weapon2": "Weapon 2",
+        "super": "Super",
+        "charm": "Charm",
+        "modifier": "Challenge",
+        "result": "Result"
+      },
+      "phase": {
+        "off": "Ready to start",
+        "voting": "Voting open",
+        "reveal": "Winner selected",
+        "result": "Ready to play",
+        "waiting_map": "Waiting for the map",
+        "countdown": "Countdown",
+        "loading": "Starting match",
+        "active": "Match in progress",
+        "completed": "Event finished"
+      },
+      "outcome": {
+        "tie": "Tie: the system picked randomly among the top options.",
+        "no_votes": "No votes: the system picked randomly among all presented options.",
+        "most_votes": "The option with the most votes won."
+      },
+      "feedback": {
+        "already_running": "The event is already running.",
+        "development_only": "This test is only available in the Dev package.",
+        "test_votes_running": "Test votes are already being sent in this round.",
+        "invalid_action": "Could not apply that configuration.",
+        "map_required": "Return to a save's map before starting.",
+        "blocked_by_live_event": "Another Live Event is running.",
+        "stale_round": "This round has already closed. Wait for the next round.",
+        "no_options": "No compatible options are available.",
+        "load_failed": "Could not start the chosen boss. Return to the map and start a new event.",
+        "request_failed": "Could not confirm the action. Check the connection to the game."
+      }
     },
     "documentTitle": "La Pichi Ruleta — Dashboard",
     "title": "Dashboard",
@@ -99,7 +173,10 @@
       "title": "Live Events",
       "description": "Choose an activity to configure it and follow its status during the live stream.",
       "back": "Back to Live Events",
-      "status": { "active": "Active", "inactive": "Inactive" },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
       "peskyBattleDescription": "Recruit 2 to 5 participants and face their attacks and temporary challenges for a full level.",
       "tapFarmingDescription": "Turn the whole community's taps into extra resistance that makes the boss last longer.",
       "participants": "{count}/{capacity} participants",
@@ -466,9 +543,19 @@
       "error": "Error"
     },
     "units": {
+      "jewel": "Jewels",
       "coin": "coins",
       "bit": "Bits",
       "money": "value"
+    },
+    "youtubeEventTypes": {
+      "superchatevent": "Super Chat",
+      "superstickerevent": "Super Sticker",
+      "newsponsorevent": "New membership",
+      "upgrade": "Membership upgrade",
+      "membermilestonechatevent": "Milestone message",
+      "membershipgiftingevent": "Gifted memberships",
+      "giftevent": "Gift with Jewels"
     },
     "simulator": {
       "voteNumber": "Vote number",
@@ -509,7 +596,10 @@
       "batchSent": "{count} events accepted successfully.",
       "scheduled": "Event scheduled; it will be sent in {seconds} s.",
       "error": "The event could not be sent.",
-      "hint": "The result will appear in this session's feed."
+      "hint": "The result will appear in this session's feed.",
+      "youtubeJewels": "Gifts with Jewels",
+      "jewelsAmount": "Total Jewels",
+      "jewelsHint": "Total Jewel value of the event, including the combo. No gift selection is needed."
     },
     "time": {
       "never": "No events"
@@ -552,11 +642,11 @@
         "description": "The {source} arrangement will replace {target}."
       }
     },
-      "roulette": {
-        "replay": "Replay entry animation",
-        "disabledPreviewHint": "This layer is disabled, but you can preview it here. OBS simulation is temporary and does not enable the layer.",
-        "logoPreviewHint": "Enable “Show logo outside combat” to see it in this scenario.",
-        "previewHint": "This sample does not change your game. Hidden and Retry show the moments when the overlay exits.",
+    "roulette": {
+      "replay": "Replay entry animation",
+      "disabledPreviewHint": "This layer is disabled, but you can preview it here. OBS simulation is temporary and does not enable the layer.",
+      "logoPreviewHint": "Enable “Show logo outside combat” to see it in this scenario.",
+      "previewHint": "This sample does not change your game. Hidden and Retry show the moments when the overlay exits.",
       "order": "Order",
       "iconsAbove": "Icons above",
       "textAbove": "Challenge above",
@@ -654,13 +744,18 @@
         "close": "Close color picker"
       },
       "chatColors": {
-        "title": "Vote colors", "liquidColor": "Vote count",
-        "collectingColor": "Leader and winner", "textColor": "Text and number", "outlineColor": "Image frame",
+        "title": "Vote colors",
+        "liquidColor": "Vote count",
+        "collectingColor": "Leader and winner",
+        "textColor": "Text and number",
+        "outlineColor": "Image frame",
         "voteOutlineColor": "Vote counter border"
       },
       "chatOptions": {
-        "showTitle": "Show headings", "showTitleHint": "Shows Voting and the group the chat is voting on.",
-        "showDetails": "Result labels", "showDetailsHint": "Labels the selected equipment slots."
+        "showTitle": "Show headings",
+        "showTitleHint": "Shows Voting and the group the chat is voting on.",
+        "showDetails": "Result labels",
+        "showDetailsHint": "Labels the selected equipment slots."
       },
       "battleColors": {
         "title": "Battle colors",
@@ -699,8 +794,17 @@
         "retry": "Lose and retry"
       },
       "chat": {
-        "phases": { "off": "Inactive (empty overlay)", "voting": "Voting open", "reveal": "Round winner", "result": "Final selection", "countdown": "Start countdown", "active": "Battle (empty overlay)" },
-        "stage": "Round", "count": "Visible options", "vote": "Simulate one vote",
+        "phases": {
+          "off": "Inactive (empty overlay)",
+          "voting": "Voting open",
+          "reveal": "Round winner",
+          "result": "Final selection",
+          "countdown": "Start countdown",
+          "active": "Battle (empty overlay)"
+        },
+        "stage": "Round",
+        "count": "Visible options",
+        "vote": "Simulate one vote",
         "hint": "These tests only affect the preview. To vote in the real event, use Simulate event → Chat vote."
       },
       "battle": {
@@ -758,7 +862,7 @@
   },
   "interactions": {
     "title": "Interactions",
-    "description": "Configure how TikTok and Twitch events affect gameplay and test their execution.",
+    "description": "Configure how TikTok, Twitch and YouTube events affect the game and test their execution.",
     "workspace": {
       "eyebrow": "Interactions panel",
       "back": "Back to interactions"
@@ -799,7 +903,8 @@
         "subscriptionEvery": "every {count} new subscriptions",
         "subscription_giftEvery": "every {count} gifted subscriptions",
         "resubscriptionEvery": "every {count} resubscriptions",
-        "redemptionEvery": "every {count} redemptions of this reward"
+        "redemptionEvery": "every {count} redemptions of this reward",
+        "jewelsEvery": "Every {count} accumulated Jewels"
       },
       "editor": {
         "eyebrow": "Redeem editor",
@@ -873,7 +978,11 @@
         "executionsubscriptionSummary": "{every} new subscriptions will send {quantity} {interaction} to the game.",
         "executionsubscription_giftSummary": "{every} gifted subscriptions will send {quantity} {interaction} to the game.",
         "executionresubscriptionSummary": "{every} shared resubscriptions will send {quantity} {interaction} to the game.",
-        "executionredemptionSummary": "{every} redemptions of “{trigger}” will send {quantity} {interaction} to the game."
+        "executionredemptionSummary": "{every} redemptions of “{trigger}” will send {quantity} {interaction} to the game.",
+        "jewelsName": "Jewels",
+        "jewelsTriggerHint": "Any YouTube gift adds its Jewel value across all viewers. The remainder carries over to the next activation.",
+        "jewelsEvery": "Accumulated Jewels",
+        "executionjewelsSummary": "{every} accumulated Jewels will send {quantity} {interaction} to the game."
       },
       "actions": {
         "label": "Redeem actions",

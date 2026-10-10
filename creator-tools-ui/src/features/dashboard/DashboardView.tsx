@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
+import { StreamPlatformIcon } from "../interactions/StreamRuleIcons";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
 import { LiveEventsSection } from "./LiveEventsSection";
 import type {
@@ -179,11 +181,51 @@ export function DashboardView({
       </header>
 
       <section className="dashboard-summary" aria-labelledby="dashboard-summary-title">
-        <div className="dashboard-section-heading">
+        <div className="dashboard-section-heading dashboard-summary__heading">
           <div>
             <h2 id="dashboard-summary-title">{t("dashboard.summary.title")}</h2>
           </div>
-          <span>{t("dashboard.summary.session")}</span>
+          <ul className="dashboard-summary__connections" aria-label={t("dashboard.connections.title")}>
+            {connections.map((connection) => {
+              const needsConfiguration = connection.status === "pending" ||
+                (connection.status === "disconnected" && !connection.account);
+              const label = t(`dashboard.platforms.${connection.platform}`, connection.label);
+              const statusLabel = t(`dashboard.connectionStatus.${connection.status}`, connection.status);
+              const connected = connection.status === "connected" || connection.status === "live";
+              return (
+                <li key={connection.id} data-platform={connection.platform}>
+                  <span className="dashboard-summary__platform">
+                    <span aria-hidden="true">
+                      <StreamPlatformIcon platform={connection.platform as StreamPlatform} />
+                    </span>
+                    <strong>{label}</strong>
+                  </span>
+                  {needsConfiguration ? (
+                    <a className="dashboard-summary__configure"
+                      href={`/config/settings?connection=${connection.platform}`}
+                      aria-label={`${t("settings.configure")} ${label}`}
+                      onClick={(event) => {
+                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                        event.preventDefault(); onOpenSettings(connection.platform as StreamPlatform);
+                      }}>
+                      {t("settings.configure")}<ChevronRight aria-hidden="true" />
+                    </a>
+                  ) : connected ? (
+                    <span className="dashboard-connection-state dashboard-connection-state--dot"
+                      data-status={connection.status} role="img"
+                      aria-label={`${label}: ${statusLabel}`} title={`${label}: ${statusLabel}`}>
+                      <span aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <span className="dashboard-connection-state" data-status={connection.status}>
+                      <span aria-hidden="true" />
+                      {statusLabel}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
         <div className="dashboard-counter-grid">
           {counterCards.map(([key, value]) => (
@@ -203,40 +245,6 @@ export function DashboardView({
         peskyBattleCardRef={peskyBattleCardRef}
         tapFarmingCardRef={tapFarmingCardRef}
       />
-
-      <section className="dashboard-connections" aria-labelledby="dashboard-connections-title">
-        <div className="dashboard-section-heading">
-          <div>
-            <p className="dashboard-eyebrow">{t("dashboard.connections.eyebrow")}</p>
-            <h2 id="dashboard-connections-title">{t("dashboard.connections.title")}</h2>
-          </div>
-        </div>
-        <div className="dashboard-connection-grid">
-          {connections.map((connection) => (
-            <article
-              className="dashboard-connection-card"
-              key={connection.id}
-              data-platform={connection.platform}
-            >
-              <div className="dashboard-connection-card__header">
-                <h3>{connection.label}</h3>
-                <span className="dashboard-connection-state" data-status={connection.status}>
-                  <span aria-hidden="true" />
-                  {t(`dashboard.connectionStatus.${connection.status}`, connection.status)}
-                </span>
-              </div>
-              <div className="dashboard-connection-card__actions">
-                <a href={`/config/settings?connection=${connection.platform}`}
-                  aria-label={`${t("settings.configure")} ${connection.label}`}
-                  onClick={(event) => {
-                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                    event.preventDefault(); onOpenSettings(connection.platform as StreamPlatform);
-                  }}>{t("settings.configure")}</a>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
 
       <div className="dashboard-activity-grid">
         <InteractionQueuePanel

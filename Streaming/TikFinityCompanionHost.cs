@@ -29,6 +29,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
         private readonly object queueLock = new object();
+        private readonly YouTubeConnectionBridge youtube = new YouTubeConnectionBridge();
 #if PICHI_LAUNCHER_DEV
         private readonly TwitchConnectionBridge twitch = new TwitchConnectionBridge(testAvailable: true);
 #else
@@ -103,6 +104,8 @@ namespace Gilomx.CupheadBossRoulette
                     if (!process.HasExited)
                     {
                         SendTwitchCommand();
+                        var youtubeCommand = youtube.TakeCommand();
+                        if (youtubeCommand != null) TwitchConnectionBridge.WriteCommand(process.StandardInput.BaseStream, youtubeCommand);
                         return;
                     }
                     var exitCode = process.ExitCode;
@@ -151,6 +154,25 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal string GetTwitchState() { return twitch.GetState(); }
+        internal string GetYouTubeState() { return youtube.GetState(); }
+
+        internal string CommandYouTube(string action)
+        {
+            if (disposed) return "companion_unavailable";
+            lock (queueLock)
+            {
+                var result = youtube.Command(action);
+                var node = pending.First;
+                while (node != null)
+                {
+                    var next = node.Next;
+                    if (node.Value.Event != null && node.Value.Event.Platform == "youtube" ||
+                        node.Value.Connection != null && node.Value.Connection.ConnectionId == "youtube") pending.Remove(node);
+                    node = next;
+                }
+                return result;
+            }
+        }
 
         internal string CommandTwitch(string action)
         {
@@ -214,6 +236,7 @@ namespace Gilomx.CupheadBossRoulette
                         "El proceso no pudo iniciarse.");
                 process = candidate;
                 twitch.Restarting();
+                youtube.Restarting();
                 PublishLocalStatus("starting", "companion_starting",
                     "Iniciando el acompañante de TikFinity.");
                 candidate.BeginOutputReadLine();
@@ -243,6 +266,22 @@ namespace Gilomx.CupheadBossRoulette
             if (disposed || args.Data.Length == 0)
                 return;
             Dictionary<string, string> twitchValues;
+            Dictionary<string, string> youtubeValues;
+            if (CreatorToolsFlatJson.TryParse(args.Data, out youtubeValues) &&
+                CreatorToolsFlatJson.Value(youtubeValues, "connectionId") == "youtube")
+            {
+                lock (queueLock)
+                {
+                    if (CreatorToolsFlatJson.Value(youtubeValues, "kind") == "status")
+                    {
+                        if (!youtube.AcceptStatus(youtubeValues)) return;
+                    }
+                    else if (!youtube.AcceptsEvents) return;
+                    CreatorToolsStreamMessage youtubeMessage;
+                    if (TikFinityCompanionProtocol.TryParse(args.Data, out youtubeMessage)) Enqueue(youtubeMessage);
+                }
+                return;
+            }
             if (CreatorToolsFlatJson.TryParse(args.Data, out twitchValues) &&
                 CreatorToolsFlatJson.Value(twitchValues, "connectionId") == "twitch")
             {
@@ -296,6 +335,7 @@ namespace Gilomx.CupheadBossRoulette
         private void ScheduleRestart(string code, string message)
         {
             twitch.Restarting();
+            youtube.Restarting();
             restartAttempt = Math.Min(MaximumRestarts, restartAttempt + 1);
             var delaySeconds = Math.Min(30,
                 (int)Math.Pow(2d, Math.Min(5, restartAttempt - 1)));

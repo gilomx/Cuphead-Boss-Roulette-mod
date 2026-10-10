@@ -1,6 +1,7 @@
 using LaPichiRuleta.TikFinity.Protocol;
 using LaPichiRuleta.TikFinity.TikFinity;
 using LaPichiRuleta.TikFinity.Twitch;
+using LaPichiRuleta.TikFinity.YouTube;
 
 namespace LaPichiRuleta.TikFinity.Runtime;
 
@@ -42,28 +43,34 @@ internal sealed class CompanionHost
             new TwitchEventSub(new TwitchLocalTestApi(localHttp), output, localTest: true));
         var twitchTask = twitchControl ? twitch.RunAsync(lifetimeCancellation.Token)
             : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
-        var inputTask = twitchControl ? ReadCommandsAsync(Console.OpenStandardInput(), twitch, lifetimeCancellation.Token)
+        var youtubeApi = new YouTubeApi(http);
+        var youtube = new YouTubeConnectionService(youtubeApi, new WindowsYouTubeCredentialStore(),
+            new YouTubeAuthorization(), new YouTubeChatReceiver(youtubeApi, output), output.WriteStatusAsync);
+        var youtubeTask = twitchControl ? youtube.RunAsync(lifetimeCancellation.Token)
+            : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
+        var inputTask = twitchControl ? ReadCommandsAsync(Console.OpenStandardInput(), twitch, lifetimeCancellation.Token, youtube)
             : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
         var parentExitTask = parentLifetime.WaitForExitAsync(
             lifetimeCancellation.Token);
 
         var completedTask = await Task.WhenAny(
             connectorTask,
-            parentExitTask, twitchTask, inputTask).ConfigureAwait(false);
+            parentExitTask, twitchTask, youtubeTask, inputTask).ConfigureAwait(false);
 
         try { await completedTask.ConfigureAwait(false); }
         finally
         {
             // Never wait on a console pipe while shutting down its owning process.
             lifetimeCancellation.Cancel();
-            try { await Task.WhenAll(connectorTask, twitchTask, parentExitTask).ConfigureAwait(false); }
+            try { await Task.WhenAll(connectorTask, twitchTask, youtubeTask, parentExitTask).ConfigureAwait(false); }
             catch (OperationCanceledException) { }
         }
         return completedTask == parentExitTask || completedTask == inputTask
             ? ExitCodes.Success : ExitCodes.FatalError;
     }
 
-    internal static async Task ReadCommandsAsync(Stream input, TwitchConnectionService twitch, CancellationToken cancellationToken)
+    internal static async Task ReadCommandsAsync(Stream input, TwitchConnectionService twitch, CancellationToken cancellationToken,
+        YouTubeConnectionService? youtube = null)
     {
         // Older Mono StreamWriters can prepend UTF-8 BOM bytes before the first
         // command. Decode the pipe before validating bounded command lines.
@@ -81,6 +88,7 @@ internal sealed class CompanionHost
                 {
                     var command = line.ToString().Trim(); line.Clear();
                     if (command.StartsWith("twitch:", StringComparison.Ordinal)) twitch.TryCommand(command[7..]);
+                    if (command.StartsWith("youtube:", StringComparison.Ordinal)) youtube?.TryCommand(command[8..]);
                 }
                 else if (value != '\r')
                 {

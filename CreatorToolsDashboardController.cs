@@ -583,7 +583,7 @@ namespace Gilomx.CupheadBossRoulette
                 return string.Empty;
             if (platform == "tiktok") return "coin";
             if (platform == "twitch") return "bit";
-            if (platform == "youtube") return "money";
+            if (platform == "youtube") return type == "gift" ? "jewel" : "money";
             return string.Empty;
         }
 

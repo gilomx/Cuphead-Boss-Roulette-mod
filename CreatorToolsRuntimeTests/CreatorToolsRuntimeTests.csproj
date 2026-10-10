@@ -20,6 +20,7 @@
     <Compile Include="..\Streaming\CreatorToolsJsonParser.cs" Link="Product\Streaming\CreatorToolsJsonParser.cs" />
     <Compile Include="..\CreatorToolsPeskyBattleSettings.cs" Link="Product\CreatorToolsPeskyBattleSettings.cs" />
     <Compile Include="TwitchConnectionTests.cs.txt" Link="TwitchConnectionTests.cs" />
+    <Compile Include="YouTubeConnectionTests.cs.txt" Link="YouTubeConnectionTests.cs" />
     <Compile Include="StreamPlatformRuleTests.cs.txt" Link="StreamPlatformRuleTests.cs" />
     <Compile Include="TimedChallengeTests.cs.txt" Link="TimedChallengeTests.cs" />
     <Compile Include="..\Interactions\CreatorToolsTimedChallenge.cs" Link="Product\Interactions\CreatorToolsTimedChallenge.cs" />
@@ -111,5 +112,6 @@
              Link="Product\Streaming\TikFinityCompanionHost.cs" />
     <Compile Include="..\Streaming\TwitchConnectionBridge.cs"
              Link="Product\Streaming\TwitchConnectionBridge.cs" />
+    <Compile Include="..\Streaming\YouTubeConnectionBridge.cs" />
   </ItemGroup>
 </Project>

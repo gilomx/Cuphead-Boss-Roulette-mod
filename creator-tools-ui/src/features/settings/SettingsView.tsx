@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { Monitor } from "lucide-react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { DashboardConnection, DashboardState, StreamPlatform } from "../../model";
 import { TwitchConnectionControls } from "./TwitchConnectionControls";
+import { YouTubeConnectionControls } from "./YouTubeConnectionControls";
 import { SettingsTransferPanel } from "./SettingsTransferPanel";
 
-const PLATFORMS: StreamPlatform[] = ["twitch", "youtube", "tiktok"];
+const PLATFORMS: StreamPlatform[] = ["tiktok", "twitch", "youtube"];
 
 export function SettingsView() {
   const { t } = useLocalization();
@@ -53,12 +55,18 @@ export function SettingsView() {
                     <span aria-hidden="true" />{t(`dashboard.connectionStatus.${status}`, status)}
                   </span>
                 </header>
-                {platform === "twitch" ? <TwitchConnectionControls /> : (
-                  <p>{platform === "tiktok"
-                    ? t(`dashboard.connectionDescriptions.tikfinity.${status}`, t("settings.tikfinity"))
-                    : t("settings.youtubePending")}</p>
+                {platform === "twitch" ? <TwitchConnectionControls /> : platform === "youtube" ? <YouTubeConnectionControls /> : (
+                  <p>{t(`dashboard.connectionDescriptions.tikfinity.${status}`, t("settings.tikfinity"))}</p>
                 )}
-                {platform === "tiktok" ? <small>{t("settings.tikfinity")}</small> : null}
+                {platform === "tiktok" ? (
+                  <div className="settings-tikfinity-desktop">
+                    <Monitor aria-hidden="true" />
+                    <div>
+                      <strong>{t("settings.tikfinityDesktopTitle")}</strong>
+                      <p>{t("settings.tikfinity")}</p>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             );
           })}

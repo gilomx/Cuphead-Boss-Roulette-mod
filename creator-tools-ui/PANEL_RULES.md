@@ -7,17 +7,38 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 ## Comportamiento actual
 
 - Configuración es la última opción de la barra lateral y agrupa las
-  conexiones en `/config/settings`. Las tarjetas del dashboard conservan sólo
-  nombre, estado y «Configurar», que abre esa página enfocando la plataforma.
-  Allí se gestiona Twitch, se informa el estado de TikFinity y se reserva el
-  lugar de YouTube hasta habilitar su integración. Cambiar de página mantiene
+  conexiones en `/config/settings`. El encabezado de «Resumen del live» reúne
+  las tres plataformas con su estado, sin tarjetas separadas ni «Sesión actual».
+  Cada plataforma forma un grupo compacto con icono y nombre; «Configurar»
+  es un enlace discreto dentro de ese grupo, sin cápsula ni punto de estado.
+  Las pendientes o desconectadas sin cuenta muestran «Configurar» como enlace
+  que abre esa página enfocando la plataforma.
+  Las conectadas o en vivo muestran sólo un punto verde junto al nombre,
+  con estado accesible y tooltip; los estados de prueba y espera conservan texto.
+  Allí se gestionan Twitch y YouTube y se informa el estado de TikFinity.
+  Cambiar de página mantiene
   las conexiones en el companion.
+  TikFinity incluye un aviso destacado: se debe abrir la aplicación de escritorio
+  instalada en esta PC y mantenerla abierta; la versión web no conecta con el mod.
 - Configuración separa **Conexiones** de **Exportar e importar configuraciones**.
+  Ambos paneles se apilan dentro del ancho máximo compartido de las páginas
+  (`--content-width`), sin extender Configuración al ancho completo de la ventana.
+  Conexiones ordena TikTok / TikFinity, Twitch y YouTube de arriba hacia abajo.
   Una cuenta Twitch autorizada ofrece sólo Desconectar cuenta como acción de
   cuenta. La copia portable reúne los ajustes guardados de todos los módulos y
   el idioma, sin conexiones ni credenciales. Importar valida la copia, mantiene
   las conexiones locales y prepara los ajustes para el próximo arranque, con
   respaldo previo y opción de cancelar. Contrato: [copias de configuración](../docs/settings-transfer.md).
+- YouTube autoriza cada canal en el navegador del sistema, recuerda la cuenta
+  en las credenciales de Windows y permite desconectarla y revocar el permiso.
+  Sin live activo muestra «Cuenta conectada. Esperando una transmisión activa».
+  Detecta los chats activos del canal y recibe votos exactos del 1 al 6,
+  Super Chats, Super Stickers, membresías y regalos con Jewels por streaming.
+  Los eventos iniciales del historial no activan interacciones ni votos; los
+  combos de Jewels cuentan sólo sus incrementos y las membresías regaladas
+  cuentan la compra, sin duplicarla por destinatario.
+  El registro compartido de Google debe completarse antes de habilitar Conectar.
+  Contrato y registro: [conexión de YouTube](../docs/youtube-connection.md).
 - Configuración permite conectar Twitch con autorización de dispositivo de una
   aplicación pública compartida. Cada usuario autoriza su propio canal, sin
   introducir Client Secret ni tokens. `/api/twitch` expone sólo el estado
@@ -32,12 +53,17 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   se guarda antes de continuar. Desconectar para la recepción inmediatamente,
   elimina la credencial y solicita revocación. Si falla la eliminación se
   muestra error; si falla la revocación remota se informa que sólo se confirmó
-  la desconexión local. YouTube sigue pendiente de integración.
+  la desconexión local.
 - EventSub recibe votos exactos `1`–`6`, follows, suscripciones, Bits y canjes
   de recompensas; el texto restante del chat se descarta. Los votos alimentan
   «El chat elige»; los demás eventos llegan al dashboard. Las reglas de
   interacciones admiten regalos, taps y follows de TikTok, y follows, Bits,
-  suscripciones nuevas, regaladas, resuscripciones compartidas y canjes de Twitch.
+  suscripciones nuevas, regaladas, resuscripciones compartidas y canjes de Twitch,
+  y gemas acumuladas de YouTube. Cada regla de gemas suma el valor de cualquier
+  regalo entre todos los espectadores, conserva el sobrante durante la sesión
+  y respeta sus propias esperas. No usa un catálogo de regalos de YouTube ni
+  convierte otras monedas. La tabla incluye el filtro YouTube y el icono de
+  gemas de YouTube; el formulario y el simulador muestran ese icono junto al importe.
   Los formularios de creación y edición usan un único selector «Se activa con»:
   cada opción reúne
   plataforma y activador, con el icono de plataforma dentro del control y la lista.
@@ -71,7 +97,8 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 - El encabezado principal comienza aproximadamente a media altura del logo para
   conservar la relación visual entre navegación y contenido.
 - `/config`, `/config/roulette`, `/config/interactions` y `/dashboard` cargan la
-  misma SPA. La ruta base abre Ruleta; el historial del navegador cambia de
+  misma SPA. El menú del juego abre directamente `/dashboard`; la ruta base
+  `/config` conserva Ruleta. El historial del navegador cambia de
   vista sin desmontar el shell ni volver a solicitar el documento.
 - Dashboard consulta su propio estado operativo y no depende de que el catálogo
   de Ruleta ya esté disponible en el mapa. Muestra el estado del motor y de cada

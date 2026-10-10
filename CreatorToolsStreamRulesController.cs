@@ -9,7 +9,7 @@ namespace Gilomx.CupheadBossRoulette
 {
     internal sealed class CreatorToolsStreamRulesController
     {
-        private const int SchemaVersion = 6;
+        private const int SchemaVersion = 7;
         private const int MinimumSupportedSchemaVersion = 1;
         private const string GiftEventType = "gift";
         private const string LikeEventType = "like";
@@ -293,7 +293,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!catalogReady || streamEvent == null ||
                 !IsSupportedEventType(streamEvent.Platform, eventType))
                 return result;
-            if (streamEvent.Type == GiftEventType &&
+            if (eventType == GiftEventType &&
                 string.IsNullOrEmpty(streamEvent.ItemId))
             {
                 result.MessageCode = "gift_id_missing";
@@ -337,8 +337,9 @@ namespace Gilomx.CupheadBossRoulette
             var interactionIds = new List<string>();
             var pending = new List<PendingRuleDispatch>();
             var thresholdObserved = false;
-            // Bits are measured by value, not by the number of Cheer messages.
-            var amount = eventType == "currency"
+            // Bits and YouTube Jewels use the normalized value. YouTube's
+            // companion already removes previously counted combo increments.
+            var amount = eventType == "currency" || eventType == "jewels"
                 ? (long)Math.Min(1000000000m, Math.Max(0m, decimal.Floor(streamEvent.TotalValue)))
                 : Math.Max(0L, streamEvent.Count);
             for (var i = 0; i < rules.Count; i++)
@@ -417,7 +418,7 @@ namespace Gilomx.CupheadBossRoulette
             if (pending == null || pending.Count == 0)
                 return;
 
-            if (streamEvent.Type == GiftEventType)
+            if (RuleEventType(streamEvent) == GiftEventType)
             {
                 // Every rule attached to one gift event remains a bundle.
                 // Its shared gift cooldown is the longest configured by the
@@ -1253,7 +1254,7 @@ namespace Gilomx.CupheadBossRoulette
                     "\\{\\\"id\\\":(?<id>\\d+)," +
                     "\\\"name\\\":\\\"(?<name>(?:\\\\.|[^\\\"])*)\\\"," +
                     "\\\"enabled\\\":(?<enabled>true|false)," +
-                    "\\\"platform\\\":\\\"(?<platform>tiktok|twitch)\\\"," +
+                    "\\\"platform\\\":\\\"(?<platform>tiktok|twitch|youtube)\\\"," +
                     "(?:\\\"connectionId\\\":\\\"all\\\",)?" +
                     "\\\"eventType\\\":\\\"(?<eventType>[a-z_]+)\\\"," +
                     "\\\"giftId\\\":\\\"(?<giftId>\\d*)\\\"," +
@@ -1476,6 +1477,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (platform == "tiktok")
                 return value == GiftEventType || value == LikeEventType || value == FollowEventType;
+            if (platform == "youtube") return value == "jewels";
             return platform == "twitch" && (value == FollowEventType || value == "currency" ||
                 value == "subscription" || value == "subscription_gift" || value == "resubscription" || value == "redemption");
         }
@@ -1483,6 +1485,8 @@ namespace Gilomx.CupheadBossRoulette
         private static string RuleEventType(CreatorToolsStreamEvent entry)
         {
             if (entry == null) return string.Empty;
+            if (entry.Platform == "youtube")
+                return entry.Type == GiftEventType && entry.Unit == "jewel" ? "jewels" : string.Empty;
             if (entry.Platform != "twitch") return entry.Type;
             if (entry.Type == "currency") return entry.Unit == "bit" ? "currency" : string.Empty;
             if (entry.Type == "subscription")

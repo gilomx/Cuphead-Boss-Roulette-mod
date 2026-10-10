@@ -193,12 +193,18 @@ de regalos personalizados. Conserva ese archivo, su `.bak`, una posible
 usuario, externos al ZIP. El panel nunca exporta ni importa conexiones o tokens.
 Consulta [copias de configuración](settings-transfer.md).
 
-El companion guarda exclusivamente los tokens de Twitch en una credencial
-genérica del Administrador de credenciales de Windows, por usuario y PC,
-con destino `LaPichiRuleta/Twitch/<Client ID>`. No se incluye en el ZIP ni se
-migra con los archivos del mod. «Desconectar» detiene la recepción, elimina
-esa credencial e intenta revocar el acceso en Twitch. El panel sólo recibe
-estado público, nombre de cuenta y código temporal de autorización.
+El companion guarda los tokens de Twitch y YouTube en credenciales genéricas
+del Administrador de credenciales de Windows, por usuario y PC, con destinos
+`LaPichiRuleta/Twitch/<Client ID>` y `LaPichiRuleta/YouTube/<Client ID>`. No se
+incluyen en el ZIP ni se migran con los archivos del mod. «Desconectar» detiene
+la recepción, elimina la credencial de esa plataforma e intenta revocar su
+acceso. El panel sólo recibe estado público, nombre de cuenta y la información
+temporal para autorizar la conexión. Consulta [conexión de YouTube](youtube-connection.md).
+
+El publicador conserva el JSON del cliente OAuth de escritorio de Google en
+`youtube-oauth.local.json`, excluido de Git y necesario en cada PC que compile
+YouTube. Ese recurso se incorpora al companion como configuración de la app;
+no contiene autorizaciones personales ni se solicita a los usuarios finales.
 
 TikFinity se comunica en `ws://localhost:21213/` y transmite eventos
 al mod por stdout. Su estado de conexión, colas y contadores en memoria son

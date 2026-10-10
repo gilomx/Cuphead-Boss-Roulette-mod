@@ -78,6 +78,9 @@ namespace Gilomx.CupheadBossRoulette
         private Func<string> twitchStateHandler;
         private Func<string, string> twitchCommandHandler;
         private readonly string twitchControlToken = Guid.NewGuid().ToString("N");
+        private Func<string> youtubeStateHandler;
+        private Func<string, string> youtubeCommandHandler;
+        private readonly string youtubeControlToken = Guid.NewGuid().ToString("N");
         private readonly object settingsTransferLock = new object();
         private readonly string settingsControlToken = Guid.NewGuid().ToString("N");
         private CreatorToolsSettingsTransfer settingsTransfer;
@@ -618,6 +621,11 @@ namespace Gilomx.CupheadBossRoulette
         internal void SetTwitchHandlers(Func<string> state, Func<string, string> command)
         {
             lock (dashboardLock) { twitchStateHandler = state; twitchCommandHandler = command; }
+        }
+
+        internal void SetYouTubeHandlers(Func<string> state, Func<string, string> command)
+        {
+            lock (dashboardLock) { youtubeStateHandler = state; youtubeCommandHandler = command; }
         }
 
         internal void SetPeskyState(string json)
@@ -1270,7 +1278,8 @@ namespace Gilomx.CupheadBossRoulette
                 path != "/api/settings/export" && path != "/api/settings/import" && path != "/api/settings/cancel-import" &&
                 path != "/api/overlay-composer/config/set" &&
                 path != "/api/overlay-composer/preview/set" &&
-                path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel" && path != "/api/twitch/test")
+                path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel" && path != "/api/twitch/test" &&
+                path != "/api/youtube/connect" && path != "/api/youtube/disconnect" && path != "/api/youtube/cancel")
             {
                 WriteMethodNotAllowed(stream, "GET");
                 return;
@@ -1779,21 +1788,25 @@ namespace Gilomx.CupheadBossRoulette
                     false);
                 return;
             }
-            if (path == "/api/twitch")
+            if (path == "/api/twitch" || path == "/api/youtube")
             {
                 Func<string> handler;
-                lock (dashboardLock) handler = twitchStateHandler;
+                var youtubeRequest = path == "/api/youtube";
+                lock (dashboardLock) handler = youtubeRequest ? youtubeStateHandler : twitchStateHandler;
                 var json = handler == null ? "{\"ready\":false,\"status\":\"disconnected\",\"authorized\":false}" : handler();
-                json = json.Substring(0, json.Length - 1) + ",\"controlToken\":\"" + twitchControlToken + "\"}";
+                json = json.Substring(0, json.Length - 1) + ",\"controlToken\":\"" + (youtubeRequest ? youtubeControlToken : twitchControlToken) + "\"}";
                 WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
                 return;
             }
-            if (path == "/api/twitch/connect" || path == "/api/twitch/disconnect" || path == "/api/twitch/cancel" || path == "/api/twitch/test")
+            if (path == "/api/twitch/connect" || path == "/api/twitch/disconnect" || path == "/api/twitch/cancel" || path == "/api/twitch/test" ||
+                path == "/api/youtube/connect" || path == "/api/youtube/disconnect" || path == "/api/youtube/cancel")
             {
                 if (request.Method != "POST") { WriteMethodNotAllowed(stream, "POST"); return; }
+                var youtubeRequest = path.StartsWith("/api/youtube/", StringComparison.Ordinal);
                 string origin, proof;
                 Uri parsedOrigin;
-                if (!request.Headers.TryGetValue("X-Pichi-Twitch-Control", out proof) || proof != twitchControlToken ||
+                if (!request.Headers.TryGetValue(youtubeRequest ? "X-Pichi-YouTube-Control" : "X-Pichi-Twitch-Control", out proof) ||
+                    proof != (youtubeRequest ? youtubeControlToken : twitchControlToken) ||
                     !request.Headers.TryGetValue("Origin", out origin) ||
                     !Uri.TryCreate(origin, UriKind.Absolute, out parsedOrigin) ||
                     parsedOrigin.Scheme != "http" || parsedOrigin.Port != Port ||
@@ -1804,8 +1817,8 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
                 Func<string, string> handler;
-                lock (dashboardLock) handler = twitchCommandHandler;
-                var error = handler == null ? "companion_unavailable" : handler(path.Substring("/api/twitch/".Length));
+                lock (dashboardLock) handler = youtubeRequest ? youtubeCommandHandler : twitchCommandHandler;
+                var error = handler == null ? "companion_unavailable" : handler(path.Substring(youtubeRequest ? "/api/youtube/".Length : "/api/twitch/".Length));
                 WriteResponse(stream, error.Length == 0 ? 202 : 503, error.Length == 0 ? "Accepted" : "Service Unavailable",
                     "application/json; charset=utf-8", Encoding.UTF8.GetBytes(error.Length == 0
                         ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"companion_unavailable\"}"), false);

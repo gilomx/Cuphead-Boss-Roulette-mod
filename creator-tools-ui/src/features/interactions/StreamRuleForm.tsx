@@ -7,6 +7,7 @@ import { StreamPlatformIcon } from "./StreamRuleIcons";
 import { interactionItemFor } from "./interactionCatalog";
 import { InteractionPicker } from "./InteractionPicker";
 import { TikTokGiftPicker } from "./TikTokGiftPicker";
+import { YouTubeJewelsIcon } from "./YouTubeJewelsIcon";
 
 const streamTriggerOptions = (Object.entries(platformTriggers) as [StreamRulePlatform, StreamRuleTrigger[]][])
   .flatMap(([platform, eventTypes]) => eventTypes.map((eventType) => ({
@@ -68,7 +69,7 @@ export function StreamRuleForm({
   const canSave = Boolean(
     (!needsGift || selectedGift) && selectedInteraction &&
     (draft.eventType !== "redemption" || Boolean(draft.rewardName.trim())) &&
-    (!hasThreshold || (draft.every >= 1 && draft.every <= maxEvery)) &&
+    (!hasThreshold || (Number.isInteger(draft.every) && draft.every >= 1 && draft.every <= maxEvery)) &&
     draft.quantity >= 1 && draft.quantity <= maxQuantity &&
     Number.isInteger(draft.userCooldownSeconds) &&
     draft.userCooldownSeconds >= 0 && draft.userCooldownSeconds <= maxCooldownSeconds &&
@@ -152,7 +153,7 @@ export function StreamRuleForm({
                 ? eventType === "gift" ? nextGift?.giftId ?? "" : draft.giftId
                 : "",
               rewardName: platform === draft.platform ? draft.rewardName : "",
-              every: eventType === "currency" ? 100 : 1,
+              every: eventType === "currency" || eventType === "jewels" ? 100 : 1,
               name: eventType === "gift"
                 ? nextGift?.name ?? ""
                 : t(`interactions.rules.editor.${eventType}Name`),
@@ -191,15 +192,17 @@ export function StreamRuleForm({
         <div className="stream-rule-execution__grid" data-has-threshold={hasThreshold}>
           {hasThreshold ? (
             <label>
-              <span>{t(draft.eventType === "like"
+              <span className="stream-rule-threshold-label">{draft.eventType === "jewels" ? <YouTubeJewelsIcon /> : null}{t(draft.eventType === "like"
                 ? "interactions.rules.editor.likeEvery"
                 : draft.eventType === "currency" ? "interactions.rules.editor.bitsEvery"
+                  : draft.eventType === "jewels" ? "interactions.rules.editor.jewelsEvery"
                   : draft.eventType === "redemption" ? "interactions.rules.editor.redemptionsEvery"
                     : "interactions.rules.editor.every")}</span>
               <input
                 type="number"
                 min={1}
                 max={maxEvery}
+                step={1}
                 disabled={saving}
                 value={draft.every}
                 onChange={(event) => onChange({

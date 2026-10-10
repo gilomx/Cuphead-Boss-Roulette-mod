@@ -42,7 +42,7 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsInteractionPacingSettings.Load(emptyPath, null).AppendJson(pacing);
             defaults = new Dictionary<string, string>(StringComparer.Ordinal) {
                 { ".cfg", "" },
-                { ".stream-rules.json", "{\"version\":6,\"nextId\":1,\"rules\":[]}" },
+                { ".stream-rules.json", "{\"version\":7,\"nextId\":1,\"rules\":[]}" },
                 { ".pesky-mode.json", CreatorToolsPeskyModeSettings.Load(emptyPath, null).BuildJson() },
                 { ".interaction-pacing.json", pacing.ToString() },
                 { ".pesky-battle.json", CreatorToolsPeskyBattleSettings.Load(emptyPath, null).BuildJson() },
@@ -211,7 +211,8 @@ namespace Gilomx.CupheadBossRoulette
             foreach (var key in template.ObjectValue.Keys)
                 if (node.Property(key) == null) throw new FormatException("Incomplete settings.");
             var versionKey = suffix == ".overlay-composer.json" ? "schemaVersion" : "version";
-            if (template.Property(versionKey) != null && node.Integer(versionKey, -1) != template.Integer(versionKey, -2))
+            if (template.Property(versionKey) != null && node.Integer(versionKey, -1) != template.Integer(versionKey, -2) &&
+                !(suffix == ".stream-rules.json" && node.Integer(versionKey, -1) == 6))
                 throw new FormatException("Unsupported settings version.");
             ValidateShape(node, template);
             if (suffix == ".stream-rules.json") { ValidateRules(node); return SerializeRuleSettings(node); }
@@ -327,14 +328,16 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var id = rule.Property("id");
                 if (rule.ObjectValue == null || id == null || !id.NumberValue.HasValue || id.NumberValue.Value < 1 || id.NumberValue.Value > long.MaxValue || id.NumberValue.Value != decimal.Truncate(id.NumberValue.Value) || !ids.Add(id.NumberValue.Value) ||
-                    (rule.String("platform") != "tiktok" && rule.String("platform") != "twitch") ||
+                    (rule.String("platform") != "tiktok" && rule.String("platform") != "twitch" && rule.String("platform") != "youtube") ||
                     Array.IndexOf(CreatorToolsInteractionIds.All, rule.String("interaction")) < 0) throw new FormatException("Invalid stream rule.");
                 foreach (var key in new[] { "name", "platform", "eventType", "giftId", "giftName", "rewardName", "interaction" })
                     if (rule.Property(key) == null || rule.Property(key).StringValue == null) throw new FormatException("Invalid rule text.");
                 bool enabled;
                 if (!rule.TryBoolean("enabled", out enabled) || rule.String("name").Length > 64 || rule.String("rewardName").Length > 64 || !Regex.IsMatch(rule.String("giftId"), @"^\d*$", RegexOptions.CultureInvariant)) throw new FormatException("Invalid rule settings.");
                 var eventType = rule.String("eventType");
-                var allowed = rule.String("platform") == "tiktok" ? new[] { "gift", "like", "follow" } : new[] { "follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption" };
+                var allowed = rule.String("platform") == "tiktok" ? new[] { "gift", "like", "follow" }
+                    : rule.String("platform") == "youtube" ? new[] { "jewels" }
+                    : new[] { "follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption" };
                 if (Array.IndexOf(allowed, eventType) < 0 || (eventType == "redemption" && rule.String("rewardName").Trim().Length == 0) || (eventType == "follow" && rule.Integer("every", 0) != 1)) throw new FormatException("Invalid rule trigger.");
                 RequireRange(rule, "every", 1, 1000000);
                 RequireRange(rule, "quantity", 1, 50);
@@ -349,7 +352,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             // The legacy settings reader uses a fixed field order. Canonicalize
             // independently of the uploaded JSON's ordering, without account IDs.
-            var builder = new StringBuilder("{\"version\":6,\"nextId\":");
+            var builder = new StringBuilder("{\"version\":7,\"nextId\":");
             AppendValue(builder, node.Property("nextId")); builder.Append(",\"rules\":[");
             var rules = node.Property("rules").ArrayValue;
             var fields = new[] { "id", "name", "enabled", "platform", "eventType", "giftId", "giftName", "rewardName", "every", "interaction", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" };

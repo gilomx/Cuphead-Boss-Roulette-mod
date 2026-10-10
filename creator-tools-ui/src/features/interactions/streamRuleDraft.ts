@@ -4,17 +4,18 @@ import { interactionItems } from "./interactionCatalog";
 export const platformTriggers: Record<StreamRulePlatform, StreamRuleTrigger[]> = {
   tiktok: ["gift", "like", "follow"],
   twitch: ["follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption"],
+  youtube: ["jewels"],
 };
 
 export function createStreamRuleDraft(gift?: TikTokGift, platform: StreamRulePlatform = "tiktok"): StreamRuleDraft {
   return {
-    name: gift?.name ?? "",
+    name: platform === "tiktok" ? gift?.name ?? "" : "",
     enabled: true,
     platform,
     rewardName: "",
     eventType: platformTriggers[platform][0],
     giftId: platform === "tiktok" ? gift?.giftId ?? "" : "",
-    every: 1,
+    every: platform === "youtube" ? 100 : 1,
     interaction: interactionItems.find((item) => item.category === "attack")!.id,
     durationSeconds: 15,
     countdownSeconds: 3,

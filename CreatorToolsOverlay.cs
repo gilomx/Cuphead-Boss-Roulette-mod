@@ -1413,6 +1413,8 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsStreamWorker.ScheduleSimulation);
             creatorToolsServer.SetTwitchHandlers(creatorToolsTikFinityCompanion.GetTwitchState,
                 creatorToolsTikFinityCompanion.CommandTwitch);
+            creatorToolsServer.SetYouTubeHandlers(creatorToolsTikFinityCompanion.GetYouTubeState,
+                creatorToolsTikFinityCompanion.CommandYouTube);
             creatorToolsStreamWorker.Start();
         }
 
@@ -1697,6 +1699,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 creatorToolsServer.SetDashboardSimulationHandler(null);
                 creatorToolsServer.SetTwitchHandlers(null, null);
+                creatorToolsServer.SetYouTubeHandlers(null, null);
                 creatorToolsServer.SetStreamRuleCommandHandler(null);
                 creatorToolsServer.SetInteractionControlObserver(null);
                 creatorToolsServer.SetPeskyBattleCommandHandler(null);

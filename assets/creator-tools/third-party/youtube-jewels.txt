@@ -1,0 +1,8 @@
+YouTube Jewels icon
+
+Source: https://gstatic.com/youtube/img/jewels/jewels_balance_widget_icon_24px_v1.png
+Observed in YouTube's authenticated gift picker on 2026-10-09.
+Stored unchanged as assets/creator-tools/youtube/jewels.png (48 x 48 PNG,
+displayed at 24 x 24 CSS pixels).
+Artwork belongs to YouTube / Google. Included to identify YouTube Jewels in
+the integration; this notice does not claim a separate redistribution license.

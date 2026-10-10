@@ -30,6 +30,8 @@ Thumbs.db
 .deployment-cache/
 __pycache__/
 launcher-dev.local.json
+youtube-oauth.local.json
+client_secret*.json
 /dist/
 
 # Mugman skin working files are extracted from the locally installed game.

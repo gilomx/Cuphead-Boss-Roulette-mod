@@ -56,6 +56,11 @@ const streamRuleGlobalCooldowns = new Map();
 const followedViewers = new Set();
 
 const twitchControlToken = "local-mock-twitch-control";
+const youtubeControlToken = "local-mock-youtube-control";
+let youtubeAuthorizationTimer;
+let youtubeConnection = { ready: true, status: "disconnected", authorized: false, account: "",
+  messageCode: process.env.CREATOR_TOOLS_MOCK_YOUTUBE_UNCONFIGURED === "1" ? "application_not_configured" : "not_connected",
+  verificationUri: "", expiresAt: "", commandPending: false, controlToken: youtubeControlToken };
 const settingsControlToken = "local-mock-settings-control";
 let settingsPendingImport = false;
 const twitchStalledCommand = process.env.CREATOR_TOOLS_MOCK_TWITCH_STALL === "1";
@@ -66,10 +71,12 @@ let twitchConnection = { ready: true, status: "disconnected", authorized: false,
 
 function streamRuleTriggers(platform) {
   return platform === "tiktok" ? ["gift", "like", "follow"]
-    : platform === "twitch" ? ["follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption"] : [];
+    : platform === "twitch" ? ["follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption"]
+      : platform === "youtube" ? ["jewels"] : [];
 }
 
 function streamRuleEventType(command) {
+  if (command.platform === "youtube") return command.type === "gift" && command.unit === "jewel" ? "jewels" : "";
   if (command.platform === "twitch" && command.type === "subscription")
     return ["subscription_gift", "resubscription"].includes(command.subscriptionKind) ? command.subscriptionKind : "subscription";
   if (command.platform === "twitch" && command.type === "currency" && command.unit !== "bit") return "";
@@ -85,7 +92,7 @@ function streamRuleMatches(rule, command) {
 function streamRulesState() {
   return {
     ready: true,
-    schemaVersion: 6,
+    schemaVersion: 7,
     revision: streamRulesRevision,
     engineActive: interactionsEnabled,
     catalogVersion: giftCatalog.catalogVersion,
@@ -698,7 +705,7 @@ function parseDashboardSimulation(searchParams) {
       : platform === "twitch"
         ? "bit"
         : platform === "youtube"
-          ? "money"
+          ? type === "gift" ? "jewel" : "money"
           : null;
   const requestedUnit = (searchParams.get("unit") ?? "").trim().toLowerCase().slice(0, 24);
   const requestedCurrency = (searchParams.get("currency") ?? "").trim().toUpperCase();
@@ -841,7 +848,7 @@ function executeDashboardSimulation(command) {
             rule.eventType === "like" ? viewerKey : ""
           }`;
           const total = (streamRuleAccumulators.get(accumulatorKey) ?? 0) +
-            (rule.eventType === "currency" ? Math.floor(command.amount) : command.count);
+            (rule.eventType === "currency" || rule.eventType === "jewels" ? Math.floor(command.amount) : command.count);
           triggers = Math.floor(total / rule.every);
           streamRuleAccumulators.set(accumulatorKey, total % rule.every);
         }
@@ -857,7 +864,7 @@ function executeDashboardSimulation(command) {
       const now = Date.now();
       let giftDue = now;
       let giftIntervalMs = 0;
-      if (command.type === "gift" && triggeredRules.length > 0) {
+      if (streamRuleEventType(command) === "gift" && triggeredRules.length > 0) {
         const globalKey = `simulator-${command.platform}\ngift:${command.itemId}`;
         giftDue = Math.max(giftDue, streamRuleGlobalCooldowns.get(globalKey) ?? 0);
         for (const { rule } of triggeredRules) {
@@ -891,7 +898,7 @@ function executeDashboardSimulation(command) {
       for (const { rule, triggers, requested } of triggeredRules) {
         let due = giftDue;
         let intervalMs = giftIntervalMs;
-        if (command.type !== "gift") {
+        if (streamRuleEventType(command) !== "gift") {
           const globalKey = `simulator-${command.platform}\nrule:${rule.id}`;
           const userKey = `${rule.id}:simulator-${command.platform}\n${viewerKey}`;
           due = Math.max(now, streamRuleGlobalCooldowns.get(globalKey) ?? 0,
@@ -1201,7 +1208,7 @@ function portableMockSettings() {
   const rules = streamRules.map(({ connectionId: _connection, ...rule }) => rule);
   return { format: "la-pichi-ruleta-settings", schemaVersion: 1, panelLocale: "es", files: {
     [prefix + ".cfg"]: `[Creator Tools]\nInteraccionesActivadas = ${interactionsEnabled}\nInteraccionesMaximasEnPantalla = ${interactionMaxActive}\nMiniJefesMaximosEnPantalla = ${interactionMaxMiniBosses}\n`,
-    [prefix + ".stream-rules.json"]: JSON.stringify({ version: 6, nextId: streamRulesNextId, rules }),
+    [prefix + ".stream-rules.json"]: JSON.stringify({ version: 7, nextId: streamRulesNextId, rules }),
     [prefix + ".pesky-mode.json"]: JSON.stringify({ version: 23, enabled: peskyEnabled, ...peskyIntervals, allowConcurrentStrongInteractions: peskyAllowConcurrentStrongInteractions, maxActive: peskyMaxActive, names: peskyNames, disabledItems: peskyDisabledItems, challengeDurationSeconds: peskyChallengeDurationSeconds, challengeCountdownSeconds: peskyChallengeCountdownSeconds, challengeWaitSeconds: peskyChallengeWaitSeconds }),
     [prefix + ".interaction-pacing.json"]: JSON.stringify(interactionPacing),
     [prefix + ".pesky-battle.json"]: JSON.stringify({ version: 2, giftId: peskyBattleGiftId, capacity: peskyBattleCapacity, allowStreamAttacks: peskyBattleAllowStreamAttacks, disabledItems: peskyBattleDisabledItems }),
@@ -1229,6 +1236,29 @@ createServer((req, res) => {
     }, 1024 * 1024); return;
   }
   if (url.pathname === "/api/twitch") { json(res, twitchConnection); return; }
+  if (url.pathname === "/api/youtube") { json(res, youtubeConnection); return; }
+  if (["/api/youtube/connect", "/api/youtube/cancel", "/api/youtube/disconnect"].includes(url.pathname)) {
+    if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }
+    if (req.headers["x-pichi-youtube-control"] !== youtubeControlToken ||
+        ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(req.headers.origin)) {
+      json(res, { error: "invalid_local_control" }, 403); return;
+    }
+    clearTimeout(youtubeAuthorizationTimer);
+    const action = url.pathname.split("/").at(-1);
+    youtubeConnection = { ...youtubeConnection, commandPending: false, authorized: false, account: "",
+      verificationUri: "", expiresAt: "", status: "disconnected", messageCode: "not_connected" };
+    const connection = dashboardConnections.find((entry) => entry.id === "youtube");
+    if (action === "connect") {
+      Object.assign(youtubeConnection, { status: "connecting", messageCode: "mock_authorization_pending" });
+      youtubeAuthorizationTimer = setTimeout(() => {
+        Object.assign(youtubeConnection, { status: "simulated", messageCode: "simulated", authorized: true,
+          account: "Canal de prueba" });
+        Object.assign(connection, { status: "simulated", account: "Canal de prueba" }); dashboardRevision++;
+      }, 4000);
+    } else if (action === "cancel") youtubeConnection.messageCode = "authorization_cancelled";
+    Object.assign(connection, { status: youtubeConnection.status, account: youtubeConnection.account }); dashboardRevision++;
+    json(res, { accepted: true }, 202); return;
+  }
   if (["/api/twitch/connect", "/api/twitch/cancel", "/api/twitch/disconnect", "/api/twitch/test"].includes(url.pathname)) {
     if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }
     if (req.headers["x-pichi-twitch-control"] !== twitchControlToken ||

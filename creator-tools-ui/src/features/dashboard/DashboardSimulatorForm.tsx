@@ -3,6 +3,7 @@ import { SearchableSelectField } from "../../components/SearchableSelectField";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import type { StreamEventType, StreamPlatform, TikTokGift } from "../../model";
+import { YouTubeJewelsIcon } from "../interactions/YouTubeJewelsIcon";
 
 const PLATFORMS: StreamPlatform[] = ["tiktok", "twitch", "youtube"];
 const EVENT_TYPES: StreamEventType[] = [
@@ -90,6 +91,10 @@ function isCatalogGift(simulation: SimulationDraft) {
   return simulation.platform === "tiktok" && simulation.type === "gift";
 }
 
+function isYouTubeJewels(simulation: SimulationDraft) {
+  return simulation.platform === "youtube" && simulation.type === "gift";
+}
+
 export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulatorFormProps) {
   const { locale, t } = useLocalization();
   const { catalog, error: catalogError } = useTikTokGiftCatalog();
@@ -106,6 +111,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
     Boolean(simulation.displayName.trim()) &&
     (simulation.type !== "chat" || /^[1-6]$/.test(simulation.chatText.trim())) &&
     (simulation.platform !== "twitch" || simulation.type !== "redemption" || Boolean(simulation.rewardName.trim())) &&
+    (!isYouTubeJewels(simulation) || (Number.isInteger(simulation.amount) && simulation.amount >= 1)) &&
     (!isCatalogGift(simulation) || Boolean(selectedGift(simulation))));
   const multiple = simulations.length > 1;
 
@@ -207,6 +213,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
       if (simulation.type === "subscription") query.set("subscriptionKind", simulation.subscriptionKind);
       if (simulation.type === "redemption") query.set("rewardName", simulation.rewardName.trim());
     }
+    if (simulation.platform === "youtube" && simulation.type === "gift") query.set("unit", "jewel");
     return { query, delaySeconds };
   };
 
@@ -280,6 +287,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                         updateSimulation(simulation.key, (current) => ({
                           ...current,
                           platform,
+                          amount: platform === "youtube" && current.type === "gift" ? 100 : current.amount,
                           type: platform === "twitch" && (current.type === "gift" || current.type === "like")
                             ? "follow" : current.type,
                           selectedItemId: platform === "tiktok" && current.type === "gift"
@@ -303,6 +311,7 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                         updateSimulation(simulation.key, (current) => ({
                           ...current,
                           type,
+                          amount: current.platform === "youtube" && type === "gift" ? 100 : current.amount,
                           selectedItemId: current.platform === "tiktok" && type === "gift"
                             ? current.selectedItemId
                             : "",
@@ -310,7 +319,8 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                       }}
                     >
                       {EVENT_TYPES.filter((type) => simulation.platform !== "twitch" || (type !== "gift" && type !== "like")).map((type) => (
-                        <option key={type} value={type}>{t(simulation.platform === "twitch" && (type === "currency" || type === "redemption")
+                        <option key={type} value={type}>{t(simulation.platform === "youtube" && type === "gift"
+                          ? "dashboard.simulator.youtubeJewels" : simulation.platform === "twitch" && (type === "currency" || type === "redemption")
                           ? `interactions.rules.editor.${type}Name` : `dashboard.eventTypes.${type}`)}</option>
                       ))}
                     </select>
@@ -411,12 +421,13 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                   </div>
                 ) : (
                   <label>
-                    <span>{t("dashboard.simulator.amount")}</span>
+                    <span className="stream-rule-threshold-label">{isYouTubeJewels(simulation) ? <YouTubeJewelsIcon /> : null}
+                      {t(isYouTubeJewels(simulation) ? "dashboard.simulator.jewelsAmount" : "dashboard.simulator.amount")}</span>
                     <input
                       type="number"
-                      min={0}
+                      min={isYouTubeJewels(simulation) ? 1 : 0}
                       max={MAXIMUM_AMOUNT}
-                      step="any"
+                      step={isYouTubeJewels(simulation) ? 1 : "any"}
                       value={simulation.amount}
                       disabled={simulationStatus === "sending"}
                       onChange={(event) => updateSimulation(simulation.key, (current) => ({
@@ -424,6 +435,8 @@ export function DashboardSimulatorForm({ active, onSubmitted }: DashboardSimulat
                         amount: Math.max(0, Math.min(MAXIMUM_AMOUNT, Number(event.target.value) || 0)),
                       }))}
                     />
+                    {isYouTubeJewels(simulation) ? <small className="dashboard-simulator-form__hint">
+                      {t("dashboard.simulator.jewelsHint")}</small> : null}
                   </label>
                 )}
 

@@ -13,5 +13,13 @@
 
   <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.84.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.36.2" />
+    <PackageReference Include="Grpc.Tools" Version="2.84.0" PrivateAssets="All" />
+    <Protobuf Include="YouTube\stream_list.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('..\youtube-oauth.local.json')">
+    <EmbeddedResource Include="..\youtube-oauth.local.json" LogicalName="LaPichiRuleta.YouTube.DesktopClient.json" />
   </ItemGroup>
 </Project>

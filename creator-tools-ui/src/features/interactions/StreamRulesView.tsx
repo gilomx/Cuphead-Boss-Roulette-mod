@@ -248,7 +248,7 @@ export function StreamRulesView({
   const beginCreate = () => {
     if (!canCreate) return;
     const nextDraft = createStreamRuleDraft(
-      catalog?.gifts[0], platformFilter === "twitch" ? "twitch" : "tiktok",
+      catalog?.gifts[0], platformFilter === "all" ? "tiktok" : platformFilter,
     );
     initialDraftRef.current = nextDraft;
     setDraft(nextDraft);
@@ -359,12 +359,12 @@ export function StreamRulesView({
           ) : (
             <>
             <div className="stream-platform-filters" role="group" aria-label={t("interactions.rules.list.platformFilter")}>
-              {(["all", "tiktok", "twitch"] as const).map((platform) => (
+              {(["all", "tiktok", "twitch", "youtube"] as const).map((platform) => (
                 <button type="button" key={platform} aria-pressed={platformFilter === platform}
-                  aria-label={platform === "all" ? t("interactions.rules.list.allPlatforms") : platform === "tiktok" ? "TikTok" : "Twitch"}
+                  aria-label={platform === "all" ? t("interactions.rules.list.allPlatforms") : t(`dashboard.platforms.${platform}`)}
                   onClick={() => { setPlatformFilter(platform); setConfirmingDeleteId(null); }}>
                   {platform !== "all" ? <StreamPlatformIcon platform={platform} /> : null}
-                  {platform === "all" ? t("interactions.rules.list.allPlatforms") : platform === "tiktok" ? "TikTok" : "Twitch"}
+                  {platform === "all" ? t("interactions.rules.list.allPlatforms") : t(`dashboard.platforms.${platform}`)}
                 </button>
               ))}
             </div>

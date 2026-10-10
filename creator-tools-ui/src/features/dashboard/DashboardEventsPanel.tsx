@@ -85,8 +85,22 @@ export function DashboardEventsPanel({
     }).format(date);
   };
 
+  const eventType = (event: DashboardEvent) => {
+    const fallback = t(`dashboard.eventTypes.${event.type}`, event.type);
+    return event.platform === "youtube"
+      ? t(`dashboard.youtubeEventTypes.${event.unit === "upgrade" ? "upgrade" : event.rawEventType?.toLowerCase()}`, fallback)
+      : fallback;
+  };
+
   const eventSummary = (event: DashboardEvent) => {
     if (event.type === "chat") return event.chatText ?? "";
+    if (event.platform === "youtube" && (event.type === "currency" || event.type === "gift")) {
+      const value = event.totalValue ?? event.amount ?? 0;
+      const label = `${event.count && event.count > 1 ? `${event.count} × ` : ""}${event.itemName || eventType(event)}`;
+      return value > 0
+        ? `${label} · ${value.toLocaleString(locale === "es" ? "es-MX" : "en-US")} ${event.currency || t(`dashboard.units.${event.unit}`, event.unit ?? "")}`
+        : label;
+    }
     if (event.itemName) {
       return `${event.count && event.count > 1 ? `${event.count} × ` : ""}${event.itemName}`;
     }
@@ -183,7 +197,7 @@ export function DashboardEventsPanel({
                     <div>
                       <strong>{streamEvent.user || t("dashboard.events.community")}</strong>
                       <span className="dashboard-event-type">
-                        {t(`dashboard.eventTypes.${streamEvent.type}`, streamEvent.type)}
+                        {eventType(streamEvent)}
                       </span>
                     </div>
                     <p>{eventSummary(streamEvent)}</p>

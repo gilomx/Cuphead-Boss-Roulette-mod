@@ -16,6 +16,15 @@ internal static partial class Program
             return TwitchCliSmokeAsync().GetAwaiter().GetResult();
         var tests = new (string Name, Action Run)[]
         {
+            ("YouTube votes, money and membership events", YouTubeEvents),
+            ("YouTube Jewels combo deltas and historical suppression", YouTubeJewels),
+            ("YouTube loopback rejects wrong state and exchanges PKCE", () => YouTubeLoopbackAsync().GetAwaiter().GetResult()),
+            ("YouTube restores, refreshes and disconnects offline", () => YouTubeLifecycleAsync().GetAwaiter().GetResult()),
+            ("YouTube cancelled authorization cannot persist late tokens", () => YouTubeCancelAsync().GetAwaiter().GetResult()),
+            ("YouTube unavailable application and invalid account errors", () => YouTubeErrorsAsync().GetAwaiter().GetResult()),
+            ("YouTube Desktop client configuration rejects missing or mismatched credentials", YouTubeDesktopConfiguration),
+            ("YouTube API account ownership and quota boundaries", YouTubeHttpApi),
+            ("YouTube network reconnect resumes cursor without history or duplicate votes", () => YouTubeCursorAsync().GetAwaiter().GetResult()),
             ("flat gift progress", FlatGiftProgress),
             ("nested gift final", NestedGiftFinal),
             ("display name fallback", DisplayNameFallback),

@@ -328,9 +328,9 @@ export interface TikTokGiftCatalog {
   gifts: TikTokGift[];
 }
 
-export type StreamRulePlatform = "tiktok" | "twitch";
+export type StreamRulePlatform = "tiktok" | "twitch" | "youtube";
 export type StreamRuleTrigger = "gift" | "like" | "follow" | "currency" |
-  "subscription" | "subscription_gift" | "resubscription" | "redemption";
+  "subscription" | "subscription_gift" | "resubscription" | "redemption" | "jewels";
 
 export interface StreamRule {
   durationSeconds?: number;

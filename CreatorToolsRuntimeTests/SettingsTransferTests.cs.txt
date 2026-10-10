@@ -18,6 +18,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             Run("Portable settings include every saved category and exclude account data", TestSettingsExportPrivacy);
             Run("Portable stream rules retain their behavior without an account or connection ID", TestSettingsRuleTransfer);
+            Run("Portable version 6 rules import into version 7 without losing previous settings", TestSettingsLegacyRuleImport);
             Run("Settings import waits for restart, preserves connections and backs up previous files", TestSettingsRoundTrip);
             Run("Importing default settings replaces destination customizations", TestSettingsDefaultReplacement);
             Run("Invalid settings cannot replace a valid pending import", TestSettingsInvalidImports);
@@ -94,6 +95,7 @@ namespace Gilomx.CupheadBossRoulette
             using (var scope = new TestScope("settings-rules"))
             {
                 var rules = scope.CreateRules(3);
+                AddPlatformRule(rules, "youtube", "jewels", 250, 2, cooldown: 4);
                 var settingsPath = (string)typeof(CreatorToolsStreamRulesController)
                     .GetField("settingsPath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(rules);
                 var transfer = new CreatorToolsSettingsTransfer(Path.Combine(Path.GetDirectoryName(settingsPath), "plugin.cfg"), null);
@@ -108,7 +110,34 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(3, rule.GetProperty("quantity").GetInt32(), "rule amount survives");
                     True(rule.GetProperty("enabled").GetBoolean(), "rule activation survives");
                     Equal("tiktok", rule.GetProperty("platform").GetString(), "platform survives");
+                    var jewels = restored.RootElement.GetProperty("rules")[1];
+                    Equal("youtube", jewels.GetProperty("platform").GetString(), "YouTube gem platform survives transfer");
+                    Equal("jewels", jewels.GetProperty("eventType").GetString(), "gem trigger survives transfer");
+                    Equal(250, jewels.GetProperty("every").GetInt32(), "gem threshold survives transfer");
+                    Equal(4, jewels.GetProperty("globalCooldownSeconds").GetInt32(), "gem cooldown survives transfer");
                 }
+            }
+        }
+
+        private static void TestSettingsLegacyRuleImport()
+        {
+            using (var scope = new TestScope("settings-version-six-rules"))
+            {
+                var rules = scope.CreateRules(3);
+                var path = (string)typeof(CreatorToolsStreamRulesController).GetField("settingsPath",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(rules);
+                var transfer = new CreatorToolsSettingsTransfer(Path.Combine(Path.GetDirectoryName(path), "plugin.cfg"), null);
+                var copy = JsonNode.Parse(transfer.Export());
+                var key = SettingsPrefix + ".stream-rules.json";
+                var saved = JsonNode.Parse(copy["files"][key].GetValue<string>());
+                saved["version"] = 6;
+                copy["files"][key] = saved.ToJsonString();
+                Equal("", transfer.StageImport(copy.ToJsonString()), "previous version copy accepted");
+                True(transfer.ApplyPending(), "previous version applies");
+                using (var restored = JsonDocument.Parse(File.ReadAllText(path)))
+                    Equal(7, restored.RootElement.GetProperty("version").GetInt32(), "import canonicalizes version");
+                using (var restored = JsonDocument.Parse(SnapshotRules(scope.ReloadRules(rules))))
+                    Equal(3, restored.RootElement.GetProperty("rules")[0].GetProperty("quantity").GetInt32(), "legacy behavior preserved");
             }
         }
 
