@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -94,6 +95,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestOverlayComposerHttpRoutes);
             Run("Overlay components allow same-origin embedding in the designer",
                 TestOverlayComposerFramePolicy);
+            Run("Roulette socket pushes native reveals and keeps the retired source disabled",
+                TestRouletteOverlaySocket);
             Run("Roulette settings migrate once, retain saved scenes, and validate atomically",
                 TestRouletteOverlayMigration);
             Run("Chat overlay joins saved scenes without losing positions and validates preview transport",
@@ -2067,6 +2070,54 @@ namespace Gilomx.CupheadBossRoulette
                 using (var response = client.GetAsync("http://127.0.0.1:" + server.Port + "/config/overlay-designer")
                     .GetAwaiter().GetResult())
                     Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single(), "configuration page keeps its frame policy");
+            }
+        }
+
+        private static void TestRouletteOverlaySocket()
+        {
+            using (var scope = new TestScope("roulette-overlay-socket"))
+            using (var server = scope.StartServer())
+            using (var roulette = new ClientWebSocket())
+            using (var legacy = new ClientWebSocket())
+            using (var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+            {
+                var origin = "http://127.0.0.1:" + server.Port;
+                var socketRoot = "ws://127.0.0.1:" + server.Port;
+                roulette.Options.SetRequestHeader("Origin", origin);
+                legacy.Options.SetRequestHeader("Origin", origin);
+                var initial = "{\"type\":\"state\",\"active\":true,\"session\":42,\"revealed\":0}";
+                var retired = "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}";
+                server.Publish(initial);
+                roulette.ConnectAsync(new Uri(socketRoot + "/api/roulette-overlay/ws"),
+                    cancellation.Token).GetAwaiter().GetResult();
+                legacy.ConnectAsync(new Uri(socketRoot + "/ws"),
+                    cancellation.Token).GetAwaiter().GetResult();
+                Equal(initial, ReceiveSocketState(roulette, cancellation.Token), "current snapshot on connection");
+                Equal(retired, ReceiveSocketState(legacy, cancellation.Token), "old source stays retired");
+                for (var reveal = 1; reveal <= 3; reveal++)
+                {
+                    var state = "{\"type\":\"state\",\"active\":true,\"session\":42,\"revealed\":" + reveal + "}";
+                    server.Publish(state);
+                    Equal(state, ReceiveSocketState(roulette, cancellation.Token), "pushed reveal without an HTTP request");
+                    Equal(retired, ReceiveSocketState(legacy, cancellation.Token), "old source receives no live reveals");
+                }
+            }
+        }
+
+        private static string ReceiveSocketState(ClientWebSocket socket, CancellationToken cancellation)
+        {
+            var buffer = new byte[4096];
+            using (var message = new MemoryStream())
+            {
+                WebSocketReceiveResult result;
+                do
+                {
+                    result = socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellation)
+                        .GetAwaiter().GetResult();
+                    Equal(WebSocketMessageType.Text, result.MessageType, "state frame type");
+                    message.Write(buffer, 0, result.Count);
+                } while (!result.EndOfMessage);
+                return Encoding.UTF8.GetString(message.ToArray());
             }
         }
 

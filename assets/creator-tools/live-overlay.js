@@ -57,6 +57,7 @@
   let disposed = false;
   let dataTimer = 0;
   let previewTimer = 0;
+  let rouletteRuntime = null;
 
   function switchValue(value) {
     const normalized = String(value || "").trim().toLowerCase();
@@ -597,7 +598,6 @@
         fetchJson(registry.tap_farming.endpoint),
         fetchJson(registry.pesky_battle.endpoint),
         fetchJson(registry.chat_chooses.endpoint),
-        fetchJson(registry.roulette.endpoint),
       ]);
       if (results[0].status === "fulfilled") {
         savedProfile = normalizedProfile(results[0].value);
@@ -606,8 +606,6 @@
       if (results[2].status === "fulfilled") realStates.pesky_battle = results[2].value;
       if (results[3].status === "fulfilled") realStates.chat_chooses = results[3].value;
       else realStates.chat_chooses = initialChatState();
-      realStates.roulette = results[4].status === "fulfilled"
-        ? results[4].value : { type: "state", active: false };
       syncActiveProfile();
       render();
     } finally {
@@ -698,6 +696,7 @@
     disposed = true;
     if (dataTimer) window.clearInterval(dataTimer);
     if (previewTimer) window.clearInterval(previewTimer);
+    rouletteRuntime?.dispose();
     window.removeEventListener("message", receiveMessage);
   }
 
@@ -712,6 +711,18 @@
     render("tap_farming");
     announceReady();
   } else {
+    // The native HUD publishes each reveal in the same frame as its sound.
+    // Forward those updates without waiting for unrelated polling requests.
+    rouletteRuntime = window.LiveEventOverlayRuntime.create({
+      overlay: "roulette",
+      endpoint: registry.roulette.endpoint,
+      socketEndpoint: "/api/roulette-overlay/ws",
+      interval: 250,
+      render(state) {
+        realStates.roulette = state;
+        postComponentState("roulette");
+      },
+    });
     void pollData();
     void pollPreview();
     dataTimer = window.setInterval(() => void pollData(), DATA_POLL_INTERVAL);

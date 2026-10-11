@@ -513,6 +513,8 @@
   window.addEventListener("resize", fitContent);
   window.LiveEventOverlayRuntime.create({
     overlay: "roulette", endpoint: "/api/roulette-overlay/state",
+    socketEndpoint: "/api/roulette-overlay/ws",
+    interval: 250,
     initialLiveState: { type: "state", active: false },
     render: applyState,
   });

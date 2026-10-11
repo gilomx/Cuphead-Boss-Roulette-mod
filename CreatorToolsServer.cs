@@ -921,7 +921,8 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
 
-                if (request.Path == "/ws" && request.IsWebSocket)
+                if ((request.Path == "/ws" ||
+                     request.Path == "/api/roulette-overlay/ws") && request.IsWebSocket)
                 {
                     if (request.Method != "GET")
                     {
@@ -937,7 +938,8 @@ namespace Gilomx.CupheadBossRoulette
                     connection.ReceiveTimeout = 0;
                     connection.SendTimeout = 0;
                     upgraded = true;
-                    RunWebSocketClient(connection, stream);
+                    RunWebSocketClient(connection, stream,
+                        request.Path == "/api/roulette-overlay/ws");
                     return;
                 }
 
@@ -1003,9 +1005,9 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private void RunWebSocketClient(
-            TcpClient connection, NetworkStream stream)
+            TcpClient connection, NetworkStream stream, bool rouletteState)
         {
-            var client = new WebSocketClient(connection, stream);
+            var client = new WebSocketClient(connection, stream, rouletteState);
             lock (clientsLock)
                 clients.Add(client);
 
@@ -1015,11 +1017,11 @@ namespace Gilomx.CupheadBossRoulette
                 long initialRevision;
                 lock (stateLock)
                 {
-                    initialMessage = "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}";
+                    initialMessage = rouletteState ? latestMessage :
+                        "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}";
                     initialRevision = latestRevision;
                 }
-                client.SendText(initialMessage);
-                client.LastRevision = initialRevision;
+                client.SendState(initialMessage, initialRevision);
                 ReadClientFrames(client);
             }
             finally
@@ -1050,7 +1052,7 @@ namespace Gilomx.CupheadBossRoulette
                 long revision;
                 lock (stateLock)
                 {
-                    message = "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}";
+                    message = latestMessage;
                     revision = latestRevision;
                 }
 
@@ -1063,10 +1065,11 @@ namespace Gilomx.CupheadBossRoulette
                     var client = snapshot[i];
                     try
                     {
-                        if (stateChanged && client.LastRevision != revision)
+                        if (stateChanged)
                         {
-                            client.SendText(message);
-                            client.LastRevision = revision;
+                            client.SendState(client.RouletteState ? message :
+                                "{\"type\":\"state\",\"active\":false,\"overlayMoved\":true}",
+                                revision);
                         }
                         else if (!stateChanged)
                             client.SendPing();
@@ -2629,7 +2632,8 @@ namespace Gilomx.CupheadBossRoulette
             private volatile bool alive = true;
 
             internal readonly NetworkStream Stream;
-            internal long LastRevision = -1;
+            internal readonly bool RouletteState;
+            private long lastRevision = -1;
 
             internal bool IsAlive
             {
@@ -2637,15 +2641,23 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             internal WebSocketClient(
-                TcpClient connection, NetworkStream stream)
+                TcpClient connection, NetworkStream stream, bool rouletteState)
             {
                 this.connection = connection;
                 Stream = stream;
+                RouletteState = rouletteState;
             }
 
-            internal void SendText(string message)
+            internal void SendState(string message, long revision)
             {
-                SendFrame(0x1, Encoding.UTF8.GetBytes(message ?? string.Empty));
+                lock (sendLock)
+                {
+                    // An initial snapshot may race a newer broadcast. Never send
+                    // the older reveal count after the newer one.
+                    if (revision <= lastRevision) return;
+                    SendFrame(0x1, Encoding.UTF8.GetBytes(message ?? string.Empty));
+                    lastRevision = revision;
+                }
             }
 
             internal void SendPing()

@@ -7,6 +7,16 @@ const widget = readFileSync(new URL('../../assets/creator-tools/roulette-overlay
 const bridge = readFileSync(new URL('../../assets/creator-tools/live-event-overlay-runtime.js', import.meta.url), 'utf8');
 const composer = readFileSync(new URL('../../assets/creator-tools/live-overlay.js', import.meta.url), 'utf8');
 const typography = readFileSync(new URL('../../assets/creator-tools/overlay-text-style.js', import.meta.url), 'utf8');
+const flush = () => new Promise(resolve => setImmediate(resolve));
+function socketHarness() {
+  const connections = [];
+  class Socket {
+    constructor(url) { this.url = url; connections.push(this); }
+    message(state) { this.onmessage?.({ data: typeof state === 'string' ? state : JSON.stringify(state) }); }
+    close() { this.closed = true; this.onclose?.(); }
+  }
+  return { connections, Socket };
+}
 class Element {
   children = []; hidden = true; textContent = ''; style = { setProperty(key, value) { this[key] = value; } };
   offsetWidth = 640; scrollWidth = 640; offsetHeight = 260; scrollHeight = 260;
@@ -36,36 +46,58 @@ function boot() {
     window.innerWidth = width; window.innerHeight = height; listeners.resize();
   }, finish() { for (let n=0; timers.size && n<30; n++) { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(fn => fn()); } } };
 }
-async function bootComposer(designer = false) {
+async function bootComposer(designer = false, options = {}) {
   const root = new Element(); root.dataset = {}; root.append = child => root.appendChild(child);
-  const listeners = {}, intervals = new Map(), frames = [];
+  const listeners = {}, intervals = new Map(), frames = [], sockets = socketHarness();
+  const emit = (key, event) => (listeners[key] || []).forEach(fn => fn(event));
   const parent = { postMessage() {} };
   let preview = { active: false };
   const profile = { id: 'horizontal', canvas: { width: 1920, height: 1080 },
     components: [{ id: 'roulette', enabled: false, opacity: 75 }] };
   const window = { parent, location: { origin: 'http://roulette.test', pathname: '/overlay/horizontal', search: designer ? '?designer=1' : '' },
-    addEventListener: (key, fn) => { listeners[key] = fn; }, removeEventListener() {},
-    setInterval: (fn, ms) => { intervals.set(ms, fn); return ms; }, clearInterval() {},
+    addEventListener: (key, fn) => { (listeners[key] ||= []).push(fn); }, removeEventListener() {},
+    setInterval: (fn, ms) => { intervals.set(ms, fn); return ms; }, clearInterval: ms => intervals.delete(ms),
     setTimeout: () => 1, clearTimeout() {} };
-  vm.runInNewContext(composer, { window, URLSearchParams, encodeURIComponent,
-    document: { documentElement: {}, getElementById: () => root, createElement(tag) {
+  if (options.socket) window.WebSocket = sockets.Socket;
+  const document = { documentElement: { dataset: {} }, body: { dataset: {} }, getElementById: () => root, createElement(tag) {
       const element = new Element(); element.dataset = {};
       element.append = child => element.appendChild(child); element.addEventListener = () => {};
       if (tag === 'iframe') { element.posted = []; element.contentWindow = { postMessage: data => element.posted.push(data) }; frames.push(element); }
       return element;
-    } }, fetch: async url => ({ ok: true, json: async () => url.includes('/preview?') ? preview
+    } };
+  const context = { window, document, URLSearchParams, encodeURIComponent,
+    fetch: async url => options.fetch?.(url) || ({ ok: true, json: async () => url.includes('/preview?') ? preview
       : url === '/api/overlay-composer/config' ? { profiles: [profile] }
       : { type: 'state', active: true, visible: true, battleActive: true, session: 10 } }),
-  });
-  const flush = () => new Promise(resolve => setImmediate(resolve));
+  };
+  vm.runInNewContext(bridge, context);
+  vm.runInNewContext(composer, context);
   await flush();
-  return { profile, host: root.children.find(child => child.dataset.componentId === 'roulette'),
+  return { profile, sockets: sockets.connections, intervals, close: () => emit('pagehide'),
+    host: root.children.find(child => child.dataset.componentId === 'roulette'),
     frame: frames.find(frame => frame.title === 'roulette'),
-    design(selectedComponentId) { listeners.message({ source: parent, origin: window.location.origin,
+    design(selectedComponentId) { emit('message', { source: parent, origin: window.location.origin,
       data: { type: 'creator-tools-overlay-composer-design', version: 1, profileId: 'horizontal',
         profile, selectedComponentId, states: { roulette: { type: 'state', active: true, visible: true, preview: true } } } }); },
     async setPreview(next) { preview = next; intervals.get(100)(); await flush(); },
   };
+}
+function bootRuntime(search = '') {
+  const sockets = socketHarness(), timers = new Map(), requests = [], drawn = [], intervals = new Map();
+  let nextTimer = 0;
+  const window = { parent: { postMessage() {} }, location: { origin: 'http://roulette.test', search }, WebSocket: sockets.Socket,
+    addEventListener() {}, removeEventListener() {},
+    setInterval(fn, ms) { intervals.set(ms, fn); return ms; }, clearInterval(ms) { intervals.delete(ms); },
+    setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
+    clearTimeout(id) { timers.delete(id); } };
+  vm.runInNewContext(bridge, { window, URLSearchParams,
+    document: { documentElement: { dataset: {} }, body: { dataset: {} } },
+    fetch: () => new Promise(resolve => requests.push({ reply(state) { resolve({ ok: true, json: async () => state }); } })),
+  });
+  const runtime = window.LiveEventOverlayRuntime.create({ overlay: 'roulette', endpoint: '/api/roulette-overlay/state',
+    socketEndpoint: '/api/roulette-overlay/ws', interval: 250, render: state => drawn.push(state) });
+  return { runtime, sockets: sockets.connections, requests, drawn, intervals, timers,
+    reconnect() { const [id, timer] = timers.entries().next().value; timers.delete(id); timer.fn(); } };
 }
 function state(presentation = {}) {
   return { type: 'state', active: true, battleActive: true, visible: true, session: 1,
@@ -158,13 +190,14 @@ test('a disabled roulette can be inspected without enabling it or other hidden l
   assert.equal(view.host.dataset.enabled, 'false', 'deselecting restores configured visibility');
 });
 test('OBS only shows a disabled roulette during explicit simulation and restores it afterwards', async () => {
-  const view = await bootComposer();
+  const view = await bootComposer(false, { socket: true });
   assert.equal(view.host.dataset.enabled, 'false', 'a real battle does not enable a disabled layer');
   const preview = { active: true, revision: 1, componentId: 'roulette', scenario: 'hud',
     simulationActive: false, layout: view.profile, eventEpoch: 2 };
   await view.setPreview(preview);
   assert.equal(view.host.dataset.enabled, 'false', 'opening the designer alone does not force an OBS preview');
   await view.setPreview({ ...preview, revision: 2, simulationActive: true });
+  view.sockets[0].message({ ...state(), session: 22 });
   assert.equal(view.host.dataset.enabled, 'true');
   assert.equal(view.frame.posted.at(-1).state.session, -3, 'replay survives OBS transport');
   await view.setPreview({ ...preview, revision: 3 });
@@ -172,6 +205,89 @@ test('OBS only shows a disabled roulette during explicit simulation and restores
   await view.setPreview({ active: false, revision: 4 });
   assert.equal(view.host.dataset.enabled, 'false');
   assert.equal(view.profile.components[0].enabled, false);
+});
+
+test('native reveals reach the OBS widget immediately even while another event request is pending', async () => {
+  const view = await bootComposer(false, { socket: true,
+    fetch: url => url === '/api/config/pesky-battle' ? new Promise(() => {}) : undefined });
+  assert.equal(view.sockets.length, 1);
+  assert.equal(view.sockets[0].url, 'ws://roulette.test/api/roulette-overlay/ws');
+  for (let revealed = 0; revealed <= 3; revealed++) {
+    view.sockets[0].message({ ...state(), revealed, textVisible: false });
+    assert.equal(view.frame.posted.at(-1).state.revealed, revealed);
+  }
+  view.close();
+  assert.equal(view.sockets[0].closed, true);
+  assert.equal(view.intervals.size, 0);
+});
+
+test('live icon and challenge reveals render on receipt without starting preview timers', () => {
+  const view = boot();
+  view.send({ ...state(), revealed: 0, textVisible: false });
+  for (let revealed = 1; revealed <= 3; revealed++) {
+    view.send({ ...state(), revealed, textVisible: false });
+    assert.ok(view.nodes.icons.children[revealed - 1].classList.contains('reveal'));
+    assert.equal(view.pendingTimers, 0);
+  }
+  view.send(state());
+  assert.ok(view.nodes.challenge.classList.contains('reveal'));
+  assert.equal(view.pendingTimers, 0);
+});
+
+test('designer and embedded widgets never open native sockets or poll the live state', async () => {
+  const designer = await bootComposer(true, { socket: true });
+  assert.equal(designer.sockets.length, 0);
+  assert.equal(designer.intervals.size, 0);
+  for (const search of ['?preview=1', '?embedded=1']) {
+    const view = bootRuntime(search);
+    assert.equal(view.sockets.length, 0);
+    assert.equal(view.requests.length, 0);
+    view.runtime.dispose();
+  }
+});
+
+test('a late HTTP snapshot cannot reverse a newer socket reveal, even after disconnection', async () => {
+  const view = bootRuntime();
+  const socket = view.sockets[0];
+  socket.message('invalid JSON');
+  socket.message({ type: 'other', revealed: 0 });
+  assert.equal(view.drawn.length, 0);
+  socket.message({ ...state(), revealed: 2 });
+  socket.close();
+  view.requests[0].reply({ ...state(), revealed: 0 });
+  await flush();
+  assert.deepEqual(view.drawn.map(value => value.revealed), [2]);
+  const refreshed = view.intervals.get(250)();
+  view.requests[1].reply({ ...state(), revealed: 3 });
+  await refreshed;
+  assert.deepEqual(view.drawn.map(value => value.revealed), [2, 3]);
+  view.runtime.dispose();
+});
+
+test('socket disconnect uses HTTP fallback and reconnects, while disposal cancels pending work', async () => {
+  const view = bootRuntime();
+  view.requests[0].reply({ ...state(), revealed: 0 });
+  await flush();
+  view.sockets[0].message({ ...state(), revealed: 1 });
+  await view.runtime.refresh();
+  assert.equal(view.requests.length, 1, 'a healthy socket does not poll');
+  view.sockets[0].close();
+  assert.equal(view.requests.length, 2, 'HTTP fallback starts on disconnect');
+  assert.equal([...view.timers.values()][0].ms, 500);
+  view.reconnect();
+  assert.equal(view.sockets.length, 2);
+  view.sockets[1].message({ ...state(), revealed: 2 });
+  view.requests[1].reply({ ...state(), revealed: 1 });
+  await flush();
+  assert.deepEqual(view.drawn.map(value => value.revealed), [0, 1, 2]);
+  view.sockets[1].close();
+  view.runtime.dispose();
+  view.requests[2].reply({ ...state(), revealed: 3 });
+  view.sockets[1].message({ ...state(), revealed: 3 });
+  await flush();
+  assert.deepEqual(view.drawn.map(value => value.revealed), [0, 1, 2]);
+  assert.equal(view.timers.size, 0);
+  assert.equal(view.intervals.size, 0);
 });
 test('replay restarts entry animation while ordinary presentation updates keep the current preview', () => {
   const view = boot(); const first = { ...state(), preview: true, session: -1 };

@@ -31,6 +31,7 @@
   const create = ({
     overlay,
     endpoint,
+    socketEndpoint,
     interval = 500,
     initialLiveState,
     initialPreviewState,
@@ -50,6 +51,11 @@
     let lastRevision = null;
     let timer = 0;
     let disposed = false;
+    let socket = null;
+    let socketReady = false;
+    let socketVersion = 0;
+    let reconnectTimer = 0;
+    let reconnectDelay = 500;
 
     document.documentElement.dataset.overlayMode = mode;
     document.body.dataset.overlayMode = mode;
@@ -60,12 +66,16 @@
     };
 
     const refresh = async () => {
-      if (mode !== "live" || requestPending || disposed || !endpoint) return;
+      if (mode !== "live" || requestPending || disposed || !endpoint || socketReady) return;
       requestPending = true;
+      const requestedSocketVersion = socketVersion;
       try {
         const response = await fetch(endpoint, { cache: "no-store" });
         if (!response.ok) return;
         const state = await response.json();
+        // A slower HTTP snapshot must not undo an immediate socket reveal,
+        // including when that socket has already disconnected again.
+        if (disposed || socketReady || requestedSocketVersion !== socketVersion) return;
         const revision = Number(state?.revision);
         if (!Number.isFinite(revision) || revision !== lastRevision) {
           lastRevision = Number.isFinite(revision) ? revision : lastRevision;
@@ -76,6 +86,51 @@
       } finally {
         requestPending = false;
       }
+    };
+
+    const scheduleReconnect = () => {
+      if (disposed || reconnectTimer) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = 0;
+        connectSocket();
+      }, reconnectDelay);
+      reconnectDelay = Math.min(5000, reconnectDelay * 2);
+    };
+
+    const connectSocket = () => {
+      if (mode !== "live" || disposed || socket || !socketEndpoint ||
+          typeof window.WebSocket !== "function") return;
+      let connection;
+      try {
+        connection = new window.WebSocket(
+          window.location.origin.replace(/^http/, "ws") + socketEndpoint);
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      socket = connection;
+      connection.onmessage = (event) => {
+        if (disposed || socket !== connection) return;
+        let state;
+        try { state = JSON.parse(event.data); } catch { return; }
+        if (!state || typeof state !== "object" || state.type !== "state") return;
+        socketReady = true;
+        socketVersion++;
+        reconnectDelay = 500;
+        draw(state);
+      };
+      connection.onclose = () => {
+        if (disposed || socket !== connection) return;
+        socket = null;
+        socketReady = false;
+        socketVersion++;
+        lastRevision = null;
+        void refresh();
+        scheduleReconnect();
+      };
+      connection.onerror = () => {
+        if (!disposed && socket === connection) connection.close();
+      };
     };
 
     const receivePreview = (event) => {
@@ -106,6 +161,11 @@
       if (disposed) return;
       disposed = true;
       if (timer) window.clearInterval(timer);
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      const connection = socket;
+      socket = null;
+      socketReady = false;
+      if (connection) connection.close();
       window.removeEventListener("message", receivePreview);
     };
 
@@ -116,6 +176,7 @@
       announceReady();
     } else {
       draw(initialLiveState);
+      connectSocket();
       void refresh();
       timer = window.setInterval(refresh, Math.max(250, Number(interval) || 500));
     }

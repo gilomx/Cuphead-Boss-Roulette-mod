@@ -71,7 +71,12 @@ muestran un aviso con el enlace al diseñador y los pasos para actualizar la URL
 El antiguo transporte `/ws` publica un estado desactivado; una fuente antigua
 debe actualizarse o recargarse para ver el aviso. El componente nuevo recibe el
 estado nativo del equipo y el reto a través del compositor, conservando las
-animaciones y el texto del reto.
+animaciones y el texto del reto. El compositor recibe inmediatamente cada cambio
+mediante `/api/roulette-overlay/ws`, publicado en el mismo fotograma que el sonido
+del HUD; Ruleta no espera la consulta periódica de los otros eventos. Si se pierde
+la conexión, conserva el último estado, usa consultas HTTP independientes cada
+250 ms y vuelve a conectar automáticamente. Las vistas del diseñador siguen
+recibiendo sólo su simulación y no abren conexiones al estado de la partida.
 
 Validación sin iniciar Cuphead:
 
