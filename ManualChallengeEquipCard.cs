@@ -433,7 +433,10 @@ namespace Gilomx.CupheadBossRoulette
         {
             var plugin = activeInstance;
             if (plugin != null)
+            {
                 plugin.ClearEquippedManualChallengeForSaveSlot(__0);
+                plugin.ClearNativeDifficultyForSaveSlot(__0);
+            }
         }
 
         private static void ActivateEquippedChallengeForLevelPrefix(
@@ -1774,7 +1777,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (equippedChallengeBySave == null)
                 return ModifierId.None;
-            var slot = CurrentManualChallengeSaveSlot();
+            var slot = CurrentSaveSlot();
             if (slot < 0 || slot >= equippedChallengeBySave.Length ||
                 equippedChallengeBySave[slot] == null)
                 return ModifierId.None;
@@ -1795,7 +1798,7 @@ namespace Gilomx.CupheadBossRoulette
             if (FindModifierEntry(challenge) == null ||
                 !ExperimentalFeatures.IsChallengeEnabled(challenge))
                 challenge = ModifierId.None;
-            var slot = CurrentManualChallengeSaveSlot();
+            var slot = CurrentSaveSlot();
             if (slot < 0 || equippedChallengeBySave == null ||
                 slot >= equippedChallengeBySave.Length ||
                 equippedChallengeBySave[slot] == null)
@@ -1837,7 +1840,7 @@ namespace Gilomx.CupheadBossRoulette
                            (slot + 1) + ".");
         }
 
-        private static int CurrentManualChallengeSaveSlot()
+        private static int CurrentSaveSlot()
         {
             try
             {

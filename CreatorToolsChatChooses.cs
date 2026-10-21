@@ -13,6 +13,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool chatChoosesBattleSeen;
         private bool chatChoosesReviewCard;
         private int chatChoosesCardSession = -1;
+        private int chatChoosesCardSaveSlot = -1;
         private bool chatChoosesOriginalUglyMode;
         private readonly ChatChoosesCardEntrance chatChoosesCardEntrance = new ChatChoosesCardEntrance();
 
@@ -76,8 +77,12 @@ namespace Gilomx.CupheadBossRoulette
                     chatChoosesCardEntrance.Suspend();
                     return;
                 }
-                if (chatChoosesCardSession != creatorToolsChatChooses.SessionId)
+                var saveSlot = CurrentSaveSlot();
+                if (chatChoosesCardSession != creatorToolsChatChooses.SessionId ||
+                    chatChoosesCardSaveSlot != saveSlot)
                 {
+                    if (chatChoosesReviewCard && chatChoosesCardSaveSlot != saveSlot)
+                        ClearChatChoosesCard();
                     if (!IsChatChoosesSelectionValid(chosen))
                     {
                         creatorToolsChatChooses.InvalidateResult();
@@ -85,7 +90,9 @@ namespace Gilomx.CupheadBossRoulette
                     }
                     chatChoosesOriginalUglyMode = uglyMode;
                     chatChoosesCardSession = creatorToolsChatChooses.SessionId;
+                    chatChoosesCardSaveSlot = saveSlot;
                     chatChoosesReviewCard = true;
+                    UseNativeDifficultyForCurrentSave();
                     result = CreateChatChoosesResult(chosen);
                     uglyMode = RouletteData.Modifiers[result.Modifier].Id != ModifierId.None;
                     RememberBossResult(result.Boss);
@@ -151,6 +158,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             uglyMode = chatChoosesOriginalUglyMode;
             chatChoosesReviewCard = false; chatChoosesCardSession = -1;
+            chatChoosesCardSaveSlot = -1;
         }
 
         private ChatChoosesCatalog BuildChatChoosesCatalog()

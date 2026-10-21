@@ -180,6 +180,7 @@ namespace Gilomx.CupheadBossRoulette
         private ConfigEntry<KeyboardShortcut> spinShortcut;
         private ConfigEntry<bool> autoLoad;
         private ConfigEntry<Level.Mode> difficultySetting;
+        private ConfigEntry<Level.Mode>[] nativeDifficultyBySave;
         private ConfigEntry<bool> challengeSetting;
         private ConfigEntry<string> disabledChallengesSetting;
         private ConfigEntry<float> loadDelay;
@@ -443,6 +444,12 @@ namespace Gilomx.CupheadBossRoulette
             autoLoad = Config.Bind("Juego", "CargarAutomaticamente", true, "Carga el jefe al finalizar el giro.");
             difficultySetting = Config.Bind("Juego", "Dificultad", Level.Mode.Normal,
                 "Dificultad usada por la ruleta: Easy, Normal o Hard.");
+            nativeDifficultyBySave = new ConfigEntry<Level.Mode>[3];
+            for (var i = 0; i < nativeDifficultyBySave.Length; i++)
+                nativeDifficultyBySave[i] = Config.Bind("Juego",
+                    "DificultadCupheadPartida" + (i + 1), Level.Mode.Normal,
+                    "Última dificultad elegida en Cuphead para esta partida; " +
+                    "la ruleta no modifica este historial. Easy, Normal o Hard.");
             challengeSetting = Config.Bind("Juego", "Reto", false,
                 "Activa los retos adicionales de la ruleta.");
             disabledChallengesSetting = Config.Bind("Juego",
@@ -481,6 +488,27 @@ namespace Gilomx.CupheadBossRoulette
             SceneLoader.OnFadeInEndEvent +=
                 CompleteChallengeVisualRestartOnFadeInEnd;
             harmony = new Harmony(PluginGuid);
+            var nativeDifficultySelection = AccessTools.Method(
+                typeof(MapDifficultySelectStartUI), "Next",
+                new[] { typeof(int) });
+            var rememberNativeDifficulty = AccessTools.Method(
+                typeof(Plugin), "RememberNativeDifficultySelection");
+            if (nativeDifficultySelection != null && rememberNativeDifficulty != null)
+                harmony.Patch(nativeDifficultySelection,
+                    postfix: new HarmonyMethod(rememberNativeDifficulty));
+            else
+                Logger.LogWarning(
+                    "Could not remember Cuphead's last difficulty selection.");
+            var nativeDifficultyConfirmation = AccessTools.Method(
+                typeof(AbstractMapSceneStartUI), "LoadLevel", Type.EmptyTypes);
+            var rememberConfirmedDifficulty = AccessTools.Method(
+                typeof(Plugin), "RememberNativeDifficultyConfirmationPrefix");
+            if (nativeDifficultyConfirmation != null && rememberConfirmedDifficulty != null)
+                harmony.Patch(nativeDifficultyConfirmation,
+                    prefix: new HarmonyMethod(rememberConfirmedDifficulty));
+            else
+                Logger.LogWarning(
+                    "Could not remember Cuphead's confirmed difficulty.");
             InstallManualChallengeEquipmentPatches();
             if (ExperimentalFeatures.EnableCreatorTools)
                 InstallCreatorToolsPatches();
@@ -1501,12 +1529,8 @@ namespace Gilomx.CupheadBossRoulette
                 var modes = new[] { Level.Mode.Easy, Level.Mode.Normal, Level.Mode.Hard };
                 var current = difficulty == Level.Mode.Easy ? 0 : difficulty == Level.Mode.Hard ? 2 : 1;
                 var nextDifficulty = modes[Wrap(current + direction, modes.Length)];
-                if (difficulty != nextDifficulty)
-                {
-                    difficulty = nextDifficulty;
-                    difficultySetting.Value = difficulty;
-                    changed = true;
-                }
+                SetRouletteDifficulty(nextDifficulty);
+                return;
             }
             else if (navigationIndex == 1)
             {
@@ -1531,6 +1555,80 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private void SetRouletteDifficulty(Level.Mode mode, bool saveRouletteSetting = true)
+        {
+            if (mode != Level.Mode.Easy && mode != Level.Mode.Normal &&
+                mode != Level.Mode.Hard)
+                return;
+
+            var changed = difficulty != mode;
+            difficulty = mode;
+            if (saveRouletteSetting && difficultySetting.Value != mode)
+            {
+                difficultySetting.Value = mode;
+                Config.Save();
+            }
+            if (changed && resultReady && !chatChoosesReviewCard)
+            {
+                resultReady = false;
+                status = RouletteStatus.Ready;
+            }
+        }
+
+        private static void RememberNativeDifficultySelection()
+        {
+            var plugin = activeInstance;
+            var slot = CurrentSaveSlot();
+            if (plugin == null || plugin.nativeDifficultyBySave == null || slot < 0)
+                return;
+
+            // Record explicit choices only. Special levels also call
+            // SetCurrentMode temporarily and must not replace this preference.
+            var mode = Level.CurrentMode;
+            if (mode != Level.Mode.Easy && mode != Level.Mode.Normal &&
+                mode != Level.Mode.Hard)
+                return;
+            if (plugin.nativeDifficultyBySave[slot].Value != mode)
+            {
+                plugin.nativeDifficultyBySave[slot].Value = mode;
+                plugin.Config.Save();
+            }
+            plugin.SetRouletteDifficulty(mode, false);
+        }
+
+        private static void RememberNativeDifficultyConfirmationPrefix(
+            AbstractMapSceneStartUI __instance)
+        {
+            // Confirming the initial option is a choice too. Capture it before
+            // the load callback, and ignore start cards without a mode selector.
+            if (__instance is MapDifficultySelectStartUI)
+                RememberNativeDifficultySelection();
+        }
+
+        private void UseNativeDifficultyForCurrentSave()
+        {
+            var slot = CurrentSaveSlot();
+            var mode = slot < 0 || nativeDifficultyBySave == null
+                ? Level.Mode.Normal
+                : nativeDifficultyBySave[slot].Value;
+            SetRouletteDifficulty(mode == Level.Mode.Easy || mode == Level.Mode.Hard
+                ? mode : Level.Mode.Normal, false);
+        }
+
+        private void ClearNativeDifficultyForSaveSlot(int slot)
+        {
+            if (nativeDifficultyBySave == null || slot < 0 ||
+                slot >= nativeDifficultyBySave.Length)
+                return;
+            if (chatChoosesCardSaveSlot == slot)
+                ClearChatChoosesCard();
+            if (nativeDifficultyBySave[slot].Value == Level.Mode.Normal)
+                return;
+
+            nativeDifficultyBySave[slot].Value = Level.Mode.Normal;
+            Config.Save();
+        }
+
         private void SetVisible(bool value)
         {
             if (value && creatorToolsChatChooses != null && creatorToolsChatChooses.Reserved &&
@@ -1539,7 +1637,11 @@ namespace Gilomx.CupheadBossRoulette
             if (visible == value)
                 return;
             if (value)
+            {
                 RefreshAvailableContent();
+                if (!chatChoosesReviewCard)
+                    UseNativeDifficultyForCurrentSave();
+            }
             else if (running)
                 CancelRouletteSpin();
             visible = value;
@@ -2781,7 +2883,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (GUI.Button(rect, (difficulty == mode ? "?  " : "") + label,
                 difficulty == mode ? buttonActiveStyle : buttonStyle))
-                difficulty = mode;
+                SetRouletteDifficulty(mode);
         }
 
         private void UpdateBlackAndWhiteTransition()

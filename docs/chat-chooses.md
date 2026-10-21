@@ -44,8 +44,11 @@ espera, ésta se reinicia, incluso si Unity dejó de actualizar en segundo plano
 No se anima anticipadamente fuera de foco ni permite abrir o jugar durante
 la espera. Los fotogramas largos tampoco saltan toda la entrada.
 La tarjeta muestra las decisiones del chat ya elegidas. Sólo ofrece el ajuste de dificultad y **Jugar**; oculta
-los interruptores de reto y carga automática. Conserva la última dificultad
-guardada por el jugador. Cambiarla mantiene intacto el resultado. El panel web
+los interruptores de reto y carga automática. Al preparar una tarjeta, toma
+la última dificultad elegida en Cuphead para la partida guardada activa,
+registrada por el mod por separado para cada partida y también entre reinicios.
+Si todavía no hay una registrada, usa Normal. Cambiarla en la tarjeta mantiene
+intacto el resultado y no modifica ese historial. El panel web
 recuerda revisarla antes de jugar. No existe cuenta ni inicio automático:
 el resultado espera hasta que el jugador confirme en el juego.
 

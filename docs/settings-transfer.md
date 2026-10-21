@@ -6,7 +6,8 @@ para usar otra cuenta primero se desconecta la anterior y después se conecta
 la nueva. Los controles de prueba de Twitch CLI siguen disponibles sólo en Dev.
 
 **Exportar configuraciones** descarga un único archivo JSON con los ajustes
-guardados de Ruleta, controles, retos equipados por ranura, exclusiones de retos,
+guardados de Ruleta, última dificultad de Cuphead por partida, controles,
+retos equipados por ranura, exclusiones de retos,
 Interacciones y sus reglas, Modo Molestoso, Batalla Molestosa, Farmeando taps,
 los dos perfiles de overlays y el idioma del panel. También conserva la
 identidad del regalo personalizado necesaria para recuperar sus reglas.

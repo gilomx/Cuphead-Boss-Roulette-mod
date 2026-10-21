@@ -20,6 +20,7 @@ namespace Gilomx.CupheadBossRoulette
             Run("Portable stream rules retain their behavior without an account or connection ID", TestSettingsRuleTransfer);
             Run("Portable version 6 rules import into version 7 without losing previous settings", TestSettingsLegacyRuleImport);
             Run("Settings import waits for restart, preserves connections and backs up previous files", TestSettingsRoundTrip);
+            Run("Portable settings retain Cuphead difficulty separately for all three save slots", TestSettingsCupheadDifficultyRoundTrip);
             Run("Importing default settings replaces destination customizations", TestSettingsDefaultReplacement);
             Run("Invalid settings cannot replace a valid pending import", TestSettingsInvalidImports);
             Run("A failed import rolls back every changed file and retains the pending copy", TestSettingsRollback);
@@ -87,6 +88,26 @@ namespace Gilomx.CupheadBossRoulette
                 True(File.ReadAllText(Path.Combine(backup, SettingsPrefix + ".cfg")).Contains("later save"), "previous primary backed up");
                 Equal("old recovery config", File.ReadAllText(Path.Combine(backup, SettingsPrefix + ".cfg.bak")), "previous recovery copy retained");
                 True(!transfer.ApplyPending(), "applies only once");
+            }
+        }
+
+        private static void TestSettingsCupheadDifficultyRoundTrip()
+        {
+            using (var scope = new TestScope("settings-cuphead-difficulty"))
+            {
+                var path = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg");
+                File.WriteAllText(path, "[Juego]\nDificultad = Hard\nDificultadCupheadPartida1 = Easy\nDificultadCupheadPartida2 = Normal\nDificultadCupheadPartida3 = Hard\n");
+                var transfer = Transfer(scope);
+                var exported = transfer.Export();
+                var exportedConfig = JsonNode.Parse(exported)["files"][SettingsPrefix + ".cfg"].GetValue<string>();
+                True(exportedConfig.Contains("DificultadCupheadPartida1 = Easy\n"), "first slot difficulty exported");
+                True(exportedConfig.Contains("DificultadCupheadPartida2 = Normal\n"), "second slot difficulty exported");
+                True(exportedConfig.Contains("DificultadCupheadPartida3 = Hard\n"), "third slot difficulty exported");
+                File.WriteAllText(path, "[Juego]\nDificultad = Easy\nDificultadCupheadPartida1 = Hard\nDificultadCupheadPartida2 = Hard\nDificultadCupheadPartida3 = Easy\n");
+                Equal("", transfer.StageImport(exported), "saved slot difficulties accepted");
+                True(transfer.ApplyPending(), "slot difficulties apply on restart");
+                Equal(exportedConfig, File.ReadAllText(path), "all slot preferences restored independently of manual roulette difficulty");
+                Equal(exportedConfig, JsonNode.Parse(transfer.Export())["files"][SettingsPrefix + ".cfg"].GetValue<string>(), "slot preferences survive re-export");
             }
         }
 
@@ -186,6 +207,12 @@ namespace Gilomx.CupheadBossRoulette
                 var typed = JsonNode.Parse(valid); typed["files"][SettingsPrefix + ".tap-farming.json"] = "{\"version\":2,\"tapsPerConversion\":\"bad\",\"healthPointsPerConversion\":1}"; cases.Add(typed.ToJsonString());
                 var limits = JsonNode.Parse(valid); limits["files"][SettingsPrefix + ".tap-farming.json"] = "{\"version\":2,\"tapsPerConversion\":0,\"healthPointsPerConversion\":1}"; cases.Add(limits.ToJsonString());
                 var boolean = JsonNode.Parse(valid); boolean["files"][SettingsPrefix + ".cfg"] = "[Juego]\nReto = invalid\n"; cases.Add(boolean.ToJsonString());
+                foreach (var slot in new[] { 1, 2, 3 })
+                {
+                    var difficulty = JsonNode.Parse(valid);
+                    difficulty["files"][SettingsPrefix + ".cfg"] = "[Juego]\nDificultadCupheadPartida" + slot + " = invalid\n";
+                    cases.Add(difficulty.ToJsonString());
+                }
                 var hidden = JsonNode.Parse(valid);
                 var overlay = JsonNode.Parse(hidden["files"][SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
                 overlay["profiles"][0]["components"][0]["accessToken"] = "private";

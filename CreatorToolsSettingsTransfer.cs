@@ -398,6 +398,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             foreach (var allowed in new[] {
                 "Controles/AbrirCerrar", "Controles/Girar", "Juego/CargarAutomaticamente", "Juego/Dificultad", "Juego/Reto", "Juego/RetosDesactivados", "Juego/DemoraAntesDeCargar",
+                "Juego/DificultadCupheadPartida1", "Juego/DificultadCupheadPartida2", "Juego/DificultadCupheadPartida3",
                 "Juego/RetoEquipadoPartida1", "Juego/RetoEquipadoPartida2", "Juego/RetoEquipadoPartida3", "El chat elige/Con reto",
                 "Creator Tools/Activado", "Creator Tools/Tamano", "Creator Tools/Orden", "Creator Tools/Alineacion", "Creator Tools/Opacidad", "Creator Tools/VistaPrevia", "Creator Tools/MostrarNombre", "Creator Tools/AlReintentar",
                 "Creator Tools/InteraccionesMaximasEnPantalla", "Creator Tools/InteraccionesSinLimiteEnPantalla", "Creator Tools/MiniJefesMaximosEnPantalla", "Creator Tools/InteraccionesActivadas"
@@ -408,7 +409,8 @@ namespace Gilomx.CupheadBossRoulette
         private static void ValidateConfigValue(string entry, string value)
         {
             var key = entry.Substring(entry.IndexOf('/') + 1);
-            if (key == "Dificultad")
+            if (key == "Dificultad" || key == "DificultadCupheadPartida1" ||
+                key == "DificultadCupheadPartida2" || key == "DificultadCupheadPartida3")
             { if (value != "Easy" && value != "Normal" && value != "Hard") throw new FormatException("Invalid difficulty."); }
             else if (key == "Orden")
             { if (value != "IconsAbove" && value != "TextAbove") throw new FormatException("Invalid order."); }

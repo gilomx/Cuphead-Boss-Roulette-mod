@@ -404,6 +404,14 @@ El archivo de configuración se crea en:
 
 `BepInEx\config\mx.gilomx.cuphead.bossroulette.cfg`
 
+Al abrir la ruleta, toma la última dificultad elegida en el selector de Cuphead
+para la partida guardada activa. El mod recuerda ese dato por separado para
+las tres partidas, también entre reinicios, y lo limpia al borrar una partida.
+Cambiar la dificultad dentro de la ruleta no modifica ese historial de Cuphead.
+Los niveles especiales que cambian temporalmente la dificultad tampoco lo alteran.
+Cuphead no guarda por sí mismo la última elección: si el mod todavía no ha
+registrado una para esa partida, la ruleta empieza en Normal.
+
 ## Documentación del proyecto
 
 Para añadir artículos a Creator Tools, consulta primero la

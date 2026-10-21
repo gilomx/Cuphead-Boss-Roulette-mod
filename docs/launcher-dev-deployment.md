@@ -173,7 +173,7 @@ prefijo de todos los archivos siguientes es `mx.gilomx.cuphead.bossroulette`:
 
 | Sufijo | Datos persistentes |
 | --- | --- |
-| `.cfg` | Opciones de ruleta, selección/exclusión de retos, reto equipado por ranura de partida, overlay, interruptores y otros ajustes de BepInEx del plugin. |
+| `.cfg` | Opciones de ruleta, última dificultad nativa por partida, selección/exclusión de retos, reto equipado por ranura de partida, overlay, interruptores y otros ajustes de BepInEx del plugin. |
 | `.stream-rules.json` | Reglas de regalos, likes y follows. |
 | `.pesky-mode.json` | Ajustes de Modo Molestoso, nombres y selección de artículos. |
 | `.interaction-pacing.json` | Balance y ritmo independientes de Interacciones. |
