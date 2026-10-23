@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { matchesOverlayPreviewLayout } from "./mock-overlay-layout.mjs";
 
 // Run the production reducer on every supported Node version, including Node 20.
 const uiRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -14,17 +15,59 @@ const exports = {};
 try {
   const compiled = spawnSync(process.execPath, [
     "node_modules/typescript/bin/tsc", "src/features/overlay-designer/simulation.ts",
+    "src/features/overlay-designer/interactionsPreview.ts",
     "--ignoreConfig", "--target", "es2022", "--module", "commonjs",
     "--outDir", temporary, "--skipLibCheck",
   ], { cwd: uiRoot, encoding: "utf8", windowsHide: true });
   assert.equal(compiled.status, 0, compiled.error?.message || compiled.stdout + compiled.stderr);
   const folder = existsSync(join(temporary, "simulation.js")) ? temporary : join(temporary, "features/overlay-designer");
   const require = createRequire(import.meta.url);
-  Object.assign(exports, require(join(folder, "simulation.js")), require(join(folder, "chatSimulation.js")));
+  Object.assign(exports, require(join(folder, "simulation.js")), require(join(folder, "chatSimulation.js")),
+    require(join(folder, "interactionsPreview.js")), require(join(folder, "model.js")));
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
 const { createBattleSimulation, battleSimulationReducer, previewCommand } = exports;
+
+test("mock preview accepts the complete five-component designer profile and rejects malformed component sets", () => {
+  const profile = { id: "vertical", canvas: { width: 1080, height: 1920 },
+    components: exports.COMPONENT_IDS.map(id => ({ id, enabled: false })) };
+  const command = previewCommand("start", "vertical", "interactions", "preview-session",
+    exports.createTapSimulation(), createBattleSimulation(), profile, false);
+  const layout = JSON.parse(command.layoutJson);
+  assert.equal(layout.components.length, 5);
+  assert.equal(matchesOverlayPreviewLayout(layout, profile), true);
+  assert.equal(matchesOverlayPreviewLayout({ ...layout, components: [...layout.components].reverse() }, profile), true);
+  assert.equal(matchesOverlayPreviewLayout({ ...layout, components: layout.components.slice(0, 4) }, profile), false);
+  assert.equal(matchesOverlayPreviewLayout({ ...layout, components: [...layout.components.slice(0, 4), layout.components[0]] }, profile), false);
+  assert.equal(matchesOverlayPreviewLayout({ ...layout, components: [...layout.components.slice(0, 4), { id: "unknown" }] }, profile), false);
+  assert.equal(matchesOverlayPreviewLayout({ ...layout, id: "horizontal" }, profile), false);
+  assert.equal(matchesOverlayPreviewLayout({ ...layout, components: [null, ...layout.components.slice(1)] }, profile), false);
+});
+
+test("interaction designer examples remain separate from configured rules", () => {
+  const example = exports.createInteractionsPreview({ rules: [] }, key => `translated:${key}`);
+  assert.equal(example.examples, true);
+  assert.equal(example.preview, true);
+  assert.equal(new Set(example.rules.map(rule => rule.interaction)).size, 18, "two complete nine-item pages");
+  assert.deepEqual([...new Set(example.rules.map(rule => rule.platform))], ["tiktok", "twitch", "youtube"]);
+  assert.ok(example.rules.every(rule => rule.id < 0 && rule.enabled));
+  assert.equal(exports.isOverlayComponentId("interactions"), true);
+  assert.ok(exports.COMPONENT_IDS.includes("interactions"));
+
+  const actual = { id: 1, enabled: true, name: "My price", every: 17, interaction: "help_extra_life", platform: "tiktok" };
+  const disabled = { ...actual, id: 2, enabled: false };
+  const config = { rules: [actual, disabled], communityGift: { giftId: "123", imagePath: "/gift.webp" } };
+  const before = JSON.stringify(config);
+  const preview = exports.createInteractionsPreview(config, key => key);
+  assert.equal(preview.examples, false);
+  assert.deepEqual(preview.rules, [actual]);
+  assert.equal(preview.communityGift, config.communityGift);
+  assert.equal(JSON.stringify(config), before, "preview does not alter saved prices or rules");
+  const allDisabled = exports.createInteractionsPreview({ rules: [disabled] }, key => key);
+  assert.equal(allDisabled.examples, false, "disabled rules must not be replaced by sample prices");
+  assert.deepEqual(allDisabled.rules, []);
+});
 
 test("chat designer scenarios and votes travel to OBS independently of real events", () => {
   const { createChatSimulation, chatSimulationReducer } = exports;

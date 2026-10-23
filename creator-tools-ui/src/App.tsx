@@ -190,7 +190,7 @@ export default function App() {
         : view === "settings"
           ? <SettingsView />
         : view === "interactions"
-        ? <InteractionsView />
+        ? <InteractionsView onOpenOverlayDesigner={() => openOverlayDesigner("interactions")} />
         : view === "pesky"
           ? <PeskyModeView />
           : <RouletteView />}

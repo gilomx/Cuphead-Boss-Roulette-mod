@@ -6,6 +6,9 @@ acceso al panel y la acción de volver.
 
 Ruleta es una capa de los perfiles vertical (1080 × 1920) y horizontal
 (1920 × 1080), junto a Farmeando taps, Batalla Molestosa y El chat elige.
+El diseñador incluye también la capa de [Interacciones](interactions-overlay.md),
+con tarjetas o iconos flotantes y formatos de franja continua o páginas compactas.
+
 Se puede mover, redimensionar, bloquear, ordenar, activar u ocultar y cambiar su
 opacidad. El tamaño se ajusta al contenedor: al redimensionar la capa, el equipo,
 el reto y el logo crecen o se reducen juntos sin deformarse. Conserva los controles

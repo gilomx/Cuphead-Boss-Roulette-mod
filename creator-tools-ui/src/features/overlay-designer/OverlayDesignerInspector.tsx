@@ -6,6 +6,7 @@ import type {
   OverlayComposerComponent,
   OverlayComposerProfile,
   OverlayTextFont,
+  InteractionsPreviewSnapshot,
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
@@ -24,6 +25,7 @@ interface OverlayDesignerInspectorProps {
   battleState: PeskyBattlePreviewSnapshot;
   chatState: ChatChoosesState;
   rouletteScenario: RouletteScenario;
+  interactionsState: InteractionsPreviewSnapshot;
   onRouletteScenarioChange: (scenario: RouletteScenario) => void;
   onRouletteReplay: () => void;
   previewActive: boolean;
@@ -213,6 +215,7 @@ export function OverlayDesignerInspector({
   battleState,
   chatState,
   rouletteScenario,
+  interactionsState,
   onRouletteScenarioChange,
   onRouletteReplay,
   previewActive,
@@ -241,7 +244,13 @@ export function OverlayDesignerInspector({
     width: profile.canvas.width - component.x,
     height: profile.canvas.height - component.y,
   };
-  const independentSize = component.id === "chat_chooses";
+  const independentSize = component.id === "chat_chooses" || component.id === "interactions";
+  const interactionsLayout = component.interactionsLayout ?? (profile.id === "vertical" ? "pages" : "strip");
+  const interactionsPlatforms = [
+    ["interactionsTikTok", "TikTok", component.interactionsTikTok ?? true],
+    ["interactionsTwitch", "Twitch", component.interactionsTwitch ?? profile.id === "horizontal"],
+    ["interactionsYouTube", "YouTube", component.interactionsYouTube ?? profile.id === "horizontal"],
+  ] as const;
   const minimumSize = independentSize ? minimumComponentSize(component.id) : proportionalComponentSize(component, 0, maximumSize);
   const maximumProportionalSize = independentSize ? maximumSize : proportionalComponentSize(
     component,
@@ -258,6 +267,8 @@ export function OverlayDesignerInspector({
     "enabled" | "locked" | "showTitle" | "showDetails" | "motion"
   > = component.id === "roulette"
     ? ["enabled", "locked"]
+    : component.id === "interactions"
+    ? ["enabled", "locked", "showTitle", "motion"]
     : component.id === "tap_farming"
     ? ["enabled", "locked", "motion"]
     : component.id === "chat_chooses"
@@ -364,6 +375,64 @@ export function OverlayDesignerInspector({
           </span>
         </label>
 
+        {component.id === "interactions" ? (
+          <div className="overlay-designer-simulation__body" role="group" aria-label={t("overlayDesigner.interactions.title")}>
+            <strong>{t("overlayDesigner.interactions.title")}</strong>
+            <label><span>{t("overlayDesigner.interactions.template")}</span>
+              <select disabled={disabled} value={component.interactionsTemplate ?? "floating"}
+                onChange={event => {
+                  const template = event.target.value as "cards" | "floating";
+                  onChange({ interactionsTemplate: template, showTitle: template === "cards" });
+                }}>
+                <option value="cards">{t("overlayDesigner.interactions.cards")}</option>
+                <option value="floating">{t("overlayDesigner.interactions.floating")}</option>
+              </select>
+            </label>
+            <label><span>{t("overlayDesigner.interactions.layout")}</span>
+              <select disabled={disabled} value={interactionsLayout}
+                onChange={event => {
+                  const layout = event.target.value as "strip" | "pages";
+                  const width = Math.min(profile.canvas.width, layout === "pages" ? 960 : profile.id === "vertical" ? 960 : 1800);
+                  const height = Math.min(profile.canvas.height, layout === "pages" ? 620 : 230);
+                  onChange({ interactionsLayout: layout, width, height,
+                    x: Math.min(component.x, profile.canvas.width - width),
+                    y: Math.min(component.y, profile.canvas.height - height) });
+                }}>
+                <option value="strip">{t("overlayDesigner.interactions.strip")}</option>
+                <option value="pages">{t("overlayDesigner.interactions.pages")}</option>
+              </select>
+            </label>
+            <strong>{t("overlayDesigner.interactions.platforms")}</strong>
+            {interactionsPlatforms.map(([key, label, checked]) => (
+              <label className="overlay-designer-properties__checkbox" key={key}>
+                <input type="checkbox" disabled={disabled} checked={checked}
+                  onChange={event => onChange({ [key]: event.target.checked })} />
+                <span>{label}</span>
+              </label>
+            ))}
+            {!interactionsPlatforms.some(([, , checked]) => checked) ? <small role="status">{t("overlayDesigner.interactions.noPlatforms")}</small> : null}
+            {interactionsLayout === "pages" ? <>
+              <label><span>{t("overlayDesigner.interactions.pageSeconds")}</span>
+                <input type="number" min="3" max="60" step="1" disabled={disabled}
+                  value={component.interactionsPageSeconds ?? 8}
+                  onChange={event => onChange({ interactionsPageSeconds: Math.max(3, Math.min(60, numberValue(event.target.value, 8))) })} />
+              </label>
+              <small>{t("overlayDesigner.interactions.pagesHint")}</small>
+            </> : <label><span>{t("overlayDesigner.interactions.speed")}</span>
+              <input type="range" min="10" max="120" step="1" disabled={disabled}
+                value={component.interactionsSpeed ?? 40}
+                onChange={event => onChange({ interactionsSpeed: Number(event.target.value) })} />
+              <output>{component.interactionsSpeed ?? 40} px/s</output>
+            </label>}
+            <label className="overlay-designer-properties__checkbox">
+              <input type="checkbox" disabled={disabled} checked={component.interactionsAdaptive ?? true}
+                onChange={event => onChange({ interactionsAdaptive: event.target.checked })} />
+              <span>{t("overlayDesigner.interactions.adaptive")}</span>
+            </label>
+            <small>{t("overlayDesigner.interactions.adaptiveHint")}</small>
+          </div>
+        ) : null}
+
         <div className="overlay-designer-simulation__body" role="group" aria-label={t("overlayDesigner.inspector.typography.title")}>
           <strong>{t("overlayDesigner.inspector.typography.title")}</strong>
           {component.id === "roulette" ? <small>{t("overlayDesigner.inspector.typography.fixedRouletteFont")}</small> : <>
@@ -393,7 +462,7 @@ export function OverlayDesignerInspector({
           <small>{t("overlayDesigner.inspector.typography.shadowHint")}</small>
         </div>
 
-        {component.id !== "roulette" ? (
+        {component.id !== "roulette" && component.id !== "interactions" ? (
           <div className="overlay-designer-properties__colors">
             <strong>{t(`overlayDesigner.inspector.${colorGroup}.title`)}</strong>
             {colorKeys.map((key) => (
@@ -410,7 +479,7 @@ export function OverlayDesignerInspector({
               />
             ))}
           </div>
-        ) : (
+        ) : component.id === "roulette" ? (
           <div className="overlay-designer-simulation__body">
             <label><span>{t("overlayDesigner.roulette.order")}</span>
               <select disabled={disabled} value={String(component.rouletteTextFirst ?? false)} onChange={event => onChange({ rouletteTextFirst: event.target.value === "true" })}>
@@ -433,7 +502,7 @@ export function OverlayDesignerInspector({
               <span>{t("overlayDesigner.roulette.logo")}</span>
             </label>
           </div>
-        )}
+        ) : null}
 
         <div className="overlay-designer-properties__switches">
           {switchKeys.map((key) => (
@@ -447,8 +516,8 @@ export function OverlayDesignerInspector({
               onClick={() => onChange({ [key]: !component[key] })}
             >
               <span>
-                <strong>{t(`overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}`)}</strong>
-                <small>{t(`overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}Hint`)}</small>
+                <strong>{t(component.id === "interactions" && key === "showTitle" ? "overlayDesigner.interactions.showTitle" : `overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}`)}</strong>
+                <small>{t(component.id === "interactions" && key === "showTitle" ? "overlayDesigner.interactions.showTitleHint" : `overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}Hint`)}</small>
               </span>
               <i aria-hidden="true"><b /></i>
             </button>
@@ -459,10 +528,17 @@ export function OverlayDesignerInspector({
       <section className="overlay-designer-panel overlay-designer-simulation" aria-labelledby="overlay-designer-simulation-title">
         <header>
           <span>{t("overlayDesigner.simulation.eyebrow")}</span>
-          <h2 id="overlay-designer-simulation-title">{t("overlayDesigner.simulation.title")}</h2>
+          <h2 id="overlay-designer-simulation-title">{t(component.id === "interactions" ? "overlayDesigner.interactions.previewTitle" : "overlayDesigner.simulation.title")}</h2>
         </header>
 
-        {component.id === "roulette" ? (
+        {component.id === "interactions" ? (
+          <div className="overlay-designer-simulation__body">
+            <strong>{t(interactionsState.examples ? "overlayDesigner.interactions.examples" : "overlayDesigner.interactions.configuredRules")}</strong>
+            <small>{t(interactionsState.examples ? "overlayDesigner.interactions.examplesHint"
+              : interactionsState.rules.length ? "overlayDesigner.interactions.rulesHint" : "overlayDesigner.interactions.noRules")}</small>
+            <small>{t("overlayDesigner.interactions.obsHint")}</small>
+          </div>
+        ) : component.id === "roulette" ? (
           <div className="overlay-designer-simulation__body">
             <label><span>{t("overlayDesigner.simulation.scenario")}</span>
               <select value={rouletteScenario} onChange={event => onRouletteScenarioChange(event.target.value as RouletteScenario)}>

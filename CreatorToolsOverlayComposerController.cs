@@ -408,6 +408,41 @@ namespace Gilomx.CupheadBossRoulette
                 if (variant.Length == 0) return false;
                 component.Variant = variant; changed = true;
             }
+            foreach (var key in new[] { "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
+                "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive" })
+            {
+                if (!values.ContainsKey(key)) continue;
+                if (component.Id != CreatorToolsOverlayComposerSettings.InteractionsComponentId) return false;
+                if (key == "interactionsTemplate")
+                {
+                    var template = CreatorToolsOverlayComposerSettings.NormalizeInteractionsTemplate(Value(values, key));
+                    if (template.Length == 0) return false;
+                    component.InteractionsTemplate = template;
+                }
+                else if (key == "interactionsLayout")
+                {
+                    var layout = CreatorToolsOverlayComposerSettings.NormalizeInteractionsLayout(Value(values, key));
+                    if (layout.Length == 0) return false;
+                    component.InteractionsLayout = layout;
+                }
+                else if (key == "interactionsPageSeconds" || key == "interactionsSpeed")
+                {
+                    if (!TryReadInt(values, key, out number) ||
+                        number < (key == "interactionsPageSeconds" ? 3 : 10) ||
+                        number > (key == "interactionsPageSeconds" ? 60 : 120)) return false;
+                    if (key == "interactionsPageSeconds") component.InteractionsPageSeconds = number;
+                    else component.InteractionsSpeed = number;
+                }
+                else
+                {
+                    if (!TryReadBoolean(values, key, out boolean)) return false;
+                    if (key == "interactionsTikTok") component.InteractionsTikTok = boolean;
+                    else if (key == "interactionsTwitch") component.InteractionsTwitch = boolean;
+                    else if (key == "interactionsYouTube") component.InteractionsYouTube = boolean;
+                    else component.InteractionsAdaptive = boolean;
+                }
+                changed = true;
+            }
             if (component.Id == CreatorToolsOverlayComposerSettings.RouletteComponentId)
             {
                 if (values.ContainsKey("rouletteSize"))

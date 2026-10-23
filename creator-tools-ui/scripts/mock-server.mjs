@@ -2,6 +2,7 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { createChatChoosesMock } from "./mock-chat-chooses.mjs";
+import { matchesOverlayPreviewLayout } from "./mock-overlay-layout.mjs";
 const chatChooses = createChatChoosesMock({ developmentTools: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0" });
 
 const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
@@ -378,6 +379,15 @@ function defaultOverlayProfiles() {
     showTitle: false, showDetails: false, motion: true,
     liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
     rouletteSize: 100, rouletteAlignment: "center", rouletteTextFirst: false, rouletteLogo: false, rouletteRetry: "reappear",
+  }, {
+    id: "interactions", x: 60, y: profile.id === "vertical" ? 1200 : 800,
+    width: profile.id === "vertical" ? 960 : 1800, height: profile.id === "vertical" ? 620 : 230,
+    enabled: false, locked: false, layer: 50, opacity: 100, variant: "default",
+    showTitle: false, showDetails: false, motion: true,
+    liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
+    interactionsTemplate: "floating", interactionsLayout: profile.id === "vertical" ? "pages" : "strip",
+    interactionsTikTok: true, interactionsTwitch: profile.id === "horizontal", interactionsYouTube: profile.id === "horizontal",
+    interactionsPageSeconds: 8, interactionsSpeed: 40, interactionsAdaptive: true,
   }].map(component => ({ ...component, voteOutlineColor: "#ffffff", textFont: "clean", textWeight: 700,
     textShadowColor: "#00000000", textShadowX: 2, textShadowY: 3, textShadowBlur: 2 })) }));
 }
@@ -1060,6 +1070,20 @@ function normalizeOverlayComponent(component, canvas) {
   component.voteOutlineColor = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(component.voteOutlineColor ?? ""))
     ? String(component.voteOutlineColor).toLowerCase()
     : "#ffffff";
+  if (component.id === "interactions") {
+    const vertical = canvas.height > canvas.width;
+    component.interactionsTemplate = component.interactionsTemplate === "cards" ? "cards" : "floating";
+    component.interactionsLayout = ["strip", "pages"].includes(component.interactionsLayout)
+      ? component.interactionsLayout : vertical ? "pages" : "strip";
+    component.interactionsTikTok = component.interactionsTikTok !== false;
+    component.interactionsTwitch = component.interactionsTwitch ?? !vertical;
+    component.interactionsYouTube = component.interactionsYouTube ?? !vertical;
+    component.interactionsAdaptive = component.interactionsAdaptive !== false;
+    for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 10, 120]]) {
+      const value = Number(component[key] ?? fallback);
+      component[key] = Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, Math.round(value))) : fallback;
+    }
+  }
 }
 
 function applyOverlayComposerCommand(command, res) {
@@ -1126,6 +1150,14 @@ function applyOverlayComposerCommand(command, res) {
       json(res, { ok: false, error: "invalid_text_style" }, 400);
       return;
     }
+    if (command.interactionsTemplate != null && !["cards", "floating"].includes(command.interactionsTemplate) ||
+        command.interactionsLayout != null && !["strip", "pages"].includes(command.interactionsLayout) ||
+        ["interactionsTikTok", "interactionsTwitch", "interactionsYouTube", "interactionsAdaptive"].some(key => command[key] != null && typeof command[key] !== "boolean") ||
+        [["interactionsPageSeconds", 3, 60], ["interactionsSpeed", 10, 120]].some(([key, minimum, maximum]) =>
+          command[key] != null && (!Number.isInteger(command[key]) || command[key] < minimum || command[key] > maximum))) {
+      json(res, { ok: false, error: "invalid_interactions_options" }, 400);
+      return;
+    }
     for (const key of ["textShadowX", "textShadowY", "textShadowBlur"]) {
       if (command[key] != null && (!Number.isInteger(command[key]) || command[key] < (key === "textShadowBlur" ? 0 : -20) || command[key] > 20)) {
         json(res, { ok: false, error: "invalid_text_shadow" }, 400);
@@ -1145,6 +1177,8 @@ function applyOverlayComposerCommand(command, res) {
       "variant", "showTitle", "showDetails", "motion",
       "textFont", "textWeight", "textShadowColor", "textShadowX", "textShadowY", "textShadowBlur",
       "rouletteSize", "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
+      "interactionsTemplate", "interactionsLayout", "interactionsTikTok", "interactionsTwitch", "interactionsYouTube",
+      "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive",
       "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",
     ]) {
       if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];
@@ -1300,6 +1334,9 @@ createServer((req, res) => {
   }
   if (url.pathname === "/roulette-overlay") {
     serveCreatorToolFile("roulette-overlay.html", "text/html; charset=utf-8", res); return;
+  }
+  if (["/interactions-overlay", "/interactions-overlay/", "/interactions-overlay.html"].includes(url.pathname)) {
+    serveCreatorToolFile("interactions-overlay.html", "text/html; charset=utf-8", res); return;
   }
   if (url.pathname === "/api/roulette-overlay/state") {
     json(res, { type: "state", active: false }); return;
@@ -1573,7 +1610,7 @@ createServer((req, res) => {
         });
         return;
       }
-      if (!["tap_farming", "pesky_battle", "chat_chooses", "roulette"].includes(command.componentId)) {
+      if (!["tap_farming", "pesky_battle", "chat_chooses", "roulette", "interactions"].includes(command.componentId)) {
         json(res, { ok: false, error: "unknown_component" }, 400);
         return;
       }
@@ -1583,8 +1620,8 @@ createServer((req, res) => {
       } catch {
         layout = null;
       }
-      if (!layout || layout.id !== profileId ||
-          !Array.isArray(layout.components) || layout.components.length !== 4) {
+      if (!matchesOverlayPreviewLayout(layout,
+        overlayComposerProfiles.find(profile => profile.id === profileId))) {
         json(res, { ok: false, error: "invalid_preview_layout" }, 400);
         return;
       }

@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="Program.cs.txt" Link="Program.cs" />
     <Compile Include="SettingsTransferTests.cs.txt" Link="SettingsTransferTests.cs" />
+    <Compile Include="InteractionsOverlayComposerTests.cs.txt" Link="InteractionsOverlayComposerTests.cs" />
     <Compile Include="..\CreatorToolsSettingsTransfer.cs" Link="Product\CreatorToolsSettingsTransfer.cs" />
     <Compile Include="..\Streaming\CreatorToolsJsonParser.cs" Link="Product\Streaming\CreatorToolsJsonParser.cs" />
     <Compile Include="..\CreatorToolsPeskyBattleSettings.cs" Link="Product\CreatorToolsPeskyBattleSettings.cs" />

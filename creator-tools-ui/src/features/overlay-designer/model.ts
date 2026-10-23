@@ -1,7 +1,7 @@
-import type { ChatChoosesState } from "../../model";
+import type { ChatChoosesState, StreamRule, StreamRulesConfigState } from "../../model";
 
 export type OverlayProfileId = "vertical" | "horizontal";
-export type OverlayComponentId = "tap_farming" | "pesky_battle" | "chat_chooses" | "roulette";
+export type OverlayComponentId = "tap_farming" | "pesky_battle" | "chat_chooses" | "roulette" | "interactions";
 export type OverlayVariant = "default" | "compact" | "minimal";
 export type OverlayTextFont = "clean" | "system" | "rounded" | "serif";
 
@@ -39,6 +39,14 @@ export interface OverlayComposerComponent {
   rouletteTextFirst?: boolean;
   rouletteLogo?: boolean;
   rouletteRetry?: "keep" | "reappear";
+  interactionsTemplate?: "cards" | "floating";
+  interactionsLayout?: "strip" | "pages";
+  interactionsTikTok?: boolean;
+  interactionsTwitch?: boolean;
+  interactionsYouTube?: boolean;
+  interactionsPageSeconds?: number;
+  interactionsSpeed?: number;
+  interactionsAdaptive?: boolean;
 }
 
 export interface OverlayComposerProfile {
@@ -92,6 +100,14 @@ export interface OverlayComposerCommand {
   rouletteTextFirst?: boolean;
   rouletteLogo?: boolean;
   rouletteRetry?: "keep" | "reappear";
+  interactionsTemplate?: "cards" | "floating";
+  interactionsLayout?: "strip" | "pages";
+  interactionsTikTok?: boolean;
+  interactionsTwitch?: boolean;
+  interactionsYouTube?: boolean;
+  interactionsPageSeconds?: number;
+  interactionsSpeed?: number;
+  interactionsAdaptive?: boolean;
 }
 
 export interface OverlayPreviewCommand {
@@ -225,6 +241,13 @@ export interface PeskyBattlePreviewSnapshot {
   };
 }
 
+export interface InteractionsPreviewSnapshot {
+  rules: StreamRule[];
+  communityGift?: StreamRulesConfigState["communityGift"];
+  preview: true;
+  examples: boolean;
+}
+
 export interface OverlayComposerDesignMessage {
   type: "creator-tools-overlay-composer-design";
   version: 1;
@@ -236,6 +259,7 @@ export interface OverlayComposerDesignMessage {
     pesky_battle: PeskyBattlePreviewSnapshot;
     chat_chooses: ChatChoosesState;
     roulette: ReturnType<typeof roulettePreview>;
+    interactions: InteractionsPreviewSnapshot;
   };
   locale: string;
   background: "alpha" | "light" | "dark";
@@ -251,6 +275,7 @@ export const COMPONENT_IDS: OverlayComponentId[] = [
   "pesky_battle",
   "chat_chooses",
   "roulette",
+  "interactions",
 ];
 
 export function minimumComponentSize(
@@ -313,7 +338,7 @@ export function isOverlayProfileId(value: string | null): value is OverlayProfil
 }
 
 export function isOverlayComponentId(value: string | null): value is OverlayComponentId {
-  return value === "tap_farming" || value === "pesky_battle" || value === "chat_chooses" || value === "roulette";
+  return value === "tap_farming" || value === "pesky_battle" || value === "chat_chooses" || value === "roulette" || value === "interactions";
 }
 
 export type RouletteScenario = "hud" | "logo" | "hidden" | "retry";

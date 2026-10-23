@@ -76,9 +76,11 @@ async function bootComposer(designer = false, options = {}) {
   return { profile, sockets: sockets.connections, intervals, close: () => emit('pagehide'),
     host: root.children.find(child => child.dataset.componentId === 'roulette'),
     frame: frames.find(frame => frame.title === 'roulette'),
-    design(selectedComponentId) { emit('message', { source: parent, origin: window.location.origin,
+    interactionsHost: root.children.find(child => child.dataset.componentId === 'interactions'),
+    interactionsFrame: frames.find(frame => frame.title === 'interactions'),
+    design(selectedComponentId, extraStates = {}) { emit('message', { source: parent, origin: window.location.origin,
       data: { type: 'creator-tools-overlay-composer-design', version: 1, profileId: 'horizontal',
-        profile, selectedComponentId, states: { roulette: { type: 'state', active: true, visible: true, preview: true } } } }); },
+        profile, selectedComponentId, states: { roulette: { type: 'state', active: true, visible: true, preview: true }, ...extraStates } } }); },
     async setPreview(next) { preview = next; intervals.get(100)(); await flush(); },
   };
 }
@@ -104,6 +106,50 @@ function state(presentation = {}) {
     revealed: 3, textVisible: true, challengeText: 'NO DASH', labelRevision: 0,
     icons: ['weapons/lanzaguisantes.png','supers/super1.png','charms/bombadehumo.png'], presentation };
 }
+
+test('interaction designer previews a disabled layer and forwards its independent presentation', async () => {
+  const view = await bootComposer(true);
+  view.profile.components.push({ id: 'interactions', enabled: false,
+    interactionsTemplate: 'cards', interactionsLayout: 'pages',
+    interactionsTikTok: true, interactionsTwitch: false, interactionsYouTube: false,
+    interactionsPageSeconds: 12, interactionsSpeed: 30, interactionsAdaptive: true });
+  const rules = [{ id: 1, enabled: true, platform: 'tiktok', eventType: 'gift',
+    giftId: '5655', every: 1, interaction: 'help_extra_life', quantity: 1 }];
+  view.design('interactions', { interactions: { rules, examples: true } });
+  assert.equal(view.interactionsHost.dataset.enabled, 'true');
+  const message = view.interactionsFrame.posted.at(-1);
+  assert.equal(message.overlay, 'interactions');
+  assert.equal(message.state.preview, true);
+  assert.equal(message.state.examples, true);
+  assert.equal(message.state.rules.length, 1);
+  assert.equal(message.state.presentation.interactionsTemplate, 'cards');
+  assert.equal(message.state.presentation.interactionsLayout, 'pages');
+  assert.equal(message.state.presentation.interactionsTwitch, false);
+  assert.equal(message.state.presentation.interactionsPageSeconds, 12);
+  view.design('roulette');
+  assert.equal(view.interactionsHost.dataset.enabled, 'false');
+  view.close();
+});
+
+test('OBS interaction layout preview uses real rules and restores the saved visibility', async () => {
+  const rules = [{ id: 9, enabled: true, platform: 'youtube', eventType: 'jewels',
+    every: 500, interaction: 'challenge_no_dash', quantity: 1 }];
+  const view = await bootComposer(false, { fetch: url => url === '/api/config/interactions/rules'
+    ? { ok: true, json: async () => ({ ready: true, rules }) } : undefined });
+  view.profile.components.push({ id: 'interactions', enabled: false,
+    interactionsTemplate: 'floating', interactionsLayout: 'strip' });
+  await view.setPreview({ active: true, simulationActive: true,
+    componentId: 'interactions', revision: 1, layout: view.profile });
+  assert.equal(view.interactionsHost.dataset.enabled, 'true');
+  const message = view.interactionsFrame.posted.at(-1);
+  assert.equal(message.state.preview, false);
+  assert.equal(message.state.examples, undefined);
+  assert.equal(message.state.rules[0].id, 9);
+  assert.equal(message.state.presentation.interactionsLayout, 'strip');
+  await view.setPreview({ active: false, revision: 2 });
+  assert.equal(view.interactionsHost.dataset.enabled, 'false');
+  view.close();
+});
 test('designer bridge owns transport and applies the original editable settings', () => {
   const view = boot();
   assert.equal(view.posted[0].overlay, 'roulette');

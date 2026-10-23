@@ -665,11 +665,37 @@
         "retry": "Reintento"
       }
     },
+    "interactions": {
+      "title": "Presentación de interacciones",
+      "template": "Plantilla",
+      "cards": "1 · Tarjetas",
+      "floating": "2 · Iconos flotantes",
+      "layout": "Distribución",
+      "strip": "Franja móvil continua",
+      "pages": "Paginado compacto · 3 × 3",
+      "platforms": "Redes de este overlay",
+      "noPlatforms": "Selecciona al menos una red para mostrar sus canjes.",
+      "pageSeconds": "Segundos por página",
+      "pagesHint": "Hasta nueve ítems por página, juntos y estáticos. Ambas plantillas usan el mismo acomodo.",
+      "speed": "Velocidad de la franja",
+      "adaptive": "Agrandar canjes cuando hay menos opciones",
+      "adaptiveHint": "Un canje se ve grande; dos, medianos; tres o más, compactos.",
+      "showTitle": "Nombres de los ítems",
+      "showTitleHint": "Muestra el nombre junto a la imagen de cada ataque, ayuda o reto.",
+      "previewTitle": "Vista previa de interacciones",
+      "examples": "Muestra con precios de ejemplo",
+      "examplesHint": "Todavía no hay reglas. Estos ejemplos sólo aparecen en el diseñador; no se guardan ni se envían a OBS.",
+      "configuredRules": "Reglas configuradas",
+      "rulesHint": "La vista previa usa tus reglas habilitadas y las redes seleccionadas en este overlay.",
+      "noRules": "Tus reglas están deshabilitadas. Habilita alguna para mostrarla en el overlay.",
+      "obsHint": "La prueba en OBS muestra tus reglas reales guardadas y activa esta capa temporalmente."
+    },
     "components": {
       "roulette": "Ruleta",
       "tap_farming": "Farmeando taps",
       "pesky_battle": "Batalla Molestosa",
-      "chat_chooses": "El chat elige"
+      "chat_chooses": "El chat elige",
+      "interactions": "Interacciones y canjes"
     },
     "canvas": {
       "title": "Lienzo del overlay",

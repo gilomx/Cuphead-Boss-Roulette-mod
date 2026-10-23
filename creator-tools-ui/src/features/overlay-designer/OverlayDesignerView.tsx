@@ -42,6 +42,7 @@ import {
 } from "./simulation";
 import { useOverlayComposer } from "./useOverlayComposer";
 import { chatSimulationReducer, createChatSimulation } from "./chatSimulation";
+import { createInteractionsPreview } from "./interactionsPreview";
 
 interface OverlayDesignerViewProps {
   onBack: () => void;
@@ -71,7 +72,8 @@ function createPreviewSessionId() {
 
 export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const { locale, t } = useLocalization();
-  const { tapFarming, peskyBattle } = useConfig();
+  const { tapFarming, peskyBattle, streamRules } = useConfig();
+  const interactionsState = useMemo(() => createInteractionsPreview(streamRules, t), [streamRules, t]);
   const initialSelection = useMemo(querySelection, []);
   const [profileId, setProfileId] = useState<OverlayProfileId>(initialSelection.profileId);
   const [selectedComponentId, setSelectedComponentId] = useState<OverlayComponentId>(
@@ -657,6 +659,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             chatState={chatState}
             rouletteScenario={rouletteScenario}
             rouletteReplay={rouletteReplay}
+            interactionsState={interactionsState}
             disabled={busy}
             onChange={(componentId, update) => changeComponent(componentId, update)}
           />
@@ -669,6 +672,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             battleState={battleState}
             chatState={chatState}
             rouletteScenario={rouletteScenario}
+            interactionsState={interactionsState}
             previewActive={previewActive}
             previewPending={previewPending}
             previewError={previewError}

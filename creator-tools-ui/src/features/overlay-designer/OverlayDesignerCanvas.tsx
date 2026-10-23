@@ -14,6 +14,7 @@ import type {
   OverlayComposerDesignMessage,
   OverlayComposerProfile,
   OverlayComponentId,
+  InteractionsPreviewSnapshot,
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
@@ -32,6 +33,7 @@ interface OverlayDesignerCanvasProps {
   chatState: ChatChoosesState;
   rouletteScenario: RouletteScenario;
   rouletteReplay: number;
+  interactionsState: InteractionsPreviewSnapshot;
   disabled?: boolean;
   onChange: (
     componentId: OverlayComponentId,
@@ -101,6 +103,7 @@ export function OverlayDesignerCanvas({
   chatState,
   rouletteScenario,
   rouletteReplay,
+  interactionsState,
   disabled = false,
   onChange,
 }: OverlayDesignerCanvasProps) {
@@ -149,10 +152,11 @@ export function OverlayDesignerCanvas({
       pesky_battle: battleState,
       chat_chooses: chatState,
       roulette: roulettePreview(rouletteScenario, rouletteReplay),
+      interactions: interactionsState,
     },
     locale,
     background,
-  }), [background, battleState, chatState, rouletteScenario, rouletteReplay, locale, profile, selectedComponentId, tapState]);
+  }), [background, battleState, chatState, rouletteScenario, rouletteReplay, interactionsState, locale, profile, selectedComponentId, tapState]);
 
   const latestMessageRef = useRef(message);
   latestMessageRef.current = message;

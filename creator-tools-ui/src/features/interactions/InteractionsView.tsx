@@ -2,10 +2,13 @@ import { useCallback, useState } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
 import { InteractionSettingsPanel } from "./InteractionSettingsPanel";
 import { StreamRulesView } from "./StreamRulesView";
+import { OverlayDesignerCallout } from "../dashboard/OverlayDesignerCallout";
 
 type InteractionWorkspaceView = "rules" | "settings";
 
-export function InteractionsView() {
+export function InteractionsView({ onOpenOverlayDesigner }: {
+  onOpenOverlayDesigner: () => void;
+}) {
   const { t } = useLocalization();
   const [workspaceView, setWorkspaceView] = useState<InteractionWorkspaceView>("rules");
   const [focusAdvancedSettings, setFocusAdvancedSettings] = useState(false);
@@ -20,6 +23,8 @@ export function InteractionsView() {
           <p>{t("interactions.description")}</p>
         </div>
       </header>
+
+      <OverlayDesignerCallout componentId="interactions" onOpen={onOpenOverlayDesigner} />
 
       <div className="interaction-workspace">
         <div

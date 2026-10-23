@@ -1378,6 +1378,20 @@ namespace Gilomx.CupheadBossRoulette
                     "text/html; charset=utf-8", false);
                 return;
             }
+            if (path == "/interactions-overlay" ||
+                path == "/interactions-overlay/" ||
+                path == "/interactions-overlay.html")
+            {
+                if (request.Method != "GET")
+                {
+                    WriteMethodNotAllowed(stream, "GET");
+                    return;
+                }
+                ServeFile(stream, Path.Combine(assetsDirectory,
+                    "creator-tools\\interactions-overlay.html"),
+                    "text/html; charset=utf-8", false, true);
+                return;
+            }
             if (path == "/pesky-battle-overlay" ||
                 path == "/pesky-battle-overlay/" ||
                 path == "/pesky-battle-overlay.html")

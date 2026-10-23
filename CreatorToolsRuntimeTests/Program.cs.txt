@@ -39,6 +39,7 @@ namespace Gilomx.CupheadBossRoulette
             RunMiniBossBalanceTests();
             RunVisualSnapshotHierarchyTests();
             RunNativeLoadingBarrierTests();
+            RunInteractionsOverlayComposerTests();
             Run("Evaluate creates backlog without Enqueue",
                 TestEvaluateOnlyCreatesBacklog);
             Run("Explicit drain moves the exact quantity",
@@ -1689,8 +1690,11 @@ namespace Gilomx.CupheadBossRoulette
                 var legacy = JsonNode.Parse(File.ReadAllText(path));
                 foreach (var profile in legacy["profiles"].AsArray())
                 {
-                    profile["components"].AsArray().RemoveAt(3);
-                    profile["components"].AsArray().RemoveAt(2);
+                    var components = profile["components"].AsArray();
+                    foreach (var component in components.Where(item =>
+                        item["id"].GetValue<string>() != "tap_farming" &&
+                        item["id"].GetValue<string>() != "pesky_battle").ToArray())
+                        components.Remove(component);
                 }
                 File.WriteAllText(path, legacy.ToJsonString());
                 var migrated = scope.CreateOverlayComposer(null);
@@ -1713,7 +1717,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     Equal("chat_chooses", json.RootElement.GetProperty("componentId").GetString(), "selected simulation component");
                     Equal(7, json.RootElement.GetProperty("chatState").GetProperty("options")[0].GetProperty("votes").GetInt32(), "chat preview votes delivered to OBS");
-                    Equal(4, json.RootElement.GetProperty("layout").GetProperty("components").GetArrayLength(), "legacy preview adds chat and roulette layers");
+                    Equal(5, json.RootElement.GetProperty("layout").GetProperty("components").GetArrayLength(), "legacy preview adds chat, roulette and disabled interactions layers");
                 }
                 request = JsonSerializer.Serialize(new { operation = "update", profileId = "vertical", sessionId = "chat-design-test", componentId = "chat_chooses",
                     chatStateJson = ballot.Replace("bosses/pandillaraiz.png", "../private.png") });
@@ -1919,7 +1923,13 @@ namespace Gilomx.CupheadBossRoulette
                 var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
                 var legacy = JsonNode.Parse(File.ReadAllText(path));
                 foreach (var profile in legacy["profiles"].AsArray())
-                    profile["components"].AsArray().RemoveAt(3);
+                {
+                    var components = profile["components"].AsArray();
+                    foreach (var component in components.Where(item =>
+                        item["id"].GetValue<string>() == "roulette" ||
+                        item["id"].GetValue<string>() == "interactions").ToArray())
+                        components.Remove(component);
+                }
                 File.WriteAllText(path, legacy.ToJsonString());
                 controller = scope.CreateOverlayComposer(null);
                 True(controller.ImportRouletteSettings(true, 150, "right", 75, true, true, "keep"), "import legacy values");
@@ -2058,7 +2068,8 @@ namespace Gilomx.CupheadBossRoulette
             using (var client = new HttpClient())
             {
                 foreach (var path in new[] { "/roulette-overlay?embedded=1", "/roulette-overlay/",
-                    "/overlay/vertical", "/overlay/horizontal", "/chat-chooses-overlay" })
+                    "/overlay/vertical", "/overlay/horizontal", "/chat-chooses-overlay",
+                    "/interactions-overlay", "/interactions-overlay/", "/interactions-overlay.html" })
                 using (var response = client.GetAsync("http://127.0.0.1:" + server.Port + path)
                     .GetAwaiter().GetResult())
                 {
@@ -2818,6 +2829,9 @@ namespace Gilomx.CupheadBossRoulette
                 File.WriteAllText(Path.Combine(
                     assetsDirectory, "creator-tools", "roulette-overlay.html"),
                     "<!doctype html><title>Roulette overlay</title>");
+                File.WriteAllText(Path.Combine(
+                    assetsDirectory, "creator-tools", "interactions-overlay.html"),
+                    "<!doctype html><title>Interactions overlay</title>");
             }
 
             internal CreatorToolsStreamRulesController CreateRules(

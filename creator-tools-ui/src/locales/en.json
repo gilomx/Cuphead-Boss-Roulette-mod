@@ -665,11 +665,37 @@
         "retry": "Retry"
       }
     },
+    "interactions": {
+      "title": "Interaction presentation",
+      "template": "Template",
+      "cards": "1 · Cards",
+      "floating": "2 · Floating icons",
+      "layout": "Layout",
+      "strip": "Continuous moving strip",
+      "pages": "Compact pages · 3 × 3",
+      "platforms": "Platforms in this overlay",
+      "noPlatforms": "Select at least one platform to display its exchanges.",
+      "pageSeconds": "Seconds per page",
+      "pagesHint": "Up to nine static items per page, closely arranged. Both templates use the same layout.",
+      "speed": "Strip speed",
+      "adaptive": "Enlarge exchanges when there are fewer options",
+      "adaptiveHint": "One exchange is large; two are medium; three or more are compact.",
+      "showTitle": "Item names",
+      "showTitleHint": "Show a name beside each attack, help or challenge image.",
+      "previewTitle": "Interaction preview",
+      "examples": "Sample with example prices",
+      "examplesHint": "There are no rules yet. These examples appear only in the designer; they are never saved or sent to OBS.",
+      "configuredRules": "Configured rules",
+      "rulesHint": "The preview uses your enabled rules and the platforms selected for this overlay.",
+      "noRules": "Your rules are disabled. Enable a rule to display it in the overlay.",
+      "obsHint": "OBS testing shows your real saved rules and enables this layer temporarily."
+    },
     "components": {
       "roulette": "Roulette",
       "tap_farming": "Tap Farming",
       "pesky_battle": "Pesky Battle",
-      "chat_chooses": "Chat chooses"
+      "chat_chooses": "Chat chooses",
+      "interactions": "Interactions and exchanges"
     },
     "canvas": {
       "title": "Overlay canvas",

@@ -19,6 +19,10 @@
   const ownOrigin = window.location.origin;
 
   const registry = Object.freeze({
+    interactions: Object.freeze({
+      id: "interactions", overlay: "interactions",
+      endpoint: "/api/config/interactions/rules", src: "/interactions-overlay",
+    }),
     roulette: Object.freeze({ id: "roulette", overlay: "roulette",
       endpoint: "/api/roulette-overlay/state", src: "/roulette-overlay" }),
     tap_farming: Object.freeze({
@@ -43,6 +47,7 @@
   let savedProfile = defaultProfile(profileId);
   let activeProfile = savedProfile;
   let realStates = {
+    interactions: { ready: false, rules: [] },
     roulette: { type: "state", active: false },
     tap_farming: initialTapState(),
     pesky_battle: initialPeskyState(),
@@ -87,7 +92,7 @@
 
   function normalizeComponentId(value) {
     const id = String(value || "").trim().toLowerCase().replaceAll("-", "_");
-    if (id === "tap_farming" || id === "pesky_battle" || id === "chat_chooses" || id === "roulette") return id;
+    if (id === "tap_farming" || id === "pesky_battle" || id === "chat_chooses" || id === "roulette" || id === "interactions") return id;
     return "";
   }
 
@@ -107,12 +112,14 @@
     const vertical = id === "vertical";
     const placements = vertical
       ? {
+          interactions: { x: 60, y: 1200, width: 960, height: 620, layer: 50 },
           roulette: { x: 60, y: 540, width: 960, height: 420, layer: 40 },
           tap_farming: { x: 360, y: 1220, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 60, y: 1260, width: 960, height: 560, layer: 10 },
           chat_chooses: { x: 60, y: 1040, width: 960, height: 760, layer: 30 },
         }
       : {
+          interactions: { x: 60, y: 800, width: 1800, height: 230, layer: 50 },
           roulette: { x: 480, y: 330, width: 960, height: 420, layer: 40 },
           tap_farming: { x: 1395, y: 565, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 80, y: 720, width: 1760, height: 300, layer: 10 },
@@ -126,7 +133,7 @@
       components: Object.keys(registry).map((componentId, index) => ({
         id: componentId,
         ...placements[componentId],
-        enabled: componentId !== "roulette",
+        enabled: componentId !== "roulette" && componentId !== "interactions",
         locked: false,
         layer: placements[componentId].layer ?? 20 + index,
         opacity: 100,
@@ -139,6 +146,16 @@
         textColor: "#ffffff",
         outlineColor: componentId === "chat_chooses" ? "#d3af93" : "#f5f5f7",
         voteOutlineColor: "#ffffff",
+        ...(componentId === "interactions" ? {
+          interactionsTemplate: "floating",
+          interactionsLayout: vertical ? "pages" : "strip",
+          interactionsTikTok: true,
+          interactionsTwitch: !vertical,
+          interactionsYouTube: !vertical,
+          interactionsPageSeconds: 8,
+          interactionsSpeed: 40,
+          interactionsAdaptive: true,
+        } : {}),
       })),
     };
   }
@@ -214,6 +231,14 @@
       rouletteTextFirst: component.rouletteTextFirst === true,
       rouletteLogo: component.rouletteLogo === true,
       rouletteRetry: component.rouletteRetry || "reappear",
+      interactionsTemplate: component.interactionsTemplate === "cards" ? "cards" : "floating",
+      interactionsLayout: component.interactionsLayout === "strip" ? "strip" : "pages",
+      interactionsTikTok: component.interactionsTikTok !== false,
+      interactionsTwitch: component.interactionsTwitch !== false,
+      interactionsYouTube: component.interactionsYouTube !== false,
+      interactionsPageSeconds: clamp(finiteNumber(component.interactionsPageSeconds, 8), 3, 60),
+      interactionsSpeed: clamp(finiteNumber(component.interactionsSpeed, 40), 10, 120),
+      interactionsAdaptive: component.interactionsAdaptive !== false,
     };
   }
 
@@ -279,12 +304,12 @@
         String(clamp(finiteNumber(config.opacity, 100), 0, 100) / 100),
       );
       entry.host.style.zIndex = String(Math.round(finiteNumber(config.layer, 1)));
-      const roulettePreviewActive = id === "roulette" && (
+      const selectedPreviewActive = (id === "roulette" || id === "interactions") && (
         (designer && designerComponentId === id) ||
         (!designer && previewState.active === true && previewState.simulationActive === true &&
           normalizeComponentId(previewState.componentId) === id)
       );
-      entry.host.dataset.enabled = String(config.enabled !== false || roulettePreviewActive);
+      entry.host.dataset.enabled = String(config.enabled !== false || selectedPreviewActive);
       entry.host.dataset.configEnabled = String(config.enabled !== false);
       entry.host.dataset.locked = String(config.locked === true);
       entry.host.dataset.variant = presentationFor(config).variant;
@@ -486,6 +511,8 @@
   }
 
   function stateFor(id) {
+    // Interaction offers always come from saved rules, including OBS layout previews.
+    if (id === "interactions") return realStates.interactions || { ready: false, rules: [] };
     if (previewState?.active && previewState.simulationActive === true &&
         normalizeComponentId(previewState.componentId) === id) {
       if (id === "roulette") return rouletteSnapshot(previewState.scenario, previewState.eventEpoch);
@@ -543,6 +570,7 @@
     return {
       ...(state && typeof state === "object" ? state : {}),
       locale: activeLocale,
+      ...(id === "interactions" ? { preview: designer } : {}),
       presentation: presentationFor(config),
     };
   }
@@ -598,6 +626,7 @@
         fetchJson(registry.tap_farming.endpoint),
         fetchJson(registry.pesky_battle.endpoint),
         fetchJson(registry.chat_chooses.endpoint),
+        fetchJson(registry.interactions.endpoint),
       ]);
       if (results[0].status === "fulfilled") {
         savedProfile = normalizedProfile(results[0].value);
@@ -606,6 +635,8 @@
       if (results[2].status === "fulfilled") realStates.pesky_battle = results[2].value;
       if (results[3].status === "fulfilled") realStates.chat_chooses = results[3].value;
       else realStates.chat_chooses = initialChatState();
+      realStates.interactions = results[4].status === "fulfilled"
+        ? results[4].value : { ready: false, rules: [] };
       syncActiveProfile();
       render();
     } finally {
@@ -669,6 +700,8 @@
     designerComponentId = normalizeComponentId(message.selectedComponentId);
     const states = message.states && typeof message.states === "object" ? message.states : {};
     realStates = {
+      interactions: states.interactions && typeof states.interactions === "object"
+        ? states.interactions : { ready: true, rules: [], preview: true },
       roulette: states.roulette || rouletteSnapshot(),
       tap_farming: states.tap_farming && typeof states.tap_farming === "object"
         ? states.tap_farming

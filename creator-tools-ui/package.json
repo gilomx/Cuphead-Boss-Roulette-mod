@@ -11,6 +11,7 @@
     "test:chat-chooses-overlay": "node --test scripts/test-chat-chooses-overlay.mjs",
     "test:roulette-overlay": "node --test scripts/test-roulette-overlay.mjs",
     "test:overlay-text-style": "node --test scripts/test-overlay-text-style.mjs",
+    "test:interactions-overlay": "node --test scripts/test-interactions-overlay.mjs",
     "validate:gifts": "node scripts/validate-gift-catalog.mjs",
     "validate:interactions": "node scripts/validate-interaction-catalog.mjs",
     "build": "npm run validate:interactions && npm run validate:gifts && node scripts/generate-overlay-interactions.mjs && tsc -b && vite build --config vite.embedded.config.ts",

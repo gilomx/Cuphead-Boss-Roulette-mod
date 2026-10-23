@@ -63,6 +63,7 @@ export default defineConfig(({ mode }) => {
       "/pesky-battle-overlay": proxyTarget,
       "/roulette-overlay": proxyTarget,
       "/chat-chooses-overlay": proxyTarget,
+      "/interactions-overlay": proxyTarget,
     },
   },
   };

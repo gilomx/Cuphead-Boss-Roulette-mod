@@ -1,0 +1,260 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunInteractionsOverlayComposerTests()
+        {
+            Run("Interactions overlay defaults remain opt-in and normalize bounds safely", TestInteractionsOverlayDefaults);
+            Run("Interactions overlay persists, copies and resets independently per profile", TestInteractionsOverlayPersistence);
+            Run("Interactions overlay rejects invalid commands and preview settings atomically", TestInteractionsOverlayValidation);
+            Run("Interactions overlay extends legacy scenes and preserves their recovery backup", TestInteractionsOverlayMigration);
+        }
+
+        private static void TestInteractionsOverlayDefaults()
+        {
+            var settings = CreatorToolsOverlayComposerSettings.CreateDefaults("unused-overlay-settings.json", null);
+            foreach (var profile in settings.Profiles)
+            {
+                var vertical = profile.Id == "vertical";
+                var component = profile.FindComponent("interactions");
+                False(component.Enabled, "new catalog does not change existing OBS output");
+                Equal("floating", component.InteractionsTemplate, "floating template default");
+                Equal(vertical ? "pages" : "strip", component.InteractionsLayout, "layout follows profile");
+                True(component.InteractionsTikTok, "TikTok is visible by default");
+                Equal(!vertical, component.InteractionsTwitch, "Twitch follows profile default");
+                Equal(!vertical, component.InteractionsYouTube, "YouTube follows profile default");
+                True(component.InteractionsAdaptive, "adaptive sizes default");
+                Equal(8, component.InteractionsPageSeconds, "page timing default");
+                Equal(40, component.InteractionsSpeed, "strip speed default");
+                Equal(60, component.X, "default left position");
+                Equal(vertical ? 1200 : 800, component.Y, "default top position");
+                Equal(vertical ? 960 : 1800, component.Width, "default width");
+                Equal(vertical ? 620 : 230, component.Height, "default height");
+                Equal(50, component.Layer, "default layer");
+
+                component.InteractionsTemplate = "invalid";
+                component.InteractionsLayout = "invalid";
+                component.InteractionsPageSeconds = -20;
+                component.InteractionsSpeed = 999;
+                component.X = -20; component.Y = 9999;
+                CreatorToolsOverlayComposerSettings.NormalizeComponent(profile, component);
+                Equal("floating", component.InteractionsTemplate, "invalid template falls back safely");
+                Equal(vertical ? "pages" : "strip", component.InteractionsLayout, "invalid layout uses profile default");
+                Equal(3, component.InteractionsPageSeconds, "normalization clamps minimum page duration");
+                Equal(120, component.InteractionsSpeed, "normalization clamps maximum speed");
+                Equal(0, component.X, "normalization clamps left edge");
+                Equal(profile.CanvasHeight - component.Height, component.Y, "normalization clamps bottom edge");
+            }
+            var cloned = settings.Clone();
+            cloned.FindProfile("vertical").FindComponent("interactions").InteractionsTikTok = false;
+            True(settings.FindProfile("vertical").FindComponent("interactions").InteractionsTikTok,
+                "candidate clone cannot mutate active profile");
+        }
+
+        private static void TestInteractionsOverlayPersistence()
+        {
+            using (var scope = new TestScope("interactions-overlay-persistence"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                var response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 0, profileId = "horizontal", componentId = "interactions",
+                    enabled = true, interactionsTemplate = "cards", interactionsLayout = "pages",
+                    interactionsTikTok = false, interactionsTwitch = true, interactionsYouTube = false,
+                    interactionsPageSeconds = 17, interactionsSpeed = 73, interactionsAdaptive = false,
+                    x = 77, y = 850, width = 1700, height = 200, opacity = 87, locked = true
+                }));
+                Equal(200, response.StatusCode, "save complete interactions settings");
+                controller = scope.CreateOverlayComposer(null);
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var horizontal = FindComposerComponent(state.RootElement, "horizontal", "interactions");
+                    AssertCustomizedInteractionsSettings(horizontal);
+                    Equal(77, horizontal.GetProperty("x").GetInt32(), "position survives restart");
+                    True(horizontal.GetProperty("locked").GetBoolean(), "lock survives restart");
+                    Equal(87, horizontal.GetProperty("opacity").GetInt32(), "opacity survives restart");
+                    var vertical = FindComposerComponent(state.RootElement, "vertical", "interactions");
+                    False(vertical.GetProperty("enabled").GetBoolean(), "vertical stays disabled");
+                    True(vertical.GetProperty("interactionsTikTok").GetBoolean(), "vertical networks stay independent");
+                    Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "vertical timing stays independent");
+                }
+                response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "copy", expectedRevision = 1, sourceProfileId = "horizontal",
+                    profileId = "vertical", componentId = "interactions"
+                }));
+                Equal(200, response.StatusCode, "copy component settings across profiles");
+                controller = scope.CreateOverlayComposer(null);
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "vertical", "interactions"));
+                    AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "horizontal", "interactions"));
+                    False(FindComposerComponent(state.RootElement, "vertical", "roulette").GetProperty("enabled").GetBoolean(),
+                        "copying interactions does not enable other overlays");
+                }
+                response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "reset", expectedRevision = 2, profileId = "vertical", componentId = "interactions"
+                }));
+                Equal(200, response.StatusCode, "reset interactions only");
+                using (var state = JsonDocument.Parse(response.Json))
+                {
+                    var vertical = FindComposerComponent(state.RootElement, "vertical", "interactions");
+                    False(vertical.GetProperty("enabled").GetBoolean(), "reset returns to opt-in");
+                    Equal("floating", vertical.GetProperty("interactionsTemplate").GetString(), "reset restores template");
+                    Equal("pages", vertical.GetProperty("interactionsLayout").GetString(), "reset restores profile layout");
+                    True(vertical.GetProperty("interactionsTikTok").GetBoolean(), "reset restores TikTok");
+                    False(vertical.GetProperty("interactionsTwitch").GetBoolean(), "reset hides Twitch for vertical");
+                    True(vertical.GetProperty("interactionsAdaptive").GetBoolean(), "reset restores adaptive sizes");
+                    Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "reset restores page timing");
+                    Equal(40, vertical.GetProperty("interactionsSpeed").GetInt32(), "reset restores strip speed");
+                    AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "horizontal", "interactions"));
+                }
+                response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "copy", expectedRevision = 3, sourceProfileId = "horizontal", profileId = "vertical"
+                }));
+                Equal(200, response.StatusCode, "whole profile copy includes interactions settings");
+                using (var state = JsonDocument.Parse(response.Json))
+                    AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "vertical", "interactions"));
+            }
+        }
+
+        private static void AssertCustomizedInteractionsSettings(JsonElement component)
+        {
+            True(component.GetProperty("enabled").GetBoolean(), "activation persists");
+            Equal("cards", component.GetProperty("interactionsTemplate").GetString(), "template persists");
+            Equal("pages", component.GetProperty("interactionsLayout").GetString(), "layout persists");
+            False(component.GetProperty("interactionsTikTok").GetBoolean(), "TikTok selection persists");
+            True(component.GetProperty("interactionsTwitch").GetBoolean(), "Twitch selection persists");
+            False(component.GetProperty("interactionsYouTube").GetBoolean(), "YouTube selection persists");
+            Equal(17, component.GetProperty("interactionsPageSeconds").GetInt32(), "page seconds persist");
+            Equal(73, component.GetProperty("interactionsSpeed").GetInt32(), "strip speed persists");
+            False(component.GetProperty("interactionsAdaptive").GetBoolean(), "adaptive selection persists");
+        }
+
+        private static void TestInteractionsOverlayValidation()
+        {
+            using (var scope = new TestScope("interactions-overlay-validation"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 0, profileId = "vertical", componentId = "interactions",
+                    x = 91, interactionsTikTok = false, interactionsTwitch = false, interactionsYouTube = false,
+                    interactionsPageSeconds = 3, interactionsSpeed = 120
+                })).StatusCode, "bounds and an empty network filter are valid");
+                var before = controller.GetConfigState();
+                var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var saved = File.ReadAllText(path);
+                var invalidValues = new Dictionary<string, object>[] {
+                    new Dictionary<string, object> { { "interactionsTemplate", "unknown" } },
+                    new Dictionary<string, object> { { "interactionsLayout", "grid" } },
+                    new Dictionary<string, object> { { "interactionsTikTok", "yes" } },
+                    new Dictionary<string, object> { { "interactionsTwitch", 1 } },
+                    new Dictionary<string, object> { { "interactionsYouTube", null } },
+                    new Dictionary<string, object> { { "interactionsAdaptive", "enabled" } },
+                    new Dictionary<string, object> { { "interactionsPageSeconds", 2 } },
+                    new Dictionary<string, object> { { "interactionsPageSeconds", 61 } },
+                    new Dictionary<string, object> { { "interactionsPageSeconds", 8.5 } },
+                    new Dictionary<string, object> { { "interactionsSpeed", 9 } },
+                    new Dictionary<string, object> { { "interactionsSpeed", 121 } }
+                };
+                foreach (var invalid in invalidValues)
+                {
+                    var command = new Dictionary<string, object>(invalid) {
+                        { "operation", "update" }, { "expectedRevision", 1 }, { "profileId", "vertical" },
+                        { "componentId", "interactions" }, { "x", 777 }, { "enabled", true }
+                    };
+                    Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(command)).StatusCode,
+                        "invalid interactions field rejected");
+                    Equal(before, controller.GetConfigState(), "invalid request preserves active scene and revision");
+                    Equal(saved, File.ReadAllText(path), "invalid request never writes persistent scene");
+
+                    var invalidFile = JsonNode.Parse(saved);
+                    var profileNode = invalidFile["profiles"][0];
+                    var componentNode = profileNode["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                    foreach (var pair in invalid)
+                        componentNode[pair.Key] = JsonSerializer.SerializeToNode(pair.Value);
+                    CreatorToolsOverlayComposerProfile parsed;
+                    False(CreatorToolsOverlayComposerSettings.TryParseProfileJson(profileNode.ToJsonString(), "vertical", out parsed),
+                        "preview rejects invalid interactions field");
+                    File.WriteAllText(path + ".bak", saved);
+                    File.WriteAllText(path, invalidFile.ToJsonString());
+                    Equal(before, scope.CreateOverlayComposer(null).GetConfigState(), "invalid stored field recovers the valid backup");
+                    Equal(saved, File.ReadAllText(path), "backup recovery restores the primary unchanged");
+                    Equal(saved, File.ReadAllText(path + ".bak"), "backup recovery preserves the recovery copy");
+                }
+                Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "tap_farming",
+                    x = 800, interactionsSpeed = 40
+                })).StatusCode, "interactions fields cannot mutate another overlay");
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "interactions",
+                    interactionsPageSeconds = 60, interactionsSpeed = 10
+                })).StatusCode, "other range boundaries are accepted");
+            }
+        }
+
+        private static void TestInteractionsOverlayMigration()
+        {
+            using (var scope = new TestScope("interactions-overlay-migration"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                True(controller.ImportRouletteSettings(false, 150, "right", 79, true, true, "keep"), "mark roulette settings imported");
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "pesky_battle",
+                    x = 97, opacity = 63, locked = true, textColor = "#12345680"
+                })).StatusCode, "save a customized existing scene");
+                var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                {
+                    var components = profile["components"].AsArray();
+                    components.Remove(components.First(item => item["id"].GetValue<string>() == "interactions"));
+                }
+                var legacyJson = legacy.ToJsonString();
+                File.WriteAllText(path, legacyJson);
+                controller = scope.CreateOverlayComposer(null);
+                Equal(legacyJson, File.ReadAllText(path + ".bak"), "migration retains original scene as a recovery backup");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    Equal(2, state.RootElement.GetProperty("revision").GetInt32(), "migration does not invalidate saved revision");
+                    foreach (var oldProfile in legacy["profiles"].AsArray())
+                    {
+                        var profileId = oldProfile["id"].GetValue<string>();
+                        foreach (var oldComponent in oldProfile["components"].AsArray())
+                        {
+                            var current = FindComposerComponent(state.RootElement, profileId, oldComponent["id"].GetValue<string>());
+                            Equal(oldComponent.ToJsonString(), JsonNode.Parse(current.GetRawText()).ToJsonString(),
+                                "migration retains every saved component field");
+                        }
+                        False(FindComposerComponent(state.RootElement, profileId, "interactions").GetProperty("enabled").GetBoolean(),
+                            "migration keeps interactions invisible in OBS");
+                    }
+                }
+                foreach (var profile in JsonNode.Parse(File.ReadAllText(path))["profiles"].AsArray())
+                {
+                    var parsedJson = profile.ToJsonString();
+                    var component = profile["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                    foreach (var key in component.AsObject().Select(pair => pair.Key).Where(key => key.StartsWith("interactions", StringComparison.Ordinal)).ToArray())
+                        component.AsObject().Remove(key);
+                    CreatorToolsOverlayComposerProfile parsed;
+                    True(CreatorToolsOverlayComposerSettings.TryParseProfileJson(profile.ToJsonString(), profile["id"].GetValue<string>(), out parsed),
+                        "older partial component safely receives optional defaults");
+                    False(parsed.FindComponent("interactions").Enabled, "partial legacy component remains disabled");
+                    Equal(profile["id"].GetValue<string>() == "vertical" ? "pages" : "strip",
+                        parsed.FindComponent("interactions").InteractionsLayout, "missing fields retain per-profile layout defaults");
+                    True(CreatorToolsOverlayComposerSettings.TryParseProfileJson(parsedJson, parsed.Id, out parsed),
+                        "current component round trips through preview parser");
+                }
+                var persisted = File.ReadAllText(path);
+                using (var ignored = JsonDocument.Parse(scope.CreateOverlayComposer(null).GetConfigState())) { }
+                Equal(persisted, File.ReadAllText(path), "subsequent load does not rewrite migrated file");
+                Equal(legacyJson, File.ReadAllText(path + ".bak"), "subsequent load retains original recovery backup");
+            }
+        }
+    }
+}

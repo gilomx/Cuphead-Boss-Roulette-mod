@@ -39,6 +39,14 @@ namespace Gilomx.CupheadBossRoulette
         internal bool RouletteLogo;
         internal string RouletteRetry = "reappear";
         internal bool RouletteImported;
+        internal string InteractionsTemplate = "floating";
+        internal string InteractionsLayout = "strip";
+        internal bool InteractionsTikTok = true;
+        internal bool InteractionsTwitch;
+        internal bool InteractionsYouTube;
+        internal int InteractionsPageSeconds = 8;
+        internal int InteractionsSpeed = 40;
+        internal bool InteractionsAdaptive = true;
 
         internal CreatorToolsOverlayComposerComponent Clone()
         {
@@ -88,6 +96,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string PeskyBattleComponentId = "pesky_battle";
         internal const string ChatChoosesComponentId = "chat_chooses";
         internal const string RouletteComponentId = "roulette";
+        internal const string InteractionsComponentId = "interactions";
         internal const string DefaultLiquidColor = "#ff4f92";
         internal const string DefaultCollectingColor = "#f4c95d";
         internal const string DefaultTextColor = "#ffffff";
@@ -397,7 +406,20 @@ namespace Gilomx.CupheadBossRoulette
             return value == TapFarmingComponentId ||
                 value == PeskyBattleComponentId ||
                 value == ChatChoosesComponentId ||
-                value == RouletteComponentId ? value : string.Empty;
+                value == RouletteComponentId ||
+                value == InteractionsComponentId ? value : string.Empty;
+        }
+
+        internal static string NormalizeInteractionsTemplate(string value)
+        {
+            value = (value ?? string.Empty).Trim().ToLowerInvariant();
+            return value == "cards" || value == "floating" ? value : string.Empty;
+        }
+
+        internal static string NormalizeInteractionsLayout(string value)
+        {
+            value = (value ?? string.Empty).Trim().ToLowerInvariant();
+            return value == "strip" || value == "pages" ? value : string.Empty;
         }
 
         internal static string NormalizeVariant(string value)
@@ -479,6 +501,16 @@ namespace Gilomx.CupheadBossRoulette
             component.TextShadowX = Math.Max(-20, Math.Min(20, component.TextShadowX));
             component.TextShadowY = Math.Max(-20, Math.Min(20, component.TextShadowY));
             component.TextShadowBlur = Math.Max(0, Math.Min(20, component.TextShadowBlur));
+            if (component.Id == InteractionsComponentId)
+            {
+                var template = NormalizeInteractionsTemplate(component.InteractionsTemplate);
+                component.InteractionsTemplate = template.Length == 0 ? "floating" : template;
+                var layout = NormalizeInteractionsLayout(component.InteractionsLayout);
+                component.InteractionsLayout = layout.Length == 0
+                    ? (profile.Id == VerticalProfileId ? "pages" : "strip") : layout;
+                component.InteractionsPageSeconds = Math.Max(3, Math.Min(60, component.InteractionsPageSeconds));
+                component.InteractionsSpeed = Math.Max(10, Math.Min(120, component.InteractionsSpeed));
+            }
         }
 
         internal string BuildFileJson()
@@ -568,6 +600,15 @@ namespace Gilomx.CupheadBossRoulette
                         .Append("\",\"rouletteTextFirst\":").Append(component.RouletteTextFirst ? "true" : "false")
                         .Append(",\"rouletteLogo\":").Append(component.RouletteLogo ? "true" : "false")
                         .Append(",\"rouletteRetry\":\"").Append(component.RouletteRetry).Append('"');
+                if (component.Id == InteractionsComponentId)
+                    builder.Append(",\"interactionsTemplate\":\"").Append(component.InteractionsTemplate)
+                        .Append("\",\"interactionsLayout\":\"").Append(component.InteractionsLayout)
+                        .Append("\",\"interactionsTikTok\":").Append(component.InteractionsTikTok ? "true" : "false")
+                        .Append(",\"interactionsTwitch\":").Append(component.InteractionsTwitch ? "true" : "false")
+                        .Append(",\"interactionsYouTube\":").Append(component.InteractionsYouTube ? "true" : "false")
+                        .Append(",\"interactionsPageSeconds\":").Append(component.InteractionsPageSeconds)
+                        .Append(",\"interactionsSpeed\":").Append(component.InteractionsSpeed)
+                        .Append(",\"interactionsAdaptive\":").Append(component.InteractionsAdaptive ? "true" : "false");
                 builder.Append('}');
             }
             builder.Append("]}");
@@ -653,6 +694,18 @@ namespace Gilomx.CupheadBossRoulette
                 LiquidColor = DefaultLiquidColor, CollectingColor = DefaultCollectingColor,
                 TextColor = DefaultTextColor, OutlineColor = DefaultOutlineColor
             });
+            profile.Components.Add(new CreatorToolsOverlayComposerComponent
+            {
+                Id = InteractionsComponentId,
+                X = 60, Y = vertical ? 1200 : 800,
+                Width = vertical ? 960 : 1800, Height = vertical ? 620 : 230,
+                Layer = 50, Enabled = false, Opacity = 100,
+                Variant = "default", Motion = true,
+                LiquidColor = DefaultLiquidColor, CollectingColor = DefaultCollectingColor,
+                TextColor = DefaultTextColor, OutlineColor = DefaultOutlineColor,
+                InteractionsLayout = vertical ? "pages" : "strip",
+                InteractionsTwitch = !vertical, InteractionsYouTube = !vertical
+            });
             return profile;
         }
 
@@ -696,6 +749,14 @@ namespace Gilomx.CupheadBossRoulette
             destination.RouletteLogo = source.RouletteLogo;
             destination.RouletteRetry = source.RouletteRetry;
             destination.RouletteImported = source.RouletteImported;
+            destination.InteractionsTemplate = source.InteractionsTemplate;
+            destination.InteractionsLayout = source.InteractionsLayout;
+            destination.InteractionsTikTok = source.InteractionsTikTok;
+            destination.InteractionsTwitch = source.InteractionsTwitch;
+            destination.InteractionsYouTube = source.InteractionsYouTube;
+            destination.InteractionsPageSeconds = source.InteractionsPageSeconds;
+            destination.InteractionsSpeed = source.InteractionsSpeed;
+            destination.InteractionsAdaptive = source.InteractionsAdaptive;
         }
 
         private static double ComponentFitScale(
@@ -787,6 +848,10 @@ namespace Gilomx.CupheadBossRoulette
                     // Add the new event without replacing either saved layout.
                     if (!seenComponents.Contains(ChatChoosesComponentId))
                         migratedBounds = true;
+                    // Existing scenes keep every saved component; the new catalog
+                    // starts disabled so adding it never changes their OBS output.
+                    if (!seenComponents.Contains(InteractionsComponentId))
+                        migratedBounds = true;
                 }
                 if (seenProfiles.Count != candidate.Profiles.Count)
                     return false;
@@ -866,6 +931,9 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJsonValue node,
             CreatorToolsOverlayComposerComponent component)
         {
+            if (component.Id == InteractionsComponentId &&
+                !TryLoadInteractionsSettings(node, component))
+                return false;
             if (component.Id == RouletteComponentId && node.Property("rouletteSize") != null)
             {
                 int size;
@@ -989,6 +1057,45 @@ namespace Gilomx.CupheadBossRoulette
                 if (key == "textShadowX") component.TextShadowX = number;
                 else if (key == "textShadowY") component.TextShadowY = number;
                 else component.TextShadowBlur = number;
+            }
+            return true;
+        }
+
+        private static bool TryLoadInteractionsSettings(
+            CreatorToolsJsonValue node,
+            CreatorToolsOverlayComposerComponent component)
+        {
+            if (node.Property("interactionsTemplate") != null)
+            {
+                var template = NormalizeInteractionsTemplate(node.String("interactionsTemplate"));
+                if (template.Length == 0) return false;
+                component.InteractionsTemplate = template;
+            }
+            if (node.Property("interactionsLayout") != null)
+            {
+                var layout = NormalizeInteractionsLayout(node.String("interactionsLayout"));
+                if (layout.Length == 0) return false;
+                component.InteractionsLayout = layout;
+            }
+            foreach (var key in new[] { "interactionsTikTok", "interactionsTwitch", "interactionsYouTube", "interactionsAdaptive" })
+            {
+                if (node.Property(key) == null) continue;
+                bool value;
+                if (!node.TryBoolean(key, out value)) return false;
+                if (key == "interactionsTikTok") component.InteractionsTikTok = value;
+                else if (key == "interactionsTwitch") component.InteractionsTwitch = value;
+                else if (key == "interactionsYouTube") component.InteractionsYouTube = value;
+                else component.InteractionsAdaptive = value;
+            }
+            foreach (var key in new[] { "interactionsPageSeconds", "interactionsSpeed" })
+            {
+                if (node.Property(key) == null) continue;
+                int value;
+                if (!node.TryInteger(key, out value) ||
+                    value < (key == "interactionsPageSeconds" ? 3 : 10) ||
+                    value > (key == "interactionsPageSeconds" ? 60 : 120)) return false;
+                if (key == "interactionsPageSeconds") component.InteractionsPageSeconds = value;
+                else component.InteractionsSpeed = value;
             }
             return true;
         }

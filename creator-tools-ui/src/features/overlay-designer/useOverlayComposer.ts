@@ -34,6 +34,9 @@ const EDITABLE_KEYS = [
   "voteOutlineColor",
   "textFont", "textWeight", "textShadowColor",
   "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
+  "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
+  "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds",
+  "interactionsSpeed", "interactionsAdaptive",
 ] as const;
 
 function sameComponent(
@@ -77,6 +80,16 @@ function updateCommand(
       rouletteTextFirst: component.rouletteTextFirst ?? false,
       rouletteLogo: component.rouletteLogo ?? false,
       rouletteRetry: component.rouletteRetry ?? "reappear",
+    } : {}),
+    ...(component.id === "interactions" ? {
+      interactionsTemplate: component.interactionsTemplate ?? "floating",
+      interactionsLayout: component.interactionsLayout ?? (profileId === "vertical" ? "pages" : "strip"),
+      interactionsTikTok: component.interactionsTikTok ?? true,
+      interactionsTwitch: component.interactionsTwitch ?? profileId === "horizontal",
+      interactionsYouTube: component.interactionsYouTube ?? profileId === "horizontal",
+      interactionsPageSeconds: component.interactionsPageSeconds ?? 8,
+      interactionsSpeed: component.interactionsSpeed ?? 40,
+      interactionsAdaptive: component.interactionsAdaptive ?? true,
     } : {}),
   };
 }

@@ -13,6 +13,8 @@ const catalog = Object.fromEntries([...source.matchAll(/\{\s*id:\s*"([^"]+)"([\s
   return [id, {
     imagePath: fields.match(/image:\s*"([^"]+)"/)[1],
     visualScale,
+    category: fields.match(/category:\s*"([^"]+)"/)?.[1] ?? "attack",
+    group: fields.match(/group:\s*"([^"]+)"/)?.[1] ?? "light",
     names: Object.fromEntries(Object.entries(translations).map(([locale, messages]) =>
       [locale, key.split(".").reduce((value, part) => value[part], messages)])),
   }];
