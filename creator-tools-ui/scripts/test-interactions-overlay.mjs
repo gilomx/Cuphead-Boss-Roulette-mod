@@ -59,7 +59,30 @@ test('visible payment count controls size and disabling adaptive keeps a fixed s
   assert.ok(model.paymentSize(2) > model.paymentSize(3));
   assert.equal(model.paymentSize(1, false), model.paymentSize(3, false));
   assert.equal(model.presentation({ interactionsPageSeconds: 100, interactionsSpeed: -3 }).interactionsPageSeconds, 60);
-  assert.equal(model.presentation({ interactionsPageSeconds: 100, interactionsSpeed: -3 }).interactionsSpeed, 10);
+  assert.equal(model.presentation({ interactionsPageSeconds: 100, interactionsSpeed: -3 }).interactionsSpeed, 40);
+});
+
+test('strip speed has the saved 40 to 140 range and preserves intermediate values', () => {
+  assert.equal(model.presentation().interactionsSpeed, 40);
+  assert.equal(model.presentation({ interactionsSpeed: -4 }).interactionsSpeed, 40);
+  assert.equal(model.presentation({ interactionsSpeed: 999 }).interactionsSpeed, 140);
+  assert.equal(model.presentation({ interactionsSpeed: 95 }).interactionsSpeed, 95);
+  assert.equal(model.presentation({ interactionsSpeed: 'not-a-number' }).interactionsSpeed, 40);
+});
+
+test('card appearance accepts only full hex colors and bounded integer paper intensity', () => {
+  const defaults = model.presentation();
+  assert.equal(defaults.interactionsCardColor, '#23262bee');
+  assert.equal(defaults.interactionsCardNoise, 18);
+  assert.equal(model.presentation({ interactionsCardColor: '#faf3d8' }).interactionsCardColor, '#faf3d8');
+  assert.equal(model.presentation({ interactionsCardColor: '#10203080' }).interactionsCardColor, '#10203080');
+  for (const color of ['#abc', 'red', 'url(https://evil.test/a)', '#123456;opacity:0']) {
+    assert.equal(model.presentation({ interactionsCardColor: color }).interactionsCardColor, '#23262bee');
+  }
+  assert.equal(model.presentation({ interactionsCardNoise: -10 }).interactionsCardNoise, 0);
+  assert.equal(model.presentation({ interactionsCardNoise: 300 }).interactionsCardNoise, 100);
+  assert.equal(model.presentation({ interactionsCardNoise: 31.8 }).interactionsCardNoise, 32);
+  assert.equal(model.presentation({ interactionsCardNoise: 'wrong' }).interactionsCardNoise, 18);
 });
 
 test('legacy name settings cannot enable labels and inspector typography is preserved', () => {
@@ -240,6 +263,45 @@ test('currency artwork uses catalog gifts, official Twitch Bits and YouTube Jewe
   assert.ok(images.includes(catalog.gifts[0].imagePath));
   assert.ok(images.includes('/assets/creator-tools/twitch/bits.png'));
   assert.ok(images.includes('/assets/creator-tools/youtube/jewels.png'));
+});
+
+test('every template and layout shows only exchange artwork plus its value while keeping platform accessibility', async () => {
+  const runtime = await boot();
+  const rules = [rule(), rule({ platform: 'twitch', eventType: 'currency', every: 125 }),
+    rule({ platform: 'youtube', eventType: 'jewels', every: 400 })];
+  for (const template of ['cards', 'floating']) for (const layout of ['pages', 'strip']) {
+    const before = runtime.created.length;
+    runtime.send({ rules, presentation: { interactionsTemplate: template, interactionsLayout: layout } });
+    const created = runtime.created.slice(before);
+    const payments = created.filter(node => node.className === 'interaction-payment');
+    assert.equal(payments.length, 3);
+    for (const [index, label] of ['TikTok:', 'Twitch:', 'YouTube:'].entries()) {
+      assert.ok(payments[index].attributes['aria-label'].startsWith(label));
+      assert.deepEqual(payments[index].children.map(node => node.className), ['interaction-currency', 'interaction-cost']);
+      assert.equal(payments[index].children[0].children.length, 1, 'currency contains no extra platform insignia');
+      assert.equal(payments[index].children[0].children[0].tagName, 'img');
+    }
+    assert.ok(!created.some(node => ['interaction-platform-mark', 'interaction-brand'].includes(node.className)));
+  }
+});
+
+test('live card appearance updates its background controls without changing grouped offers or artwork', async () => {
+  const runtime = await boot();
+  const rules = [rule(), rule({ platform: 'twitch', eventType: 'currency', every: 125 })];
+  let grainPosition;
+  for (const [color, noise] of [['#23262bee', 18], ['#f4e5bd', 0], ['#050a1080', 85]]) {
+    runtime.send({ rules, presentation: { interactionsTemplate: 'cards', interactionsLayout: 'pages',
+      interactionsCardColor: color, interactionsCardNoise: noise } });
+    const root = runtime.nodes['interactions-overlay'];
+    assert.equal(root.style['--paper'], color);
+    assert.equal(root.style['--card-noise'], String(noise / 100));
+    assert.equal(root.dataset.count, '1', 'the two offers remain on one effect card');
+    const card = runtime.nodes['interactions-content'].children[0].children[0].children[0];
+    assert.equal(card.children[1].children.length, 2);
+    assert.equal(card.children[0].children[0].children[0].children[0].src, artwork.effect_0.imagePath);
+    if (grainPosition) assert.equal(card.style['--card-grain-position'], grainPosition, 'texture stays static when intensity changes');
+    grainPosition = card.style['--card-grain-position'];
+  }
 });
 
 test('one to four items remain fully static without duplicate copies in both templates', async () => {

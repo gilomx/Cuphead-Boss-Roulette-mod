@@ -25,6 +25,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumQuantity = 50;
         private const int MaximumCooldownSeconds = 3600;
         private const int MaximumRuntimeViewerKeys = 100000;
+        internal const int MaximumGroupCommandLength = 16384;
 
         private readonly string settingsPath;
         private readonly string communityGiftPath;
@@ -190,6 +191,11 @@ namespace Gilomx.CupheadBossRoulette
                 stateDirty = false;
                 return state;
             }
+        }
+
+        internal static bool IsGroupCommand(string query)
+        {
+            return string.Equals(Value(ParseQuery(query), "action").Trim(), "group", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -635,6 +641,11 @@ namespace Gilomx.CupheadBossRoulette
         private void ProcessCommand(Dictionary<string, string> values)
         {
             var action = Value(values, "action").Trim().ToLowerInvariant();
+            if (action == "group")
+            {
+                ProcessGroupCommand(Value(values, "payload"));
+                return;
+            }
             if (!catalogReady)
             {
                 SetFeedback("catalog_unavailable", true);
@@ -676,21 +687,7 @@ namespace Gilomx.CupheadBossRoulette
                 StreamRule rule;
                 if (!TryBuildRule(values, id, out rule))
                     return;
-                var resetRuntimeState =
-                    rules[index].Platform != rule.Platform ||
-                    rules[index].RewardName != rule.RewardName ||
-                    rules[index].EventType != rule.EventType ||
-                    rules[index].GiftId != rule.GiftId ||
-                    rules[index].Every != rule.Every ||
-                    rules[index].Interaction != rule.Interaction ||
-                    rules[index].Quantity != rule.Quantity ||
-                    rules[index].UserCooldownSeconds !=
-                        rule.UserCooldownSeconds ||
-                    rules[index].GlobalCooldownSeconds !=
-                        rule.GlobalCooldownSeconds ||
-                    rules[index].DurationSeconds != rule.DurationSeconds ||
-                    rules[index].CountdownSeconds != rule.CountdownSeconds ||
-                    (rules[index].Enabled && !rule.Enabled);
+                var resetRuntimeState = ShouldResetRuleRuntimeState(rules[index], rule);
                 var candidate = CloneRules();
                 candidate[index] = rule;
                 if (TryCommit(candidate, nextId, "updated") &&
@@ -738,7 +735,8 @@ namespace Gilomx.CupheadBossRoulette
         private bool TryBuildRule(
             Dictionary<string, string> values,
             long id,
-            out StreamRule rule)
+            out StreamRule rule,
+            bool reportErrors = true)
         {
             rule = null;
             var name = NormalizeRuleName(Value(values, "name"));
@@ -758,7 +756,7 @@ namespace Gilomx.CupheadBossRoulette
                  !gifts.TryGetValue(giftId, out gift)) ||
                 !IsKnownInteraction(interaction))
             {
-                SetFeedback("invalid_rule", true);
+                if (reportErrors) SetFeedback("invalid_rule", true);
                 return false;
             }
 
@@ -780,7 +778,7 @@ namespace Gilomx.CupheadBossRoulette
                     Value(values, "globalCooldownSeconds"),
                     0, MaximumCooldownSeconds, out globalCooldown))
             {
-                SetFeedback("invalid_rule", true);
+                if (reportErrors) SetFeedback("invalid_rule", true);
                 return false;
             }
             if (eventType == FollowEventType)
@@ -790,7 +788,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!CreatorToolsTimedChallenge.TryDuration(Value(values, "durationSeconds"), out duration) ||
                 !CreatorToolsTimedChallenge.TryCountdown(Value(values, "countdownSeconds"), out countdown))
             {
-                SetFeedback("invalid_rule", true);
+                if (reportErrors) SetFeedback("invalid_rule", true);
                 return false;
             }
             rule = new StreamRule
@@ -821,11 +819,13 @@ namespace Gilomx.CupheadBossRoulette
         private bool TryCommit(
             List<StreamRule> candidateRules,
             long candidateNextId,
-            string successFeedback)
+            string successFeedback,
+            bool groupCommand = false)
         {
             if (!SaveSettings(candidateRules, candidateNextId))
             {
-                SetFeedback("save_failed", true);
+                if (groupCommand) SetGroupFailure("save_failed");
+                else SetFeedback("save_failed", true);
                 return false;
             }
             rules.Clear();
@@ -833,6 +833,236 @@ namespace Gilomx.CupheadBossRoulette
             nextId = candidateNextId;
             SetFeedback(successFeedback, false);
             return true;
+        }
+
+        private void ProcessGroupCommand(string payload)
+        {
+            CreatorToolsJsonValue root;
+            long expectedRevision;
+            if (!CreatorToolsJsonParser.TryParse(payload, out root, MaximumGroupCommandLength) ||
+                root.ObjectValue == null || root.Integer("schemaVersion", -1) != 1 ||
+                !TryGroupId(root.Property("expectedRevision"), true, out expectedRevision))
+            {
+                SetGroupFailure("invalid_group");
+                return;
+            }
+            if (expectedRevision != revision)
+            {
+                SetGroupFailure("revision_conflict");
+                return;
+            }
+            if (!catalogReady)
+            {
+                SetGroupFailure("catalog_unavailable");
+                return;
+            }
+            var action = root.String("action");
+            var idsNode = root.Property("ruleIds");
+            if ((action != "save" && action != "delete" && action != "toggle" && action != "duplicate") ||
+                idsNode == null || idsNode.ArrayValue == null || idsNode.ArrayValue.Count > 3 ||
+                (action != "save" && idsNode.ArrayValue.Count == 0))
+            {
+                SetGroupFailure("invalid_group");
+                return;
+            }
+            var referencedIds = new HashSet<long>();
+            var referenced = new List<StreamRule>();
+            var platforms = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var idNode in idsNode.ArrayValue)
+            {
+                long id;
+                if (!TryGroupId(idNode, false, out id) || !referencedIds.Add(id))
+                {
+                    SetGroupFailure("invalid_group");
+                    return;
+                }
+                var index = FindRuleIndex(id);
+                if (index < 0)
+                {
+                    SetGroupFailure("rule_not_found");
+                    return;
+                }
+                var rule = rules[index];
+                if (!platforms.Add(rule.Platform) ||
+                    (referenced.Count > 0 && !HaveSharedGroupSettings(referenced[0], rule)))
+                {
+                    SetGroupFailure("invalid_group");
+                    return;
+                }
+                referenced.Add(rule);
+            }
+
+            var candidateNextId = nextId;
+            var replacements = new Dictionary<long, StreamRule>();
+            var additions = new List<StreamRule>();
+            var candidate = new List<StreamRule>();
+            var successFeedback = action == "save" ? (referenced.Count == 0 ? "created" : "updated") : action == "delete" ? "deleted" : "duplicated";
+            if (action == "save")
+            {
+                var values = root.Property("values");
+                if (values == null || values.ArrayValue == null || values.ArrayValue.Count < 1 || values.ArrayValue.Count > 3)
+                {
+                    SetGroupFailure("invalid_group");
+                    return;
+                }
+                if (rules.Count - referenced.Count + values.ArrayValue.Count > MaximumRules)
+                {
+                    SetGroupFailure("rules_limit");
+                    return;
+                }
+                platforms.Clear();
+                var suppliedIds = new HashSet<long>();
+                foreach (var value in values.ArrayValue)
+                {
+                    long id;
+                    var existing = value.Property("id") != null;
+                    if (existing)
+                    {
+                        if (!TryGroupId(value.Property("id"), false, out id) ||
+                            !referencedIds.Contains(id) || !suppliedIds.Add(id))
+                        {
+                            SetGroupFailure("invalid_group");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        if (!TryAllocateGroupId(ref candidateNextId, out id)) return;
+                    }
+                    StreamRule rule;
+                    if (!TryBuildGroupRule(root, value, id, out rule) || !platforms.Add(rule.Platform))
+                    {
+                        SetGroupFailure("invalid_group");
+                        return;
+                    }
+                    if (existing) replacements.Add(id, rule);
+                    else additions.Add(rule);
+                }
+            }
+            else if (action == "toggle")
+            {
+                bool enabled;
+                if (!root.TryBoolean("enabled", out enabled))
+                {
+                    SetGroupFailure("invalid_group");
+                    return;
+                }
+                successFeedback = enabled ? "enabled" : "disabled";
+                foreach (var rule in referenced)
+                {
+                    var replacement = rule.Clone(rule.Id);
+                    replacement.Enabled = enabled;
+                    replacements.Add(rule.Id, replacement);
+                }
+            }
+            else if (action == "duplicate")
+            {
+                if (rules.Count + referenced.Count > MaximumRules)
+                {
+                    SetGroupFailure("rules_limit");
+                    return;
+                }
+                foreach (var rule in referenced)
+                {
+                    long id;
+                    if (!TryAllocateGroupId(ref candidateNextId, out id)) return;
+                    var copy = rule.Clone(id);
+                    copy.Name = NormalizeRuleName(copy.Name + " (copia)");
+                    additions.Add(copy);
+                    replacements.Add(rule.Id, rule.Clone(rule.Id));
+                }
+            }
+            var insertionIndex = rules.Count;
+            foreach (var rule in rules)
+            {
+                if (!referencedIds.Contains(rule.Id)) candidate.Add(rule.Clone(rule.Id));
+                else
+                {
+                    StreamRule replacement;
+                    if (replacements.TryGetValue(rule.Id, out replacement)) candidate.Add(replacement);
+                    insertionIndex = candidate.Count;
+                }
+            }
+            candidate.InsertRange(insertionIndex, additions);
+            if (!TryCommit(candidate, candidateNextId, successFeedback, true)) return;
+            foreach (var previous in referenced)
+            {
+                StreamRule replacement;
+                if (!replacements.TryGetValue(previous.Id, out replacement) ||
+                    ShouldResetRuleRuntimeState(previous, replacement))
+                    ResetRuleRuntimeState(previous.Id, previous);
+            }
+        }
+
+        private bool TryBuildGroupRule(CreatorToolsJsonValue root, CreatorToolsJsonValue value, long id, out StreamRule rule)
+        {
+            rule = null;
+            if (value == null || value.ObjectValue == null) return false;
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var key in new[] { "interaction", "name", "platform", "eventType", "giftId", "rewardName" })
+            {
+                var node = (key == "interaction" ? root : value).Property(key);
+                if (node == null && (key == "giftId" || key == "rewardName")) { fields[key] = string.Empty; continue; }
+                if (node == null || node.StringValue == null || node.StringValue.Length >
+                    (key == "name" ? 1024 : key == "interaction" ? 96 : MaximumRuleNameLength)) return false;
+                fields[key] = node.StringValue;
+            }
+            if (fields["platform"] != "tiktok" && fields["platform"] != "twitch" && fields["platform"] != "youtube") return false;
+            if (fields["eventType"].Length == 0) return false;
+            bool enabled;
+            if (!value.TryBoolean("enabled", out enabled)) return false;
+            fields["enabled"] = enabled ? "true" : "false";
+            foreach (var key in new[] { "every", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" })
+            {
+                int number;
+                if (!(key == "every" ? value : root).TryInteger(key, out number)) return false;
+                fields[key] = number.ToString(CultureInfo.InvariantCulture);
+            }
+            return TryBuildRule(fields, id, out rule, false);
+        }
+
+        private bool TryAllocateGroupId(ref long candidateNextId, out long id)
+        {
+            id = candidateNextId;
+            if (id <= 0 || id == long.MaxValue || FindRuleIndex(id) >= 0)
+            {
+                SetGroupFailure("rules_limit");
+                return false;
+            }
+            candidateNextId++;
+            return true;
+        }
+
+        private static bool TryGroupId(CreatorToolsJsonValue node, bool allowZero, out long value)
+        {
+            value = 0;
+            if (node == null || !node.NumberValue.HasValue ||
+                node.NumberValue.Value != decimal.Truncate(node.NumberValue.Value) ||
+                node.NumberValue.Value < (allowZero ? 0 : 1) || node.NumberValue.Value > long.MaxValue) return false;
+            value = decimal.ToInt64(node.NumberValue.Value);
+            return true;
+        }
+
+        private static bool HaveSharedGroupSettings(StreamRule left, StreamRule right)
+        {
+            return left.Interaction == right.Interaction && left.Quantity == right.Quantity &&
+                left.UserCooldownSeconds == right.UserCooldownSeconds && left.GlobalCooldownSeconds == right.GlobalCooldownSeconds &&
+                left.DurationSeconds == right.DurationSeconds && left.CountdownSeconds == right.CountdownSeconds;
+        }
+
+        private static bool ShouldResetRuleRuntimeState(StreamRule previous, StreamRule replacement)
+        {
+            return previous.Platform != replacement.Platform || previous.RewardName != replacement.RewardName ||
+                previous.EventType != replacement.EventType || previous.GiftId != replacement.GiftId ||
+                previous.Every != replacement.Every || !HaveSharedGroupSettings(previous, replacement) ||
+                (previous.Enabled && !replacement.Enabled);
+        }
+
+        private void SetGroupFailure(string code)
+        {
+            feedback = code;
+            error = true;
+            stateDirty = true;
         }
 
         private void SetFeedback(string value, bool isError)
@@ -1370,6 +1600,7 @@ namespace Gilomx.CupheadBossRoulette
             IList<StreamRule> rulesToSave,
             long nextIdToSave)
         {
+            var temporaryPath = settingsPath + ".tmp";
             try
             {
                 var directory = Path.GetDirectoryName(settingsPath);
@@ -1393,22 +1624,13 @@ namespace Gilomx.CupheadBossRoulette
                     builder.Append('\n');
                 builder.Append("  ]\n}\n");
 
-                var temporaryPath = settingsPath + ".tmp";
                 File.WriteAllText(temporaryPath, builder.ToString(),
                     new UTF8Encoding(false));
                 if (File.Exists(settingsPath))
                 {
-                    try
-                    {
-                        File.Replace(temporaryPath, settingsPath,
-                            settingsPath + ".bak", true);
-                        return true;
-                    }
-                    catch
-                    {
-                        File.Copy(settingsPath, settingsPath + ".bak", true);
-                        File.Delete(settingsPath);
-                    }
+                    File.Replace(temporaryPath, settingsPath,
+                        settingsPath + ".bak", true);
+                    return true;
                 }
                 File.Move(temporaryPath, settingsPath);
                 return true;
@@ -1418,6 +1640,11 @@ namespace Gilomx.CupheadBossRoulette
                 Warn("No se pudieron guardar las reglas de stream: " +
                     exception.Message);
                 return false;
+            }
+            finally
+            {
+                try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); }
+                catch { }
             }
         }
 
@@ -1437,7 +1664,7 @@ namespace Gilomx.CupheadBossRoulette
             return cloned;
         }
 
-        private void ResetRuleRuntimeState(long id)
+        private void ResetRuleRuntimeState(long id, StreamRule previous = null)
         {
             var prefix = id.ToString(CultureInfo.InvariantCulture) + ":";
             var keys = new List<string>();
@@ -1455,7 +1682,16 @@ namespace Gilomx.CupheadBossRoulette
             // Gift cooldowns are shared by every rule that maps the same
             // gift. A rule edit invalidates those ephemeral reservations;
             // persisted configuration remains untouched.
-            globalCooldowns.Clear();
+            if (previous == null) globalCooldowns.Clear();
+            else
+            {
+                var suffix = "\n" + (previous.EventType == GiftEventType ? "gift:" + previous.GiftId :
+                    "rule:" + previous.Id.ToString(CultureInfo.InvariantCulture));
+                keys.Clear();
+                foreach (var key in globalCooldowns.Keys)
+                    if (key.EndsWith(suffix, StringComparison.Ordinal)) keys.Add(key);
+                foreach (var key in keys) globalCooldowns.Remove(key);
+            }
             dispatchBacklog.RemoveRule(id);
         }
 
@@ -1608,7 +1844,8 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     continue;
                 }
-                if (key.Length <= 64 && value.Length <= 1024)
+                if (key.Length <= 64 && value.Length <= (string.Equals(key, "payload", StringComparison.OrdinalIgnoreCase)
+                    ? MaximumGroupCommandLength : 1024))
                     values[key] = value;
             }
             return values;

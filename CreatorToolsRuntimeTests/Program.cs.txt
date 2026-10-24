@@ -25,6 +25,7 @@ namespace Gilomx.CupheadBossRoulette
             RunTwitchConnectionTests();
             RunYouTubeConnectionTests();
             RunStreamPlatformRuleTests();
+            RunStreamRuleGroupTests();
             RunMiniBossSpawnPolicyTests();
             RunMiniBossArenaPolicyTests();
             RunTimedChallengeTests();

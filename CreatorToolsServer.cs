@@ -1281,6 +1281,7 @@ namespace Gilomx.CupheadBossRoulette
                 path != "/api/settings/export" && path != "/api/settings/import" && path != "/api/settings/cancel-import" &&
                 path != "/api/overlay-composer/config/set" &&
                 path != "/api/overlay-composer/preview/set" &&
+                path != "/api/config/interactions/rules/group/set" &&
                 path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel" && path != "/api/twitch/test" &&
                 path != "/api/youtube/connect" && path != "/api/youtube/disconnect" && path != "/api/youtube/cancel")
             {
@@ -1740,6 +1741,11 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/api/config/interactions/rules/set")
             {
                 var query = request.Query ?? string.Empty;
+                if (CreatorToolsStreamRulesController.IsGroupCommand(query))
+                {
+                    WriteMethodNotAllowed(stream, "POST");
+                    return;
+                }
                 if (query.Length > MaximumStreamRuleQueryLength)
                     query = query.Substring(0, MaximumStreamRuleQueryLength);
 
@@ -1803,6 +1809,61 @@ namespace Gilomx.CupheadBossRoulette
                           "{\"ok\":false,\"error\":" +
                           "\"rules_queue_full\"}"),
                     false);
+                return;
+            }
+            if (path == "/api/config/interactions/rules/group/set")
+            {
+                if (request.Method != "POST") { WriteMethodNotAllowed(stream, "POST"); return; }
+                if (!HasJsonContentType(request)) { WriteUnsupportedMediaType(stream); return; }
+                string origin;
+                Uri parsedOrigin;
+                if (request.Headers.TryGetValue("Origin", out origin) &&
+                    (!Uri.TryCreate(origin, UriKind.Absolute, out parsedOrigin) ||
+                     parsedOrigin.Scheme != "http" || parsedOrigin.Port != Port ||
+                     (parsedOrigin.Host != "127.0.0.1" && parsedOrigin.Host != "localhost")))
+                {
+                    WriteResponse(stream, 403, "Forbidden", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"error\":\"invalid_origin\"}"), false);
+                    return;
+                }
+                if (string.IsNullOrEmpty(request.Body) || request.Body.Length > CreatorToolsStreamRulesController.MaximumGroupCommandLength)
+                {
+                    WriteResponse(stream, 400, "Bad Request", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"error\":\"invalid_group\"}"), false);
+                    return;
+                }
+                Func<string, string> handler;
+                lock (streamRulesLock) handler = streamRuleCommandHandler;
+                if (handler == null)
+                {
+                    WriteResponse(stream, 503, "Service Unavailable", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"ready\":false,\"error\":\"rules_unavailable\"}"), false);
+                    return;
+                }
+                try
+                {
+                    string state;
+                    CreatorToolsJsonValue response;
+                    lock (streamRulesProcessingLock)
+                    {
+                        state = handler("action=group&payload=" + Uri.EscapeDataString(request.Body));
+                        if (!CreatorToolsJsonParser.TryParse(state, out response, 512 * 1024) || response.ObjectValue == null)
+                            throw new InvalidOperationException("The stream-rule handler returned no state.");
+                        SetStreamRulesState(state);
+                    }
+                    bool failed;
+                    response.TryBoolean("error", out failed);
+                    var code = !failed ? 200 : response.String("feedback") == "revision_conflict" ? 409 :
+                        response.String("feedback") == "save_failed" ? 500 : 400;
+                    WriteResponse(stream, code, code == 200 ? "OK" : code == 409 ? "Conflict" : code == 500 ? "Internal Server Error" : "Bad Request",
+                        "application/json; charset=utf-8", Encoding.UTF8.GetBytes(state), false);
+                }
+                catch (Exception exception)
+                {
+                    if (logWarning != null) logWarning("Creator Tools could not process a rule group: " + exception.Message);
+                    WriteResponse(stream, 500, "Internal Server Error", "application/json; charset=utf-8",
+                        Encoding.UTF8.GetBytes("{\"error\":\"rules_processing_failed\"}"), false);
+                }
                 return;
             }
             if (path == "/api/twitch" || path == "/api/youtube")

@@ -25,6 +25,7 @@ import type {
   ChatChoosesState,
 } from "../model";
 import { validPacing, type PacingValues } from "../features/interactions/pacingValues";
+import type { StreamRuleGroupDraft } from "../features/interactions/streamRuleGroups";
 
 interface ConfigValue {
   config: RouletteConfigState | null;
@@ -77,6 +78,10 @@ interface ConfigValue {
   deleteStreamRule: (id: number) => boolean;
   duplicateStreamRule: (id: number) => void;
   toggleStreamRule: (id: number, enabled: boolean) => void;
+  saveStreamRuleGroup: (draft: StreamRuleGroupDraft) => boolean;
+  deleteStreamRuleGroup: (ruleIds: number[]) => boolean;
+  duplicateStreamRuleGroup: (ruleIds: number[]) => boolean;
+  toggleStreamRuleGroup: (ruleIds: number[], enabled: boolean) => boolean;
   testInteraction: (item: string, donor: string, quantity: number, delay: number, durationSeconds?: number, countdownSeconds?: number) => void;
 }
 
@@ -1441,6 +1446,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           if (next.ready && typeof next.revision === "number" &&
               Array.isArray(next.rules)) {
             streamRulesRevisionRef.current = null;
+            lastAppliedLoadRevisionRef.current = ++loadRequestRevisionRef.current;
             if (mountedRef.current) {
               setStreamRules(next as StreamRulesConfigState);
               setStatus(next.error ? "error" : "saved");
@@ -1513,6 +1519,87 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     [sendStreamRuleUpdate],
   );
 
+  const sendStreamRuleGroupUpdate = useCallback(
+    (command: Record<string, unknown>) => {
+      if (!streamRules?.ready) return false;
+      const payload = {
+        schemaVersion: 1,
+        expectedRevision: streamRules.revision,
+        ...command,
+      };
+      streamRulesRevisionRef.current = streamRules.revision;
+      setStatus("saving");
+      const send = async () => {
+        try {
+          const response = await fetch("/api/config/interactions/rules/group/set", {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const next = await response.json() as Partial<StreamRulesConfigState>;
+          if (typeof next.revision !== "number" || !Array.isArray(next.rules))
+            throw new Error("Invalid stream-rule group response");
+          streamRulesRevisionRef.current = null;
+          // Polls already in flight must not replace the acknowledged group
+          // with a snapshot taken before this atomic write.
+          lastAppliedLoadRevisionRef.current = ++loadRequestRevisionRef.current;
+          if (mountedRef.current) {
+            setStreamRules(next as StreamRulesConfigState);
+            setStatus(!response.ok || next.error ? "error" : "saved");
+          }
+        } catch {
+          streamRulesRevisionRef.current = null;
+          if (mountedRef.current) {
+            setStatus("error");
+            void load();
+          }
+        }
+      };
+      streamRulesWriteChainRef.current = streamRulesWriteChainRef.current.then(send, send);
+      return true;
+    },
+    [load, streamRules],
+  );
+
+  const saveStreamRuleGroup = useCallback(
+    (group: StreamRuleGroupDraft) => sendStreamRuleGroupUpdate({
+      action: "save",
+      ...(group.expectedRevision !== undefined ? { expectedRevision: group.expectedRevision } : {}),
+      ruleIds: group.ruleIds,
+      interaction: group.interaction,
+      quantity: group.quantity,
+      userCooldownSeconds: group.userCooldownSeconds,
+      globalCooldownSeconds: group.globalCooldownSeconds,
+      durationSeconds: group.durationSeconds,
+      countdownSeconds: group.countdownSeconds,
+      values: group.values.map(value => ({
+        ...(value.id !== undefined ? { id: value.id } : {}),
+        name: value.name.trim(),
+        enabled: value.enabled,
+        platform: value.platform,
+        eventType: value.eventType,
+        giftId: value.giftId,
+        rewardName: value.rewardName.trim(),
+        every: value.every,
+      })),
+    }),
+    [sendStreamRuleGroupUpdate],
+  );
+
+  const deleteStreamRuleGroup = useCallback(
+    (ruleIds: number[]) => sendStreamRuleGroupUpdate({ action: "delete", ruleIds }),
+    [sendStreamRuleGroupUpdate],
+  );
+  const duplicateStreamRuleGroup = useCallback(
+    (ruleIds: number[]) => sendStreamRuleGroupUpdate({ action: "duplicate", ruleIds }),
+    [sendStreamRuleGroupUpdate],
+  );
+  const toggleStreamRuleGroup = useCallback(
+    (ruleIds: number[], enabled: boolean) => sendStreamRuleGroupUpdate({ action: "toggle", ruleIds, enabled }),
+    [sendStreamRuleGroupUpdate],
+  );
+
   const value = useMemo(
     () => ({
       config,
@@ -1560,6 +1647,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       deleteStreamRule,
       duplicateStreamRule,
       toggleStreamRule,
+      saveStreamRuleGroup,
+      deleteStreamRuleGroup,
+      duplicateStreamRuleGroup,
+      toggleStreamRuleGroup,
     }),
     [
       config,
@@ -1607,6 +1698,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       deleteStreamRule,
       duplicateStreamRule,
       toggleStreamRule,
+      saveStreamRuleGroup,
+      deleteStreamRuleGroup,
+      duplicateStreamRuleGroup,
+      toggleStreamRuleGroup,
     ],
   );
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;

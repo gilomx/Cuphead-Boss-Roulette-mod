@@ -48,6 +48,8 @@ export interface OverlayComposerComponent {
   interactionsSpeed?: number;
   interactionsSize?: number;
   interactionsAdaptive?: boolean;
+  interactionsCardColor?: string;
+  interactionsCardNoise?: number;
 }
 
 export interface OverlayComposerProfile {
@@ -110,6 +112,8 @@ export interface OverlayComposerCommand {
   interactionsSpeed?: number;
   interactionsSize?: number;
   interactionsAdaptive?: boolean;
+  interactionsCardColor?: string;
+  interactionsCardNoise?: number;
 }
 
 export interface OverlayPreviewCommand {

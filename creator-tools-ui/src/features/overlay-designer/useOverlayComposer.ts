@@ -37,6 +37,7 @@ const EDITABLE_KEYS = [
   "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
   "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds",
   "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
+  "interactionsCardColor", "interactionsCardNoise",
 ] as const;
 
 function sameComponent(
@@ -91,6 +92,8 @@ function updateCommand(
       interactionsSpeed: component.interactionsSpeed ?? 40,
       interactionsSize: component.interactionsSize ?? 0,
       interactionsAdaptive: component.interactionsAdaptive ?? true,
+      interactionsCardColor: component.interactionsCardColor ?? "#23262bee",
+      interactionsCardNoise: component.interactionsCardNoise ?? 18,
     } : {}),
   };
 }

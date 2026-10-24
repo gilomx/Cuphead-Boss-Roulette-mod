@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { createChatChoosesMock } from "./mock-chat-chooses.mjs";
 import { matchesOverlayPreviewLayout } from "./mock-overlay-layout.mjs";
+import { applyStreamRuleGroup } from "./mock-stream-rule-groups.mjs";
 const chatChooses = createChatChoosesMock({ developmentTools: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0" });
 
 const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
@@ -388,6 +389,7 @@ function defaultOverlayProfiles() {
     interactionsTemplate: "floating", interactionsLayout: profile.id === "vertical" ? "pages" : "strip",
     interactionsTikTok: true, interactionsTwitch: profile.id === "horizontal", interactionsYouTube: profile.id === "horizontal",
     interactionsPageSeconds: 8, interactionsSpeed: 40, interactionsAdaptive: true, interactionsSize: 0,
+    interactionsCardColor: "#23262bee", interactionsCardNoise: 18,
   }].map(component => ({ ...component, voteOutlineColor: "#ffffff", textFont: "clean", textWeight: 700,
     textShadowColor: "#00000000", textShadowX: 2, textShadowY: 3, textShadowBlur: 2 })) }));
 }
@@ -1079,9 +1081,11 @@ function normalizeOverlayComponent(component, canvas) {
     component.interactionsTwitch = component.interactionsTwitch ?? !vertical;
     component.interactionsYouTube = component.interactionsYouTube ?? !vertical;
     component.interactionsAdaptive = component.interactionsAdaptive !== false;
+    component.interactionsCardColor = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(String(component.interactionsCardColor ?? ""))
+      ? component.interactionsCardColor.toLowerCase() : "#23262bee";
     component.interactionsSize = Number(component.interactionsSize) > 0
       ? Math.max(25, Math.min(100, Math.round(Number(component.interactionsSize)))) : 0;
-    for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 10, 120]]) {
+    for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 40, 140], ["interactionsCardNoise", 18, 0, 100]]) {
       const value = Number(component[key] ?? fallback);
       component[key] = Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, Math.round(value))) : fallback;
     }
@@ -1157,7 +1161,7 @@ function applyOverlayComposerCommand(command, res) {
         ["interactionsTikTok", "interactionsTwitch", "interactionsYouTube", "interactionsAdaptive"].some(key => command[key] != null && typeof command[key] !== "boolean") ||
         command.interactionsSize != null && (!Number.isInteger(command.interactionsSize) ||
           command.interactionsSize !== 0 && (command.interactionsSize < 25 || command.interactionsSize > 100)) ||
-        [["interactionsPageSeconds", 3, 60], ["interactionsSpeed", 10, 120]].some(([key, minimum, maximum]) =>
+        [["interactionsPageSeconds", 3, 60], ["interactionsSpeed", 40, 140], ["interactionsCardNoise", 0, 100]].some(([key, minimum, maximum]) =>
           command[key] != null && (!Number.isInteger(command[key]) || command[key] < minimum || command[key] > maximum))) {
       json(res, { ok: false, error: "invalid_interactions_options" }, 400);
       return;
@@ -1168,7 +1172,7 @@ function applyOverlayComposerCommand(command, res) {
         return;
       }
     }
-    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor", "textShadowColor"]) {
+    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor", "textShadowColor", "interactionsCardColor"]) {
       if (Object.prototype.hasOwnProperty.call(command, key) &&
           !/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(command[key] ?? ""))) {
         json(res, { ok: false, error: "invalid_color" }, 400);
@@ -1183,6 +1187,7 @@ function applyOverlayComposerCommand(command, res) {
       "rouletteSize", "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
       "interactionsTemplate", "interactionsLayout", "interactionsTikTok", "interactionsTwitch", "interactionsYouTube",
       "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
+      "interactionsCardColor", "interactionsCardNoise",
       "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",
     ]) {
       if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];
@@ -1850,6 +1855,26 @@ createServer((req, res) => {
     }
     streamRulesRevision += 1;
     json(res, streamRulesState());
+    return;
+  }
+  if (url.pathname === "/api/config/interactions/rules/group/set") {
+    if (req.method !== "POST") {
+      json(res, { ok: false, error: "method_not_allowed" }, 405);
+      return;
+    }
+    readJsonBody(req, res, command => {
+      const result = applyStreamRuleGroup({ rules: streamRules, nextId: streamRulesNextId, revision: streamRulesRevision },
+        command, { giftsById, interactionItems });
+      if (!result.error) {
+        for (const id of result.resetIds) resetStreamRuleAccumulators(id);
+        streamRules = result.rules;
+        streamRulesNextId = result.nextId;
+        streamRulesRevision = result.revision;
+      }
+      streamRulesFeedback = result.feedback;
+      streamRulesError = result.error;
+      json(res, streamRulesState(), result.status);
+    });
     return;
   }
   if (url.pathname === "/api/config/interactions/set") {

@@ -670,6 +670,9 @@
       "template": "Template",
       "cards": "1 · Cards",
       "floating": "2 · Floating icons",
+      "cardColor": "Card color",
+      "cardNoise": "Aged texture",
+      "cardNoiseHint": "Add subtle grain and weathering to the background. At 0% it stays smooth.",
       "layout": "Layout",
       "strip": "Continuous moving strip",
       "pages": "Compact pages · 3 × 3",
@@ -897,6 +900,21 @@
     },
     "rules": {
       "coins": "coins",
+      "groups": {
+        "interaction": "Attack, help or challenge",
+        "values": "Values by platform",
+        "valuesHint": "Add only the platforms you use. Every value sends the same attack to the game.",
+        "addValue": "Add a value from another platform",
+        "valueFor": "Value on {platform}",
+        "enabledValue": "Enabled",
+        "removeValue": "Remove {platform} value",
+        "changeGift": "Choose another gift",
+        "sharedHint": "These waits apply to each value for this attack.",
+        "completeValues": "Review the attack and complete the values for each platform.",
+        "mixedStatus": "Partially enabled",
+        "noValue": "No value",
+        "countdown": "Starts in {seconds} s"
+      },
       "notice": {
         "catalogLoading": "Loading catalog…",
         "catalogError": "The installed catalog could not be loaded."
@@ -1036,6 +1054,8 @@
         "catalog_unavailable": "The mod could not validate the gift catalog.",
         "rules_limit": "The redeem limit was reached.",
         "invalid_rule": "The redeem contains invalid data.",
+        "invalid_group": "Review the attack and its platform values.",
+        "revision_conflict": "The configuration changed in another window. Reopen the attack to review its values.",
         "rule_not_found": "The redeem no longer exists.",
         "invalid_action": "The requested action is invalid.",
         "save_failed": "The redeem configuration could not be saved."

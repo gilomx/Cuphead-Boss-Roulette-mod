@@ -15,6 +15,7 @@ namespace Gilomx.CupheadBossRoulette
             Run("Interactions overlay persists, copies and resets independently per profile", TestInteractionsOverlayPersistence);
             Run("Interactions overlay rejects invalid commands and preview settings atomically", TestInteractionsOverlayValidation);
             Run("Interactions overlay extends legacy scenes and preserves their recovery backup", TestInteractionsOverlayMigration);
+            Run("Interactions overlay migrates legacy strip speeds without losing scene settings", TestInteractionsOverlaySpeedMigration);
         }
 
         private static void TestInteractionsOverlayDefaults()
@@ -33,6 +34,8 @@ namespace Gilomx.CupheadBossRoulette
                 True(component.InteractionsAdaptive, "adaptive sizes default");
                 Equal(8, component.InteractionsPageSeconds, "page timing default");
                 Equal(40, component.InteractionsSpeed, "strip speed default");
+                Equal("#23262bee", component.InteractionsCardColor, "card color default includes opacity");
+                Equal(18, component.InteractionsCardNoise, "card texture strength default");
                 Equal(0, component.InteractionsSize, "legacy and new scenes retain automatic size");
                 Equal(60, component.X, "default left position");
                 Equal(vertical ? 1200 : 800, component.Y, "default top position");
@@ -44,6 +47,8 @@ namespace Gilomx.CupheadBossRoulette
                 component.InteractionsLayout = "invalid";
                 component.InteractionsPageSeconds = -20;
                 component.InteractionsSpeed = 999;
+                component.InteractionsCardColor = "invalid";
+                component.InteractionsCardNoise = 999;
                 component.X = -20; component.Y = 9999;
                 component.ShowTitle = true; component.ShowDetails = true;
                 CreatorToolsOverlayComposerSettings.NormalizeComponent(profile, component);
@@ -52,14 +57,22 @@ namespace Gilomx.CupheadBossRoulette
                 Equal("floating", component.InteractionsTemplate, "invalid template falls back safely");
                 Equal(vertical ? "pages" : "strip", component.InteractionsLayout, "invalid layout uses profile default");
                 Equal(3, component.InteractionsPageSeconds, "normalization clamps minimum page duration");
-                Equal(120, component.InteractionsSpeed, "normalization clamps maximum speed");
+                Equal(140, component.InteractionsSpeed, "normalization clamps maximum speed");
+                Equal("#23262bee", component.InteractionsCardColor, "invalid card color falls back safely");
+                Equal(100, component.InteractionsCardNoise, "normalization clamps maximum texture strength");
                 Equal(0, component.X, "normalization clamps left edge");
                 Equal(profile.CanvasHeight - component.Height, component.Y, "normalization clamps bottom edge");
             }
             var cloned = settings.Clone();
             cloned.FindProfile("vertical").FindComponent("interactions").InteractionsTikTok = false;
+            cloned.FindProfile("vertical").FindComponent("interactions").InteractionsCardColor = "#aabbcc";
+            cloned.FindProfile("vertical").FindComponent("interactions").InteractionsCardNoise = 0;
             True(settings.FindProfile("vertical").FindComponent("interactions").InteractionsTikTok,
                 "candidate clone cannot mutate active profile");
+            Equal("#23262bee", settings.FindProfile("vertical").FindComponent("interactions").InteractionsCardColor,
+                "candidate clone cannot mutate the active card color");
+            Equal(100, settings.FindProfile("vertical").FindComponent("interactions").InteractionsCardNoise,
+                "candidate clone cannot mutate the active card texture");
         }
 
         private static void TestInteractionsOverlayPersistence()
@@ -72,6 +85,7 @@ namespace Gilomx.CupheadBossRoulette
                     enabled = true, interactionsTemplate = "cards", interactionsLayout = "pages",
                     interactionsTikTok = false, interactionsTwitch = true, interactionsYouTube = false,
                     interactionsPageSeconds = 17, interactionsSpeed = 73, interactionsAdaptive = false, interactionsSize = 67,
+                    interactionsCardColor = "#AABBCC80", interactionsCardNoise = 67,
                     x = 77, y = 850, width = 1700, height = 200, opacity = 87, locked = true
                 }));
                 Equal(200, response.StatusCode, "save complete interactions settings");
@@ -87,6 +101,8 @@ namespace Gilomx.CupheadBossRoulette
                     False(vertical.GetProperty("enabled").GetBoolean(), "vertical stays disabled");
                     True(vertical.GetProperty("interactionsTikTok").GetBoolean(), "vertical networks stay independent");
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "vertical timing stays independent");
+                    Equal("#23262bee", vertical.GetProperty("interactionsCardColor").GetString(), "vertical card color stays independent");
+                    Equal(18, vertical.GetProperty("interactionsCardNoise").GetInt32(), "vertical texture stays independent");
                 }
                 response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "copy", expectedRevision = 1, sourceProfileId = "horizontal",
@@ -117,6 +133,8 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "reset restores page timing");
                     Equal(40, vertical.GetProperty("interactionsSpeed").GetInt32(), "reset restores strip speed");
                     Equal(0, vertical.GetProperty("interactionsSize").GetInt32(), "reset restores automatic size");
+                    Equal("#23262bee", vertical.GetProperty("interactionsCardColor").GetString(), "reset restores card color");
+                    Equal(18, vertical.GetProperty("interactionsCardNoise").GetInt32(), "reset restores card texture");
                     AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "horizontal", "interactions"));
                 }
                 response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
@@ -140,6 +158,8 @@ namespace Gilomx.CupheadBossRoulette
             Equal(73, component.GetProperty("interactionsSpeed").GetInt32(), "strip speed persists");
             Equal(67, component.GetProperty("interactionsSize").GetInt32(), "manual size persists and copies independently");
             False(component.GetProperty("interactionsAdaptive").GetBoolean(), "adaptive selection persists");
+            Equal("#aabbcc80", component.GetProperty("interactionsCardColor").GetString(), "canonical card color persists and copies with alpha");
+            Equal(67, component.GetProperty("interactionsCardNoise").GetInt32(), "texture strength persists and copies");
         }
 
         private static void TestInteractionsOverlayValidation()
@@ -150,7 +170,8 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "update", expectedRevision = 0, profileId = "vertical", componentId = "interactions",
                     x = 91, interactionsTikTok = false, interactionsTwitch = false, interactionsYouTube = false,
-                    interactionsPageSeconds = 3, interactionsSpeed = 120, interactionsSize = 25
+                    interactionsPageSeconds = 3, interactionsSpeed = 140, interactionsSize = 25,
+                    interactionsCardColor = "#ABCDEF", interactionsCardNoise = 0
                 })).StatusCode, "bounds and an empty network filter are valid");
                 var before = controller.GetConfigState();
                 var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
@@ -166,7 +187,16 @@ namespace Gilomx.CupheadBossRoulette
                     new Dictionary<string, object> { { "interactionsPageSeconds", 61 } },
                     new Dictionary<string, object> { { "interactionsPageSeconds", 8.5 } },
                     new Dictionary<string, object> { { "interactionsSpeed", 9 } },
-                    new Dictionary<string, object> { { "interactionsSpeed", 121 } },
+                    new Dictionary<string, object> { { "interactionsSpeed", 141 } },
+                    new Dictionary<string, object> { { "interactionsSpeed", 73.5 } },
+                    new Dictionary<string, object> { { "interactionsCardColor", "red" } },
+                    new Dictionary<string, object> { { "interactionsCardColor", "#aabbccz1" } },
+                    new Dictionary<string, object> { { "interactionsCardColor", "#abc" } },
+                    new Dictionary<string, object> { { "interactionsCardColor", null } },
+                    new Dictionary<string, object> { { "interactionsCardNoise", -1 } },
+                    new Dictionary<string, object> { { "interactionsCardNoise", 101 } },
+                    new Dictionary<string, object> { { "interactionsCardNoise", 18.5 } },
+                    new Dictionary<string, object> { { "interactionsCardNoise", "many" } },
                     new Dictionary<string, object> { { "interactionsSize", -1 } },
                     new Dictionary<string, object> { { "interactionsSize", 24 } },
                     new Dictionary<string, object> { { "interactionsSize", 101 } },
@@ -198,14 +228,39 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(saved, File.ReadAllText(path), "backup recovery restores the primary unchanged");
                     Equal(saved, File.ReadAllText(path + ".bak"), "backup recovery preserves the recovery copy");
                 }
-                Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
-                    operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "tap_farming",
-                    x = 800, interactionsSpeed = 40
-                })).StatusCode, "interactions fields cannot mutate another overlay");
+                foreach (var oldSpeed in new[] { 10, 39 })
+                {
+                    Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                        operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "interactions",
+                        x = 800, interactionsSpeed = oldSpeed
+                    })).StatusCode, "API rejects speeds below its new minimum");
+                    Equal(before, controller.GetConfigState(), "rejected legacy API speed preserves the active scene");
+                    Equal(saved, File.ReadAllText(path), "rejected legacy API speed preserves saved settings");
+                }
+                foreach (var pair in new Dictionary<string, object> {
+                    { "interactionsSpeed", 40 }, { "interactionsCardColor", "#123456" }, { "interactionsCardNoise", 0 }
+                })
+                {
+                    var command = new Dictionary<string, object> {
+                        { "operation", "update" }, { "expectedRevision", 1 }, { "profileId", "vertical" },
+                        { "componentId", "tap_farming" }, { "x", 800 }, { pair.Key, pair.Value }
+                    };
+                    Equal(400, controller.ProcessConfigCommand(JsonSerializer.Serialize(command)).StatusCode,
+                        "interactions fields cannot mutate another overlay");
+                }
                 Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "interactions",
-                    interactionsPageSeconds = 60, interactionsSpeed = 10, interactionsSize = 100
+                    interactionsPageSeconds = 60, interactionsSpeed = 40, interactionsSize = 100,
+                    interactionsCardNoise = 100
                 })).StatusCode, "other range boundaries are accepted");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var current = FindComposerComponent(state.RootElement, "vertical", "interactions");
+                    Equal("#abcdef", current.GetProperty("interactionsCardColor").GetString(), "six digit colors retain their opacity semantics");
+                    Equal(100, current.GetProperty("interactionsCardNoise").GetInt32(), "maximum texture strength is accepted");
+                    False(FindComposerComponent(state.RootElement, "vertical", "roulette").TryGetProperty("interactionsCardColor", out _),
+                        "unrelated overlays expose no interactions card fields");
+                }
                 Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "update", expectedRevision = 2, profileId = "vertical", componentId = "interactions",
                     interactionsSize = 0
@@ -264,6 +319,8 @@ namespace Gilomx.CupheadBossRoulette
                         "older partial component safely receives optional defaults");
                     False(parsed.FindComponent("interactions").Enabled, "partial legacy component remains disabled");
                     Equal(0, parsed.FindComponent("interactions").InteractionsSize, "old scenes keep automatic sizing");
+                    Equal("#23262bee", parsed.FindComponent("interactions").InteractionsCardColor, "old scenes receive the default card color");
+                    Equal(18, parsed.FindComponent("interactions").InteractionsCardNoise, "old scenes receive the default card texture");
                     Equal(profile["id"].GetValue<string>() == "vertical" ? "pages" : "strip",
                         parsed.FindComponent("interactions").InteractionsLayout, "missing fields retain per-profile layout defaults");
                     True(CreatorToolsOverlayComposerSettings.TryParseProfileJson(parsedJson, parsed.Id, out parsed),
@@ -273,6 +330,62 @@ namespace Gilomx.CupheadBossRoulette
                 using (var ignored = JsonDocument.Parse(scope.CreateOverlayComposer(null).GetConfigState())) { }
                 Equal(persisted, File.ReadAllText(path), "subsequent load does not rewrite migrated file");
                 Equal(legacyJson, File.ReadAllText(path + ".bak"), "subsequent load retains original recovery backup");
+            }
+        }
+
+        private static void TestInteractionsOverlaySpeedMigration()
+        {
+            foreach (var speed in new[] { 10, 39, 40, 120, 140 })
+            using (var scope = new TestScope("interactions-overlay-speed-migration-" + speed))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                True(controller.ImportRouletteSettings(false, 150, "right", 79, true, true, "keep"), "mark roulette imported before saving a legacy scene");
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "interactions",
+                    enabled = true, locked = true, x = 91, y = 1170, opacity = 63, interactionsTemplate = "cards",
+                    interactionsSpeed = 73, interactionsSize = 67, interactionsAdaptive = false,
+                    interactionsTikTok = false, interactionsTwitch = true, interactionsYouTube = false
+                })).StatusCode, "save customized interactions before migration");
+                var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                {
+                    var component = profile["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                    component["interactionsSpeed"] = speed;
+                    component.AsObject().Remove("interactionsCardColor");
+                    component.AsObject().Remove("interactionsCardNoise");
+                    CreatorToolsOverlayComposerProfile preview;
+                    True(CreatorToolsOverlayComposerSettings.TryParseProfileJson(profile.ToJsonString(), profile["id"].GetValue<string>(), out preview),
+                        "preview accepts legacy speed and absent texture fields");
+                    Equal(Math.Max(40, speed), preview.FindComponent("interactions").InteractionsSpeed,
+                        "preview migrates only speeds below the new minimum");
+                    Equal("#23262bee", preview.FindComponent("interactions").InteractionsCardColor, "preview receives the default card color");
+                    Equal(18, preview.FindComponent("interactions").InteractionsCardNoise, "preview receives the default texture strength");
+                }
+                var legacyJson = legacy.ToJsonString();
+                File.WriteAllText(path, legacyJson);
+                controller = scope.CreateOverlayComposer(null);
+                Equal(legacyJson, File.ReadAllText(path + ".bak"), "migration preserves the complete old scene in its backup");
+                var expected = JsonNode.Parse(legacyJson);
+                foreach (var profile in expected["profiles"].AsArray())
+                {
+                    var component = profile["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                    component["interactionsSpeed"] = Math.Max(40, speed);
+                    component["interactionsCardColor"] = "#23262bee";
+                    component["interactionsCardNoise"] = 18;
+                }
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    Equal(2, state.RootElement.GetProperty("revision").GetInt32(), "speed migration retains the existing revision");
+                    Equal(expected["profiles"].ToJsonString(), JsonNode.Parse(state.RootElement.GetProperty("profiles").GetRawText()).ToJsonString(),
+                        "speed migration retains all unrelated fields, geometry, visibility and components");
+                }
+                var persisted = File.ReadAllText(path);
+                using (var current = JsonDocument.Parse(scope.CreateOverlayComposer(null).GetConfigState()))
+                    Equal(Math.Max(40, speed), FindComposerComponent(current.RootElement, "vertical", "interactions").GetProperty("interactionsSpeed").GetInt32(),
+                        "migrated speed survives another load");
+                Equal(persisted, File.ReadAllText(path), "migration persists once without rewriting on later loads");
+                Equal(legacyJson, File.ReadAllText(path + ".bak"), "later loads retain the pre-migration recovery backup");
             }
         }
     }

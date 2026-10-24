@@ -1,0 +1,33 @@
+.stream-rule-groups-table-wrap { overflow-x:auto; }
+.stream-rule-groups-table { width:100%; min-width:52rem; table-layout:fixed; }
+.stream-rule-groups-table th:first-child { width:7rem; }
+.stream-rule-groups-table th:nth-child(2) { width:26%; }
+.stream-rule-groups-table th:last-child { width:8rem; text-align:right; }
+.stream-rule-groups-table td { vertical-align:middle; }
+.stream-rule-groups-table .stream-rule-row__actions { gap:.25rem; }
+.stream-rule-groups-table .stream-rule-row__actions button { width:2.25rem; height:2.25rem; }
+.stream-rule-group-result { display:flex; align-items:center; gap:.65rem; min-width:0; }
+.stream-rule-group-result>img { width:3.4rem; height:3.4rem; flex:0 0 3.4rem; object-fit:contain; }
+.stream-rule-group-result>span { display:grid; gap:.2rem; min-width:0; }
+.stream-rule-group-result strong { font-size:.9rem; line-height:1.25; overflow-wrap:anywhere; }
+.stream-rule-group-result small { color:var(--color-text-muted); font-size:.75rem; line-height:1.3; }
+.stream-rule-group-network-heading { display:flex; align-items:center; gap:.35rem; }
+.stream-rule-group-network-heading svg { width:1rem; height:1rem; flex:0 0 1rem; }
+.stream-rule-group-cost { display:flex; align-items:center; gap:.4rem; min-width:0; }
+.stream-rule-group-cost+.stream-rule-group-cost { margin-top:.45rem; }
+.stream-rule-group-cost>img,.stream-rule-group-cost>svg { width:2rem; height:2rem; object-fit:contain; flex:0 0 2rem; }
+.stream-rule-group-cost>span { display:grid; min-width:0; gap:.1rem; }
+.stream-rule-group-cost strong { font-size:.95rem; font-variant-numeric:tabular-nums; }
+.stream-rule-group-cost small { color:var(--color-text-muted); font-size:.7rem; line-height:1.2; overflow-wrap:anywhere; }
+.stream-rule-group-cost[data-enabled="false"] { opacity:.5; }
+.stream-rule-group-cost__disabled { color:var(--color-text-muted); }
+.stream-rule-group-network[data-platform="twitch"] .stream-trigger-icon { color:#c49aff; }
+.stream-rule-group-network[data-platform="youtube"] .stream-trigger-icon { color:#86b5ff; }
+.stream-rule-group-network__empty { color:var(--color-text-muted); }
+.stream-rule-group-row .stream-rule-switch input:indeterminate+.stream-rule-switch__track { background:var(--color-warning); }
+.stream-rule-group-row .stream-rule-switch input:indeterminate+.stream-rule-switch__track i { transform:translateX(.5rem); }
+@media (max-width:60rem) {
+  .stream-rule-groups-table { min-width:48rem; }
+  .stream-rule-groups-table th:first-child { width:6rem; }
+  .stream-rule-groups-table th:last-child { width:7.5rem; }
+}

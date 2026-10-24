@@ -1,0 +1,395 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunStreamRuleGroupTests()
+        {
+            Run("Rule groups create and edit all three platforms with stable row identities", TestRuleGroupCrud);
+            Run("Rule group edits preserve unchanged counters and invalidate only changed rows", TestRuleGroupRuntimeState);
+            Run("Rule groups reject foreign IDs, mixed cohorts, invalid values and stale revisions atomically", TestRuleGroupValidation);
+            Run("Rule groups honor the flat 100-rule limit without partial additions", TestRuleGroupLimit);
+            Run("Rule group save failures retain files, IDs, counters and the prior backup", TestRuleGroupSaveFailure);
+            Run("Rule groups retain legacy flat files and legacy individual CRUD", TestRuleGroupLegacyCompatibility);
+            Run("Rule group HTTP POST validates methods, origin, body and concurrent revisions", TestRuleGroupHttp);
+        }
+
+        private static JsonObject RuleGroupValue(string platform, long id = 0, int every = 2)
+        {
+            var value = new JsonObject {
+                ["name"] = "Value " + platform, ["enabled"] = true, ["platform"] = platform,
+                ["eventType"] = platform == "tiktok" ? "gift" : platform == "twitch" ? "currency" : "jewels",
+                ["giftId"] = platform == "tiktok" ? "1" : "", ["rewardName"] = "", ["every"] = every
+            };
+            if (id > 0) value["id"] = id;
+            return value;
+        }
+
+        private static JsonObject RuleGroupRequest(CreatorToolsStreamRulesController rules, string action = "save", long[] ids = null, JsonArray values = null)
+        {
+            var references = new JsonArray();
+            foreach (var id in ids ?? new long[0]) references.Add(id);
+            return new JsonObject {
+                ["schemaVersion"] = 1, ["expectedRevision"] = RuleGroupState(rules)["revision"].GetValue<long>(),
+                ["action"] = action, ["ruleIds"] = references, ["interaction"] = "test_attack", ["quantity"] = 2,
+                ["userCooldownSeconds"] = 5, ["globalCooldownSeconds"] = 7,
+                ["durationSeconds"] = 15, ["countdownSeconds"] = 3,
+                ["values"] = values ?? new JsonArray(RuleGroupValue("tiktok"), RuleGroupValue("twitch"), RuleGroupValue("youtube"))
+            };
+        }
+
+        private static JsonObject RuleGroupState(CreatorToolsStreamRulesController rules)
+        {
+            return JsonNode.Parse(SnapshotRules(rules)).AsObject();
+        }
+
+        private static JsonObject ExecuteRuleGroup(CreatorToolsStreamRulesController rules, JsonObject request)
+        {
+            return JsonNode.Parse(rules.ProcessServerCommand("action=group&payload=" + Uri.EscapeDataString(request.ToJsonString()))).AsObject();
+        }
+
+        private static JsonObject RuleGroupRow(JsonObject state, long id)
+        {
+            return state["rules"].AsArray().Single(row => row["id"].GetValue<long>() == id).AsObject();
+        }
+
+        private static long[] CreatedGroupIds(JsonObject state)
+        {
+            return state["rules"].AsArray().Where(row => row["id"].GetValue<long>() != 1).Select(row => row["id"].GetValue<long>()).ToArray();
+        }
+
+        private static string RuleGroupSettingsPath(CreatorToolsStreamRulesController rules)
+        {
+            return (string)typeof(CreatorToolsStreamRulesController).GetField("settingsPath", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(rules);
+        }
+
+        private static void AssertRuleGroupSuccess(JsonObject state, string feedback)
+        {
+            False(state["error"].GetValue<bool>(), "group command succeeds: " + state.ToJsonString());
+            Equal(feedback, state["feedback"].GetValue<string>(), "group result feedback");
+        }
+
+        private static void TestRuleGroupCrud()
+        {
+            using (var scope = new TestScope("rule-group-crud"))
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var foreign = RuleGroupRow(RuleGroupState(rules), 1).ToJsonString();
+                var before = File.ReadAllText(RuleGroupSettingsPath(rules));
+                var created = ExecuteRuleGroup(rules, RuleGroupRequest(rules));
+                AssertRuleGroupSuccess(created, "created");
+                Equal(2L, created["revision"].GetValue<long>(), "three rows commit in one revision");
+                Equal(4, created["rules"].AsArray().Count, "three platform values become three flat rules");
+                Equal(before, File.ReadAllText(RuleGroupSettingsPath(rules) + ".bak"), "one atomic save retains the entire prior file");
+                var ids = CreatedGroupIds(created);
+                Equal(3, ids.Distinct().Count(), "each network receives its own stable ID");
+                rules = scope.ReloadRules(rules);
+                var saved = RuleGroupState(rules);
+                Equal(created["rules"].ToJsonString(), saved["rules"].ToJsonString(), "all three values survive restart");
+                var update = RuleGroupRequest(rules, ids: ids,
+                    values: new JsonArray(RuleGroupValue("tiktok", ids[0], 4), RuleGroupValue("twitch", ids[1], 150)));
+                update["quantity"] = 3;
+                update["values"][0]["name"] = new string('n', 80);
+                update["durationSeconds"] = 30;
+                update["countdownSeconds"] = 4;
+                var edited = ExecuteRuleGroup(rules, update);
+                AssertRuleGroupSuccess(edited, "updated");
+                Equal(3, edited["rules"].AsArray().Count, "removing a network removes exactly that row");
+                Equal(4, RuleGroupRow(edited, ids[0])["every"].GetValue<int>(), "TikTok price changes under the same ID");
+                Equal(new string('n', 64), RuleGroupRow(edited, ids[0])["name"].GetValue<string>(), "long display names normalize like the legacy API");
+                Equal(150, RuleGroupRow(edited, ids[1])["every"].GetValue<int>(), "Twitch price changes under the same ID");
+                Equal(30, RuleGroupRow(edited, ids[1])["durationSeconds"].GetValue<int>(), "shared duration updates every row");
+                Equal(foreign, RuleGroupRow(edited, 1).ToJsonString(), "foreign rule remains byte-for-byte equivalent");
+                var toggle = RuleGroupRequest(rules, "toggle", ids.Take(2).ToArray());
+                toggle["enabled"] = false;
+                var disabled = ExecuteRuleGroup(rules, toggle);
+                AssertRuleGroupSuccess(disabled, "disabled");
+                False(RuleGroupRow(disabled, ids[0])["enabled"].GetValue<bool>(), "toggle disables TikTok");
+                False(RuleGroupRow(disabled, ids[1])["enabled"].GetValue<bool>(), "toggle disables Twitch");
+                True(RuleGroupRow(disabled, 1)["enabled"].GetValue<bool>(), "toggle leaves foreign rule enabled");
+                var duplicate = ExecuteRuleGroup(rules, RuleGroupRequest(rules, "duplicate", ids.Take(2).ToArray()));
+                AssertRuleGroupSuccess(duplicate, "duplicated");
+                var copies = duplicate["rules"].AsArray().Where(row => row["id"].GetValue<long>() > ids[2]).ToArray();
+                Equal(2, copies.Length, "duplicate copies the whole group");
+                foreach (var row in copies)
+                {
+                    var sourceName = disabled["rules"].AsArray().Single(source =>
+                        source["id"].GetValue<long>() != 1 && source["platform"].GetValue<string>() == row["platform"].GetValue<string>())["name"].GetValue<string>();
+                    var copyName = sourceName + " (copia)";
+                    Equal(copyName.Substring(0, Math.Min(64, copyName.Length)), row["name"].GetValue<string>(), "copies retain the legacy naming and length limit");
+                    False(row["enabled"].GetValue<bool>(), "duplicate retains each row's disabled state");
+                    Equal(3, row["quantity"].GetValue<int>(), "duplicate retains shared settings");
+                }
+                var enabled = RuleGroupRequest(rules, "toggle", copies.Select(row => row["id"].GetValue<long>()).ToArray());
+                enabled["enabled"] = true;
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, enabled), "enabled");
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, RuleGroupRequest(rules, "delete", ids.Take(2).ToArray())), "deleted");
+                Equal(3, RuleGroupState(rules)["rules"].AsArray().Count, "delete preserves foreign rule and complete duplicate");
+                rules = scope.ReloadRules(rules);
+                Equal(3, RuleGroupState(rules)["rules"].AsArray().Count, "group toggle, duplicate and deletion persist together");
+            }
+        }
+
+        private static void TestRuleGroupRuntimeState()
+        {
+            using (var scope = new TestScope("rule-group-runtime"))
+            {
+                var clock = new DateTime(2026, 10, 23, 12, 0, 0, DateTimeKind.Utc);
+                var rules = scope.CreateRules(1, utcNow: () => clock, giftId: "0");
+                var created = ExecuteRuleGroup(rules, RuleGroupRequest(rules, values: new JsonArray(
+                    RuleGroupValue("tiktok", every: 2), RuleGroupValue("twitch", every: 100), RuleGroupValue("youtube", every: 100))));
+                var ids = CreatedGroupIds(created);
+                rules.Evaluate(NewGiftEvent(1, 3), true);
+                rules.Evaluate(PlatformRuleEvent("twitch", "currency", value: 160m), true);
+                rules.Evaluate(JewelRuleEvent(160m), true);
+                Equal(6L, rules.BacklogCount, "all three networks have pending quantities");
+                var globals = (Dictionary<string, DateTime>)typeof(CreatorToolsStreamRulesController).GetField("globalCooldowns", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(rules);
+                var youtubeKey = "shared-connection\nrule:" + ids[2];
+                var youtubeDue = globals[youtubeKey];
+                var update = RuleGroupRequest(rules, ids: ids, values: new JsonArray(
+                    RuleGroupValue("tiktok", ids[0], 2), RuleGroupValue("twitch", ids[1], 200), RuleGroupValue("youtube", ids[2], 100)));
+                update["values"][0]["name"] = "Renamed without changing behavior";
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, update), "updated");
+                Equal(4L, rules.BacklogCount, "only changed Twitch row loses its pending dispatch");
+                Equal(youtubeDue, globals[youtubeKey], "unchanged YouTube cooldown reservation survives a sibling edit");
+                Equal(2L, rules.Evaluate(NewGiftEvent(2, 1), true).DeferredInteractions, "unchanged TikTok remainder survives its rename");
+                Equal(2L, rules.Evaluate(JewelRuleEvent(40m), true).DeferredInteractions, "unchanged YouTube remainder survives");
+                Equal(0L, rules.Evaluate(PlatformRuleEvent("twitch", "currency", value: 140m), true).DeferredInteractions, "changed Twitch remainder resets");
+                Equal(2L, rules.Evaluate(PlatformRuleEvent("twitch", "currency", value: 60m), true).DeferredInteractions, "new Twitch threshold applies from zero");
+                Equal(10L, rules.BacklogCount, "retained and newly earned dispatches coexist");
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, RuleGroupRequest(rules, ids: ids, values: new JsonArray(
+                    RuleGroupValue("tiktok", ids[0], 2), RuleGroupValue("youtube", ids[2], 100)))), "updated");
+                Equal(8L, rules.BacklogCount, "removing Twitch purges only its dispatches");
+                var toggle = RuleGroupRequest(rules, "toggle", new[] { ids[0], ids[2] }); toggle["enabled"] = false;
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, toggle), "disabled");
+                Equal(0L, rules.BacklogCount, "disabling a group clears all of its remaining dispatches");
+            }
+        }
+
+        private static void TestRuleGroupValidation()
+        {
+            using (var scope = new TestScope("rule-group-validation"))
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var state = ExecuteRuleGroup(rules, RuleGroupRequest(rules));
+                var ids = CreatedGroupIds(state);
+                var valid = RuleGroupRequest(rules, ids: ids, values: new JsonArray(
+                    RuleGroupValue("tiktok", ids[0]), RuleGroupValue("twitch", ids[1]), RuleGroupValue("youtube", ids[2])));
+                var invalid = new List<JsonObject>();
+                Action<Action<JsonObject>> add = mutate => { var copy = valid.DeepClone().AsObject(); mutate(copy); invalid.Add(copy); };
+                add(node => node["schemaVersion"] = 2);
+                add(node => node["expectedRevision"] = 0);
+                add(node => node["expectedRevision"] = 2.5);
+                add(node => node["ruleIds"] = new JsonArray(ids[0], ids[0]));
+                add(node => node["ruleIds"] = new JsonArray(ids[0], 9999));
+                add(node => node["ruleIds"] = new JsonArray(1, ids[0]));
+                add(node => node["ruleIds"] = new JsonArray(1, ids[0], ids[1], ids[2]));
+                add(node => node["values"] = new JsonArray());
+                add(node => node["values"] = new JsonArray(RuleGroupValue("tiktok"), RuleGroupValue("twitch"), RuleGroupValue("youtube"), RuleGroupValue("tiktok")));
+                add(node => node["values"][1]["platform"] = "tiktok");
+                add(node => node["values"][1]["id"] = 1);
+                add(node => node["values"][1]["id"] = ids[0]);
+                add(node => node["values"][1]["eventType"] = "gift");
+                add(node => node["values"][0]["giftId"] = "999999");
+                add(node => node["values"][0]["enabled"] = "yes");
+                add(node => node["values"][0]["every"] = 0);
+                add(node => node["values"][0]["every"] = 1.5);
+                add(node => node["values"][0]["name"] = "");
+                add(node => node["values"][1]["eventType"] = "redemption");
+                add(node => node["interaction"] = "unknown_attack");
+                add(node => node["quantity"] = 51);
+                add(node => node["userCooldownSeconds"] = 3601);
+                add(node => node["globalCooldownSeconds"] = -1);
+                add(node => node["durationSeconds"] = 121);
+                add(node => node["countdownSeconds"] = 31);
+                add(node => { node["action"] = "delete"; node["ruleIds"] = new JsonArray(); });
+                add(node => { node["action"] = "toggle"; node["enabled"] = "yes"; });
+                var baseline = RuleGroupState(rules);
+                var saved = File.ReadAllText(RuleGroupSettingsPath(rules));
+                foreach (var request in invalid)
+                {
+                    var result = ExecuteRuleGroup(rules, request);
+                    True(result["error"].GetValue<bool>(), "invalid group rejected: " + request.ToJsonString());
+                    Equal(baseline["revision"].GetValue<long>(), result["revision"].GetValue<long>(), "invalid group never consumes a revision");
+                    Equal(baseline["rules"].ToJsonString(), result["rules"].ToJsonString(), "invalid group never changes any row");
+                    Equal(saved, File.ReadAllText(RuleGroupSettingsPath(rules)), "invalid group never writes a partial file");
+                }
+                var old = valid.DeepClone().AsObject();
+                rules.ProcessServerCommand("action=duplicate&id=" + ids[0]);
+                var sameNetworkId = RuleGroupState(rules)["rules"].AsArray().Max(row => row["id"].GetValue<long>());
+                var duplicateNetwork = RuleGroupRequest(rules, "delete", new[] { ids[0], sameNetworkId });
+                True(ExecuteRuleGroup(rules, duplicateNetwork)["error"].GetValue<bool>(), "legacy rows on one platform remain separate cohorts");
+                var stale = ExecuteRuleGroup(rules, old);
+                Equal("revision_conflict", stale["feedback"].GetValue<string>(), "legacy edit invalidates an open group draft");
+                Equal(5, stale["rules"].AsArray().Count, "stale edit cannot remove the legacy duplicate");
+            }
+        }
+
+        private static void TestRuleGroupLimit()
+        {
+            using (var scope = new TestScope("rule-group-limit"))
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var created = ExecuteRuleGroup(rules, RuleGroupRequest(rules));
+                var ids = CreatedGroupIds(created);
+                for (var index = 4; index < 100; index++) AddPlatformRule(rules, "twitch", "currency");
+                var before = RuleGroupState(rules);
+                Equal(100, before["rules"].AsArray().Count, "fixture reaches the flat row limit");
+                foreach (var request in new[] {
+                    RuleGroupRequest(rules),
+                    RuleGroupRequest(rules, "duplicate", ids),
+                    RuleGroupRequest(rules, ids: new[] { ids[0] })
+                })
+                {
+                    var rejected = ExecuteRuleGroup(rules, request);
+                    Equal("rules_limit", rejected["feedback"].GetValue<string>(), "over-limit group is rejected as one operation");
+                    Equal(before["revision"].GetValue<long>(), rejected["revision"].GetValue<long>(), "limit error preserves revision");
+                    Equal(before["rules"].ToJsonString(), rejected["rules"].ToJsonString(), "limit error preserves all 100 rows");
+                }
+                var allowed = RuleGroupRequest(rules, ids: ids, values: new JsonArray(
+                    RuleGroupValue("tiktok", ids[0], 5), RuleGroupValue("twitch", ids[1], 5), RuleGroupValue("youtube", ids[2], 5)));
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, allowed), "updated");
+                Equal(100, RuleGroupState(rules)["rules"].AsArray().Count, "editing existing rows remains possible at the limit");
+            }
+        }
+
+        private static void TestRuleGroupSaveFailure()
+        {
+            using (var scope = new TestScope("rule-group-save-failure"))
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var created = ExecuteRuleGroup(rules, RuleGroupRequest(rules));
+                var ids = CreatedGroupIds(created);
+                rules.Evaluate(NewGiftEvent(1, 3), true);
+                var pending = rules.BacklogCount;
+                var baseline = RuleGroupState(rules);
+                var path = RuleGroupSettingsPath(rules);
+                var file = File.ReadAllText(path);
+                var backup = File.ReadAllText(path + ".bak");
+                var commands = new List<JsonObject> {
+                    RuleGroupRequest(rules), RuleGroupRequest(rules, "duplicate", ids), RuleGroupRequest(rules, "delete", ids),
+                    RuleGroupRequest(rules, ids: ids, values: new JsonArray(RuleGroupValue("tiktok", ids[0], 3)))
+                };
+                var toggle = RuleGroupRequest(rules, "toggle", ids); toggle["enabled"] = false; commands.Add(toggle);
+                using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                foreach (var command in commands)
+                {
+                    var rejected = ExecuteRuleGroup(rules, command);
+                    Equal("save_failed", rejected["feedback"].GetValue<string>(), "failed persistence is reported for the whole group");
+                    Equal(baseline["revision"].GetValue<long>(), rejected["revision"].GetValue<long>(), "failed persistence retains revision");
+                    Equal(baseline["rules"].ToJsonString(), rejected["rules"].ToJsonString(), "failed persistence retains active rules");
+                    Equal(pending, rules.BacklogCount, "failed persistence cannot clear active backlog");
+                    Equal(file, File.ReadAllText(path), "failed replacement never deletes the prior primary file");
+                    Equal(backup, File.ReadAllText(path + ".bak"), "failed replacement retains the prior backup");
+                    False(File.Exists(path + ".tmp"), "failed save cleans its temporary file");
+                }
+                var succeeded = ExecuteRuleGroup(rules, RuleGroupRequest(rules, values: new JsonArray(RuleGroupValue("twitch"))));
+                AssertRuleGroupSuccess(succeeded, "created");
+                Equal(ids.Max() + 1, succeeded["rules"].AsArray().Max(row => row["id"].GetValue<long>()), "failed commands do not consume IDs");
+                Equal(2L, rules.Evaluate(NewGiftEvent(2, 1), true).DeferredInteractions, "failed commands preserve the old gift remainder");
+            }
+        }
+
+        private static void TestRuleGroupLegacyCompatibility()
+        {
+            using (var scope = new TestScope("rule-group-legacy"))
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var created = ExecuteRuleGroup(rules, RuleGroupRequest(rules));
+                var ids = CreatedGroupIds(created);
+                var path = RuleGroupSettingsPath(rules);
+                var persisted = JsonNode.Parse(File.ReadAllText(path));
+                Equal(7, persisted["version"].GetValue<int>(), "persisted schema remains seven");
+                False(persisted.AsObject().ContainsKey("groups"), "no parallel group store or persistent group ID is introduced");
+                rules.ProcessServerCommand("action=duplicate&id=" + ids[0]);
+                var before = RuleGroupState(rules)["rules"].ToJsonString();
+                rules = scope.ReloadRules(rules);
+                Equal(before, RuleGroupState(rules)["rules"].ToJsonString(), "legacy duplicate platform values survive loading without merging");
+                var toggled = rules.ProcessServerCommand("action=toggle&id=" + ids[0] + "&enabled=0");
+                True(toggled.Contains("\"feedback\":\"disabled\""), "legacy toggle remains compatible with group-created rows");
+                var updated = rules.ProcessServerCommand("action=update&id=" + ids[1] +
+                    "&name=Legacy+updated&platform=twitch&eventType=currency&every=42&interaction=test_attack&quantity=2&userCooldownSeconds=5&globalCooldownSeconds=7&durationSeconds=15&countdownSeconds=3&enabled=1");
+                True(updated.Contains("\"feedback\":\"updated\""), "legacy update remains available");
+                var removed = rules.ProcessServerCommand("action=delete&id=" + ids[2]);
+                True(removed.Contains("\"feedback\":\"deleted\""), "legacy deletion remains available");
+                rules = scope.ReloadRules(rules);
+                Equal(42, RuleGroupRow(RuleGroupState(rules), ids[1])["every"].GetValue<int>(), "legacy edits persist alongside grouped rows");
+            }
+        }
+
+        private static void TestRuleGroupHttp()
+        {
+            using (var scope = new TestScope("rule-group-http"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var url = "http://127.0.0.1:" + server.Port + "/api/config/interactions/rules/group/set";
+                Equal(HttpStatusCode.MethodNotAllowed, GetStatusCode(server, "/api/config/interactions/rules/group/set"), "group mutations require POST");
+                Equal(HttpStatusCode.UnsupportedMediaType, PostStatus(server, "/api/config/interactions/rules/group/set", "{}", "text/plain"), "group mutations require JSON");
+                Equal(HttpStatusCode.ServiceUnavailable, PostStatus(server, "/api/config/interactions/rules/group/set", "{}", "application/json"), "group mutations cannot enter a deferred queue");
+                server.SetStreamRuleCommandHandler(rules.ProcessServerCommand);
+                var request = RuleGroupRequest(rules);
+                var body = request.ToJsonString();
+                using (var forbidden = new HttpRequestMessage(HttpMethod.Post, url))
+                {
+                    forbidden.Headers.TryAddWithoutValidation("Origin", "https://attacker.invalid");
+                    forbidden.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    using (var response = client.Send(forbidden)) Equal(HttpStatusCode.Forbidden, response.StatusCode, "cross-origin group mutation is rejected");
+                }
+                Equal(HttpStatusCode.BadRequest, PostStatus(server, "/api/config/interactions/rules/group/set", "{", "application/json"), "invalid group JSON is rejected");
+                Equal(HttpStatusCode.BadRequest, PostStatus(server, "/api/config/interactions/rules/group/set",
+                    new string(' ', CreatorToolsStreamRulesController.MaximumGroupCommandLength + 1), "application/json"),
+                    "oversized group JSON is rejected before dispatch");
+                var calls = new[] { 0, 1 }.Select(_ => Task.Run(() => {
+                    using (var http = new HttpClient())
+                    using (var content = new StringContent(body, Encoding.UTF8, "application/json"))
+                    using (var response = http.PostAsync(url, content).GetAwaiter().GetResult())
+                    {
+                        var state = JsonNode.Parse(response.Content.ReadAsStringAsync().GetAwaiter().GetResult()).AsObject();
+                        return new { response.StatusCode, State = state };
+                    }
+                })).ToArray();
+                Task.WaitAll(calls);
+                Equal(1, calls.Count(call => call.Result.StatusCode == HttpStatusCode.OK), "one simultaneous draft commits");
+                Equal(1, calls.Count(call => call.Result.StatusCode == HttpStatusCode.Conflict), "the other simultaneous draft receives conflict");
+                Equal(2L, RuleGroupState(rules)["revision"].GetValue<long>(), "concurrent group save increments revision only once");
+                using (var state = GetJson(server, "/api/config/interactions/rules"))
+                    Equal(4, state.RootElement.GetProperty("rules").GetArrayLength(), "HTTP state never exposes a partial group");
+                Equal(HttpStatusCode.MethodNotAllowed, GetStatusCode(server,
+                    "/api/config/interactions/rules/set?action=create&action=%20GROUP%20&payload=" + Uri.EscapeDataString(body)),
+                    "legacy GET cannot tunnel a group mutation through repeated or padded action keys");
+                using (var legacy = GetJson(server, "/api/config/interactions/rules/set?action=toggle&id=1&enabled=0"))
+                    Equal("disabled", legacy.RootElement.GetProperty("feedback").GetString(), "legacy individual GET still works");
+                var current = RuleGroupState(rules);
+                var bad = RuleGroupRequest(rules); bad["values"][1]["platform"] = "tiktok";
+                using (var rejected = PostJson(server, "/api/config/interactions/rules/group/set", bad.ToJsonString(), out var status))
+                {
+                    Equal(HttpStatusCode.BadRequest, status, "semantic group errors return 400");
+                    Equal(current["revision"].GetValue<long>(), rejected.RootElement.GetProperty("revision").GetInt64(), "400 response retains full current state");
+                }
+                using (var locked = new FileStream(RuleGroupSettingsPath(rules), FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var rejected = PostJson(server, "/api/config/interactions/rules/group/set",
+                    RuleGroupRequest(rules).ToJsonString(), out var failedStatus))
+                {
+                    Equal(HttpStatusCode.InternalServerError, failedStatus, "failed atomic persistence returns 500");
+                    Equal("save_failed", rejected.RootElement.GetProperty("feedback").GetString(), "save error includes the full current state");
+                    Equal(current["revision"].GetValue<long>(), rejected.RootElement.GetProperty("revision").GetInt64(), "failed HTTP save preserves revision");
+                    Equal(4, rejected.RootElement.GetProperty("rules").GetArrayLength(), "failed HTTP save exposes no new rows");
+                }
+            }
+        }
+    }
+}

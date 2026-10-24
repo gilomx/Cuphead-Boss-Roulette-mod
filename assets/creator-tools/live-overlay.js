@@ -156,6 +156,8 @@
           interactionsSpeed: 40,
           interactionsSize: 0,
           interactionsAdaptive: true,
+          interactionsCardColor: "#23262bee",
+          interactionsCardNoise: 18,
         } : {}),
       })),
     };
@@ -238,9 +240,11 @@
       interactionsTwitch: component.interactionsTwitch !== false,
       interactionsYouTube: component.interactionsYouTube !== false,
       interactionsPageSeconds: clamp(finiteNumber(component.interactionsPageSeconds, 8), 3, 60),
-      interactionsSpeed: clamp(finiteNumber(component.interactionsSpeed, 40), 10, 120),
+      interactionsSpeed: clamp(finiteNumber(component.interactionsSpeed, 40), 40, 140),
       interactionsSize: Number(component.interactionsSize) > 0 ? Math.round(clamp(finiteNumber(component.interactionsSize, 75), 25, 100)) : 0,
       interactionsAdaptive: component.interactionsAdaptive !== false,
+      interactionsCardColor: normalizeHexColor(component.interactionsCardColor, "#23262bee"),
+      interactionsCardNoise: Math.round(clamp(finiteNumber(component.interactionsCardNoise, 18), 0, 100)),
     };
   }
 
@@ -303,7 +307,8 @@
       entry.host.style.setProperty("--component-height", `${Math.max(0.1, height)}%`);
       entry.host.style.setProperty(
         "--component-opacity",
-        String(clamp(finiteNumber(config.opacity, 100), 0, 100) / 100),
+        String((clamp(finiteNumber(config.opacity, 100), 0, 100) / 100) *
+          (designer && designerComponentId !== id ? 0.3 : 1)),
       );
       entry.host.style.zIndex = String(Math.round(finiteNumber(config.layer, 1)));
       const selectedPreviewActive = (id === "roulette" || id === "interactions") && (

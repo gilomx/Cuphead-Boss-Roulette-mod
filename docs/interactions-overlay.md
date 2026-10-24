@@ -22,6 +22,9 @@ para evitar huecos. En paginado el porcentaje se aplica a la página completa,
 conservando todos sus ítems visibles y la misma escala al avanzar. Las escenas
 antiguas mantienen el tamaño automático.
 
+La velocidad de la franja se ajusta entre **40 y 140 px/s**. Las escenas guardadas
+con una velocidad menor conservan el resto de su diseño y pasan al mínimo de 40.
+
 El ajuste **Agrandar canjes cuando hay menos opciones** sigue siendo independiente
 del tamaño general. Al mostrar menos redes, los iconos de canje y sus cantidades crecen
 automáticamente. Las imágenes de los efectos conservan su proporción y se ajustan
@@ -35,13 +38,23 @@ calculados para los canjes del catálogo, con 16 px de padding interno y espacio
 entre el efecto y los precios. Sólo cada tarjeta tiene fondo.
 El exterior de ambas plantillas permanece transparente.
 
+En **Tarjetas**, **Color de las tarjetas** permite cambiar el fondo y su
+transparencia. **Ruido envejecido** añade grano y marcas sutiles sobre ese fondo;
+su intensidad se ajusta del 0% al 100%, con 0% para desactivarlo. La textura es
+estática y queda debajo de las imágenes y las cantidades. Ambos ajustes se
+guardan por perfil y se aplican tanto a la franja como al paginado.
+
 El contenido sale de las reglas habilitadas de **Interacciones**. La cantidad
 del canje corresponde a «cada N» regalos, Bits, gemas, likes u otros eventos
 configurados. Los nombres de recompensas de Twitch se conservan sólo en las
 etiquetas de accesibilidad, sin texto visible junto al precio. Los regalos usan
 las imágenes reales del catálogo local; Bits usa el Cheermote oficial de Twitch
-y Gemas el recurso de YouTube. Las reglas con distinta cantidad de efectos o distinta duración se
+y Gemas el recurso de YouTube, sin insignias adicionales con el logotipo de la red.
+Las reglas con distinta cantidad de efectos o distinta duración se
 mantienen separadas aunque compartan la misma imagen.
+
+El editor permite [configurar un ataque con valores por red](interaction-values.md)
+mediante una sola ficha. El overlay reúne esos valores en el mismo ítem.
 
 Si aún no hay reglas configuradas, el diseñador muestra ejemplos señalados como
 tales, con regalos reales variados e iconos propios de cada red. La vista previa

@@ -1,17 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Plus, Settings } from "lucide-react";
 import { useConfig } from "../../config/ConfigContext";
 import { useTikTokGiftCatalog } from "../../hooks/useTikTokGiftCatalog";
 import { useLocalization } from "../../i18n/LocalizationContext";
-import type { StreamRule, StreamRuleDraft, StreamRulePlatform } from "../../model";
+import type { StreamRulePlatform } from "../../model";
 import { StreamPlatformIcon } from "./StreamRuleIcons";
 import {
-  createStreamRuleDraft,
-  draftForStreamRule,
-  sameStreamRuleDraft,
-} from "./streamRuleDraft";
-import { StreamRuleForm } from "./StreamRuleForm";
-import { StreamRulesTable } from "./StreamRulesTable";
+  createStreamRuleGroupDraft,
+  draftForStreamRuleGroup,
+  groupStreamRules,
+  sameStreamRuleGroupDraft,
+  type StreamRuleGroup,
+  type StreamRuleGroupDraft,
+} from "./streamRuleGroups";
+import { StreamRuleGroupForm } from "./StreamRuleGroupForm";
+import { StreamRuleGroupsTable } from "./StreamRuleGroupsTable";
 
 type HighlightFeedback = "created" | "updated" | "duplicated";
 
@@ -21,6 +24,7 @@ interface HighlightRequest {
   previousIds: number[];
   revision: number;
   closeEditor: boolean;
+  submittedDraft?: StreamRuleGroupDraft;
 }
 
 interface VisibleRuleFeedback {
@@ -45,15 +49,15 @@ export function StreamRulesView({
 }: StreamRulesViewProps) {
   const {
     streamRules,
-    saveStreamRule,
-    deleteStreamRule,
-    duplicateStreamRule,
-    toggleStreamRule,
+    saveStreamRuleGroup,
+    deleteStreamRuleGroup,
+    duplicateStreamRuleGroup,
+    toggleStreamRuleGroup,
     status,
   } = useConfig();
   const { t } = useLocalization();
   const { catalog, error: catalogError } = useTikTokGiftCatalog();
-  const [draft, setDraft] = useState<StreamRuleDraft | null>(null);
+  const [draft, setDraft] = useState<StreamRuleGroupDraft | null>(null);
   const [platformFilter, setPlatformFilter] = useState<StreamRulePlatform | "all">("all");
   const [savePending, setSavePending] = useState(false);
   const [highlightedRuleId, setHighlightedRuleId] = useState<number | null>(null);
@@ -68,11 +72,12 @@ export function StreamRulesView({
   const feedbackTimerRef = useRef<number | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const observedRulesStateRef = useRef(false);
-  const initialDraftRef = useRef<StreamRuleDraft | null>(null);
+  const initialDraftRef = useRef<StreamRuleGroupDraft | null>(null);
   const editorOpen = draft !== null;
   const draftChanged = editorOpen &&
-    !sameStreamRuleDraft(draft, initialDraftRef.current);
+    !sameStreamRuleGroupDraft(draft, initialDraftRef.current);
   const rules = streamRules?.rules ?? [];
+  const groups = useMemo(() => groupStreamRules(streamRules?.rules ?? []), [streamRules?.rules]);
   const canCreate = Boolean(
     catalog && streamRules?.ready && rules.length < (streamRules?.maxRules ?? 0),
   );
@@ -186,23 +191,49 @@ export function StreamRulesView({
 
   useEffect(() => {
     const request = highlightRequestRef.current;
-    if (!request || !streamRules || streamRules.revision <= request.revision) return;
+    if (!request || !streamRules || status === "saving" || status === "pending") return;
+
+    // Rejected stale drafts do not advance the rules revision. Release the
+    // saving state while retaining exactly what the user was editing.
+    if (streamRules.error || status === "error") {
+      highlightRequestRef.current = null;
+      if (request.closeEditor) setSavePending(false);
+      return;
+    }
+    if (streamRules.revision <= request.revision) return;
 
     highlightRequestRef.current = null;
     if (request.closeEditor) setSavePending(false);
-    if (streamRules.error || streamRules.feedback !== request.feedback) return;
+    if (streamRules.feedback !== request.feedback) return;
 
     const id = request.id ?? streamRules.rules.find(
       (rule) => !request.previousIds.includes(rule.id),
     )?.id;
+    const comparable = (value: StreamRuleGroupDraft): StreamRuleGroupDraft => ({
+      ...value, ruleIds: [], expectedRevision: undefined,
+      values: value.values.map(entry => ({ ...entry, id: undefined })),
+    });
+    // Equivalent legacy rules can join different visual cohorts after an
+    // update. Verify the individual saved values rather than requiring the
+    // resulting table row to have exactly the previous group membership.
+    const submitted = request.submittedDraft;
+    const savedIds = submitted ? submitted.values.flatMap(value => {
+      const savedRule = streamRules.rules.find(rule =>
+        (value.id === undefined ? !request.previousIds.includes(rule.id) : rule.id === value.id) &&
+        sameStreamRuleGroupDraft(
+          comparable(draftForStreamRuleGroup(groupStreamRules([rule])[0])),
+          comparable({ ...submitted, values: [value] }),
+        ));
+      return savedRule ? [savedRule.id] : [];
+    }) : id === undefined ? [] : [id];
+    if (submitted && savedIds.length !== submitted.values.length) return;
+    const saved = groups.find(group => group.ruleIds.some(ruleId => savedIds.includes(ruleId)));
+    if (!saved) return;
     if (request.closeEditor) setDraft(null);
-    if (id !== undefined) {
-      const saved = streamRules.rules.find((rule) => rule.id === id);
-      if (saved && platformFilter !== "all" && saved.platform !== platformFilter)
-        setPlatformFilter(saved.platform);
-      highlightRule(id);
-    }
-  }, [highlightRule, platformFilter, streamRules]);
+    if (platformFilter !== "all" && !saved.rules.some(rule => rule.platform === platformFilter))
+      setPlatformFilter(saved.rules[0].platform);
+    highlightRule(saved.id);
+  }, [groups, highlightRule, platformFilter, status, streamRules]);
 
   useEffect(() => {
     if (!savePending || status !== "error") return;
@@ -213,17 +244,17 @@ export function StreamRulesView({
   useEffect(() => {
     if (
       confirmingDeleteId !== null &&
-      !rules.some((rule) => rule.id === confirmingDeleteId)
+      !groups.some((group) => group.id === confirmingDeleteId)
     ) {
       setConfirmingDeleteId(null);
     }
     if (
       deletingRuleId !== null &&
-      !rules.some((rule) => rule.id === deletingRuleId)
+      !groups.some((group) => group.id === deletingRuleId)
     ) {
       setDeletingRuleId(null);
     }
-  }, [confirmingDeleteId, deletingRuleId, rules]);
+  }, [confirmingDeleteId, deletingRuleId, groups]);
 
   useEffect(() => {
     if (deletingRuleId !== null && status === "error") {
@@ -235,6 +266,7 @@ export function StreamRulesView({
     feedback: HighlightFeedback,
     id?: number,
     closeEditor = false,
+    submittedDraft?: StreamRuleGroupDraft,
   ) => {
     highlightRequestRef.current = {
       feedback,
@@ -242,32 +274,34 @@ export function StreamRulesView({
       previousIds: rules.map((rule) => rule.id),
       revision: streamRules?.revision ?? -1,
       closeEditor,
+      submittedDraft,
     };
   };
 
   const beginCreate = () => {
     if (!canCreate) return;
-    const nextDraft = createStreamRuleDraft(
+    const nextDraft = { ...createStreamRuleGroupDraft(
       catalog?.gifts[0], platformFilter === "all" ? "tiktok" : platformFilter,
-    );
+    ), expectedRevision: streamRules?.revision };
     initialDraftRef.current = nextDraft;
     setDraft(nextDraft);
   };
 
-  const beginEdit = (rule: StreamRule) => {
-    const nextDraft = draftForStreamRule(rule);
+  const beginEdit = (group: StreamRuleGroup) => {
+    const nextDraft = { ...draftForStreamRuleGroup(group), expectedRevision: streamRules?.revision };
     initialDraftRef.current = nextDraft;
     setDraft(nextDraft);
   };
 
-  const saveDraft = (nextDraft: StreamRuleDraft) => {
+  const saveDraft = (nextDraft: StreamRuleGroupDraft) => {
     requestHighlight(
-      nextDraft.id === undefined ? "created" : "updated",
-      nextDraft.id,
+      nextDraft.ruleIds.length === 0 ? "created" : "updated",
+      nextDraft.ruleIds.length ? Math.min(...nextDraft.ruleIds) : undefined,
       true,
+      nextDraft,
     );
     setSavePending(true);
-    if (!saveStreamRule(nextDraft)) {
+    if (!saveStreamRuleGroup(nextDraft)) {
       highlightRequestRef.current = null;
       setSavePending(false);
     }
@@ -290,7 +324,7 @@ export function StreamRulesView({
             ) : null}
             <h2 id="stream-rules-panel-title">
               {t(draft
-                ? draft.id === undefined
+                ? draft.ruleIds.length === 0
                   ? "interactions.rules.editor.createTitle"
                   : "interactions.rules.editor.editTitle"
                 : "interactions.rules.list.title")}
@@ -341,15 +375,16 @@ export function StreamRulesView({
         <div
           className="stream-rules-panel__view"
           data-direction={draft ? "forward" : "back"}
-          key={draft ? `editor-${draft.id ?? "new"}` : "table"}
+          key={draft ? `editor-${draft.ruleIds[0] ?? "new"}` : "table"}
         >
           {draft && catalog ? (
-            <StreamRuleForm
+            <StreamRuleGroupForm
               draft={draft}
               gifts={catalog.gifts}
               maxEvery={streamRules?.maxEvery ?? 1_000_000}
               maxQuantity={streamRules?.maxQuantity ?? 50}
               maxCooldownSeconds={streamRules?.maxCooldownSeconds ?? 3_600}
+              maxValues={Math.max(0, Math.min(3, (streamRules?.maxRules ?? 0) - rules.length + draft.ruleIds.length))}
               saving={savePending}
               onOpenAdvancedSettings={onOpenAdvancedSettings}
               onChange={setDraft}
@@ -368,26 +403,27 @@ export function StreamRulesView({
                 </button>
               ))}
             </div>
-            <StreamRulesTable
-              rules={rules.filter((rule) => platformFilter === "all" || rule.platform === platformFilter)}
+            <StreamRuleGroupsTable
+              groups={groups.filter(group => platformFilter === "all" || group.rules.some(rule => rule.platform === platformFilter))}
               gifts={catalog?.gifts ?? []}
               canCreate={canCreate}
+              availableRuleSlots={Math.max(0, (streamRules?.maxRules ?? 0) - rules.length)}
               disabled={!streamRules?.ready || !catalog || deletingRuleId !== null}
               highlightedRuleId={highlightedRuleId}
               confirmingDeleteId={confirmingDeleteId}
               deletingRuleId={deletingRuleId}
               onCreate={beginCreate}
               onEdit={beginEdit}
-              onToggle={toggleStreamRule}
-              onDuplicate={(id) => {
+              onToggle={toggleStreamRuleGroup}
+              onDuplicate={(ruleIds) => {
                 requestHighlight("duplicated");
-                duplicateStreamRule(id);
+                if (!duplicateStreamRuleGroup(ruleIds)) highlightRequestRef.current = null;
               }}
               onRequestDelete={setConfirmingDeleteId}
               onCancelDelete={() => setConfirmingDeleteId(null)}
-              onConfirmDelete={(id) => {
-                if (confirmingDeleteId !== id || deletingRuleId !== null) return;
-                if (deleteStreamRule(id)) setDeletingRuleId(id);
+              onConfirmDelete={(group) => {
+                if (confirmingDeleteId !== group.id || deletingRuleId !== null) return;
+                if (deleteStreamRuleGroup(group.ruleIds)) setDeletingRuleId(group.id);
               }}
             />
             </>

@@ -19,7 +19,10 @@
       interactionsTwitch: source.interactionsTwitch !== false,
       interactionsYouTube: source.interactionsYouTube !== false,
       interactionsPageSeconds: Math.round(number(source.interactionsPageSeconds, 8, 3, 60)),
-      interactionsSpeed: number(source.interactionsSpeed, 40, 10, 120),
+      interactionsSpeed: number(source.interactionsSpeed, 40, 40, 140),
+      interactionsCardColor: /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(source.interactionsCardColor || '')
+        ? source.interactionsCardColor : '#23262bee',
+      interactionsCardNoise: Math.round(number(source.interactionsCardNoise ?? 18, 18, 0, 100)),
       interactionsSize: Number(source.interactionsSize) > 0 ? Math.round(number(source.interactionsSize, 75, 25, 100)) : 0,
       interactionsAdaptive: source.interactionsAdaptive !== false,
       // Older scenes may still request labels. This overlay is always image + cost.

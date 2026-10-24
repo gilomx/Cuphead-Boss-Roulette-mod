@@ -670,6 +670,9 @@
       "template": "Plantilla",
       "cards": "1 · Tarjetas",
       "floating": "2 · Iconos flotantes",
+      "cardColor": "Color de las tarjetas",
+      "cardNoise": "Ruido envejecido",
+      "cardNoiseHint": "Añade grano y suciedad sutiles al fondo. En 0% queda liso.",
       "layout": "Distribución",
       "strip": "Franja móvil continua",
       "pages": "Paginado compacto · 3 × 3",
@@ -897,6 +900,21 @@
     },
     "rules": {
       "coins": "monedas",
+      "groups": {
+        "interaction": "Ataque, ayuda o reto",
+        "values": "Valores por red",
+        "valuesHint": "Agrega sólo las redes que uses. Todos los valores envían este mismo ataque al juego.",
+        "addValue": "Agregar valor de otra red",
+        "valueFor": "Valor en {platform}",
+        "enabledValue": "Activo",
+        "removeValue": "Quitar valor de {platform}",
+        "changeGift": "Elegir otro regalo",
+        "sharedHint": "Estos tiempos se aplican a cada valor de este ataque.",
+        "completeValues": "Revisa el ataque y completa los valores de cada red.",
+        "mixedStatus": "Algunos activos",
+        "noValue": "Sin valor",
+        "countdown": "Inicio en {seconds} s"
+      },
       "notice": {
         "catalogLoading": "Cargando catálogo…",
         "catalogError": "No se pudo cargar el catálogo instalado."
@@ -1036,6 +1054,8 @@
         "catalog_unavailable": "El mod no pudo validar el catálogo de regalos.",
         "rules_limit": "Se alcanzó el límite de interacciones.",
         "invalid_rule": "La interacción contiene datos no válidos.",
+        "invalid_group": "Revisa el ataque y los valores de sus redes.",
+        "revision_conflict": "La configuración cambió en otra ventana. Vuelve a abrir el ataque para revisar sus valores.",
         "rule_not_found": "La interacción ya no existe.",
         "invalid_action": "La acción solicitada no es válida.",
         "save_failed": "No se pudo guardar la configuración de interacciones."

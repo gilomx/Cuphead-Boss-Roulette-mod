@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { matchesOverlayPreviewLayout } from "./mock-overlay-layout.mjs";
 
 // Run the production reducer on every supported Node version, including Node 20.
@@ -28,6 +29,66 @@ try {
   rmSync(temporary, { recursive: true, force: true });
 }
 const { createBattleSimulation, battleSimulationReducer, previewCommand } = exports;
+
+function mockComposer() {
+  // Exercise the mock's actual API/normalizer without opening a localhost port.
+  const source = readFileSync(join(uiRoot, "scripts/mock-server.mjs"), "utf8");
+  const defaults = source.slice(source.indexOf("function defaultOverlayProfiles()"), source.indexOf("function tapFarmingState()"));
+  const commands = source.slice(source.indexOf("function normalizeOverlayComponent("), source.indexOf("function serveAsset("));
+  return runInNewContext(`let overlayComposerRevision = 1;\n${defaults}\n${commands}\n({
+    normalize: normalizeOverlayComponent,
+    state: overlayComposerState,
+    send(command) { const response = {}; applyOverlayComposerCommand(command, response); return response; }
+  })`, { json(response, body, status = 200) { response.body = body; response.status = status; } });
+}
+
+test("card appearance and expanded strip speeds persist through the mock API and copying profiles", () => {
+  const mock = mockComposer();
+  const card = (state, id = "vertical") => state.profiles.find(profile => profile.id === id).components.find(component => component.id === "interactions");
+  const send = command => mock.send({ schemaVersion: 1, expectedRevision: mock.state().revision, profileId: "vertical", operation: "update", componentId: "interactions", ...command });
+  assert.equal(card(mock.state()).interactionsCardColor, "#23262bee");
+  assert.equal(card(mock.state()).interactionsCardNoise, 18);
+  const saved = send({ interactionsTemplate: "cards", interactionsCardColor: "#ABCDEF80", interactionsCardNoise: 77, interactionsSpeed: 140 });
+  assert.equal(saved.status, 200);
+  assert.equal(card(saved.body).interactionsCardColor, "#abcdef80");
+  assert.equal(card(saved.body).interactionsCardNoise, 77);
+  assert.equal(card(saved.body).interactionsSpeed, 140);
+  const copied = send({ operation: "copy", profileId: "horizontal", sourceProfileId: "vertical" });
+  assert.equal(copied.status, 200);
+  assert.equal(card(copied.body, "horizontal").interactionsCardColor, "#abcdef80");
+  assert.equal(card(copied.body, "horizontal").interactionsCardNoise, 77);
+  assert.equal(card(copied.body, "horizontal").interactionsSpeed, 140);
+  for (const command of [
+    { interactionsCardColor: "#abc" }, { interactionsCardColor: "transparent" },
+    { interactionsCardNoise: -1 }, { interactionsCardNoise: 101 }, { interactionsCardNoise: 18.5 },
+    { interactionsSpeed: 39 }, { interactionsSpeed: 141 },
+  ]) {
+    const revision = mock.state().revision;
+    assert.equal(send(command).status, 400, JSON.stringify(command));
+    assert.equal(mock.state().revision, revision, "invalid options do not modify the saved profile");
+  }
+  assert.equal(send({ interactionsCardColor: "#123456", interactionsCardNoise: 0, interactionsSpeed: 40 }).status, 200);
+  assert.equal(send({ interactionsCardNoise: 100 }).status, 200);
+  const reset = send({ operation: "reset" });
+  assert.equal(reset.status, 200);
+  assert.equal(card(reset.body).interactionsCardColor, "#23262bee");
+  assert.equal(card(reset.body).interactionsCardNoise, 18);
+});
+
+test("old slow strip values migrate to the new minimum and missing card settings gain defaults", () => {
+  const mock = mockComposer();
+  const profile = mock.state().profiles.find(profile => profile.id === "vertical");
+  const defaults = profile.components.find(component => component.id === "interactions");
+  for (const speed of [10, 25, 39]) {
+    const legacy = { ...defaults, interactionsSpeed: speed };
+    delete legacy.interactionsCardColor;
+    delete legacy.interactionsCardNoise;
+    mock.normalize(legacy, profile.canvas);
+    assert.equal(legacy.interactionsSpeed, 40);
+    assert.equal(legacy.interactionsCardColor, "#23262bee");
+    assert.equal(legacy.interactionsCardNoise, 18);
+  }
+});
 
 test("mock preview accepts the complete five-component designer profile and rejects malformed component sets", () => {
   const profile = { id: "vertical", canvas: { width: 1080, height: 1920 },

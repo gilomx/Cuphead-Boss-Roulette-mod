@@ -112,7 +112,8 @@ test('interaction designer previews a disabled layer and forwards its independen
   view.profile.components.push({ id: 'interactions', enabled: false,
     interactionsTemplate: 'cards', interactionsLayout: 'pages',
     interactionsTikTok: true, interactionsTwitch: false, interactionsYouTube: false,
-    interactionsPageSeconds: 12, interactionsSpeed: 30, interactionsAdaptive: true, interactionsSize: 65 });
+    interactionsPageSeconds: 12, interactionsSpeed: 140, interactionsAdaptive: true, interactionsSize: 65,
+    interactionsCardColor: '#3f2b20aa', interactionsCardNoise: 35 });
   const rules = [{ id: 1, enabled: true, platform: 'tiktok', eventType: 'gift',
     giftId: '5655', every: 1, interaction: 'help_extra_life', quantity: 1 }];
   view.design('interactions', { interactions: { rules, examples: true } });
@@ -127,6 +128,9 @@ test('interaction designer previews a disabled layer and forwards its independen
   assert.equal(message.state.presentation.interactionsTwitch, false);
   assert.equal(message.state.presentation.interactionsPageSeconds, 12);
   assert.equal(message.state.presentation.interactionsSize, 65);
+  assert.equal(message.state.presentation.interactionsSpeed, 140);
+  assert.equal(message.state.presentation.interactionsCardColor, '#3f2b20aa');
+  assert.equal(message.state.presentation.interactionsCardNoise, 35);
   view.design('roulette');
   assert.equal(view.interactionsHost.dataset.enabled, 'false');
   view.close();

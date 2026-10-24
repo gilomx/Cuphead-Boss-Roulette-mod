@@ -409,11 +409,23 @@ namespace Gilomx.CupheadBossRoulette
                 component.Variant = variant; changed = true;
             }
             foreach (var key in new[] { "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
-                "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize" })
+                "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
+                "interactionsCardColor", "interactionsCardNoise" })
             {
                 if (!values.ContainsKey(key)) continue;
                 if (component.Id != CreatorToolsOverlayComposerSettings.InteractionsComponentId) return false;
-                if (key == "interactionsTemplate")
+                if (key == "interactionsCardColor")
+                {
+                    var color = CreatorToolsOverlayComposerSettings.NormalizeColor(Value(values, key));
+                    if (color.Length == 0) return false;
+                    component.InteractionsCardColor = color;
+                }
+                else if (key == "interactionsCardNoise")
+                {
+                    if (!TryReadInt(values, key, out number) || number < 0 || number > 100) return false;
+                    component.InteractionsCardNoise = number;
+                }
+                else if (key == "interactionsTemplate")
                 {
                     var template = CreatorToolsOverlayComposerSettings.NormalizeInteractionsTemplate(Value(values, key));
                     if (template.Length == 0) return false;
@@ -433,8 +445,8 @@ namespace Gilomx.CupheadBossRoulette
                 else if (key == "interactionsPageSeconds" || key == "interactionsSpeed")
                 {
                     if (!TryReadInt(values, key, out number) ||
-                        number < (key == "interactionsPageSeconds" ? 3 : 10) ||
-                        number > (key == "interactionsPageSeconds" ? 60 : 120)) return false;
+                        number < (key == "interactionsPageSeconds" ? 3 : 40) ||
+                        number > (key == "interactionsPageSeconds" ? 60 : 140)) return false;
                     if (key == "interactionsPageSeconds") component.InteractionsPageSeconds = number;
                     else component.InteractionsSpeed = number;
                 }

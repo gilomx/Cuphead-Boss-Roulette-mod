@@ -48,6 +48,8 @@ namespace Gilomx.CupheadBossRoulette
         internal int InteractionsSpeed = 40;
         internal int InteractionsSize;
         internal bool InteractionsAdaptive = true;
+        internal string InteractionsCardColor = CreatorToolsOverlayComposerSettings.DefaultInteractionsCardColor;
+        internal int InteractionsCardNoise = 18;
 
         internal CreatorToolsOverlayComposerComponent Clone()
         {
@@ -98,6 +100,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string ChatChoosesComponentId = "chat_chooses";
         internal const string RouletteComponentId = "roulette";
         internal const string InteractionsComponentId = "interactions";
+        internal const string DefaultInteractionsCardColor = "#23262bee";
         internal const string DefaultLiquidColor = "#ff4f92";
         internal const string DefaultCollectingColor = "#f4c95d";
         internal const string DefaultTextColor = "#ffffff";
@@ -512,8 +515,11 @@ namespace Gilomx.CupheadBossRoulette
                 component.InteractionsLayout = layout.Length == 0
                     ? (profile.Id == VerticalProfileId ? "pages" : "strip") : layout;
                 component.InteractionsPageSeconds = Math.Max(3, Math.Min(60, component.InteractionsPageSeconds));
-                component.InteractionsSpeed = Math.Max(10, Math.Min(120, component.InteractionsSpeed));
+                component.InteractionsSpeed = Math.Max(40, Math.Min(140, component.InteractionsSpeed));
                 if (!IsValidInteractionsSize(component.InteractionsSize)) component.InteractionsSize = 0;
+                var cardColor = NormalizeColor(component.InteractionsCardColor);
+                component.InteractionsCardColor = cardColor.Length == 0 ? DefaultInteractionsCardColor : cardColor;
+                component.InteractionsCardNoise = Math.Max(0, Math.Min(100, component.InteractionsCardNoise));
             }
         }
 
@@ -613,7 +619,9 @@ namespace Gilomx.CupheadBossRoulette
                         .Append(",\"interactionsPageSeconds\":").Append(component.InteractionsPageSeconds)
                         .Append(",\"interactionsSpeed\":").Append(component.InteractionsSpeed)
                         .Append(",\"interactionsSize\":").Append(component.InteractionsSize)
-                        .Append(",\"interactionsAdaptive\":").Append(component.InteractionsAdaptive ? "true" : "false");
+                        .Append(",\"interactionsAdaptive\":").Append(component.InteractionsAdaptive ? "true" : "false")
+                        .Append(",\"interactionsCardColor\":\"").Append(component.InteractionsCardColor)
+                        .Append("\",\"interactionsCardNoise\":").Append(component.InteractionsCardNoise);
                 builder.Append('}');
             }
             builder.Append("]}");
@@ -763,6 +771,8 @@ namespace Gilomx.CupheadBossRoulette
             destination.InteractionsSpeed = source.InteractionsSpeed;
             destination.InteractionsSize = source.InteractionsSize;
             destination.InteractionsAdaptive = source.InteractionsAdaptive;
+            destination.InteractionsCardColor = source.InteractionsCardColor;
+            destination.InteractionsCardNoise = source.InteractionsCardNoise;
         }
 
         private static double ComponentFitScale(
@@ -846,6 +856,11 @@ namespace Gilomx.CupheadBossRoulette
                         migratedBounds =
                             MigrateChatChoosesBounds(target, component) ||
                             migratedBounds;
+                        if (component.Id == InteractionsComponentId &&
+                            (component.InteractionsSpeed < 40 ||
+                             componentNode.Property("interactionsCardColor") == null ||
+                             componentNode.Property("interactionsCardNoise") == null))
+                            migratedBounds = true;
                         NormalizeComponent(target, component);
                     }
                     if (!seenComponents.Contains(TapFarmingComponentId) ||
@@ -1099,7 +1114,7 @@ namespace Gilomx.CupheadBossRoulette
                 int value;
                 if (!node.TryInteger(key, out value) ||
                     value < (key == "interactionsPageSeconds" ? 3 : 10) ||
-                    value > (key == "interactionsPageSeconds" ? 60 : 120)) return false;
+                    value > (key == "interactionsPageSeconds" ? 60 : 140)) return false;
                 if (key == "interactionsPageSeconds") component.InteractionsPageSeconds = value;
                 else component.InteractionsSpeed = value;
             }
@@ -1108,6 +1123,18 @@ namespace Gilomx.CupheadBossRoulette
                 int value;
                 if (!node.TryInteger("interactionsSize", out value) || !IsValidInteractionsSize(value)) return false;
                 component.InteractionsSize = value;
+            }
+            if (node.Property("interactionsCardColor") != null)
+            {
+                var color = NormalizeColor(node.String("interactionsCardColor"));
+                if (color.Length == 0) return false;
+                component.InteractionsCardColor = color;
+            }
+            if (node.Property("interactionsCardNoise") != null)
+            {
+                int noise;
+                if (!node.TryInteger("interactionsCardNoise", out noise) || noise < 0 || noise > 100) return false;
+                component.InteractionsCardNoise = noise;
             }
             return true;
         }

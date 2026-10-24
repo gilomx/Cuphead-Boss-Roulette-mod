@@ -32,11 +32,6 @@
     resubscription: ['M20 7v5h-5M4 17v-5h5', 'M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2'],
     redemption: ['M3 5h18v4a3 3 0 0 0 0 6v4H3v-4a3 3 0 0 0 0-6V5ZM13 5v2m0 3v2m0 3v2'],
   };
-  const brands = {
-    tiktok: 'M16.6 2c.4 2.5 1.8 4 4.4 4.2v3.9a9.3 9.3 0 0 1-4.4-1.2v7.6a6.5 6.5 0 1 1-6.5-6.5h1v4a2.6 2.6 0 1 0 1.6 2.4V2h3.9Z',
-    twitch: 'M4 2 1 5v16h6v3l4-3h5l7-7V2H4Zm17 11-4 4h-6l-4 4v-4H3V4h18v9ZM16 7h2v6h-2V7Zm-5 0h2v6h-2V7Z',
-    youtube: 'M6 5a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4V9a4 4 0 0 0-4-4H6Zm4 3v8l6-4-6-4Z',
-  };
   let catalog = {};
   let latestState = null;
   let view = model.presentation();
@@ -142,7 +137,6 @@
     else if (offer.platform === 'twitch' && offer.eventType === 'currency') icon.append(image('/assets/creator-tools/twitch/bits.png'));
     else if (offer.eventType === 'jewels') icon.append(image('/assets/creator-tools/youtube/jewels.png'));
     else icon.append(svgIcon(paths[offer.eventType] || paths.gift));
-    const mark = element('span', 'interaction-platform-mark'); mark.append(svgIcon([brands[offer.platform]], true)); icon.append(mark);
     node.append(icon, element('span', 'interaction-cost', String(offer.every)));
     return node;
   }
@@ -150,6 +144,9 @@
     const node = element('article', 'interaction-item');
     node.setAttribute('aria-label', item.name);
     node.dataset.interaction = item.interaction;
+    // Keep a stable, different part of the paper grain on each item and its loop copies.
+    const grainSeed = Array.from(item.key).reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0, 17);
+    node.style.setProperty('--card-grain-position', `${grainSeed % 397}px ${Math.floor(grainSeed / 397) % 313}px`);
     const payments = element('div', 'interaction-payments');
     const size = model.paymentSize(item.offers.length, view.interactionsAdaptive, view.interactionsTemplate);
     node.style.setProperty('--currency', `${size}px`);
@@ -273,6 +270,8 @@
     root.dataset.layout = view.interactionsLayout;
     root.dataset.count = String(allItems.length);
     root.style.setProperty('--ink', view.textColor);
+    root.style.setProperty('--paper', view.interactionsCardColor);
+    root.style.setProperty('--card-noise', String(view.interactionsCardNoise / 100));
     window.CreatorToolsOverlayText?.apply(root, view);
     allPages = model.pages(allItems);
     const retainedPage = previousKey ? allPages.findIndex(entries => entries.some(entry => entry.key === previousKey)) : -1;

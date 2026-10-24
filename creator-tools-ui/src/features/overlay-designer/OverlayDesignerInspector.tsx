@@ -389,6 +389,25 @@ export function OverlayDesignerInspector({
                 <option value="floating">{t("overlayDesigner.interactions.floating")}</option>
               </select>
             </label>
+            {component.interactionsTemplate === "cards" ? <>
+              <OverlayColorPicker
+                label={t("overlayDesigner.interactions.cardColor")}
+                value={component.interactionsCardColor ?? "#23262bee"}
+                disabled={disabled}
+                alphaLabel={t("overlayDesigner.inspector.colors.alpha")}
+                hexLabel={t("overlayDesigner.inspector.colors.hex")}
+                openLabel={t("overlayDesigner.inspector.colors.open")}
+                closeLabel={t("overlayDesigner.inspector.colors.close")}
+                onChange={value => onChange({ interactionsCardColor: value })}
+              />
+              <label><span>{t("overlayDesigner.interactions.cardNoise")}</span>
+                <input type="range" min="0" max="100" step="1" disabled={disabled}
+                  value={component.interactionsCardNoise ?? 18}
+                  onChange={event => onChange({ interactionsCardNoise: Number(event.target.value) })} />
+                <output>{component.interactionsCardNoise ?? 18}%</output>
+              </label>
+              <small>{t("overlayDesigner.interactions.cardNoiseHint")}</small>
+            </> : null}
             <label><span>{t("overlayDesigner.interactions.layout")}</span>
               <select disabled={disabled} value={interactionsLayout}
                 onChange={event => {
@@ -420,7 +439,7 @@ export function OverlayDesignerInspector({
               </label>
               <small>{t("overlayDesigner.interactions.pagesHint")}</small>
             </> : <><label><span>{t("overlayDesigner.interactions.speed")}</span>
-              <input type="range" min="10" max="120" step="1" disabled={disabled}
+              <input type="range" min="40" max="140" step="1" disabled={disabled}
                 value={component.interactionsSpeed ?? 40}
                 onChange={event => onChange({ interactionsSpeed: Number(event.target.value) })} />
               <output>{component.interactionsSpeed ?? 40} px/s</output>
