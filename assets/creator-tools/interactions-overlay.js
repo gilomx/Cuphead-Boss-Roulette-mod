@@ -6,12 +6,13 @@
   const scene = document.getElementById('interactions-scene');
   const viewport = document.getElementById('interactions-viewport');
   const content = document.getElementById('interactions-content');
-  const heading = document.getElementById('interactions-heading');
-  const pagination = document.getElementById('interactions-pagination');
   const query = new URLSearchParams(location.search);
   const embedded = query.get('mode') === 'embedded' || query.get('embedded') === '1';
   const profileId = query.get('profile') === 'vertical' ? 'vertical' : 'horizontal';
   const SVG = 'http://www.w3.org/2000/svg';
+  const stripGap = 20;
+  const stripInset = 12;
+  const stripCapacity = 4;
   const platformNames = { tiktok: 'TikTok', twitch: 'Twitch', youtube: 'YouTube' };
   const labels = {
     es: { title: 'Interacciones', attack: 'Ataque', challenge: 'Reto', help: 'Ayuda',
@@ -47,11 +48,13 @@
   let lastSignature = '';
   let stripOffset = 0;
   let cycleWidth = 0;
+  let pageWidth = 0;
   let scale = 1;
   let lastFrame = 0;
   let frame = 0;
   let pollTimer = 0;
   let disposed = false;
+  let measuredCards = [];
   const measurements = new Map();
   const measuring = new Map();
   let metricRenderQueued = false;
@@ -63,9 +66,11 @@
     if (text !== undefined) node.textContent = text;
     return node;
   }
-  function image(path, alt) {
+  function image(path) {
     const node = element('img');
-    node.src = path; node.alt = alt; node.draggable = false;
+    // The enclosing card/payment supplies its accessible label. Even a failed
+    // image must not turn an item or reward name into visible fallback text.
+    node.src = path; node.alt = ''; node.draggable = false;
     return node;
   }
   function svgIcon(pathList, filled = false) {
@@ -112,19 +117,18 @@
   }
   function effect(item) {
     const node = element('div', 'interaction-effect');
-    node.append(element('span', 'interaction-category', labels[locale][item.category]));
-    node.children[0].dataset.category = item.category;
     const art = element('div', 'interaction-art');
     const bounds = measurements.get(item.image);
     if (bounds) {
-      for (const [key, value] of Object.entries(bounds)) art.style.setProperty(key === 'ratio' ? '--art-ratio' : `--image-${key}`, String(value));
+      for (const [key, value] of Object.entries(model.containArtwork(bounds))) {
+        const property = key === 'cropWidth' ? '--crop-width' : key === 'cropHeight' ? '--crop-height' : `--image-${key}`;
+        art.style.setProperty(property, String(value));
+      }
     }
     const crop = element('div', 'interaction-art-crop');
-    const img = image(item.image, item.name); img.className = 'interaction-art-image'; crop.append(img); art.append(crop);
+    const img = image(item.image); img.className = 'interaction-art-image'; crop.append(img); art.append(crop);
     if (item.quantity > 1) art.append(element('span', 'interaction-quantity', `${item.quantity}×`));
-    const name = element('h2', 'interaction-name', item.name);
-    name.hidden = !view.showTitle;
-    node.append(art, name);
+    node.append(art);
     metrics(item.image);
     return node;
   }
@@ -133,93 +137,122 @@
     node.dataset.platform = offer.platform;
     const denomination = offer.giftName || labels[locale][offer.eventType];
     node.setAttribute('aria-label', `${platformNames[offer.platform]}: ${offer.every} ${denomination}${offer.rewardName ? ` · ${offer.rewardName}` : ''}`);
-    node.append(element('span', 'interaction-brand', platformNames[offer.platform]));
     const icon = element('span', 'interaction-currency');
-    if (offer.image) icon.append(image(offer.image, offer.giftName));
-    else if (offer.eventType === 'jewels') icon.append(image('/assets/creator-tools/youtube/jewels.png', labels[locale].jewels));
+    if (offer.image) icon.append(image(offer.image));
+    else if (offer.platform === 'twitch' && offer.eventType === 'currency') icon.append(image('/assets/creator-tools/twitch/bits.png'));
+    else if (offer.eventType === 'jewels') icon.append(image('/assets/creator-tools/youtube/jewels.png'));
     else icon.append(svgIcon(paths[offer.eventType] || paths.gift));
     const mark = element('span', 'interaction-platform-mark'); mark.append(svgIcon([brands[offer.platform]], true)); icon.append(mark);
     node.append(icon, element('span', 'interaction-cost', String(offer.every)));
-    if (offer.rewardName) node.append(element('span', 'interaction-reward', offer.rewardName));
     return node;
   }
-  function card(item) {
+  function card(item, measure = true) {
     const node = element('article', 'interaction-item');
     node.setAttribute('aria-label', item.name);
     node.dataset.interaction = item.interaction;
-    if (view.interactionsTemplate === 'cards') {
-      node.style.width = `${Math.max(204, (measurements.get(item.image)?.ratio || 1) * 70 + 22)}px`;
-    }
     const payments = element('div', 'interaction-payments');
     const size = model.paymentSize(item.offers.length, view.interactionsAdaptive, view.interactionsTemplate);
     node.style.setProperty('--currency', `${size}px`);
     node.style.setProperty('--value-size', `${Math.round(size * .58)}px`);
     for (const offer of item.offers) payments.append(payment(offer));
     node.append(effect(item), payments);
+    if (measure) measuredCards.push(node);
     return node;
   }
-  function cycle() {
+  function cycle(duplicate = false) {
     const node = element('div', 'interactions-cycle');
-    for (const item of allItems) node.append(card(item));
+    for (const item of allItems) node.append(card(item, !duplicate));
     return node;
   }
-  function drawPagination() {
-    pagination.replaceChildren();
-    if (allPages.length <= 1) return;
-    for (let index = 0; index < allPages.length; index++) {
-      const dot = element('span', 'interaction-dot'); dot.dataset.current = String(index === page); pagination.append(dot);
-    }
+  function movePage(animate) {
+    const motion = animate && view.motion && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    content.style.transition = motion ? 'transform 380ms cubic-bezier(.22,.68,0,1)' : 'none';
+    content.style.transform = `translateX(${-page * pageWidth}px)`;
+    root.dataset.page = String(page);
   }
   function drawContent() {
     if (disposed || root.hidden) return;
     content.style.transform = '';
+    content.style.transition = 'none';
+    measuredCards = [];
     if (view.interactionsLayout === 'pages') {
-      content.replaceChildren(...(allPages[page] || []).map(item => {
-        const cell = element('div', 'interaction-cell'); cell.append(card(item)); return cell;
+      content.replaceChildren(...allPages.map(items => {
+        const sheet = element('div', 'interactions-page');
+        for (const item of items) {
+          const cell = element('div', 'interaction-cell'); cell.append(card(item)); sheet.append(cell);
+        }
+        return sheet;
       }));
-      root.dataset.page = String(page);
-      drawPagination();
     } else {
       content.replaceChildren(cycle());
-      pagination.replaceChildren();
     }
     fit();
+  }
+  function sizeCards() {
+    root.style.setProperty('--item-width', 'max-content');
+    root.style.setProperty('--item-height', 'auto');
+    // Normalize across the entire catalog, including pages not currently visible.
+    const width = Math.ceil(Math.max(1, ...measuredCards.map(card => card.offsetWidth || card.scrollWidth || 1)));
+    const height = Math.ceil(Math.max(1, ...measuredCards.map(card => card.offsetHeight || card.scrollHeight || 1)));
+    root.style.setProperty('--item-width', `${width}px`);
+    root.style.setProperty('--item-height', `${height}px`);
+    return { width, height };
+  }
+  function fitPages(width, height) {
+    const sheets = Array.from(content.children);
+    for (const sheet of sheets) { sheet.style.width = ''; sheet.style.height = ''; }
+    pageWidth = Math.max(1, ...sheets.map(sheet => Math.max(sheet.offsetWidth || 0, sheet.scrollWidth || 0)));
+    const naturalHeight = Math.max(1, ...sheets.map(sheet => Math.max(sheet.offsetHeight || 0, sheet.scrollHeight || 0)));
+    for (const sheet of sheets) { sheet.style.width = `${pageWidth}px`; sheet.style.height = `${naturalHeight}px`; }
+    scene.style.width = `${pageWidth}px`;
+    viewport.style.width = `${pageWidth}px`;
+    viewport.style.height = `${naturalHeight}px`;
+    scale = view.interactionsSize > 0
+      ? Math.min(width / pageWidth, height * view.interactionsSize / 100 / naturalHeight)
+      : Math.min(width / pageWidth, height / naturalHeight, 4);
+    scene.style.left = `${Math.max(0, (width - pageWidth * scale) / 2)}px`;
+    scene.style.top = `${Math.max(0, (height - naturalHeight * scale) / 2)}px`;
+    movePage(false);
+  }
+  function fitStrip(width, height, size) {
+    if (!content.children[0]) return;
+    const visibleCount = Math.min(stripCapacity, allItems.length);
+    let naturalWidth = visibleCount * size.width + (visibleCount - 1) * stripGap + stripInset * 2;
+    const naturalHeight = size.height + stripInset * 2;
+    const moving = allItems.length > stripCapacity;
+    if (view.interactionsSize > 0) {
+      // Small groups must fit completely. Moving strips can show fewer/larger
+      // items, but even at maximum height one full item must fit horizontally.
+      scale = Math.min(height * view.interactionsSize / 100 / naturalHeight,
+        width / (moving ? size.width + stripInset * 2 : naturalWidth));
+      if (moving) naturalWidth = width / scale;
+    } else scale = Math.min(width / naturalWidth, height / naturalHeight, 4);
+    viewport.style.width = `${naturalWidth}px`;
+    viewport.style.height = `${naturalHeight}px`;
+    scene.style.width = `${naturalWidth}px`;
+    scene.style.left = `${Math.max(0, (width - naturalWidth * scale) / 2)}px`;
+    scene.style.top = `${Math.max(0, (height - naturalHeight * scale) / 2)}px`;
+    // A whole cycle includes its trailing gap, matching the gap between copies.
+    cycleWidth = allItems.length * (size.width + stripGap);
+    root.dataset.scrolling = String(moving);
+    const required = moving ? model.repetitions(cycleWidth, naturalWidth) : 1;
+    while (content.children.length < required) {
+      const copy = cycle(true); copy.setAttribute('aria-hidden', 'true'); content.append(copy);
+    }
+    while (content.children.length > required) content.lastElementChild.remove();
+    stripOffset = moving ? stripOffset % cycleWidth : 0;
+    content.style.transform = `translateX(${stripInset - stripOffset}px)`;
   }
   function fit() {
     if (disposed || root.hidden) return;
     const width = root.clientWidth || window.innerWidth || 1;
     const height = root.clientHeight || window.innerHeight || 1;
-    scene.style.width = ''; scene.style.transform = ''; viewport.style.width = '';
+    scene.style.width = ''; scene.style.transform = ''; viewport.style.width = ''; viewport.style.height = '';
+    const size = sizeCards();
     if (view.interactionsLayout === 'pages') {
-      const inset = view.interactionsTemplate === 'cards' ? 26 : 0;
-      const naturalWidth = Math.max(content.getBoundingClientRect?.()?.width || 0,
-        content.offsetWidth || 0, content.scrollWidth || 1) + inset;
-      scene.style.width = `${naturalWidth}px`;
-      viewport.style.width = `${Math.max(1, naturalWidth - inset)}px`;
-      const naturalHeight = Math.max(scene.getBoundingClientRect?.()?.height || 0,
-        scene.offsetHeight || 0, scene.scrollHeight || content.scrollHeight || 1);
-      scale = Math.min(width / naturalWidth, height / naturalHeight, 4);
-      scene.style.left = `${Math.max(0, (width - naturalWidth * scale) / 2)}px`;
-      scene.style.top = `${Math.max(0, (height - naturalHeight * scale) / 2)}px`;
+      fitPages(width, height);
     } else {
-      const first = content.children[0];
-      if (!first) return;
-      const naturalHeight = Math.max(scene.getBoundingClientRect?.()?.height || 0,
-        scene.offsetHeight || 0, scene.scrollHeight || 1);
-      scale = Math.min(height / naturalHeight, 4);
-      const inset = view.interactionsTemplate === 'cards' ? 26 : 0;
-      const viewportWidth = Math.max(1, width / scale - inset);
-      viewport.style.width = `${viewportWidth}px`;
-      scene.style.width = `${width / scale}px`;
-      scene.style.left = '0px'; scene.style.top = `${Math.max(0, (height - naturalHeight * scale) / 2)}px`;
-      cycleWidth = first.offsetWidth || first.scrollWidth || 1;
-      const required = model.repetitions(cycleWidth, viewportWidth);
-      while (content.children.length < required) {
-        const copy = cycle(); copy.setAttribute('aria-hidden', 'true'); content.append(copy);
-      }
-      while (content.children.length > required) content.lastElementChild.remove();
-      stripOffset %= cycleWidth;
-      content.style.transform = `translateX(${-stripOffset}px)`;
+      fitStrip(width, height, size);
     }
     scene.style.transform = `scale(${scale})`;
   }
@@ -239,15 +272,12 @@
     root.dataset.template = view.interactionsTemplate;
     root.dataset.layout = view.interactionsLayout;
     root.dataset.count = String(allItems.length);
-    root.dataset.showTitle = String(view.showTitle);
     root.style.setProperty('--ink', view.textColor);
     window.CreatorToolsOverlayText?.apply(root, view);
     allPages = model.pages(allItems);
     const retainedPage = previousKey ? allPages.findIndex(entries => entries.some(entry => entry.key === previousKey)) : -1;
     page = retainedPage >= 0 ? retainedPage : Math.min(page, Math.max(0, allPages.length - 1));
     pageElapsed = 0;
-    heading.replaceChildren(element('span', '', labels[locale].title), element('span', 'interaction-network-list',
-      model.selectedNetworks(view).map(network => platformNames[network]).join(' · ')));
     if (!visible) { content.replaceChildren(); return; }
     drawContent();
   }
@@ -260,11 +290,11 @@
         pageElapsed += elapsed;
         if (allPages.length > 1 && pageElapsed >= view.interactionsPageSeconds * 1000) {
           pageElapsed %= view.interactionsPageSeconds * 1000;
-          page = model.nextPage(page, allPages.length); drawContent();
+          page = model.nextPage(page, allPages.length); movePage(true);
         }
-      } else if (view.motion && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      } else if (allItems.length > stripCapacity && view.motion && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         stripOffset = model.offset(stripOffset, view.interactionsSpeed, elapsed, cycleWidth);
-        content.style.transform = `translateX(${-stripOffset}px)`;
+        content.style.transform = `translateX(${stripInset - stripOffset}px)`;
       }
     }
     frame = requestAnimationFrame(tick);

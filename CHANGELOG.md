@@ -2,6 +2,22 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- Interacciones permite ajustar el contenido del 25% al 100% de la altura del
+  overlay o conservar el tamaño automático. Hasta cuatro ítems siguen fijos y
+  completos, limitados también por el ancho; con más, pueden verse más grandes
+  y pasar menos a la vez. El ajuste se guarda por perfil y mantiene independiente
+  el tamaño adaptativo de los canjes.
+
+- Las tarjetas de Interacciones igualan ancho y alto, contienen imágenes anchas
+  o altas sin deformarlas y añaden padding interno. La franja queda estática
+  hasta cuatro ítems; con más, mantiene un ciclo continuo por una ventana de cuatro.
+
+- Los overlays de Interacciones muestran sólo efecto, iconos de canje y cantidades.
+  Se elimina la opción de nombres y el texto de recompensas; las tarjetas se
+  ajustan al contenido y son el único elemento con fondo. La franja muestra hasta cuatro
+  elementos grandes; el paginado desliza entre páginas. El diseñador usa regalos
+  reales e iconos de cada red y completa dos páginas de ejemplo.
+
 - El resumen final del overlay acerca el jefe al equipo: elimina las alturas
   reservadas y reduce el espacio vertical entre sus imágenes de 76 a 18 px.
 

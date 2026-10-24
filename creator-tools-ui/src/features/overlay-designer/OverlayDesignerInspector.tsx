@@ -246,6 +246,7 @@ export function OverlayDesignerInspector({
   };
   const independentSize = component.id === "chat_chooses" || component.id === "interactions";
   const interactionsLayout = component.interactionsLayout ?? (profile.id === "vertical" ? "pages" : "strip");
+  const interactionsSize = component.interactionsSize ?? 0;
   const interactionsPlatforms = [
     ["interactionsTikTok", "TikTok", component.interactionsTikTok ?? true],
     ["interactionsTwitch", "Twitch", component.interactionsTwitch ?? profile.id === "horizontal"],
@@ -268,7 +269,7 @@ export function OverlayDesignerInspector({
   > = component.id === "roulette"
     ? ["enabled", "locked"]
     : component.id === "interactions"
-    ? ["enabled", "locked", "showTitle", "motion"]
+    ? ["enabled", "locked", "motion"]
     : component.id === "tap_farming"
     ? ["enabled", "locked", "motion"]
     : component.id === "chat_chooses"
@@ -382,7 +383,7 @@ export function OverlayDesignerInspector({
               <select disabled={disabled} value={component.interactionsTemplate ?? "floating"}
                 onChange={event => {
                   const template = event.target.value as "cards" | "floating";
-                  onChange({ interactionsTemplate: template, showTitle: template === "cards" });
+                  onChange({ interactionsTemplate: template, showTitle: false, showDetails: false });
                 }}>
                 <option value="cards">{t("overlayDesigner.interactions.cards")}</option>
                 <option value="floating">{t("overlayDesigner.interactions.floating")}</option>
@@ -392,8 +393,8 @@ export function OverlayDesignerInspector({
               <select disabled={disabled} value={interactionsLayout}
                 onChange={event => {
                   const layout = event.target.value as "strip" | "pages";
-                  const width = Math.min(profile.canvas.width, layout === "pages" ? 960 : profile.id === "vertical" ? 960 : 1800);
-                  const height = Math.min(profile.canvas.height, layout === "pages" ? 620 : 230);
+                  const width = Math.min(profile.canvas.width, 960);
+                  const height = Math.min(profile.canvas.height, layout === "pages" ? 620 : 280);
                   onChange({ interactionsLayout: layout, width, height,
                     x: Math.min(component.x, profile.canvas.width - width),
                     y: Math.min(component.y, profile.canvas.height - height) });
@@ -418,18 +419,30 @@ export function OverlayDesignerInspector({
                   onChange={event => onChange({ interactionsPageSeconds: Math.max(3, Math.min(60, numberValue(event.target.value, 8))) })} />
               </label>
               <small>{t("overlayDesigner.interactions.pagesHint")}</small>
-            </> : <label><span>{t("overlayDesigner.interactions.speed")}</span>
+            </> : <><label><span>{t("overlayDesigner.interactions.speed")}</span>
               <input type="range" min="10" max="120" step="1" disabled={disabled}
                 value={component.interactionsSpeed ?? 40}
                 onChange={event => onChange({ interactionsSpeed: Number(event.target.value) })} />
               <output>{component.interactionsSpeed ?? 40} px/s</output>
-            </label>}
+            </label><small>{t("overlayDesigner.interactions.stripHint")}</small></>}
             <label className="overlay-designer-properties__checkbox">
               <input type="checkbox" disabled={disabled} checked={component.interactionsAdaptive ?? true}
                 onChange={event => onChange({ interactionsAdaptive: event.target.checked })} />
               <span>{t("overlayDesigner.interactions.adaptive")}</span>
             </label>
             <small>{t("overlayDesigner.interactions.adaptiveHint")}</small>
+            <label className="overlay-designer-properties__checkbox">
+              <input type="checkbox" disabled={disabled} checked={interactionsSize === 0}
+                onChange={event => onChange({ interactionsSize: event.target.checked ? 0 : 75 })} />
+              <span>{t("overlayDesigner.interactions.automaticSize")}</span>
+            </label>
+            {interactionsSize > 0 ? <label><span>{t("overlayDesigner.interactions.itemSize")}</span>
+              <input type="range" min="25" max="100" step="1" disabled={disabled}
+                value={interactionsSize}
+                onChange={event => onChange({ interactionsSize: Number(event.target.value) })} />
+              <output>{interactionsSize}%</output>
+            </label> : null}
+            <small>{t("overlayDesigner.interactions.itemSizeHint")}</small>
           </div>
         ) : null}
 
@@ -516,8 +529,8 @@ export function OverlayDesignerInspector({
               onClick={() => onChange({ [key]: !component[key] })}
             >
               <span>
-                <strong>{t(component.id === "interactions" && key === "showTitle" ? "overlayDesigner.interactions.showTitle" : `overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}`)}</strong>
-                <small>{t(component.id === "interactions" && key === "showTitle" ? "overlayDesigner.interactions.showTitleHint" : `overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}Hint`)}</small>
+                <strong>{t(`overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}`)}</strong>
+                <small>{t(`overlayDesigner.inspector.${component.id === "chat_chooses" && (key === "showTitle" || key === "showDetails") ? "chatOptions" : "options"}.${key}Hint`)}</small>
               </span>
               <i aria-hidden="true"><b /></i>
             </button>

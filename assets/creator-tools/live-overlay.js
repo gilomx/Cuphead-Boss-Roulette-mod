@@ -154,6 +154,7 @@
           interactionsYouTube: !vertical,
           interactionsPageSeconds: 8,
           interactionsSpeed: 40,
+          interactionsSize: 0,
           interactionsAdaptive: true,
         } : {}),
       })),
@@ -238,6 +239,7 @@
       interactionsYouTube: component.interactionsYouTube !== false,
       interactionsPageSeconds: clamp(finiteNumber(component.interactionsPageSeconds, 8), 3, 60),
       interactionsSpeed: clamp(finiteNumber(component.interactionsSpeed, 40), 10, 120),
+      interactionsSize: Number(component.interactionsSize) > 0 ? Math.round(clamp(finiteNumber(component.interactionsSize, 75), 25, 100)) : 0,
       interactionsAdaptive: component.interactionsAdaptive !== false,
     };
   }

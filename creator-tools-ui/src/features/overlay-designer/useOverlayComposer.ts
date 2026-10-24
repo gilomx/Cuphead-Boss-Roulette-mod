@@ -36,7 +36,7 @@ const EDITABLE_KEYS = [
   "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
   "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
   "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds",
-  "interactionsSpeed", "interactionsAdaptive",
+  "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
 ] as const;
 
 function sameComponent(
@@ -64,8 +64,8 @@ function updateCommand(
     layer: component.layer,
     opacity: component.opacity,
     variant: component.variant,
-    showTitle: component.showTitle,
-    showDetails: component.showDetails,
+    showTitle: component.id === "interactions" ? false : component.showTitle,
+    showDetails: component.id === "interactions" ? false : component.showDetails,
     motion: component.motion,
     liquidColor: component.liquidColor,
     collectingColor: component.collectingColor,
@@ -89,6 +89,7 @@ function updateCommand(
       interactionsYouTube: component.interactionsYouTube ?? profileId === "horizontal",
       interactionsPageSeconds: component.interactionsPageSeconds ?? 8,
       interactionsSpeed: component.interactionsSpeed ?? 40,
+      interactionsSize: component.interactionsSize ?? 0,
       interactionsAdaptive: component.interactionsAdaptive ?? true,
     } : {}),
   };

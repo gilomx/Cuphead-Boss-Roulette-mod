@@ -1,0 +1,7 @@
+Twitch Bits / Cheer 100 icon
+
+Source: https://d3aqoihi2n8ty8.cloudfront.net/actions/cheer/dark/static/100/4.png
+Twitch API reference: https://dev.twitch.tv/docs/api/reference#get-cheermotes
+Retrieved unchanged on 2026-10-23 as assets/creator-tools/twitch/bits.png.
+Artwork belongs to Twitch. Used to identify Bits in the Twitch integration;
+this notice does not claim a separate redistribution license.

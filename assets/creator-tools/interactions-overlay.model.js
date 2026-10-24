@@ -20,8 +20,10 @@
       interactionsYouTube: source.interactionsYouTube !== false,
       interactionsPageSeconds: Math.round(number(source.interactionsPageSeconds, 8, 3, 60)),
       interactionsSpeed: number(source.interactionsSpeed, 40, 10, 120),
+      interactionsSize: Number(source.interactionsSize) > 0 ? Math.round(number(source.interactionsSize, 75, 25, 100)) : 0,
       interactionsAdaptive: source.interactionsAdaptive !== false,
-      showTitle: source.showTitle === true,
+      // Older scenes may still request labels. This overlay is always image + cost.
+      showTitle: false,
       motion: source.motion !== false,
       textColor: /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(source.textColor || '') ? source.textColor : '#fff4dc',
       textFont: ['clean', 'system', 'rounded', 'serif'].includes(source.textFont) ? source.textFont : 'clean',
@@ -92,9 +94,9 @@
     }
     return Array.from(grouped.values());
   }
-  function paymentSize(count, adaptive = true, template = 'floating') {
+  function paymentSize(count, adaptive = true) {
     const size = !adaptive ? 34 : count <= 1 ? 62 : count === 2 ? 46 : count === 3 ? 34 : 28;
-    return template === 'cards' ? Math.round(size * .66) : size;
+    return size;
   }
   function pages(items, pageSize = 9) {
     const result = [];
@@ -119,6 +121,12 @@
     return { ratio: (right - left + 1) / visibleHeight, width: width / visibleHeight,
       height: height / visibleHeight, left: -left / visibleHeight, top: -top / visibleHeight };
   }
+  function containArtwork(bounds) {
+    const scale = 1 / Math.max(1, bounds.ratio);
+    return { cropWidth: bounds.ratio * scale, cropHeight: scale,
+      width: bounds.width * scale, height: bounds.height * scale,
+      left: bounds.left * scale, top: bounds.top * scale };
+  }
   host.CreatorToolsInteractionsOverlayModel = Object.freeze({ presentation, selectedNetworks, localImage, items,
-    paymentSize, pages, nextPage, offset, repetitions, opaqueBounds });
+    paymentSize, pages, nextPage, offset, repetitions, opaqueBounds, containArtwork });
 })(typeof window === 'undefined' ? globalThis : window);

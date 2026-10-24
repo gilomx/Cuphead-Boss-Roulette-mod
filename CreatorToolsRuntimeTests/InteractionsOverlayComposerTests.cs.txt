@@ -33,6 +33,7 @@ namespace Gilomx.CupheadBossRoulette
                 True(component.InteractionsAdaptive, "adaptive sizes default");
                 Equal(8, component.InteractionsPageSeconds, "page timing default");
                 Equal(40, component.InteractionsSpeed, "strip speed default");
+                Equal(0, component.InteractionsSize, "legacy and new scenes retain automatic size");
                 Equal(60, component.X, "default left position");
                 Equal(vertical ? 1200 : 800, component.Y, "default top position");
                 Equal(vertical ? 960 : 1800, component.Width, "default width");
@@ -44,7 +45,10 @@ namespace Gilomx.CupheadBossRoulette
                 component.InteractionsPageSeconds = -20;
                 component.InteractionsSpeed = 999;
                 component.X = -20; component.Y = 9999;
+                component.ShowTitle = true; component.ShowDetails = true;
                 CreatorToolsOverlayComposerSettings.NormalizeComponent(profile, component);
+                False(component.ShowTitle, "legacy scenes cannot enable interaction item names");
+                False(component.ShowDetails, "legacy scenes cannot enable interaction details");
                 Equal("floating", component.InteractionsTemplate, "invalid template falls back safely");
                 Equal(vertical ? "pages" : "strip", component.InteractionsLayout, "invalid layout uses profile default");
                 Equal(3, component.InteractionsPageSeconds, "normalization clamps minimum page duration");
@@ -67,7 +71,7 @@ namespace Gilomx.CupheadBossRoulette
                     operation = "update", expectedRevision = 0, profileId = "horizontal", componentId = "interactions",
                     enabled = true, interactionsTemplate = "cards", interactionsLayout = "pages",
                     interactionsTikTok = false, interactionsTwitch = true, interactionsYouTube = false,
-                    interactionsPageSeconds = 17, interactionsSpeed = 73, interactionsAdaptive = false,
+                    interactionsPageSeconds = 17, interactionsSpeed = 73, interactionsAdaptive = false, interactionsSize = 67,
                     x = 77, y = 850, width = 1700, height = 200, opacity = 87, locked = true
                 }));
                 Equal(200, response.StatusCode, "save complete interactions settings");
@@ -112,6 +116,7 @@ namespace Gilomx.CupheadBossRoulette
                     True(vertical.GetProperty("interactionsAdaptive").GetBoolean(), "reset restores adaptive sizes");
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "reset restores page timing");
                     Equal(40, vertical.GetProperty("interactionsSpeed").GetInt32(), "reset restores strip speed");
+                    Equal(0, vertical.GetProperty("interactionsSize").GetInt32(), "reset restores automatic size");
                     AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "horizontal", "interactions"));
                 }
                 response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
@@ -133,6 +138,7 @@ namespace Gilomx.CupheadBossRoulette
             False(component.GetProperty("interactionsYouTube").GetBoolean(), "YouTube selection persists");
             Equal(17, component.GetProperty("interactionsPageSeconds").GetInt32(), "page seconds persist");
             Equal(73, component.GetProperty("interactionsSpeed").GetInt32(), "strip speed persists");
+            Equal(67, component.GetProperty("interactionsSize").GetInt32(), "manual size persists and copies independently");
             False(component.GetProperty("interactionsAdaptive").GetBoolean(), "adaptive selection persists");
         }
 
@@ -144,7 +150,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "update", expectedRevision = 0, profileId = "vertical", componentId = "interactions",
                     x = 91, interactionsTikTok = false, interactionsTwitch = false, interactionsYouTube = false,
-                    interactionsPageSeconds = 3, interactionsSpeed = 120
+                    interactionsPageSeconds = 3, interactionsSpeed = 120, interactionsSize = 25
                 })).StatusCode, "bounds and an empty network filter are valid");
                 var before = controller.GetConfigState();
                 var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
@@ -160,7 +166,12 @@ namespace Gilomx.CupheadBossRoulette
                     new Dictionary<string, object> { { "interactionsPageSeconds", 61 } },
                     new Dictionary<string, object> { { "interactionsPageSeconds", 8.5 } },
                     new Dictionary<string, object> { { "interactionsSpeed", 9 } },
-                    new Dictionary<string, object> { { "interactionsSpeed", 121 } }
+                    new Dictionary<string, object> { { "interactionsSpeed", 121 } },
+                    new Dictionary<string, object> { { "interactionsSize", -1 } },
+                    new Dictionary<string, object> { { "interactionsSize", 24 } },
+                    new Dictionary<string, object> { { "interactionsSize", 101 } },
+                    new Dictionary<string, object> { { "interactionsSize", 75.5 } },
+                    new Dictionary<string, object> { { "interactionsSize", "big" } }
                 };
                 foreach (var invalid in invalidValues)
                 {
@@ -193,8 +204,15 @@ namespace Gilomx.CupheadBossRoulette
                 })).StatusCode, "interactions fields cannot mutate another overlay");
                 Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "interactions",
-                    interactionsPageSeconds = 60, interactionsSpeed = 10
+                    interactionsPageSeconds = 60, interactionsSpeed = 10, interactionsSize = 100
                 })).StatusCode, "other range boundaries are accepted");
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 2, profileId = "vertical", componentId = "interactions",
+                    interactionsSize = 0
+                })).StatusCode, "automatic size can be restored");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                    Equal(0, FindComposerComponent(state.RootElement, "vertical", "interactions").GetProperty("interactionsSize").GetInt32(),
+                        "automatic size persists after a manual setting");
             }
         }
 
@@ -245,6 +263,7 @@ namespace Gilomx.CupheadBossRoulette
                     True(CreatorToolsOverlayComposerSettings.TryParseProfileJson(profile.ToJsonString(), profile["id"].GetValue<string>(), out parsed),
                         "older partial component safely receives optional defaults");
                     False(parsed.FindComponent("interactions").Enabled, "partial legacy component remains disabled");
+                    Equal(0, parsed.FindComponent("interactions").InteractionsSize, "old scenes keep automatic sizing");
                     Equal(profile["id"].GetValue<string>() == "vertical" ? "pages" : "strip",
                         parsed.FindComponent("interactions").InteractionsLayout, "missing fields retain per-profile layout defaults");
                     True(CreatorToolsOverlayComposerSettings.TryParseProfileJson(parsedJson, parsed.Id, out parsed),

@@ -62,11 +62,11 @@ test('visible payment count controls size and disabling adaptive keeps a fixed s
   assert.equal(model.presentation({ interactionsPageSeconds: 100, interactionsSpeed: -3 }).interactionsSpeed, 10);
 });
 
-test('floating names are optional and inspector typography is preserved in the presentation contract', () => {
+test('legacy name settings cannot enable labels and inspector typography is preserved', () => {
   assert.equal(model.presentation().showTitle, false);
   const view = model.presentation({ showTitle: true, textFont: 'serif', textWeight: 400, textShadowColor: '#ff0000',
     textShadowX: -4, textShadowY: 7, textShadowBlur: 5 });
-  assert.equal(view.showTitle, true);
+  assert.equal(view.showTitle, false);
   assert.equal(view.textFont, 'serif');
   assert.equal(view.textWeight, 400);
   assert.equal(view.textShadowColor, '#ff0000');
@@ -74,6 +74,14 @@ test('floating names are optional and inspector typography is preserved in the p
   assert.equal(view.textShadowY, 7);
   assert.equal(view.textShadowBlur, 5);
   assert.equal(model.presentation({ textFont: 'url(evil)', textWeight: 666 }).textFont, 'clean');
+});
+
+test('manual height is optional and constrained without changing automatic sizing in old scenes', () => {
+  assert.equal(model.presentation().interactionsSize, 0);
+  assert.equal(model.presentation({ interactionsSize: 0 }).interactionsSize, 0);
+  assert.equal(model.presentation({ interactionsSize: 1 }).interactionsSize, 25);
+  assert.equal(model.presentation({ interactionsSize: 999 }).interactionsSize, 100);
+  assert.equal(model.presentation({ interactionsSize: 67.4 }).interactionsSize, 67);
 });
 
 test('nine static items per page wrap without omissions and strip repeats enough whole cycles', () => {
@@ -94,6 +102,19 @@ test('opaque bounds normalize visible artwork height without deforming its aspec
   const metrics = model.opaqueBounds(6, 8, data);
   assert.deepEqual(plain(metrics), { ratio: .5, width: 1.5, height: 2, left: -.25, top: -.5 });
   assert.equal((6 / metrics.width) / (8 / metrics.height), 1, 'same scale factor in both dimensions');
+});
+
+test('wide and tall artwork fits completely inside the same square slot without deformation', () => {
+  for (const ratio of [.25, 1, 2.6]) {
+    const bounds = { ratio, width: ratio * 2, height: 2, left: -.2, top: -.1 };
+    const fitted = model.containArtwork(bounds);
+    assert.ok(fitted.cropWidth <= 1 && fitted.cropHeight <= 1);
+    assert.equal(Math.max(fitted.cropWidth, fitted.cropHeight), 1);
+    assert.ok(Math.abs(fitted.cropWidth / fitted.cropHeight - ratio) < 1e-10);
+    assert.ok(Math.abs(fitted.width / fitted.height - bounds.width / bounds.height) < 1e-10);
+    assert.ok(Math.abs(fitted.left / fitted.width - bounds.left / bounds.width) < 1e-10,
+      'transparent margins are removed at the same scale as the image');
+  }
 });
 
 class Element {
@@ -146,7 +167,7 @@ test('embedded messaging authenticates parent and origin, renders configured rul
   runtime.send(state, 'https://evil.test'); assert.equal(runtime.nodes['interactions-overlay'].dataset.count, undefined);
   runtime.send(state, undefined, {}); assert.equal(runtime.nodes['interactions-overlay'].dataset.count, undefined);
   runtime.send(state); assert.equal(runtime.nodes['interactions-overlay'].hidden, false);
-  assert.equal(runtime.nodes['interactions-content'].children.length, 1);
+  assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 1);
   runtime.send({ ...state, preview: false }); assert.equal(runtime.nodes['interactions-overlay'].hidden, true);
 });
 
@@ -158,13 +179,13 @@ test('composer embedded=1 query uses the parent transport without polling real s
   assert.equal(runtime.nodes['interactions-overlay'].dataset.count, '1');
 });
 
-test('the inspector name control hides and reveals item names in both templates', async () => {
+test('neither template creates names, categories, headings or reward labels even from old scenes', async () => {
   const runtime = await boot('?embedded=1');
   for (const template of ['floating', 'cards']) {
     for (const showTitle of [false, true, false]) {
-      runtime.send({ rules: [rule()], presentation: { interactionsLayout: 'pages', interactionsTemplate: template, showTitle } });
-      const name = runtime.created.filter(node => node.className === 'interaction-name').at(-1);
-      assert.equal(name.hidden, !showTitle, `${template} obeys showTitle=${showTitle}`);
+      runtime.send({ rules: [rule({ platform: 'twitch', eventType: 'redemption', rewardName: 'canjesito' })],
+        presentation: { interactionsLayout: 'pages', interactionsTemplate: template, showTitle, showDetails: true } });
+      assert.ok(!runtime.created.some(node => ['interaction-name', 'interaction-category', 'interaction-reward', 'interaction-brand'].includes(node.className)));
     }
   }
 });
@@ -179,27 +200,152 @@ test('height-constrained layouts include the scene border when scaling to the vi
   }
 });
 
-test('static pages advance on the configured interval despite repeated polling, then reconcile removed data', async () => {
+test('pages slide at the configured interval despite repeated polling and keep the same scale', async () => {
   const runtime = await boot();
   const state = { rules: Array.from({ length: 10 }, (_, index) => rule({ interaction: `effect_${index}` })),
     presentation: { interactionsTemplate: 'floating', interactionsLayout: 'pages', interactionsPageSeconds: 3 } };
-  runtime.send(state); assert.equal(runtime.nodes['interactions-content'].children.length, 9);
+  runtime.send(state);
+  assert.deepEqual(runtime.nodes['interactions-content'].children.map(page => page.children.length), [9, 1]);
+  const scale = runtime.nodes['interactions-scene'].style.transform;
   runtime.frame(1); runtime.frame(1001); runtime.send(structuredClone(state)); runtime.frame(2001); runtime.frame(3001);
   assert.equal(runtime.nodes['interactions-overlay'].dataset.page, '1');
-  assert.equal(runtime.nodes['interactions-content'].children.length, 1);
+  assert.match(runtime.nodes['interactions-content'].style.transition, /380ms/);
+  assert.equal(runtime.nodes['interactions-content'].style.transform, 'translateX(-600px)');
+  assert.equal(runtime.nodes['interactions-scene'].style.transform, scale);
+  runtime.send(structuredClone(state));
+  assert.equal(runtime.nodes['interactions-content'].style.transform, 'translateX(-600px)', 'polling does not interrupt the slide');
+  runtime.send({ ...state, presentation: { ...state.presentation, motion: false } });
+  runtime.frame(4001); runtime.frame(5001); runtime.frame(6001);
+  assert.equal(runtime.nodes['interactions-content'].style.transition, 'none', 'motion disabled switches pages without sliding');
   runtime.send({ ...state, rules: [rule()] });
   assert.equal(runtime.nodes['interactions-overlay'].dataset.page, '0');
-  assert.equal(runtime.nodes['interactions-content'].children.length, 1);
+  assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 1);
 });
 
-test('redemption names remain text nodes and no data-controlled HTML is parsed', async () => {
+test('reward names stay accessible without visible text and no data-controlled HTML is parsed', async () => {
   const runtime = await boot();
   const name = '<img src=x onerror=alert(1)>';
   runtime.send({ rules: [rule({ platform: 'twitch', eventType: 'redemption', rewardName: name })], presentation: { interactionsLayout: 'pages' } });
-  const reward = runtime.created.find(node => node.className === 'interaction-reward');
-  assert.equal(reward.textContent, name);
-  assert.equal(reward.children.length, 0);
+  assert.ok(!runtime.created.some(node => node.className === 'interaction-reward'));
+  assert.ok(runtime.created.some(node => node.className === 'interaction-payment' && node.attributes['aria-label'].includes(name)));
   assert.ok(!runtimeCode.includes('innerHTML'));
+});
+
+test('currency artwork uses catalog gifts, official Twitch Bits and YouTube Jewels', async () => {
+  const runtime = await boot();
+  runtime.send({ rules: [rule(), rule({ platform: 'twitch', eventType: 'currency' }), rule({ platform: 'youtube', eventType: 'jewels' })] });
+  const images = runtime.created.filter(node => node.tagName === 'img').map(node => node.src);
+  assert.ok(runtime.created.filter(node => node.tagName === 'img').every(node => node.alt === ''),
+    'failed image loads cannot display item or gift names as fallback text');
+  assert.ok(images.includes(catalog.gifts[0].imagePath));
+  assert.ok(images.includes('/assets/creator-tools/twitch/bits.png'));
+  assert.ok(images.includes('/assets/creator-tools/youtube/jewels.png'));
+});
+
+test('one to four items remain fully static without duplicate copies in both templates', async () => {
+  const runtime = await boot();
+  for (const template of ['cards', 'floating']) for (const count of [1, 2, 3, 4]) {
+    runtime.send({ rules: Array.from({ length: count }, (_, index) => rule({ interaction: `effect_${index}` })),
+      presentation: { interactionsLayout: 'strip', interactionsTemplate: template } });
+    assert.equal(runtime.nodes['interactions-overlay'].dataset.scrolling, 'false');
+    assert.equal(runtime.nodes['interactions-content'].children.length, 1);
+    assert.equal(runtime.nodes['interactions-content'].children[0].children.length, count);
+    const position = runtime.nodes['interactions-content'].style.transform;
+    runtime.frame(1); runtime.frame(1001); runtime.frame(2001);
+    assert.equal(runtime.nodes['interactions-content'].style.transform, position);
+    assert.equal(position, 'translateX(12px)', 'keeps an inset at the first image');
+  }
+});
+
+test('five or more items loop through a four-item window and return to a complete static group when reduced', async () => {
+  const runtime = await boot();
+  runtime.send({ rules: Array.from({ length: 20 }, (_, index) => rule({ interaction: `effect_${index}` })),
+    presentation: { interactionsLayout: 'strip' } });
+  assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 20);
+  assert.equal(runtime.nodes['interactions-viewport'].style.width, `${4 * 600 + 3 * 20 + 24}px`);
+  assert.equal(runtime.nodes['interactions-overlay'].dataset.scrolling, 'true');
+  assert.ok(runtime.nodes['interactions-content'].children.length >= 2);
+  runtime.frame(1); runtime.frame(1001);
+  assert.notEqual(runtime.nodes['interactions-content'].style.transform, 'translateX(12px)');
+  const state = { rules: Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` })),
+    presentation: { interactionsLayout: 'strip' } };
+  runtime.send(state);
+  const copies = runtime.nodes['interactions-content'].children;
+  assert.deepEqual(copies[0].children.map(item => item.dataset.interaction), copies[1].children.map(item => item.dataset.interaction));
+  runtime.send({ ...state, rules: state.rules.slice(0, 4) });
+  assert.equal(runtime.nodes['interactions-content'].children.length, 1);
+  assert.equal(runtime.nodes['interactions-overlay'].dataset.scrolling, 'false');
+  assert.equal(runtime.nodes['interactions-content'].style.transform, 'translateX(12px)');
+});
+
+test('all cards share the largest natural width and height across pages and strips', async () => {
+  const runtime = await boot();
+  const rules = [rule(), rule({ interaction: 'effect_1' })];
+  for (const layout of ['pages', 'strip']) {
+    runtime.send({ rules, presentation: { interactionsLayout: layout, interactionsTemplate: 'cards' } });
+    const cards = runtime.created.filter(node => node.className === 'interaction-item').slice(-2);
+    cards[0].offsetWidth = 180; cards[0].offsetHeight = 128;
+    cards[1].offsetWidth = 210; cards[1].offsetHeight = 160;
+    runtime.listeners.resize();
+    assert.equal(runtime.nodes['interactions-overlay'].style['--item-width'], '210px');
+    assert.equal(runtime.nodes['interactions-overlay'].style['--item-height'], '160px');
+  }
+});
+
+test('manual strip height enlarges items, fills the moving viewport and preserves complete static groups', async () => {
+  const runtime = await boot();
+  const root = runtime.nodes['interactions-overlay'], viewport = runtime.nodes['interactions-viewport'];
+  const content = runtime.nodes['interactions-content'], scene = runtime.nodes['interactions-scene'];
+  root.clientWidth = 900; root.clientHeight = 250;
+  const rules = Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` }));
+  const sizes = {};
+  for (const template of ['cards', 'floating']) for (const count of [5, 4, 1]) for (const height of [25, 100]) {
+    runtime.send({ rules: rules.slice(0, count), presentation: {
+      interactionsLayout: 'strip', interactionsTemplate: template, interactionsSize: height,
+    } });
+    for (const card of content.children[0].children) { card.offsetWidth = 180; card.offsetHeight = 130; }
+    runtime.listeners.resize();
+    const scale = Number(scene.style.transform.match(/scale\(([^)]+)\)/)[1]);
+    sizes[`${template}-${count}-${height}`] = scale;
+    assert.ok(Number.parseFloat(viewport.style.height) * scale <= root.clientHeight + 1e-8);
+    assert.ok(Number.parseFloat(viewport.style.width) * scale <= root.clientWidth + 1e-8);
+    assert.equal(root.dataset.scrolling, String(count > 4));
+    if (count > 4) {
+      assert.ok((content.children.length - 1) * count * (180 + 20) >= Number.parseFloat(viewport.style.width),
+        'copies cover the entire viewport even at the smallest manual height');
+      runtime.frame(1); runtime.frame(1001);
+      assert.notEqual(content.style.transform, 'translateX(12px)');
+    } else {
+      assert.equal(content.children.length, 1);
+      runtime.frame(2001); runtime.frame(3001);
+      assert.equal(content.style.transform, 'translateX(12px)');
+    }
+  }
+  for (const template of ['cards', 'floating']) for (const count of [5, 4, 1])
+    assert.ok(sizes[`${template}-${count}-100`] > sizes[`${template}-${count}-25`]);
+  assert.ok(sizes['cards-4-100'] < sizes['cards-5-100'], 'four items respect the width needed by the whole group');
+});
+
+test('manual page height respects the overlay bounds and stays constant on the next page', async () => {
+  const runtime = await boot();
+  const root = runtime.nodes['interactions-overlay'], scene = runtime.nodes['interactions-scene'];
+  const viewport = runtime.nodes['interactions-viewport'];
+  root.clientWidth = 1800; root.clientHeight = 420;
+  const rules = Array.from({ length: 10 }, (_, index) => rule({ interaction: `effect_${index}` }));
+  let smaller;
+  for (const height of [25, 100]) {
+    runtime.send({ rules, presentation: { interactionsLayout: 'pages', interactionsSize: height, interactionsPageSeconds: 3 } });
+    const scale = Number(scene.style.transform.match(/scale\(([^)]+)\)/)[1]);
+    assert.ok(Number.parseFloat(viewport.style.height) * scale <= root.clientHeight + 1e-8);
+    assert.ok(Number.parseFloat(viewport.style.width) * scale <= root.clientWidth + 1e-8);
+    if (height === 25) smaller = scale;
+    else assert.ok(scale > smaller);
+    const before = scene.style.transform;
+    const previousPage = root.dataset.page;
+    runtime.frame(1); runtime.frame(1001); runtime.frame(2001); runtime.frame(3001);
+    assert.notEqual(root.dataset.page, previousPage);
+    assert.equal(scene.style.transform, before);
+  }
 });
 
 test('standalone OBS mode reads saved profile and real rules then refreshes prices', async () => {

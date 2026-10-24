@@ -2,6 +2,70 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Tamaño manual de Interacciones limitado por el overlay (2026-10-23)
+
+El inspector añade «Tamaño automático» y, al desactivarlo, «Altura del contenido»
+de 25% a 100%. `interactionsSize = 0` conserva el ajuste anterior; los valores
+manuales son enteros de 25 a 100, validados atómicamente por el mod. Se guarda,
+copia y restablece por perfil. Las escenas sin el campo conservan automático.
+El tamaño adaptativo de los canjes sigue siendo independiente.
+
+Hasta cuatro ítems quedan estáticos y se limitan por el ancho del grupo completo.
+Con más de cuatro, la altura controla la escala y la franja usa todo el ancho,
+con al menos un ítem completo y suficientes copias para cubrir todo el recorrido.
+Paginado aplica el porcentaje a la página completa, manteniendo la escala entre
+páginas. Los límites incluyen márgenes exteriores.
+
+Se aprobaron 50 pruebas JS seleccionadas y toda la suite runtime. Revisión visual
+en el diseñador: tamaño mínimo/máximo, guardado después de recargar, transición
+de cinco ítems móviles a cuatro estáticos y paginado de dieciocho ejemplos.
+Tokens `interactions-4` y `composer-interactions-32`.
+Publicación Dev completa en proceso independiente, con destino físico verificado:
+1,517 archivos; SHA-256
+`7174518DAB934946A218AA4F7EF59EFD45FCD9D676B6A79E1C56B29F7CA05EC3`.
+
+## Tarjetas uniformes y franja fija hasta cuatro (2026-10-23)
+
+La imagen se contiene en un espacio fijo de 96 × 96, conservando su proporción
+y eliminando sólo sus márgenes transparentes. Los zepelines anchos ya no agrandan
+una columna ni exceden los límites de la franja. Todas las tarjetas tienen las
+mismas dimensiones en el catálogo y 16 px de padding, con 12 px entre imagen y
+precios. Paginado y franja usan funciones de ajuste independientes.
+
+La franja permanece estática hasta cuatro ítems, sin duplicarlos. A partir de cinco
+muestra una ventana de cuatro y repite el catálogo con la misma separación al
+enlazar ciclos. Al reducir las reglas a cuatro limpia el desplazamiento anterior.
+Los bordes del grupo reservan espacio para imágenes, cantidades y sombras.
+Se aprobaron 47 pruebas JS. En el diseñador real se comprobaron dimensiones
+iguales en todas las tarjetas, imágenes panorámicas contenidas, cuatro ítems
+estáticos y el movimiento continuo al añadir un quinto. Publicación Dev completa
+en proceso independiente, con ruta física verificada: 1,517 archivos; SHA-256
+`58AE591974618494CF9108D122031009DA261CE2A423685BEDE97B6FB6B9FF9F`.
+
+## Interacciones sin nombres y presentación compacta (2026-10-23)
+
+Las dos plantillas eliminan nombres de ítems, categorías, encabezado, redes
+escritas y nombres visibles de recompensas. El inspector ya no ofrece nombres;
+la normalización del mod y del navegador ignora esa preferencia en escenas antiguas.
+Las tarjetas ajustan su ancho al arte y al precio, conservando fondo sólo dentro
+de cada tarjeta. La franja muestra un grupo de tres elementos y conserva el resto
+del catálogo en movimiento. Al cambiar a franja el diseñador propone 960 × 280.
+
+El diseñador completa dieciocho efectos por red al previsualizar páginas, usando
+regalos TikTok del catálogo, Bits oficiales de Twitch y Gemas de YouTube. Los
+ejemplos no alteran reglas ni salen a OBS. El paginado desliza en 380 ms con escala
+estable y respeta el interruptor de animaciones y la preferencia de movimiento reducido.
+
+Pruebas de regresión: nombres antiguos, recompensas sin texto visible, imágenes
+por plataforma, franja acotada, deslizamiento sin reinicio por polling y vistas
+previas con pocas reglas. Ver `docs/interactions-overlay.md`.
+Se aprobaron las 44 pruebas JS seleccionadas, toda la suite runtime y los
+contratos compilados. Se revisaron las cuatro combinaciones en el diseñador;
+captura: `.deployment-cache/interactions-cards-compact-preview.png`.
+Publicación Dev en proceso independiente completada, con ruta física verificada:
+1,517 archivos; SHA-256
+`A2A3E781E110F7CECBA4D77A57E36478E55A32F12316BF9DE9B1C6E97EDF2F41`.
+
 ## Espacio vertical del resumen (2026-10-05)
 
 Se retiran `min-height: 280px` del contenedor del jefe y `min-height: 188px`

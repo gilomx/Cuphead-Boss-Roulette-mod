@@ -409,7 +409,7 @@ namespace Gilomx.CupheadBossRoulette
                 component.Variant = variant; changed = true;
             }
             foreach (var key in new[] { "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
-                "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive" })
+                "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize" })
             {
                 if (!values.ContainsKey(key)) continue;
                 if (component.Id != CreatorToolsOverlayComposerSettings.InteractionsComponentId) return false;
@@ -424,6 +424,11 @@ namespace Gilomx.CupheadBossRoulette
                     var layout = CreatorToolsOverlayComposerSettings.NormalizeInteractionsLayout(Value(values, key));
                     if (layout.Length == 0) return false;
                     component.InteractionsLayout = layout;
+                }
+                else if (key == "interactionsSize")
+                {
+                    if (!TryReadInt(values, key, out number) || !CreatorToolsOverlayComposerSettings.IsValidInteractionsSize(number)) return false;
+                    component.InteractionsSize = number;
                 }
                 else if (key == "interactionsPageSeconds" || key == "interactionsSpeed")
                 {

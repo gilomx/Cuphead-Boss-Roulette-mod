@@ -73,7 +73,6 @@ function createPreviewSessionId() {
 export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const { locale, t } = useLocalization();
   const { tapFarming, peskyBattle, streamRules } = useConfig();
-  const interactionsState = useMemo(() => createInteractionsPreview(streamRules, t), [streamRules, t]);
   const initialSelection = useMemo(querySelection, []);
   const [profileId, setProfileId] = useState<OverlayProfileId>(initialSelection.profileId);
   const [selectedComponentId, setSelectedComponentId] = useState<OverlayComponentId>(
@@ -171,6 +170,12 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
 
   const profile = profileById(profiles, profileId);
   const component = componentById(profile, selectedComponentId);
+  const interactionsLayout = componentById(profile, "interactions")?.interactionsLayout;
+  const interactionsState = useMemo(
+    () => createInteractionsPreview(streamRules, t,
+      (interactionsLayout ?? (profileId === "vertical" ? "pages" : "strip")) === "pages"),
+    [streamRules, t, interactionsLayout, profileId],
+  );
   profileRef.current = profile;
   selectedComponentIdRef.current = selectedComponentId;
   previewActiveRef.current = previewActive;

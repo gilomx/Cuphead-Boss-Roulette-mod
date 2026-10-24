@@ -46,6 +46,7 @@ export interface OverlayComposerComponent {
   interactionsYouTube?: boolean;
   interactionsPageSeconds?: number;
   interactionsSpeed?: number;
+  interactionsSize?: number;
   interactionsAdaptive?: boolean;
 }
 
@@ -107,6 +108,7 @@ export interface OverlayComposerCommand {
   interactionsYouTube?: boolean;
   interactionsPageSeconds?: number;
   interactionsSpeed?: number;
+  interactionsSize?: number;
   interactionsAdaptive?: boolean;
 }
 

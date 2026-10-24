@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -67,6 +67,26 @@ test("interaction designer examples remain separate from configured rules", () =
   const allDisabled = exports.createInteractionsPreview({ rules: [disabled] }, key => key);
   assert.equal(allDisabled.examples, false, "disabled rules must not be replaced by sample prices");
   assert.deepEqual(allDisabled.rules, []);
+
+  const paginated = exports.createInteractionsPreview(config, key => key, true);
+  assert.equal(paginated.examples, true);
+  assert.equal(new Set(paginated.rules.map(rule => rule.interaction)).size, 18);
+  assert.ok(paginated.rules.includes(actual));
+  const gifts = new Set(paginated.rules.filter(rule => rule.platform === "tiktok" && rule.id < 0).map(rule => rule.giftId));
+  assert.ok(gifts.size >= 6, "samples rotate through real gifts rather than repeating one placeholder");
+  const catalog = JSON.parse(readFileSync(join(uiRoot, "../assets/creator-tools/gifts/catalog.json"), "utf8"));
+  for (const id of gifts) {
+    const gift = catalog.gifts.find(gift => gift.giftId === id);
+    assert.ok(gift && existsSync(join(uiRoot, "..", gift.imagePath)), `real gift ${id} has bundled artwork`);
+  }
+  const twitchOnly = paginated.rules.filter(rule => rule.platform === "twitch");
+  const everyNetwork = exports.createInteractionsPreview({ rules: twitchOnly }, key => key, true);
+  for (const platform of ["tiktok", "twitch", "youtube"])
+    assert.ok(new Set(everyNetwork.rules.filter(rule => rule.platform === platform).map(rule => rule.interaction)).size >= 18,
+      `any platform selection still demonstrates pagination: ${platform}`);
+  const emptyPages = exports.createInteractionsPreview({ rules: [disabled] }, key => key, true);
+  assert.equal(new Set(emptyPages.rules.map(rule => rule.interaction)).size, 18);
+  assert.equal(JSON.stringify(config), before);
 });
 
 test("chat designer scenarios and votes travel to OBS independently of real events", () => {

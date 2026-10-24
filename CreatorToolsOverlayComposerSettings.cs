@@ -46,6 +46,7 @@ namespace Gilomx.CupheadBossRoulette
         internal bool InteractionsYouTube;
         internal int InteractionsPageSeconds = 8;
         internal int InteractionsSpeed = 40;
+        internal int InteractionsSize;
         internal bool InteractionsAdaptive = true;
 
         internal CreatorToolsOverlayComposerComponent Clone()
@@ -503,6 +504,8 @@ namespace Gilomx.CupheadBossRoulette
             component.TextShadowBlur = Math.Max(0, Math.Min(20, component.TextShadowBlur));
             if (component.Id == InteractionsComponentId)
             {
+                component.ShowTitle = false;
+                component.ShowDetails = false;
                 var template = NormalizeInteractionsTemplate(component.InteractionsTemplate);
                 component.InteractionsTemplate = template.Length == 0 ? "floating" : template;
                 var layout = NormalizeInteractionsLayout(component.InteractionsLayout);
@@ -510,6 +513,7 @@ namespace Gilomx.CupheadBossRoulette
                     ? (profile.Id == VerticalProfileId ? "pages" : "strip") : layout;
                 component.InteractionsPageSeconds = Math.Max(3, Math.Min(60, component.InteractionsPageSeconds));
                 component.InteractionsSpeed = Math.Max(10, Math.Min(120, component.InteractionsSpeed));
+                if (!IsValidInteractionsSize(component.InteractionsSize)) component.InteractionsSize = 0;
             }
         }
 
@@ -608,6 +612,7 @@ namespace Gilomx.CupheadBossRoulette
                         .Append(",\"interactionsYouTube\":").Append(component.InteractionsYouTube ? "true" : "false")
                         .Append(",\"interactionsPageSeconds\":").Append(component.InteractionsPageSeconds)
                         .Append(",\"interactionsSpeed\":").Append(component.InteractionsSpeed)
+                        .Append(",\"interactionsSize\":").Append(component.InteractionsSize)
                         .Append(",\"interactionsAdaptive\":").Append(component.InteractionsAdaptive ? "true" : "false");
                 builder.Append('}');
             }
@@ -756,6 +761,7 @@ namespace Gilomx.CupheadBossRoulette
             destination.InteractionsYouTube = source.InteractionsYouTube;
             destination.InteractionsPageSeconds = source.InteractionsPageSeconds;
             destination.InteractionsSpeed = source.InteractionsSpeed;
+            destination.InteractionsSize = source.InteractionsSize;
             destination.InteractionsAdaptive = source.InteractionsAdaptive;
         }
 
@@ -1097,7 +1103,18 @@ namespace Gilomx.CupheadBossRoulette
                 if (key == "interactionsPageSeconds") component.InteractionsPageSeconds = value;
                 else component.InteractionsSpeed = value;
             }
+            if (node.Property("interactionsSize") != null)
+            {
+                int value;
+                if (!node.TryInteger("interactionsSize", out value) || !IsValidInteractionsSize(value)) return false;
+                component.InteractionsSize = value;
+            }
             return true;
+        }
+
+        internal static bool IsValidInteractionsSize(int value)
+        {
+            return value == 0 || (value >= 25 && value <= 100);
         }
 
         internal static string NormalizeTextFont(string value)

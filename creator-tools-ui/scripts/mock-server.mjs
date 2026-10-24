@@ -387,7 +387,7 @@ function defaultOverlayProfiles() {
     liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
     interactionsTemplate: "floating", interactionsLayout: profile.id === "vertical" ? "pages" : "strip",
     interactionsTikTok: true, interactionsTwitch: profile.id === "horizontal", interactionsYouTube: profile.id === "horizontal",
-    interactionsPageSeconds: 8, interactionsSpeed: 40, interactionsAdaptive: true,
+    interactionsPageSeconds: 8, interactionsSpeed: 40, interactionsAdaptive: true, interactionsSize: 0,
   }].map(component => ({ ...component, voteOutlineColor: "#ffffff", textFont: "clean", textWeight: 700,
     textShadowColor: "#00000000", textShadowX: 2, textShadowY: 3, textShadowBlur: 2 })) }));
 }
@@ -1079,6 +1079,8 @@ function normalizeOverlayComponent(component, canvas) {
     component.interactionsTwitch = component.interactionsTwitch ?? !vertical;
     component.interactionsYouTube = component.interactionsYouTube ?? !vertical;
     component.interactionsAdaptive = component.interactionsAdaptive !== false;
+    component.interactionsSize = Number(component.interactionsSize) > 0
+      ? Math.max(25, Math.min(100, Math.round(Number(component.interactionsSize)))) : 0;
     for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 10, 120]]) {
       const value = Number(component[key] ?? fallback);
       component[key] = Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, Math.round(value))) : fallback;
@@ -1153,6 +1155,8 @@ function applyOverlayComposerCommand(command, res) {
     if (command.interactionsTemplate != null && !["cards", "floating"].includes(command.interactionsTemplate) ||
         command.interactionsLayout != null && !["strip", "pages"].includes(command.interactionsLayout) ||
         ["interactionsTikTok", "interactionsTwitch", "interactionsYouTube", "interactionsAdaptive"].some(key => command[key] != null && typeof command[key] !== "boolean") ||
+        command.interactionsSize != null && (!Number.isInteger(command.interactionsSize) ||
+          command.interactionsSize !== 0 && (command.interactionsSize < 25 || command.interactionsSize > 100)) ||
         [["interactionsPageSeconds", 3, 60], ["interactionsSpeed", 10, 120]].some(([key, minimum, maximum]) =>
           command[key] != null && (!Number.isInteger(command[key]) || command[key] < minimum || command[key] > maximum))) {
       json(res, { ok: false, error: "invalid_interactions_options" }, 400);
@@ -1178,7 +1182,7 @@ function applyOverlayComposerCommand(command, res) {
       "textFont", "textWeight", "textShadowColor", "textShadowX", "textShadowY", "textShadowBlur",
       "rouletteSize", "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
       "interactionsTemplate", "interactionsLayout", "interactionsTikTok", "interactionsTwitch", "interactionsYouTube",
-      "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive",
+      "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
       "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",
     ]) {
       if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];
