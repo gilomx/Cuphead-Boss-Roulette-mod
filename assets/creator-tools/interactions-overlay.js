@@ -10,7 +10,7 @@
   const embedded = query.get('mode') === 'embedded' || query.get('embedded') === '1';
   const profileId = query.get('profile') === 'vertical' ? 'vertical' : 'horizontal';
   const SVG = 'http://www.w3.org/2000/svg';
-  const stripGap = 20;
+  let stripGap = 20;
   const stripInset = 12;
   const stripCapacity = 4;
   const platformNames = { tiktok: 'TikTok', twitch: 'Twitch', youtube: 'YouTube' };
@@ -48,6 +48,8 @@
   let lastFrame = 0;
   let frame = 0;
   let pollTimer = 0;
+  let visibilityTimer = 0;
+  let targetVisible = false;
   let disposed = false;
   let measuredCards = [];
   const measurements = new Map();
@@ -168,7 +170,7 @@
     root.dataset.page = String(page);
   }
   function drawContent() {
-    if (disposed || root.hidden) return;
+    if (disposed || !targetVisible) return;
     content.style.transform = '';
     content.style.transition = 'none';
     measuredCards = [];
@@ -191,9 +193,11 @@
     // Normalize across the entire catalog, including pages not currently visible.
     const width = Math.ceil(Math.max(1, ...measuredCards.map(card => card.offsetWidth || card.scrollWidth || 1)));
     const height = Math.ceil(Math.max(1, ...measuredCards.map(card => card.offsetHeight || card.scrollHeight || 1)));
-    root.style.setProperty('--item-width', `${width}px`);
+    const uniform = view.interactionsTemplate === 'cards';
+    const widths = measuredCards.map(card => uniform ? width : Math.ceil(card.offsetWidth || card.scrollWidth || 1));
+    root.style.setProperty('--item-width', uniform ? `${width}px` : 'max-content');
     root.style.setProperty('--item-height', `${height}px`);
-    return { width, height };
+    return { width, height, widths };
   }
   function fitPages(width, height) {
     const sheets = Array.from(content.children);
@@ -214,7 +218,10 @@
   function fitStrip(width, height, size) {
     if (!content.children[0]) return;
     const visibleCount = Math.min(stripCapacity, allItems.length);
-    let naturalWidth = visibleCount * size.width + (visibleCount - 1) * stripGap + stripInset * 2;
+    const widths = size.widths;
+    const windowWidth = Math.max(...widths.map((_, index) =>
+      Array.from({ length: visibleCount }, (_, offset) => widths[(index + offset) % widths.length]).reduce((sum, value) => sum + value, 0)));
+    let naturalWidth = windowWidth + (visibleCount - 1) * stripGap + stripInset * 2;
     const naturalHeight = size.height + stripInset * 2;
     const moving = allItems.length > stripCapacity;
     if (view.interactionsSize > 0) {
@@ -230,7 +237,7 @@
     scene.style.left = `${Math.max(0, (width - naturalWidth * scale) / 2)}px`;
     scene.style.top = `${Math.max(0, (height - naturalHeight * scale) / 2)}px`;
     // A whole cycle includes its trailing gap, matching the gap between copies.
-    cycleWidth = allItems.length * (size.width + stripGap);
+    cycleWidth = widths.reduce((sum, value) => sum + value + stripGap, 0);
     root.dataset.scrolling = String(moving);
     const required = moving ? model.repetitions(cycleWidth, naturalWidth) : 1;
     while (content.children.length < required) {
@@ -241,7 +248,7 @@
     content.style.transform = `translateX(${stripInset - stripOffset}px)`;
   }
   function fit() {
-    if (disposed || root.hidden) return;
+    if (disposed || !targetVisible || root.hidden) return;
     const width = root.clientWidth || window.innerWidth || 1;
     const height = root.clientHeight || window.innerHeight || 1;
     scene.style.width = ''; scene.style.transform = ''; viewport.style.width = ''; viewport.style.height = '';
@@ -260,12 +267,17 @@
     document.title = `${labels[locale].title} — La Pichi Ruleta`;
     const normalized = model.presentation(state.presentation);
     const nextItems = model.items(state, normalized, catalog, artwork, locale);
-    const visible = (state.preview === true || (state.visible !== false && state.enabled !== false && state.active !== false)) && nextItems.length > 0;
+    const visible = (state.preview === true || (state.visible !== false && state.enabled !== false && state.active !== false)) && nextItems.length > 0 &&
+      (state.preview === true || state.battlePreview === true || state.interactionsBattleOnly !== true || state.battleActive === true);
     const signature = JSON.stringify([visible, normalized, nextItems, locale]);
     if (signature === lastSignature) return;
     const previousKey = allPages[page]?.[0]?.key;
     lastSignature = signature; view = normalized; allItems = nextItems;
-    root.hidden = !visible;
+    const floating = model.floatingLayout(profileId);
+    stripGap = view.interactionsTemplate === 'cards' ? 20 : floating.gap;
+    root.style.setProperty('--strip-gap', `${stripGap}px`);
+    root.style.setProperty('--floating-payment-offset', `${-floating.overlap}px`);
+    setVisibility(visible);
     root.dataset.template = view.interactionsTemplate;
     root.dataset.layout = view.interactionsLayout;
     root.dataset.count = String(allItems.length);
@@ -277,14 +289,38 @@
     const retainedPage = previousKey ? allPages.findIndex(entries => entries.some(entry => entry.key === previousKey)) : -1;
     page = retainedPage >= 0 ? retainedPage : Math.min(page, Math.max(0, allPages.length - 1));
     pageElapsed = 0;
-    if (!visible) { content.replaceChildren(); return; }
+    if (!visible) return;
     drawContent();
+  }
+  function setVisibility(visible) {
+    targetVisible = visible;
+    clearTimeout(visibilityTimer);
+    visibilityTimer = 0;
+    const motion = view.motion && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    root.dataset.motion = String(motion);
+    if (visible) {
+      if (root.hidden) {
+        root.dataset.presence = 'hidden';
+        root.hidden = false;
+        // Establish the invisible starting point before the CSS transition.
+        void root.offsetWidth;
+      }
+      root.dataset.presence = 'visible';
+    } else {
+      root.dataset.presence = 'exiting';
+      const finish = () => {
+        if (targetVisible || disposed) return;
+        root.hidden = true; root.dataset.presence = 'hidden'; content.replaceChildren();
+      };
+      if (motion && !root.hidden) visibilityTimer = setTimeout(finish, 280);
+      else finish();
+    }
   }
   function tick(time) {
     if (disposed) return;
     const elapsed = lastFrame ? Math.min(1000, Math.max(0, time - lastFrame)) : 0;
     lastFrame = time;
-    if (!root.hidden) {
+    if (targetVisible && !root.hidden) {
       if (view.interactionsLayout === 'pages') {
         pageElapsed += elapsed;
         if (allPages.length > 1 && pageElapsed >= view.interactionsPageSeconds * 1000) {
@@ -310,16 +346,18 @@
   async function poll() {
     if (disposed) return;
     try {
-      const [state, config] = await Promise.all([
+      const [state, config, battle] = await Promise.all([
         fetchJson('/api/config/interactions/rules'), fetchJson('/api/overlay-composer/config'),
+        fetchJson('/api/roulette-overlay/state').catch(() => ({})),
       ]);
       if (disposed) return;
       const profile = config.profiles?.find(entry => entry.id === profileId);
       const component = profile?.components?.find(entry => entry.id === 'interactions');
-      render({ ...state, visible: component?.enabled !== false, presentation: component || {}, locale: query.get('locale') || 'es' });
+      render({ ...state, visible: component?.enabled !== false, presentation: component || {}, locale: query.get('locale') || 'es',
+        interactionsBattleOnly: config.interactionsBattleOnly !== false, battleActive: battle.interactionBattleActive === true });
     } catch {
       // A disconnected overlay must not keep advertising stale prices indefinitely.
-      if (!disposed) { root.hidden = true; lastSignature = ''; }
+      if (!disposed) { setVisibility(false); lastSignature = ''; }
     }
     if (!disposed) pollTimer = setTimeout(poll, 1000);
   }
@@ -331,7 +369,7 @@
     render(message.state);
   }
   function dispose() {
-    disposed = true; clearTimeout(pollTimer); cancelAnimationFrame(frame);
+    disposed = true; clearTimeout(pollTimer); clearTimeout(visibilityTimer); cancelAnimationFrame(frame);
     window.removeEventListener('message', message); window.removeEventListener('resize', fit);
     for (const probe of measuring.values()) { probe.onload = null; probe.onerror = null; }
     measuring.clear();

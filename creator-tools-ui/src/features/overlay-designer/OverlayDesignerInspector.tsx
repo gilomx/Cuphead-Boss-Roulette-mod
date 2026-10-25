@@ -26,6 +26,8 @@ interface OverlayDesignerInspectorProps {
   chatState: ChatChoosesState;
   rouletteScenario: RouletteScenario;
   interactionsState: InteractionsPreviewSnapshot;
+  interactionsBattleOnly: boolean;
+  onInteractionsBattleOnlyChange: (value: boolean) => void;
   onRouletteScenarioChange: (scenario: RouletteScenario) => void;
   onRouletteReplay: () => void;
   previewActive: boolean;
@@ -216,6 +218,8 @@ export function OverlayDesignerInspector({
   chatState,
   rouletteScenario,
   interactionsState,
+  interactionsBattleOnly,
+  onInteractionsBattleOnlyChange,
   onRouletteScenarioChange,
   onRouletteReplay,
   previewActive,
@@ -462,6 +466,12 @@ export function OverlayDesignerInspector({
               <output>{interactionsSize}%</output>
             </label> : null}
             <small>{t("overlayDesigner.interactions.itemSizeHint")}</small>
+            <label className="overlay-designer-properties__checkbox">
+              <input type="checkbox" disabled={disabled} checked={interactionsBattleOnly}
+                onChange={event => onInteractionsBattleOnlyChange(event.target.checked)} />
+              <span>{t("overlayDesigner.interactions.battleOnly")}</span>
+            </label>
+            <small>{t("overlayDesigner.interactions.battleOnlyHint")}</small>
           </div>
         ) : null}
 

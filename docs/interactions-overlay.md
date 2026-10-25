@@ -33,15 +33,27 @@ proporción. Una imagen ancha o alta nunca agranda la tarjeta ni sale de ese esp
 Ninguna plantilla muestra nombres, categorías, títulos ni duración de los retos.
 No hay una opción para activarlos; los ajustes antiguos tampoco los reactivan.
 Los canjes muestran primero el símbolo y después la cantidad; en Iconos flotantes
-se superponen al borde del efecto. Todas las tarjetas comparten ancho y alto,
+se superponen al borde del efecto. Los iconos flotantes ajustan cada ancho a su
+imagen y precios, con los valores de separación aprobados para cada perfil. Las imágenes estrechas
+reservan menos ancho sin deformarse. Todas las tarjetas comparten ancho y alto,
 calculados para los canjes del catálogo, con 16 px de padding interno y espacio
 entre el efecto y los precios. Sólo cada tarjeta tiene fondo.
 El exterior de ambas plantillas permanece transparente.
 
+La superposición y separación de **Iconos flotantes** quedan fijas tras la
+confirmación visual: en vertical, el bloque de canjes entra 29 px en la imagen
+y la franja separa sus ítems 35 px. Horizontal conserva 12 y 6 px. Son medidas
+del diseño base, escaladas con el overlay. Los controles temporales se retiraron;
+sus antiguos campos se ignoran al cargar sin modificar el resto de la escena.
+Las tarjetas mantienen su separación de 20 px y distribución independiente.
+
 En **Tarjetas**, **Color de las tarjetas** permite cambiar el fondo y su
-transparencia. **Ruido envejecido** añade grano y marcas sutiles sobre ese fondo;
+transparencia. **Ruido envejecido** añade grano, escamas blancas irregulares,
+motas claras y arañazos finos, incluidos trazos curvos y discontinuos sobre ese fondo;
 su intensidad se ajusta del 0% al 100%, con 0% para desactivarlo. La textura es
-estática y queda debajo de las imágenes y las cantidades. Ambos ajustes se
+estática y queda debajo de las imágenes y las cantidades. Cada ítem conserva su
+misma posición de textura: las marcas no parpadean, aparecen ni se desplazan por
+su cuenta. Ambos ajustes se
 guardan por perfil y se aplican tanto a la franja como al paginado.
 
 El contenido sale de las reglas habilitadas de **Interacciones**. La cantidad
@@ -64,11 +76,29 @@ Una capa sin reglas habilitadas o sin
 redes seleccionadas permanece vacía. El overlay sólo lee las reglas y no ejecuta
 interacciones ni cambia la configuración de los canjes.
 
-La nueva capa empieza oculta en los perfiles existentes. Actívala, ajusta su
-posición y tamaño y usa **Copiar URL para OBS** del perfil vertical u horizontal.
+Los valores predeterminados toman el diseño guardado: en vertical, franja flotante
+en X=4, Y=1077, de 1072 × 313, tamaño al 96%, velocidad 80, Twitch y YouTube
+visibles y TikTok oculto. La capa vertical empieza activa. Se conserva el color
+de tarjetas `#662effa6` y ruido al 80%. Horizontal mantiene X=60, Y=800,
+1800 × 230, tamaño automático, velocidad 40, las tres redes y capa oculta.
+Estos valores se usan en perfiles nuevos o al restablecer; las escenas guardadas
+conservan cada preferencia explícita. Las escenas antiguas sin esta capa la
+incorporan oculta. Ajusta su posición y tamaño y usa **Copiar URL para OBS** del perfil vertical u horizontal.
 Las direcciones siguen siendo `/overlay/vertical` y `/overlay/horizontal`.
 El recurso `/interactions-overlay?profile=vertical` también permite mostrar
 sólo esta capa con su configuración guardada.
+
+En el **Diseñador de overlays**, selecciona **Interacciones y canjes**. En sus
+ajustes de presentación, **Mostrar overlay sólo en batallas activas** controla
+ambos perfiles y está activado por defecto. Se guarda con **Guardar cambios**, como
+`interactionsBattleOnly` en el compositor, independientemente de las reglas y
+de la distribución de ataques. Usa el estado nativo de una batalla contra jefe,
+tanto normal como por ruleta; la pausa no retira el overlay. Al terminar la
+batalla, cargar otra escena o volver al mapa, sale con una transición de 280 ms.
+La entrada usa la misma duración y un desplazamiento vertical sutil. Desactivar
+animaciones o reducir movimiento omite la transición. Un regreso rápido cancela
+la salida pendiente. El diseñador y las pruebas explícitas de OBS permiten
+inspeccionarlo fuera de una pelea.
 
 La configuración se guarda junto a las demás capas en
 `mx.gilomx.cuphead.bossroulette.overlay-composer.json`, conservando las copias de

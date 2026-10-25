@@ -37,6 +37,10 @@
       textShadowBlur: Math.round(number(source.textShadowBlur, 2, 0, 20)),
     };
   }
+  function floatingLayout(profile) {
+    // Confirmed in the live designer; the temporary controls are retired.
+    return profile === 'vertical' ? { overlap: 29, gap: 35 } : { overlap: 12, gap: 6 };
+  }
   function selectedNetworks(source) {
     const view = presentation(source);
     return networks.filter((network, index) => view[['interactionsTikTok', 'interactionsTwitch', 'interactionsYouTube'][index]]);
@@ -131,5 +135,5 @@
       left: bounds.left * scale, top: bounds.top * scale };
   }
   host.CreatorToolsInteractionsOverlayModel = Object.freeze({ presentation, selectedNetworks, localImage, items,
-    paymentSize, pages, nextPage, offset, repetitions, opaqueBounds, containArtwork });
+    paymentSize, pages, nextPage, offset, repetitions, opaqueBounds, containArtwork, floatingLayout });
 })(typeof window === 'undefined' ? globalThis : window);

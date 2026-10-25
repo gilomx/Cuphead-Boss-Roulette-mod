@@ -131,6 +131,7 @@ test('interaction designer previews a disabled layer and forwards its independen
   assert.equal(message.state.presentation.interactionsSpeed, 140);
   assert.equal(message.state.presentation.interactionsCardColor, '#3f2b20aa');
   assert.equal(message.state.presentation.interactionsCardNoise, 35);
+  assert.match(view.interactionsFrame.src, /profile=horizontal/);
   view.design('roulette');
   assert.equal(view.interactionsHost.dataset.enabled, 'false');
   view.close();
@@ -153,6 +154,29 @@ test('OBS interaction layout preview uses real rules and restores the saved visi
   assert.equal(message.state.presentation.interactionsLayout, 'strip');
   await view.setPreview({ active: false, revision: 2 });
   assert.equal(view.interactionsHost.dataset.enabled, 'false');
+  view.close();
+});
+
+test('ordinary boss battle visibility reaches interactions immediately and stays independent of roulette and previews', async () => {
+  const native = { type: 'state', active: false, battleActive: false, interactionBattleActive: false };
+  let config;
+  const view = await bootComposer(false, { socket: true, fetch: url =>
+    url === '/api/roulette-overlay/state' ? { ok: true, json: async () => native }
+      : url === '/api/overlay-composer/config' && config ? { ok: true, json: async () => config } : undefined });
+  view.profile.components.push({ id: 'interactions', enabled: true, interactionsLayout: 'strip' });
+  await view.setPreview({ active: false, revision: 1 });
+  assert.equal(view.interactionsFrame.posted.at(-1).state.battleActive, false);
+  assert.equal(view.interactionsFrame.posted.at(-1).state.interactionsBattleOnly, true);
+  view.sockets[0].message({ ...native, interactionBattleActive: true });
+  assert.equal(view.interactionsFrame.posted.at(-1).state.battleActive, true,
+    'ordinary battle becomes visible without waiting for polling or a roulette session');
+  view.sockets[0].message(native);
+  assert.equal(view.interactionsFrame.posted.at(-1).state.battleActive, false);
+  await view.setPreview({ active: true, simulationActive: true, componentId: 'interactions', revision: 2, layout: view.profile });
+  assert.equal(view.interactionsFrame.posted.at(-1).state.battlePreview, true);
+  config = { profiles: [view.profile], interactionsBattleOnly: false };
+  view.intervals.get(500)(); await flush();
+  assert.equal(view.interactionsFrame.posted.at(-1).state.interactionsBattleOnly, false);
   view.close();
 });
 test('designer bridge owns transport and applies the original editable settings', () => {
@@ -350,6 +374,28 @@ test('replay restarts entry animation while ordinary presentation updates keep t
   assert.equal(view.nodes.icons.children[0].classList.contains('settled'), false);
   view.finish();
   assert.ok(view.nodes.icons.children[0].classList.contains('reveal'));
+});
+test('initial designer roulette sample is visible without animation timers and explicit replay still animates', async () => {
+  const composerView = await bootComposer(true);
+  const first = { ...state(), preview: true, session: -1 };
+  composerView.design('roulette', { roulette: first });
+  const message = composerView.frame.posted.at(-1);
+  assert.equal(message.state.settledPreview, true);
+  const widgetView = boot();
+  widgetView.send(message.state);
+  assert.equal(widgetView.pendingTimers, 0);
+  assert.equal(widgetView.nodes.result.hidden, false);
+  assert.ok(widgetView.nodes.icons.children.every(icon => icon.classList.contains('settled')));
+  assert.ok(widgetView.nodes.challenge.classList.contains('settled'));
+  composerView.design('roulette', { roulette: { ...first, session: -2 } });
+  widgetView.send(composerView.frame.posted.at(-1).state);
+  assert.ok(widgetView.pendingTimers > 0);
+  composerView.close();
+  const liveView = await bootComposer(false);
+  await liveView.setPreview({ active: true, simulationActive: true, componentId: 'roulette',
+    scenario: 'hud', revision: 1, eventEpoch: 0, layout: liveView.profile });
+  assert.equal(liveView.frame.posted.at(-1).state.settledPreview, false, 'OBS keeps its entry animation');
+  liveView.close();
 });
 test('roulette always uses the fixed uppercase web font and ignores saved or incoming game fonts', () => {
   const view = boot(); const first = { ...state(), challengeText: 'Reto sin Dash áéñ', labelRevision: 42 };

@@ -129,7 +129,18 @@ namespace Gilomx.CupheadBossRoulette
 
                 var candidate = settings.Clone();
                 var feedback = string.Empty;
-                if (operation == "update")
+                if (operation == "interactions_visibility")
+                {
+                    bool battleOnly;
+                    CreatorToolsJsonValue command;
+                    if (!CreatorToolsJsonParser.TryParse(body, out command) ||
+                        !command.TryBoolean("interactionsBattleOnly", out battleOnly))
+                        return new CreatorToolsOverlayComposerResponse(400, "Bad Request",
+                            settings.BuildStateJson("invalid_interactions_visibility", true));
+                    candidate.InteractionsBattleOnly = battleOnly;
+                    feedback = "updated";
+                }
+                else if (operation == "update")
                 {
                     if (!ApplyComponentUpdate(candidate, values, profileId))
                         return new CreatorToolsOverlayComposerResponse(

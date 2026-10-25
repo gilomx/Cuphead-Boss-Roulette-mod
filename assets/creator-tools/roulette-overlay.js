@@ -211,7 +211,13 @@
     }
 
     setChallenge(state.challengeText || "");
-    if (previewStarting) {
+    // The initial designer sample must be visible even while an embedded frame's
+    // animation timers are throttled. Explicit replay and OBS keep their motion.
+    if (isPreview && state.settledPreview === true) {
+      cancelEntryAnimation();
+      revealIcons(Math.max(0, state.revealed || 0), true);
+      revealChallenge(Boolean(state.textVisible), true);
+    } else if (previewStarting) {
       animateHudEntry(
         Math.max(0, state.revealed || 0),
         Boolean(state.textVisible));

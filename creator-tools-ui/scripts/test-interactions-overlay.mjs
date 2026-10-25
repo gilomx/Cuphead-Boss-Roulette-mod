@@ -85,6 +85,13 @@ test('card appearance accepts only full hex colors and bounded integer paper int
   assert.equal(model.presentation({ interactionsCardNoise: 'wrong' }).interactionsCardNoise, 18);
 });
 
+test('confirmed floating layout is fixed per profile and temporary settings no longer affect presentation', () => {
+  assert.deepEqual(plain(model.floatingLayout('vertical')), { overlap: 29, gap: 35 });
+  assert.deepEqual(plain(model.floatingLayout('horizontal')), { overlap: 12, gap: 6 });
+  assert.equal('interactionsFloatingOverlap' in model.presentation({ interactionsFloatingOverlap: 48 }), false);
+  assert.equal('interactionsFloatingGap' in model.presentation({ interactionsFloatingGap: 0 }), false);
+});
+
 test('legacy name settings cannot enable labels and inspector typography is preserved', () => {
   assert.equal(model.presentation().showTitle, false);
   const view = model.presentation({ showTitle: true, textFont: 'serif', textWeight: 400, textShadowColor: '#ff0000',
@@ -152,6 +159,7 @@ class Element {
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function boot(search = '?mode=embedded') {
   const nodes = Object.fromEntries(['interactions-overlay', 'interactions-scene', 'interactions-viewport', 'interactions-content', 'interactions-heading', 'interactions-pagination'].map(id => [id, new Element()]));
+  nodes['interactions-overlay'].hidden = true;
   const listeners = {}, posted = [], fetched = [], created = [], timers = [], rafs = new Map();
   const parent = { postMessage: message => posted.push(message) };
   let nextId = 0, nextState = { rules: [rule()] }, component = { id: 'interactions', enabled: true, interactionsTemplate: 'floating', interactionsLayout: 'pages' };
@@ -167,7 +175,8 @@ async function boot(search = '?mode=embedded') {
     fetch: async url => {
       fetched.push(url);
       return { ok: true, json: async () => structuredClone(url.includes('catalog.json') ? catalog : url.includes('composer/config')
-        ? { profiles: [{ id: 'horizontal', components: [component] }] } : nextState) };
+        ? { profiles: [{ id: 'horizontal', components: [component] }] }
+        : url.includes('/roulette-overlay/state') ? { interactionBattleActive: true } : nextState) };
     },
     window: { parent, innerWidth: 700, innerHeight: 420, CreatorToolsOverlayInteractions: artwork,
       matchMedia: () => ({ matches: false }), addEventListener: (type, fn) => { listeners[type] = fn; },
@@ -177,6 +186,7 @@ async function boot(search = '?mode=embedded') {
   const send = (state, origin = 'http://overlay.test', source = parent) => listeners.message?.({ origin, source,
     data: { type: 'creator-tools-overlay-preview', version: 1, overlay: 'interactions', state } });
   return { nodes, fetched, posted, created, send, setState: state => { nextState = state; },
+    finishExit() { const index = timers.findIndex(timer => timer.delay === 280); if (index >= 0) timers.splice(index, 1)[0].callback(); },
     async poll() { const index = timers.findIndex(timer => timer.delay === 1000); assert.ok(index >= 0); timers.splice(index, 1)[0].callback(); await flush(); },
     frame(time) { const callbacks = [...rafs.values()]; rafs.clear(); callbacks.forEach(callback => callback(time)); },
     dispose() { listeners.pagehide(); }, listeners };
@@ -191,7 +201,9 @@ test('embedded messaging authenticates parent and origin, renders configured rul
   runtime.send(state, undefined, {}); assert.equal(runtime.nodes['interactions-overlay'].dataset.count, undefined);
   runtime.send(state); assert.equal(runtime.nodes['interactions-overlay'].hidden, false);
   assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 1);
-  runtime.send({ ...state, preview: false }); assert.equal(runtime.nodes['interactions-overlay'].hidden, true);
+  runtime.send({ ...state, preview: false });
+  assert.equal(runtime.nodes['interactions-overlay'].dataset.presence, 'exiting');
+  runtime.finishExit(); assert.equal(runtime.nodes['interactions-overlay'].hidden, true);
 });
 
 test('composer embedded=1 query uses the parent transport without polling real state', async () => {
@@ -324,7 +336,7 @@ test('five or more items loop through a four-item window and return to a complet
   runtime.send({ rules: Array.from({ length: 20 }, (_, index) => rule({ interaction: `effect_${index}` })),
     presentation: { interactionsLayout: 'strip' } });
   assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 20);
-  assert.equal(runtime.nodes['interactions-viewport'].style.width, `${4 * 600 + 3 * 20 + 24}px`);
+  assert.equal(runtime.nodes['interactions-viewport'].style.width, `${4 * 600 + 3 * 6 + 24}px`);
   assert.equal(runtime.nodes['interactions-overlay'].dataset.scrolling, 'true');
   assert.ok(runtime.nodes['interactions-content'].children.length >= 2);
   runtime.frame(1); runtime.frame(1001);
@@ -419,4 +431,66 @@ test('standalone OBS mode reads saved profile and real rules then refreshes pric
   runtime.setState({ rules: [rule({ every: 23 })] }); await runtime.poll();
   assert.ok(runtime.created.some(node => node.className === 'interaction-cost' && node.textContent === '23'));
   runtime.dispose(); assert.equal(runtime.listeners.resize, undefined);
+});
+
+test('battle visibility animates exits, cancels stale exits and permits explicit previews', async () => {
+  const runtime = await boot();
+  const root = runtime.nodes['interactions-overlay'], content = runtime.nodes['interactions-content'];
+  const state = { rules: [rule()], interactionsBattleOnly: true, battleActive: false };
+  runtime.send(state);
+  assert.equal(root.hidden, true, 'map state has no offers');
+  runtime.send({ ...state, battleActive: true });
+  assert.equal(root.hidden, false);
+  assert.equal(root.dataset.presence, 'visible');
+  runtime.send(state);
+  assert.equal(root.dataset.presence, 'exiting');
+  assert.ok(content.children.length > 0, 'outgoing offers stay in the DOM through the transition');
+  runtime.send({ ...state, battleActive: true });
+  runtime.finishExit();
+  assert.equal(root.hidden, false, 'a new battle cancels the old exit');
+  runtime.send(state); runtime.finishExit();
+  assert.equal(root.hidden, true);
+  assert.equal(content.children.length, 0);
+  runtime.send({ ...state, battlePreview: true });
+  assert.equal(root.hidden, false, 'explicit OBS preview bypasses the battle condition');
+  runtime.send({ ...state, presentation: { motion: false } });
+  assert.equal(root.hidden, true, 'disabled motion exits immediately');
+  runtime.send({ ...state, interactionsBattleOnly: false });
+  assert.equal(root.hidden, false, 'always visible mode works outside a battle');
+});
+
+test('floating strip uses each item width and closes every cycle without reserving the widest card for all', async () => {
+  const runtime = await boot();
+  runtime.send({ rules: Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` })),
+    presentation: { interactionsTemplate: 'floating', interactionsLayout: 'strip' } });
+  const originals = runtime.nodes['interactions-content'].children[0].children;
+  [110, 180, 125, 160, 140].forEach((width, index) => { originals[index].offsetWidth = width; });
+  runtime.listeners.resize();
+  assert.equal(runtime.nodes['interactions-overlay'].style['--item-width'], 'max-content');
+  assert.equal(runtime.nodes['interactions-overlay'].style['--strip-gap'], '6px');
+  const cycleWidth = 110 + 180 + 125 + 160 + 140 + 5 * 6;
+  const viewportWidth = Number.parseFloat(runtime.nodes['interactions-viewport'].style.width);
+  assert.ok((runtime.nodes['interactions-content'].children.length - 1) * cycleWidth >= viewportWidth);
+  runtime.frame(1); runtime.frame(1001);
+  assert.notEqual(runtime.nodes['interactions-content'].style.transform, 'translateX(12px)');
+});
+
+test('confirmed vertical spacing covers the strip and ignores retired tuning fields', async () => {
+  const runtime = await boot('?embedded=1&profile=vertical');
+  const state = { rules: Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` })),
+    presentation: { interactionsTemplate: 'floating', interactionsLayout: 'strip', interactionsSize: 25,
+      interactionsFloatingOverlap: 24, interactionsFloatingGap: 3 } };
+  const root = runtime.nodes['interactions-overlay'], viewport = runtime.nodes['interactions-viewport'];
+  for (const gap of [0, 3, 48]) {
+    runtime.send({ ...state, presentation: { ...state.presentation, interactionsFloatingGap: gap } });
+    assert.equal(root.style['--floating-payment-offset'], '-29px');
+    assert.equal(root.style['--strip-gap'], '35px');
+    const copies = runtime.nodes['interactions-content'].children.length;
+    assert.ok((copies - 1) * 5 * (600 + 35) >= Number.parseFloat(viewport.style.width));
+    assert.equal(root.dataset.scrolling, 'true');
+  }
+  runtime.send({ ...state, presentation: { ...state.presentation, interactionsTemplate: 'cards' } });
+  assert.equal(root.style['--strip-gap'], '20px', 'card spacing remains independent');
+  runtime.send({ ...state, rules: state.rules.slice(0, 4) });
+  assert.equal(root.dataset.scrolling, 'false', 'small groups remain static with confirmed spacing');
 });

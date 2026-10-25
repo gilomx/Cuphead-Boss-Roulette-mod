@@ -70,6 +70,7 @@ namespace Gilomx.CupheadBossRoulette
         private volatile bool creatorToolsInteractionsEnabled;
         private bool creatorToolsApplicationFocused = true;
         private bool creatorToolsBattleSessionActive;
+        private bool creatorToolsLastInteractionBattleActive;
         private bool creatorToolsBattleCompleted;
         private bool creatorToolsBattleVisible;
         private int creatorToolsBattleSessionId;
@@ -1625,6 +1626,21 @@ namespace Gilomx.CupheadBossRoulette
                     creatorToolsStreamRules.BacklogCount);
             if (creatorToolsStreamWorker != null)
                 creatorToolsStreamWorker.Signal();
+            PublishCreatorToolsInteractionBattleVisibility();
+        }
+
+        private void PublishCreatorToolsInteractionBattleVisibility()
+        {
+            var active = IsCreatorToolsInteractionBattleActive();
+            if (active == creatorToolsLastInteractionBattleActive) return;
+            creatorToolsLastInteractionBattleActive = active;
+            PublishCreatorToolsState(false);
+        }
+
+        private static bool IsCreatorToolsInteractionBattleActive()
+        {
+            Level level;
+            return TryGetActiveCreatorToolsGameplayLevel(out level) && level.LevelType == Level.Type.Battle;
         }
 
         private void OnApplicationFocus(bool hasFocus)
@@ -1902,6 +1918,7 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(enabled ? "true" : "false");
             builder.Append(",\"battleActive\":").Append(
                 battleActive ? "true" : "false");
+            builder.Append(",\"interactionBattleActive\":").Append(IsCreatorToolsInteractionBattleActive() ? "true" : "false");
             builder.Append(",\"fastRetryExit\":").Append(
                 fastRetryExit ? "true" : "false");
             builder.Append(",\"completeExit\":").Append(

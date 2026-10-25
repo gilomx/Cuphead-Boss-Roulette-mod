@@ -72,6 +72,20 @@ function createPreviewSessionId() {
 
 export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   const { locale, t } = useLocalization();
+  const pageRef = useRef<HTMLDivElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+  const pointerEditRef = useRef(false);
+  useEffect(() => {
+    const bar = topbarRef.current;
+    if (!bar) return;
+    const measure = () => pageRef.current?.style.setProperty(
+      "--designer-topbar-height", `${bar.getBoundingClientRect().height}px`,
+    );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
   const { tapFarming, peskyBattle, streamRules } = useConfig();
   const initialSelection = useMemo(querySelection, []);
   const [profileId, setProfileId] = useState<OverlayProfileId>(initialSelection.profileId);
@@ -153,12 +167,18 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
 
   const {
     profiles,
+    interactionsBattleOnly,
+    updateInteractionsBattleOnly,
     status,
     feedback,
     previewError,
     previewConflict,
     ready,
     updateComponent,
+    beginEditGroup,
+    endEditGroup,
+    undo,
+    redo,
     saveProfile,
     resetProfile,
     copyProfile,
@@ -182,6 +202,30 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   previewPendingRef.current = previewPending;
   const busy = status === "loading" || status === "saving";
   const dirty = isDirty(profileId);
+  const dirtyProfiles = profiles.filter(entry => isDirty(entry.id));
+  const displayStatus = status === "loading" || status === "saving" || status === "error"
+    ? status : dirtyProfiles.length ? "unsaved" : status === "saved" ? "saved" : "ready";
+
+  useEffect(() => {
+    const endGesture = () => {
+      if (!pointerEditRef.current) return;
+      pointerEditRef.current = false;
+      endEditGroup();
+    };
+    const endArrow = (event: globalThis.KeyboardEvent) => {
+      if (event.key.startsWith("Arrow")) endEditGroup();
+    };
+    window.addEventListener("pointerup", endGesture);
+    window.addEventListener("pointercancel", endGesture);
+    window.addEventListener("keyup", endArrow);
+    window.addEventListener("blur", endGesture);
+    return () => {
+      window.removeEventListener("pointerup", endGesture);
+      window.removeEventListener("pointercancel", endGesture);
+      window.removeEventListener("keyup", endArrow);
+      window.removeEventListener("blur", endGesture);
+    };
+  }, [endEditGroup]);
 
   const updateQuery = useCallback((
     nextProfileId: OverlayProfileId,
@@ -419,6 +463,21 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
   ) => updateComponent(profileId, componentId, update);
 
   useEffect(() => {
+    const handleHistory = (event: globalThis.KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.isComposing ||
+          event.key.toLowerCase() !== "z" || busy || !ready || previewPending) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      // Text fields retain the browser's text editing history.
+      if (target?.closest("textarea, [contenteditable='true'], input:not([type='number']):not([type='range']):not([type='checkbox']):not([type='radio'])")) return;
+      event.preventDefault();
+      const editedProfile = event.shiftKey ? redo() : undo();
+      if (editedProfile && editedProfile !== profileId) void selectProfile(editedProfile);
+    };
+    window.addEventListener("keydown", handleHistory);
+    return () => window.removeEventListener("keydown", handleHistory);
+  });
+
+  useEffect(() => {
     const handleArrowNudge = (event: globalThis.KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || busy ||
           !profile || !component || component.locked) return;
@@ -438,6 +497,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
               : null;
       if (!delta) return;
       event.preventDefault();
+      if (!event.repeat) beginEditGroup();
       updateComponent(profileId, component.id, {
         x: Math.min(
           Math.max(0, profile.canvas.width - component.width),
@@ -451,7 +511,7 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     };
     window.addEventListener("keydown", handleArrowNudge);
     return () => window.removeEventListener("keydown", handleArrowNudge);
-  }, [busy, component, profile, profileId, updateComponent]);
+  }, [beginEditGroup, busy, component, profile, profileId, updateComponent]);
 
   const moveLayer = (componentId: OverlayComponentId, direction: -1 | 1) => {
     if (!profile) return;
@@ -460,8 +520,10 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     const target = ordered[index + direction];
     const current = ordered[index];
     if (!current || !target) return;
+    beginEditGroup();
     updateComponent(profileId, current.id, { layer: target.layer });
     updateComponent(profileId, target.id, { layer: current.layer });
+    endEditGroup();
   };
 
   const togglePreview = async () => {
@@ -548,76 +610,99 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
     : "vertical";
 
   return (
-    <div className="page page--overlay-designer">
-      <header className="overlay-designer-header">
-        <button className="overlay-designer-header__back" type="button" onClick={() => {
-          void stopPreview().then((result) => {
-            if (result !== "error") onBack();
-          });
-        }}>
-          <ArrowLeft aria-hidden="true" />{t("overlayDesigner.actions.back")}
-        </button>
-        <div>
-          <p className="dashboard-eyebrow">{t("overlayDesigner.eyebrow")}</p>
-          <h1>{t("overlayDesigner.title")}</h1>
-          <p>{t("overlayDesigner.description")}</p>
-        </div>
-        {status !== "ready" ? (
-          <div className="overlay-designer-header__status" data-status={status}>
-            <span>{t(`overlayDesigner.status.${status}`)}</span>
-            {status === "error" ? (
-              <button type="button" onClick={() => void reload()}>{t("overlayDesigner.actions.retry")}</button>
-            ) : null}
+    <div className="page page--overlay-designer" ref={pageRef}
+      onKeyDownCapture={(event) => {
+        if (!event.repeat && event.key.startsWith("Arrow") &&
+            (event.target as HTMLElement).matches("input[type='number'], input[type='range']")) beginEditGroup();
+      }}
+      onPointerDownCapture={(event) => {
+        if ((event.target as HTMLElement).closest(".overlay-designer-canvas__surface, input[type='range']")) {
+          pointerEditRef.current = true;
+          beginEditGroup();
+        }
+      }}
+      onFocusCapture={(event) => {
+        if (event.target.matches("input[type='number'], input[type='text']")) beginEditGroup();
+      }}
+      onBlurCapture={(event) => {
+        if (event.target.matches("input[type='number'], input[type='text']")) endEditGroup();
+      }}
+    >
+      <header className="overlay-designer-topbar" ref={topbarRef}>
+        <div className="overlay-designer-header">
+          <button className="overlay-designer-header__back" type="button" onClick={() => {
+            void stopPreview().then((result) => {
+              if (result !== "error") onBack();
+            });
+          }}>
+            <ArrowLeft aria-hidden="true" />{t("overlayDesigner.actions.back")}
+          </button>
+          <div>
+            <h1>{t("overlayDesigner.title")}</h1>
+            <div className="overlay-designer-header__meta">
+              <p>{t("overlayDesigner.description")}</p>
+              <div className="overlay-designer-header__status" data-status={displayStatus} role="status" aria-live="polite"
+                title={dirtyProfiles.map(entry => t(`overlayDesigner.profiles.${entry.id}`)).join(", ")}>
+                <span>{t(`overlayDesigner.status.${displayStatus}`)}{!dirty && dirtyProfiles.length
+                  ? ` (${dirtyProfiles.map(entry => t(`overlayDesigner.profiles.${entry.id}`)).join(", ")})` : ""}</span>
+                {status === "error" ? (
+                  <button type="button" onClick={() => void reload()}>{t("overlayDesigner.actions.retry")}</button>
+                ) : null}
+              </div>
+            </div>
           </div>
-        ) : null}
-      </header>
+        </div>
 
-      <div className="overlay-designer-toolbar">
-        <div className="overlay-designer-tabs" role="tablist" aria-label={t("overlayDesigner.profiles.title")}>
-          {(["vertical", "horizontal"] as OverlayProfileId[]).map((id) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={profileId === id}
-              data-active={profileId === id}
-              data-profile-tab={id}
-              tabIndex={profileId === id ? 0 : -1}
-              key={id}
-              onClick={() => { void selectProfile(id); }}
-              onKeyDown={(event) => handleProfileTabKeyDown(event, id)}
-            >
-              {id === "vertical" ? <Smartphone aria-hidden="true" /> : <Monitor aria-hidden="true" />}
-              <span>
-                <strong>{t(`overlayDesigner.profiles.${id}`)}</strong>
-                <small>{id === "vertical" ? "1080 × 1920" : "1920 × 1080"}</small>
-              </span>
+        <div className="overlay-designer-toolbar">
+          <div className="overlay-designer-tabs" role="tablist" aria-label={t("overlayDesigner.profiles.title")}>
+            {(["vertical", "horizontal"] as OverlayProfileId[]).map((id) => (
+              <button
+                type="button"
+                role="tab"
+                disabled={busy}
+                aria-selected={profileId === id}
+                data-active={profileId === id}
+                data-profile-tab={id}
+                tabIndex={profileId === id ? 0 : -1}
+                key={id}
+                onClick={() => { void selectProfile(id); }}
+                onKeyDown={(event) => handleProfileTabKeyDown(event, id)}
+              >
+                {id === "vertical" ? <Smartphone aria-hidden="true" /> : <Monitor aria-hidden="true" />}
+                <span>
+                  <strong>{t(`overlayDesigner.profiles.${id}`)}</strong>
+                  <small>{id === "vertical" ? "1080 × 1920" : "1920 × 1080"}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="overlay-designer-toolbar__actions">
+            <button type="button" disabled={!ready} onClick={() => void copyObsUrl(profileId)}>
+              {copyStatus === profileId ? <Check aria-hidden="true" /> : <Clipboard aria-hidden="true" />}
+              {t(copyStatus === profileId
+                ? "overlayDesigner.actions.urlCopied"
+                : "overlayDesigner.actions.copyUrl")}
             </button>
-          ))}
+            <button type="button" disabled={busy} onClick={() => setConfirmation("copy")}>
+              <Copy aria-hidden="true" />{t("overlayDesigner.actions.copyProfile")
+                .replace("{source}", t(`overlayDesigner.profiles.${otherProfileId}`))}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setConfirmation("reset")}>
+              <RotateCcw aria-hidden="true" />{t("overlayDesigner.actions.resetProfile")}
+            </button>
+            <button
+              className="overlay-designer-toolbar__save"
+              type="button"
+              disabled={busy || !ready || !dirty}
+              onClick={() => void saveProfile(profileId)}
+            >
+              <Save aria-hidden="true" />{t("overlayDesigner.actions.save")}
+            </button>
+          </div>
         </div>
 
-        <div className="overlay-designer-toolbar__actions">
-          <button type="button" disabled={!ready} onClick={() => void copyObsUrl(profileId)}>
-            {copyStatus === profileId ? <Check aria-hidden="true" /> : <Clipboard aria-hidden="true" />}
-            {t(copyStatus === profileId
-              ? "overlayDesigner.actions.urlCopied"
-              : "overlayDesigner.actions.copyUrl")}
-          </button>
-          <button type="button" disabled={busy} onClick={() => setConfirmation("copy")}>
-            <Copy aria-hidden="true" />{t("overlayDesigner.actions.copyProfile")}
-          </button>
-          <button type="button" disabled={busy} onClick={() => setConfirmation("reset")}>
-            <RotateCcw aria-hidden="true" />{t("overlayDesigner.actions.resetProfile")}
-          </button>
-          <button
-            className="overlay-designer-toolbar__save"
-            type="button"
-            disabled={busy || !ready || !dirty}
-            onClick={() => void saveProfile(profileId)}
-          >
-            <Save aria-hidden="true" />{t("overlayDesigner.actions.save")}
-          </button>
-        </div>
-      </div>
+      </header>
 
       {confirmation ? (
         <div className="overlay-designer-confirmation" role="alert">
@@ -669,6 +754,8 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
             onChange={(componentId, update) => changeComponent(componentId, update)}
           />
           <OverlayDesignerInspector
+            interactionsBattleOnly={interactionsBattleOnly}
+            onInteractionsBattleOnlyChange={value => updateInteractionsBattleOnly(value, profileId)}
             onRouletteScenarioChange={setRouletteScenario}
             onRouletteReplay={() => { setRouletteScenario("hud"); setRouletteReplay(replay => replay + 1); }}
             profile={profile}

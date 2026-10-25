@@ -2,6 +2,114 @@
 
 Current development version: **La Pichi Ruleta 0.6.0** (new update in progress).
 
+## Controles del diseñador en segunda fila (2026-10-24)
+
+Por preferencia del usuario, título/estado y controles ocupan siempre dos filas.
+Se conserva el tamaño compacto, los iconos, el aviso de cambios y la cabecera
+sticky con altura medida. El botón muestra «Copiar config desde Horizontal»
+cuando se edita Vertical, y «Copiar config desde Vertical» en Horizontal.
+La acción de copiar y su confirmación conservan el comportamiento anterior.
+Panel compilado y revisado en navegador a 1265 y 1672 px: etiquetas de origen
+correctas en ambos formatos, segunda fila sin desbordamiento y barra fija tras
+875 px de scroll. ZIP Dev independiente publicado con ruta física verificada:
+1,517 archivos; SHA-256 `1F5E9CF606D0C7ACFF78F0EEE78DBC0EB4211DD832DD80A9F6AE59E81A995AC7`.
+
+## Cabecera sticky e historial del diseñador (2026-10-24)
+
+La cabecera compacta conserva Volver, perfiles, copiar URL, copiar perfil,
+restablecer y guardar con sus iconos originales. Es sticky y mide su altura
+con ResizeObserver para desplazar también los paneles de capas y lienzo.
+El estado muestra cambios sin guardar, guardando y guardado; avisa si quedan
+cambios en otro perfil. El guardado sigue siendo manual: el usuario consultó
+la dificultad del automático, no confirmó activarlo.
+
+`history.ts` conserva diez snapshots del borrador de ambos perfiles y la
+preferencia global de visibilidad en pelea. Ctrl+Z y Ctrl+Shift+Z deshacen y
+rehacen; texto editable conserva su historial nativo. Arrastre, slider, edición
+numérica enfocada, repetición de flecha y cambio de orden se agrupan en un paso.
+Deshacer entre perfiles selecciona el afectado. Guardar conserva el historial;
+deshacer un cambio guardado vuelve a marcar el borrador pendiente. Copiar y
+restablecer conservan su guardado inmediato y pueden deshacerse como borrador.
+El historial es de esta sesión del diseñador y se vacía al cargar de nuevo.
+
+La primera muestra de Ruleta usa `settledPreview` sólo en el diseñador, sesión
+-1, para mostrar iconos/reto sin depender de timers de entrada del iframe.
+Repetir animación y la simulación OBS mantienen la animación. No se ha confirmado
+una causa única del fallo reportado: la muestra era visible al seleccionarla
+en la sesión inspeccionada; el cambio evita la espera inicial de animación.
+Tokens `roulette-designer-4` y `composer-designer-38`.
+
+Validación: 65 pruebas JS y compilación del panel correctas. En navegador se
+comprobaron guardado/deshacer/rehacer, 12 movimientos con sólo 10 recuperables,
+un arrastre completo en un paso, cambio de perfil al deshacer y barra fija a
+802 px de scroll. Cabecera revisada a 1265 y 1672 px, con geometría guardada
+copiada únicamente al mock en memoria; los ajustes reales no se modificaron.
+Publicación Dev independiente correcta con ruta física verificada: 1,517
+archivos; SHA-256 `A7A1F4D63E343AC6D2552CF7B98E0413D601954E5B6869923FADD29D796C8314`.
+
+## Canjes confirmados y desgaste blanco estático (2026-10-24)
+
+El usuario confirmó los valores del panel real: vertical usa superposición 29
+y separación 35 px; horizontal conserva 12/6. `floatingLayout(profile)` fija
+estos números en el modelo del widget. El compositor añade el perfil al URL del
+iframe de Interacciones, por lo que diseñador, OBS y fuente individual usan el
+mismo ajuste. Tarjetas conserva gap 20 y su distribución independiente.
+
+Se retiraron los controles, tipos, payloads y campos de persistencia temporales.
+Las escenas que aún contienen `interactionsFloatingOverlap` y
+`interactionsFloatingGap` cargan conservando los demás valores; sus campos
+antiguos se ignoran. Se probó la geometría actual 50/998, 960 × 280, tamaño 79%
+sin sobrescribir el archivo antiguo durante la lectura.
+
+La referencia de Mugman muestra una escama blanca irregular y arañazos finos
+curvos además de grano. La textura SVG añade esas escamas, motas y trazos cortos
+rotos con posiciones fijas. Conserva el offset estable por ítem y la opacidad
+de Ruido envejecido; no contiene animaciones y queda detrás de arte/precios.
+
+Validación: 62 pruebas JS y suite runtime correctas. En el diseñador se
+comprobaron -29/35 y la ausencia de los dos controles. Se revisó la textura
+sobre dos tarjetas con el color guardado y ruido al 80%. Tokens `interactions-8`
+y `composer-paper-wear-37`.
+Dos capturas consecutivas de las tarjetas estáticas resultaron idénticas.
+Publicación Dev independiente con ruta física verificada: 1,517 archivos;
+SHA-256 `1E3458D7746E9C00E1B69217FD03C906CE91F894044A646782BD936A10175F9D`.
+
+## Canjes durante pelea y diseño predeterminado actual (2026-10-24)
+
+Se leyó el compositor del mod en ejecución. Los defaults verticales son franja
+flotante, X=4, Y=1077, 1072 × 313, activa, Twitch/YouTube, velocidad 80, tamaño
+96%, color de tarjeta `#662effa6` y ruido 80%. Horizontal conserva su diseño:
+60/800, 1800 × 230, inactivo, tres redes, automático, velocidad 40. Los perfiles
+guardados conservan sus campos; una escena antigua sin Interacciones recibe la
+capa desactivada tanto al cargar como en previews.
+
+Flotantes reserva el ancho natural de cada ítem, contiene la imagen y usa gap
+de 6 px con padding horizontal de 4 px. La franja calcula el ciclo sumando los
+anchos reales y los gaps; Tarjetas mantiene dimensiones iguales y gap de 20 px.
+Hasta cuatro ítems sigue siendo un grupo estático y completo.
+
+Configuración de Interacciones conserva su distribución original. El diseñador,
+al seleccionar Interacciones y canjes, añade «Mostrar overlay sólo en batallas
+activas» al final de la presentación. `interactionsBattleOnly` es global y activo
+por defecto. El check forma parte del borrador y se guarda con «Guardar cambios»,
+usando `interactions_visibility` con revisión y respaldo. Cambiar de perfil,
+copiarlo o restablecerlo conserva el borrador de esta preferencia global.
+
+`interactionBattleActive` sale del estado nativo del nivel Battle no terminado
+ni cargando, independiente de la sesión de ruleta. Los cambios se publican al
+canal existente y llegan a Interacciones sin esperar al polling. La fuente
+individual también consulta ese estado. La entrada/salida dura 280 ms; se conserva
+el DOM durante la salida, se cancela al volver y se respeta movimiento reducido.
+Diseñador y prueba OBS omiten la condición de pelea usando reglas de prueba/guardadas
+según su transporte habitual. Tokens `interactions-6` y `composer-interactions-battle-35`.
+
+Validación: 69 pruebas JS, suite runtime completa y contratos compilados correctos.
+Revisión visual en mock: check en el diseñador, guardado con el botón común y
+recarga conservando su valor; Configuración de Interacciones con su distribución
+original. También se revisaron flotantes compactos con Twitch/YouTube.
+Publicación Dev independiente con ruta física verificada: 1,517 archivos; SHA-256
+`D19A0770D85A74FAF76FD3F633A3EABAB6412277643799BE914F03AE65262925`.
+
 ## Tamaño manual de Interacciones limitado por el overlay (2026-10-23)
 
 El inspector añade «Tamaño automático» y, al desactivarlo, «Altura del contenido»

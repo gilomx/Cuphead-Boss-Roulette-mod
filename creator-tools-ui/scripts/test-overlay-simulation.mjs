@@ -17,6 +17,7 @@ try {
   const compiled = spawnSync(process.execPath, [
     "node_modules/typescript/bin/tsc", "src/features/overlay-designer/simulation.ts",
     "src/features/overlay-designer/interactionsPreview.ts",
+    "src/features/overlay-designer/history.ts",
     "--ignoreConfig", "--target", "es2022", "--module", "commonjs",
     "--outDir", temporary, "--skipLibCheck",
   ], { cwd: uiRoot, encoding: "utf8", windowsHide: true });
@@ -24,11 +25,47 @@ try {
   const folder = existsSync(join(temporary, "simulation.js")) ? temporary : join(temporary, "features/overlay-designer");
   const require = createRequire(import.meta.url);
   Object.assign(exports, require(join(folder, "simulation.js")), require(join(folder, "chatSimulation.js")),
-    require(join(folder, "interactionsPreview.js")), require(join(folder, "model.js")));
+    require(join(folder, "interactionsPreview.js")), require(join(folder, "model.js")),
+    require(join(folder, "history.js")));
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
 const { createBattleSimulation, battleSimulationReducer, previewCommand } = exports;
+
+test("designer history retains ten edits, including redo, and branches after a new edit", () => {
+  const { createEditHistory, recordEdit, undoEdit, redoEdit } = exports;
+  let history = createEditHistory(0);
+  for (let i = 1; i <= 15; i++) history = recordEdit(history, i);
+  assert.equal(history.past.length, 10);
+  for (let i = 0; i < 20; i++) history = undoEdit(history);
+  assert.equal(history.present, 5);
+  assert.equal(history.future.length, 10);
+  for (let i = 0; i < 20; i++) history = redoEdit(history);
+  assert.equal(history.present, 15);
+  assert.equal(history.past.length, 10);
+  history = undoEdit(history);
+  history = recordEdit(history, 99);
+  assert.equal(redoEdit(history).present, 99);
+  assert.equal(history.future.length, 0);
+});
+
+test("continuous drag and layer swaps undo as one edit and remain separate from other gestures", () => {
+  const { createEditHistory, recordEdit, undoEdit, redoEdit } = exports;
+  const original = { x: 10, layers: [10, 20], battleOnly: true };
+  let history = createEditHistory(original);
+  for (let x = 11; x <= 200; x++) history = recordEdit(history, { ...original, x }, "drag-1");
+  assert.equal(history.past.length, 1);
+  assert.deepEqual(undoEdit(history).present, original);
+  history = recordEdit(history, { ...history.present, layers: [20, 20] }, "layer-swap");
+  history = recordEdit(history, { ...history.present, layers: [20, 10] }, "layer-swap");
+  assert.equal(history.past.length, 2);
+  const undone = undoEdit(history);
+  assert.deepEqual(undone.present.layers, [10, 20]);
+  assert.deepEqual(redoEdit(undone).present.layers, [20, 10]);
+  const branch = recordEdit(undone, { ...undone.present, battleOnly: false }, "layer-swap");
+  assert.equal(branch.past.length, 2, "an edit after undo starts a new step even with the same group id");
+  assert.equal(branch.future.length, 0);
+});
 
 function mockComposer() {
   // Exercise the mock's actual API/normalizer without opening a localhost port.
@@ -46,8 +83,8 @@ test("card appearance and expanded strip speeds persist through the mock API and
   const mock = mockComposer();
   const card = (state, id = "vertical") => state.profiles.find(profile => profile.id === id).components.find(component => component.id === "interactions");
   const send = command => mock.send({ schemaVersion: 1, expectedRevision: mock.state().revision, profileId: "vertical", operation: "update", componentId: "interactions", ...command });
-  assert.equal(card(mock.state()).interactionsCardColor, "#23262bee");
-  assert.equal(card(mock.state()).interactionsCardNoise, 18);
+  assert.equal(card(mock.state()).interactionsCardColor, "#662effa6");
+  assert.equal(card(mock.state()).interactionsCardNoise, 80);
   const saved = send({ interactionsTemplate: "cards", interactionsCardColor: "#ABCDEF80", interactionsCardNoise: 77, interactionsSpeed: 140 });
   assert.equal(saved.status, 200);
   assert.equal(card(saved.body).interactionsCardColor, "#abcdef80");
@@ -71,8 +108,8 @@ test("card appearance and expanded strip speeds persist through the mock API and
   assert.equal(send({ interactionsCardNoise: 100 }).status, 200);
   const reset = send({ operation: "reset" });
   assert.equal(reset.status, 200);
-  assert.equal(card(reset.body).interactionsCardColor, "#23262bee");
-  assert.equal(card(reset.body).interactionsCardNoise, 18);
+  assert.equal(card(reset.body).interactionsCardColor, "#662effa6");
+  assert.equal(card(reset.body).interactionsCardNoise, 80);
 });
 
 test("old slow strip values migrate to the new minimum and missing card settings gain defaults", () => {
@@ -88,6 +125,19 @@ test("old slow strip values migrate to the new minimum and missing card settings
     assert.equal(legacy.interactionsCardColor, "#23262bee");
     assert.equal(legacy.interactionsCardNoise, 18);
   }
+});
+
+test("global battle visibility changes independently of scene defaults and rejects malformed updates", () => {
+  const mock = mockComposer();
+  const scenes = JSON.stringify(mock.state().profiles);
+  assert.equal(mock.state().interactionsBattleOnly, true);
+  const send = value => mock.send({ operation: "interactions_visibility", profileId: "vertical",
+    expectedRevision: mock.state().revision, interactionsBattleOnly: value });
+  assert.equal(send(false).status, 200);
+  assert.equal(mock.state().interactionsBattleOnly, false);
+  assert.equal(JSON.stringify(mock.state().profiles), scenes);
+  for (const invalid of ["true", null, 1]) assert.equal(send(invalid).status, 400);
+  assert.equal(mock.state().interactionsBattleOnly, false);
 });
 
 test("mock preview accepts the complete five-component designer profile and rejects malformed component sets", () => {

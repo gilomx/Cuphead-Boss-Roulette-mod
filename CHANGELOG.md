@@ -2,6 +2,25 @@
 
 ## Siguiente versión — Panel de configuración web
 
+- La cabecera del diseñador vuelve a dos filas, manteniendo los nuevos tamaños
+  y estilos sticky. «Copiar config desde Horizontal/Vertical» indica el formato
+  de origen según el perfil que se está editando.
+
+- El diseñador reúne su cabecera y acciones en una barra sticky, conservando
+  botones e iconos. Muestra cambios sin guardar y permite Ctrl+Z/Ctrl+Shift+Z
+  con diez pasos; un arrastre o ajuste continuo ocupa uno. La muestra inicial
+  de Ruleta se dibuja inmediatamente y conserva la repetición de animación.
+
+- La franja de iconos flotantes fija los valores aprobados: superposición 29 y
+  separación 35 px en vertical, 12 y 6 px en horizontal. Se retiran los controles
+  temporales. El ruido de las tarjetas añade escamas blancas, polvo y arañazos
+  finos con posiciones fijas, sin animación.
+
+- Interacciones toma el diseño actual como predeterminado y compacta los iconos
+  flotantes. El diseñador añade «Mostrar overlay sólo en batallas activas» en
+  la presentación de Interacciones y canjes, con entrada y salida animadas y
+  pruebas disponibles fuera de pelea. Se guarda con los demás cambios del overlay.
+
 - Interacciones permite ajustar el contenido del 25% al 100% de la altura del
   overlay o conservar el tamaño automático. Hasta cuatro ítems siguen fijos y
   completos, limitados también por el ancho; con más, pueden verse más grandes

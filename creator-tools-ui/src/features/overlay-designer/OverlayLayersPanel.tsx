@@ -110,6 +110,7 @@ export function OverlayLayersPanel({
         ))}
       </div>
       <p>{t("overlayDesigner.layers.hint")}</p>
+      <p className="overlay-designer-history-hint">{t("overlayDesigner.historyHint")}</p>
     </aside>
   );
 }

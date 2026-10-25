@@ -62,12 +62,13 @@ export interface OverlayComposerConfigState {
   ready: boolean;
   schemaVersion: number;
   revision: number;
+  interactionsBattleOnly?: boolean;
   profiles: OverlayComposerProfile[];
   feedback: string;
   error: boolean;
 }
 
-export type OverlayComposerOperation = "update" | "reset" | "copy";
+export type OverlayComposerOperation = "update" | "reset" | "copy" | "interactions_visibility";
 
 export interface OverlayComposerCommand {
   schemaVersion: 1;
@@ -76,6 +77,7 @@ export interface OverlayComposerCommand {
   profileId: OverlayProfileId;
   componentId?: OverlayComponentId;
   sourceProfileId?: OverlayProfileId;
+  interactionsBattleOnly?: boolean;
   x?: number;
   y?: number;
   width?: number;

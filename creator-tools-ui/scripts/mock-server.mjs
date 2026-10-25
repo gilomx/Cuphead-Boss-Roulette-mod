@@ -381,26 +381,28 @@ function defaultOverlayProfiles() {
     liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
     rouletteSize: 100, rouletteAlignment: "center", rouletteTextFirst: false, rouletteLogo: false, rouletteRetry: "reappear",
   }, {
-    id: "interactions", x: 60, y: profile.id === "vertical" ? 1200 : 800,
-    width: profile.id === "vertical" ? 960 : 1800, height: profile.id === "vertical" ? 620 : 230,
-    enabled: false, locked: false, layer: 50, opacity: 100, variant: "default",
+    id: "interactions", x: profile.id === "vertical" ? 4 : 60, y: profile.id === "vertical" ? 1077 : 800,
+    width: profile.id === "vertical" ? 1072 : 1800, height: profile.id === "vertical" ? 313 : 230,
+    enabled: profile.id === "vertical", locked: false, layer: 50, opacity: 100, variant: "default",
     showTitle: false, showDetails: false, motion: true,
     liquidColor: "#ff4f92", collectingColor: "#f4c95d", textColor: "#ffffff", outlineColor: "#f5f5f7",
-    interactionsTemplate: "floating", interactionsLayout: profile.id === "vertical" ? "pages" : "strip",
-    interactionsTikTok: true, interactionsTwitch: profile.id === "horizontal", interactionsYouTube: profile.id === "horizontal",
-    interactionsPageSeconds: 8, interactionsSpeed: 40, interactionsAdaptive: true, interactionsSize: 0,
-    interactionsCardColor: "#23262bee", interactionsCardNoise: 18,
+    interactionsTemplate: "floating", interactionsLayout: "strip",
+    interactionsTikTok: profile.id !== "vertical", interactionsTwitch: true, interactionsYouTube: true,
+    interactionsPageSeconds: 8, interactionsSpeed: profile.id === "vertical" ? 80 : 40, interactionsAdaptive: true, interactionsSize: profile.id === "vertical" ? 96 : 0,
+    interactionsCardColor: profile.id === "vertical" ? "#662effa6" : "#23262bee", interactionsCardNoise: profile.id === "vertical" ? 80 : 18,
   }].map(component => ({ ...component, voteOutlineColor: "#ffffff", textFont: "clean", textWeight: 700,
     textShadowColor: "#00000000", textShadowX: 2, textShadowY: 3, textShadowBlur: 2 })) }));
 }
 
 let overlayComposerProfiles = defaultOverlayProfiles();
+let interactionsBattleOnly = true;
 
 function overlayComposerState() {
   return {
     ready: true,
     schemaVersion: 1,
     revision: overlayComposerRevision,
+    interactionsBattleOnly,
     profiles: overlayComposerProfiles,
     feedback: "ready",
     error: false,
@@ -1108,7 +1110,12 @@ function applyOverlayComposerCommand(command, res) {
     return;
   }
 
-  if (operation === "reset") {
+  if (operation === "interactions_visibility") {
+    if (typeof command.interactionsBattleOnly !== "boolean") {
+      json(res, { ok: false, error: "invalid_interactions_visibility" }, 400); return;
+    }
+    interactionsBattleOnly = command.interactionsBattleOnly;
+  } else if (operation === "reset") {
     const defaults = defaultOverlayProfiles().find((entry) => entry.id === profile.id);
     overlayComposerProfiles = overlayComposerProfiles.map((entry) =>
       entry.id === profile.id ? defaults : entry);

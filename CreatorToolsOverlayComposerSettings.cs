@@ -113,6 +113,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logWarning;
 
         internal int Revision;
+        internal bool InteractionsBattleOnly = true;
         internal readonly List<CreatorToolsOverlayComposerProfile> Profiles =
             new List<CreatorToolsOverlayComposerProfile>();
 
@@ -167,7 +168,7 @@ namespace Gilomx.CupheadBossRoulette
         internal CreatorToolsOverlayComposerSettings Clone()
         {
             var clone = new CreatorToolsOverlayComposerSettings(
-                path, logWarning) { Revision = Revision };
+                path, logWarning) { Revision = Revision, InteractionsBattleOnly = InteractionsBattleOnly };
             for (var i = 0; i < Profiles.Count; i++)
                 clone.Profiles.Add(Profiles[i].Clone());
             return clone;
@@ -325,6 +326,7 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append("{\"ready\":true,\"schemaVersion\":")
                 .Append(SchemaVersion)
                 .Append(",\"revision\":").Append(Revision)
+                .Append(",\"interactionsBattleOnly\":").Append(InteractionsBattleOnly ? "true" : "false")
                 .Append(",\"profiles\":");
             AppendProfilesJson(builder);
             builder.Append(",\"feedback\":\"");
@@ -392,6 +394,8 @@ namespace Gilomx.CupheadBossRoulette
             if (!seenComponents.Contains(TapFarmingComponentId) ||
                 !seenComponents.Contains(PeskyBattleComponentId))
                 return false;
+            if (!seenComponents.Contains(InteractionsComponentId))
+                candidate.FindComponent(InteractionsComponentId).Enabled = false;
 
             profile = candidate;
             return true;
@@ -529,6 +533,7 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append("{\n  \"schemaVersion\": ")
                 .Append(SchemaVersion)
                 .Append(",\n  \"revision\": ").Append(Revision)
+                .Append(",\n  \"interactionsBattleOnly\": ").Append(InteractionsBattleOnly ? "true" : "false")
                 .Append(",\n  \"profiles\": ");
             AppendProfilesJson(builder);
             builder.Append("\n}\n");
@@ -710,14 +715,17 @@ namespace Gilomx.CupheadBossRoulette
             profile.Components.Add(new CreatorToolsOverlayComposerComponent
             {
                 Id = InteractionsComponentId,
-                X = 60, Y = vertical ? 1200 : 800,
-                Width = vertical ? 960 : 1800, Height = vertical ? 620 : 230,
-                Layer = 50, Enabled = false, Opacity = 100,
+                X = vertical ? 4 : 60, Y = vertical ? 1077 : 800,
+                Width = vertical ? 1072 : 1800, Height = vertical ? 313 : 230,
+                Layer = 50, Enabled = vertical, Opacity = 100,
                 Variant = "default", Motion = true,
                 LiquidColor = DefaultLiquidColor, CollectingColor = DefaultCollectingColor,
                 TextColor = DefaultTextColor, OutlineColor = DefaultOutlineColor,
-                InteractionsLayout = vertical ? "pages" : "strip",
-                InteractionsTwitch = !vertical, InteractionsYouTube = !vertical
+                InteractionsLayout = "strip", InteractionsTikTok = !vertical,
+                InteractionsTwitch = true, InteractionsYouTube = true,
+                InteractionsSpeed = vertical ? 80 : 40, InteractionsSize = vertical ? 96 : 0,
+                InteractionsCardColor = vertical ? "#662effa6" : DefaultInteractionsCardColor,
+                InteractionsCardNoise = vertical ? 80 : 18
             });
             return profile;
         }
@@ -816,6 +824,9 @@ namespace Gilomx.CupheadBossRoulette
                     : candidatePath;
                 var candidate = CreateDefaults(path, logWarning);
                 candidate.Revision = revision;
+                if (root.Property("interactionsBattleOnly") != null &&
+                    !root.TryBoolean("interactionsBattleOnly", out candidate.InteractionsBattleOnly))
+                    return false;
                 var migratedBounds = false;
                 var seenProfiles = new HashSet<string>(
                     StringComparer.OrdinalIgnoreCase);
@@ -872,7 +883,10 @@ namespace Gilomx.CupheadBossRoulette
                     // Existing scenes keep every saved component; the new catalog
                     // starts disabled so adding it never changes their OBS output.
                     if (!seenComponents.Contains(InteractionsComponentId))
+                    {
+                        target.FindComponent(InteractionsComponentId).Enabled = false;
                         migratedBounds = true;
+                    }
                 }
                 if (seenProfiles.Count != candidate.Profiles.Count)
                     return false;

@@ -63,6 +63,7 @@
   let dataTimer = 0;
   let previewTimer = 0;
   let rouletteRuntime = null;
+  let interactionsBattleOnly = true;
 
   function switchValue(value) {
     const normalized = String(value || "").trim().toLowerCase();
@@ -112,7 +113,7 @@
     const vertical = id === "vertical";
     const placements = vertical
       ? {
-          interactions: { x: 60, y: 1200, width: 960, height: 620, layer: 50 },
+          interactions: { x: 4, y: 1077, width: 1072, height: 313, layer: 50 },
           roulette: { x: 60, y: 540, width: 960, height: 420, layer: 40 },
           tap_farming: { x: 360, y: 1220, width: 360, height: 300, layer: 20 },
           pesky_battle: { x: 60, y: 1260, width: 960, height: 560, layer: 10 },
@@ -133,7 +134,7 @@
       components: Object.keys(registry).map((componentId, index) => ({
         id: componentId,
         ...placements[componentId],
-        enabled: componentId !== "roulette" && componentId !== "interactions",
+        enabled: componentId === "interactions" ? vertical : componentId !== "roulette",
         locked: false,
         layer: placements[componentId].layer ?? 20 + index,
         opacity: 100,
@@ -148,16 +149,16 @@
         voteOutlineColor: "#ffffff",
         ...(componentId === "interactions" ? {
           interactionsTemplate: "floating",
-          interactionsLayout: vertical ? "pages" : "strip",
-          interactionsTikTok: true,
-          interactionsTwitch: !vertical,
-          interactionsYouTube: !vertical,
+          interactionsLayout: "strip",
+          interactionsTikTok: !vertical,
+          interactionsTwitch: true,
+          interactionsYouTube: true,
           interactionsPageSeconds: 8,
-          interactionsSpeed: 40,
-          interactionsSize: 0,
+          interactionsSpeed: vertical ? 80 : 40,
+          interactionsSize: vertical ? 96 : 0,
           interactionsAdaptive: true,
-          interactionsCardColor: "#23262bee",
-          interactionsCardNoise: 18,
+          interactionsCardColor: vertical ? "#662effa6" : "#23262bee",
+          interactionsCardNoise: vertical ? 80 : 18,
         } : {}),
       })),
     };
@@ -276,6 +277,7 @@
 
   function embeddedUrl(definition) {
     const params = new URLSearchParams({ embedded: "1" });
+    if (definition.id === "interactions") params.set("profile", profileId);
     if (definition.id === "pesky_battle") params.set("v", "battle-icons-10");
     if (definition.id === "chat_chooses") params.set("v", "chat-artwork-13");
     if (activeLocale === "en") params.set("locale", "en");
@@ -577,7 +579,14 @@
     return {
       ...(state && typeof state === "object" ? state : {}),
       locale: activeLocale,
-      ...(id === "interactions" ? { preview: designer } : {}),
+      ...(id === "roulette" ? { settledPreview: designer && Number(state?.session) === -1 } : {}),
+      ...(id === "interactions" ? {
+        preview: designer,
+        interactionsBattleOnly,
+        battleActive: realStates.roulette?.interactionBattleActive === true,
+        battlePreview: !designer && previewState.active === true && previewState.simulationActive === true &&
+          normalizeComponentId(previewState.componentId) === "interactions",
+      } : {}),
       presentation: presentationFor(config),
     };
   }
@@ -637,6 +646,7 @@
       ]);
       if (results[0].status === "fulfilled") {
         savedProfile = normalizedProfile(results[0].value);
+        interactionsBattleOnly = results[0].value.interactionsBattleOnly !== false;
       }
       if (results[1].status === "fulfilled") realStates.tap_farming = results[1].value;
       if (results[2].status === "fulfilled") realStates.pesky_battle = results[2].value;
@@ -761,6 +771,7 @@
       render(state) {
         realStates.roulette = state;
         postComponentState("roulette");
+        postComponentState("interactions");
       },
     });
     void pollData();

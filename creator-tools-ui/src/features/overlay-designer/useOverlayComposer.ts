@@ -10,9 +10,16 @@ import type {
   OverlayProfileId,
 } from "./model";
 import { cloneProfiles, componentById, profileById } from "./model";
+import { createEditHistory, recordEdit, redoEdit, undoEdit, type EditHistory } from "./history";
 
 type ComposerStatus = "loading" | "ready" | "saving" | "saved" | "error";
 export type PreviewSendResult = "ok" | "conflict" | "expired" | "error";
+
+interface DesignerDraft {
+  profiles: OverlayComposerProfile[];
+  interactionsBattleOnly: boolean;
+  editedProfileId: OverlayProfileId;
+}
 
 const EDITABLE_KEYS = [
   "x",
@@ -167,7 +174,13 @@ function replaceProfile(
 
 export function useOverlayComposer() {
   const [confirmed, setConfirmed] = useState<OverlayComposerConfigState | null>(null);
-  const [profiles, setProfiles] = useState<OverlayComposerProfile[]>([]);
+  const [history, setHistory] = useState(() => createEditHistory<DesignerDraft>({
+    profiles: [], interactionsBattleOnly: true, editedProfileId: "vertical",
+  }));
+  const historyRef = useRef(history);
+  const editGroupRef = useRef<string | null>(null);
+  const editSequenceRef = useRef(0);
+  const { profiles, interactionsBattleOnly } = history.present;
   const [status, setStatus] = useState<ComposerStatus>("loading");
   const [feedback, setFeedback] = useState("loading");
   const [previewError, setPreviewError] = useState(false);
@@ -181,6 +194,40 @@ export function useOverlayComposer() {
     horizontal: null,
   });
 
+  const publishHistory = useCallback((next: EditHistory<DesignerDraft>) => {
+    historyRef.current = next;
+    setHistory(next);
+  }, []);
+
+  const changeDraft = useCallback((next: DesignerDraft, record = true) => {
+    const current = historyRef.current;
+    if (next.interactionsBattleOnly === current.present.interactionsBattleOnly &&
+        JSON.stringify(next.profiles) === JSON.stringify(current.present.profiles)) return;
+    publishHistory(record ? recordEdit(current, next, editGroupRef.current)
+      : { ...current, present: next, group: null });
+  }, [publishHistory]);
+
+  const beginEditGroup = useCallback(() => {
+    editGroupRef.current = String(++editSequenceRef.current);
+  }, []);
+  const endEditGroup = useCallback(() => { editGroupRef.current = null; }, []);
+
+  const undo = useCallback(() => {
+    const current = historyRef.current;
+    if (!current.past.length) return null;
+    publishHistory(undoEdit(current));
+    setStatus("ready");
+    return current.present.editedProfileId;
+  }, [publishHistory]);
+  const redo = useCallback(() => {
+    const current = historyRef.current;
+    if (!current.future.length) return null;
+    const next = redoEdit(current);
+    publishHistory(next);
+    setStatus("ready");
+    return next.present.editedProfileId;
+  }, [publishHistory]);
+
   const load = useCallback(async () => {
     setStatus("loading");
     try {
@@ -188,7 +235,9 @@ export function useOverlayComposer() {
       if (!mountedRef.current) return;
       confirmedRef.current = next;
       setConfirmed(next);
-      setProfiles(cloneProfiles(next.profiles));
+      editGroupRef.current = null;
+      publishHistory(createEditHistory({ profiles: cloneProfiles(next.profiles),
+        interactionsBattleOnly: next.interactionsBattleOnly !== false, editedProfileId: "vertical" }));
       setFeedback(next.feedback || "ready");
       setStatus(next.ready && !next.error ? "ready" : "error");
     } catch {
@@ -196,7 +245,7 @@ export function useOverlayComposer() {
       setFeedback("connection_error");
       setStatus("error");
     }
-  }, []);
+  }, [publishHistory]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -212,7 +261,9 @@ export function useOverlayComposer() {
     update: Partial<OverlayComposerComponent> |
       ((current: OverlayComposerComponent) => OverlayComposerComponent),
   ) => {
-    setProfiles((current) => current.map((profile) => profile.id !== profileId
+    const current = historyRef.current.present;
+    changeDraft({ ...current, editedProfileId: profileId,
+      profiles: current.profiles.map((profile) => profile.id !== profileId
       ? profile
       : {
           ...profile,
@@ -222,11 +273,11 @@ export function useOverlayComposer() {
               ? update(component)
               : { ...component, ...update, id: component.id };
           }),
-        }));
+        }) });
     setStatus((current) => current === "loading" || current === "error"
       ? current
       : "ready");
-  }, []);
+  }, [changeDraft]);
 
   const enqueueConfigWrite = useCallback((
     work: () => Promise<void>,
@@ -250,6 +301,11 @@ export function useOverlayComposer() {
     return next;
   }, []);
 
+  const updateInteractionsBattleOnly = useCallback((value: boolean, profileId: OverlayProfileId) => {
+    changeDraft({ ...historyRef.current.present, interactionsBattleOnly: value, editedProfileId: profileId });
+    setStatus(current => current === "loading" || current === "error" ? current : "ready");
+  }, [changeDraft]);
+
   const saveProfile = useCallback((profileId: OverlayProfileId) => {
     const draft = profileById(profiles, profileId);
     if (!draft || status === "saving" || !confirmedRef.current) return Promise.resolve();
@@ -268,9 +324,14 @@ export function useOverlayComposer() {
           if (sameComponent(componentById(serverProfile, component.id), component)) continue;
           next = await runCommand(updateCommand(profileId, component));
         }
+        if ((next?.interactionsBattleOnly !== false) !== interactionsBattleOnly) {
+          next = await runCommand({ schemaVersion: 1, operation: "interactions_visibility", profileId,
+            interactionsBattleOnly });
+        }
         const savedProfile = profileById(next?.profiles ?? [], profileId);
         if (mountedRef.current && savedProfile) {
-          setProfiles((current) => replaceProfile(current, savedProfile));
+          const current = historyRef.current.present;
+          changeDraft({ ...current, profiles: replaceProfile(current.profiles, savedProfile) }, false);
           setStatus("saved");
           window.setTimeout(() => {
             if (mountedRef.current) setStatus((current) => current === "saved" ? "ready" : current);
@@ -290,7 +351,7 @@ export function useOverlayComposer() {
         }
       }
     });
-  }, [enqueueConfigWrite, profiles, runCommand, status]);
+  }, [changeDraft, enqueueConfigWrite, profiles, runCommand, status, interactionsBattleOnly]);
 
   const resetProfile = useCallback((profileId: OverlayProfileId) => {
     if (status === "saving") return Promise.resolve();
@@ -305,7 +366,9 @@ export function useOverlayComposer() {
         });
         const replacement = profileById(next.profiles, profileId);
         if (mountedRef.current && replacement) {
-          setProfiles((current) => replaceProfile(current, replacement));
+          const current = historyRef.current.present;
+          changeDraft({ ...current, editedProfileId: profileId,
+            profiles: replaceProfile(current.profiles, replacement) });
           setStatus("ready");
         }
       } catch {
@@ -315,7 +378,7 @@ export function useOverlayComposer() {
         }
       }
     });
-  }, [enqueueConfigWrite, runCommand, status]);
+  }, [changeDraft, enqueueConfigWrite, runCommand, status]);
 
   const copyProfile = useCallback((
     sourceProfileId: OverlayProfileId,
@@ -334,7 +397,9 @@ export function useOverlayComposer() {
         });
         const replacement = profileById(next.profiles, profileId);
         if (mountedRef.current && replacement) {
-          setProfiles((current) => replaceProfile(current, replacement));
+          const current = historyRef.current.present;
+          changeDraft({ ...current, editedProfileId: profileId,
+            profiles: replaceProfile(current.profiles, replacement) });
           setStatus("ready");
         }
       } catch {
@@ -344,7 +409,7 @@ export function useOverlayComposer() {
         }
       }
     });
-  }, [enqueueConfigWrite, runCommand, status]);
+  }, [changeDraft, enqueueConfigWrite, runCommand, status]);
 
   const sendPreview = useCallback((
     command: OverlayPreviewCommand,
@@ -440,18 +505,24 @@ export function useOverlayComposer() {
     const draft = profileById(profiles, profileId);
     const server = profileById(confirmed?.profiles ?? [], profileId);
     if (!draft || !server || draft.components.length !== server.components.length) return false;
-    return draft.components.some((component) =>
+    return interactionsBattleOnly !== (confirmed?.interactionsBattleOnly !== false) || draft.components.some((component) =>
       !sameComponent(componentById(server, component.id), component));
-  }, [confirmed?.profiles, profiles]);
+  }, [confirmed?.profiles, confirmed?.interactionsBattleOnly, profiles, interactionsBattleOnly]);
 
   return {
     profiles,
+    interactionsBattleOnly,
+    updateInteractionsBattleOnly,
     status,
     feedback,
     previewError,
     previewConflict,
     ready: Boolean(confirmed?.ready),
     updateComponent,
+    beginEditGroup,
+    endEditGroup,
+    undo,
+    redo,
     saveProfile,
     resetProfile,
     copyProfile,
