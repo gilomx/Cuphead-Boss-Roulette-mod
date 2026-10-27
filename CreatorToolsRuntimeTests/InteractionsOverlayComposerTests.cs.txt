@@ -18,6 +18,64 @@ namespace Gilomx.CupheadBossRoulette
             Run("Interactions overlay rejects invalid commands and preview settings atomically", TestInteractionsOverlayValidation);
             Run("Interactions overlay extends legacy scenes and preserves their recovery backup", TestInteractionsOverlayMigration);
             Run("Interactions overlay migrates legacy strip speeds without losing scene settings", TestInteractionsOverlaySpeedMigration);
+            Run("Interaction item outlines persist, copy and reset without changing card frames", TestInteractionsItemOutlines);
+        }
+
+        private static void TestInteractionsItemOutlines()
+        {
+            using (var scope = new TestScope("interactions-item-outlines"))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 0, profileId = "vertical", componentId = "interactions",
+                    interactionsImageOutlineColor = "#AABBCC80", interactionsImageOutlineWidth = 8,
+                    interactionsTextOutlineColor = "#12345600", interactionsTextOutlineWidth = 3
+                })).StatusCode, "item outlines save with independent opacity and width");
+                controller = scope.CreateOverlayComposer(null);
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var item = FindComposerComponent(state.RootElement, "vertical", "interactions");
+                    Equal("#aabbcc80", item.GetProperty("interactionsImageOutlineColor").GetString(), "image outline alpha persists");
+                    Equal(8, item.GetProperty("interactionsImageOutlineWidth").GetInt32(), "image outline width persists");
+                    Equal("#12345600", item.GetProperty("interactionsTextOutlineColor").GetString(), "text outline alpha persists independently");
+                    Equal(3, item.GetProperty("interactionsTextOutlineWidth").GetInt32(), "text outline width persists");
+                    Equal("#f8e5be", item.GetProperty("interactionsCardColor").GetString(), "item outlines leave the card color unchanged");
+                    False(FindComposerComponent(state.RootElement, "vertical", "roulette").TryGetProperty("interactionsImageOutlineWidth", out _),
+                        "item outline controls belong only to interactions");
+                }
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "copy", expectedRevision = 1, profileId = "horizontal", sourceProfileId = "vertical"
+                })).StatusCode, "item outline settings copy to the other profile");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    var item = FindComposerComponent(state.RootElement, "horizontal", "interactions");
+                    Equal("#aabbcc80", item.GetProperty("interactionsImageOutlineColor").GetString(), "copied outline retains alpha");
+                    Equal(3, item.GetProperty("interactionsTextOutlineWidth").GetInt32(), "copied text outline retains width");
+                }
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "reset", expectedRevision = 2, profileId = "horizontal"
+                })).StatusCode, "reset restores the outline defaults in its profile");
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                {
+                    Equal(0, FindComposerComponent(state.RootElement, "horizontal", "interactions").GetProperty("interactionsImageOutlineWidth").GetInt32(), "image outline resets off");
+                    Equal(0, FindComposerComponent(state.RootElement, "horizontal", "interactions").GetProperty("interactionsTextOutlineWidth").GetInt32(), "text outline resets off");
+                    Equal(8, FindComposerComponent(state.RootElement, "vertical", "interactions").GetProperty("interactionsImageOutlineWidth").GetInt32(), "reset preserves the other profile");
+                }
+                var path = Path.Combine(scope.ConfigDirectory, "mx.gilomx.cuphead.bossroulette.overlay-composer.json");
+                var legacy = JsonNode.Parse(File.ReadAllText(path));
+                foreach (var profile in legacy["profiles"].AsArray())
+                {
+                    var item = profile["components"].AsArray().First(value => value["id"].GetValue<string>() == "interactions");
+                    foreach (var key in new[] { "interactionsImageOutlineColor", "interactionsImageOutlineWidth", "interactionsTextOutlineColor", "interactionsTextOutlineWidth" })
+                        item.AsObject().Remove(key);
+                }
+                var legacyJson = legacy.ToJsonString();
+                File.WriteAllText(path, legacyJson);
+                using (var state = JsonDocument.Parse(scope.CreateOverlayComposer(null).GetConfigState()))
+                    foreach (var id in new[] { "vertical", "horizontal" })
+                        Equal(0, FindComposerComponent(state.RootElement, id, "interactions").GetProperty("interactionsImageOutlineWidth").GetInt32(), "old scenes acquire disabled item outlines");
+                Equal(legacyJson, File.ReadAllText(path), "loading old outline settings preserves the saved scene file");
+            }
         }
 
         private static void TestRetiredFloatingControls()
@@ -107,7 +165,7 @@ namespace Gilomx.CupheadBossRoulette
                 True(component.InteractionsAdaptive, "adaptive sizes default");
                 Equal(8, component.InteractionsPageSeconds, "page timing default");
                 Equal(vertical ? 80 : 40, component.InteractionsSpeed, "saved strip speed default");
-                Equal(vertical ? "#662effa6" : "#23262bee", component.InteractionsCardColor, "saved card color includes opacity");
+                Equal("#f8e5be", component.InteractionsCardColor, "saved card color includes opacity");
                 Equal(vertical ? 80 : 18, component.InteractionsCardNoise, "saved texture strength default");
                 Equal(vertical ? 96 : 0, component.InteractionsSize, "saved size follows profile");
                 Equal(vertical ? 4 : 60, component.X, "saved left position");
@@ -131,7 +189,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(vertical ? "pages" : "strip", component.InteractionsLayout, "invalid layout uses profile default");
                 Equal(3, component.InteractionsPageSeconds, "normalization clamps minimum page duration");
                 Equal(140, component.InteractionsSpeed, "normalization clamps maximum speed");
-                Equal("#23262bee", component.InteractionsCardColor, "invalid card color falls back safely");
+                Equal("#f8e5be", component.InteractionsCardColor, "invalid card color falls back safely");
                 Equal(100, component.InteractionsCardNoise, "normalization clamps maximum texture strength");
                 Equal(0, component.X, "normalization clamps left edge");
                 Equal(profile.CanvasHeight - component.Height, component.Y, "normalization clamps bottom edge");
@@ -142,7 +200,7 @@ namespace Gilomx.CupheadBossRoulette
             cloned.FindProfile("vertical").FindComponent("interactions").InteractionsCardNoise = 0;
             False(settings.FindProfile("vertical").FindComponent("interactions").InteractionsTikTok,
                 "candidate clone cannot mutate active profile");
-            Equal("#23262bee", settings.FindProfile("vertical").FindComponent("interactions").InteractionsCardColor,
+            Equal("#f8e5be", settings.FindProfile("vertical").FindComponent("interactions").InteractionsCardColor,
                 "candidate clone cannot mutate the active card color");
             Equal(100, settings.FindProfile("vertical").FindComponent("interactions").InteractionsCardNoise,
                 "candidate clone cannot mutate the active card texture");
@@ -174,7 +232,7 @@ namespace Gilomx.CupheadBossRoulette
                     True(vertical.GetProperty("enabled").GetBoolean(), "vertical activation stays independent");
                     False(vertical.GetProperty("interactionsTikTok").GetBoolean(), "vertical networks stay independent");
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "vertical timing stays independent");
-                    Equal("#662effa6", vertical.GetProperty("interactionsCardColor").GetString(), "vertical card color stays independent");
+                    Equal("#f8e5be", vertical.GetProperty("interactionsCardColor").GetString(), "vertical card color stays independent");
                     Equal(80, vertical.GetProperty("interactionsCardNoise").GetInt32(), "vertical texture stays independent");
                 }
                 response = controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
@@ -206,7 +264,7 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "reset restores page timing");
                     Equal(80, vertical.GetProperty("interactionsSpeed").GetInt32(), "reset restores strip speed");
                     Equal(96, vertical.GetProperty("interactionsSize").GetInt32(), "reset restores saved size");
-                    Equal("#662effa6", vertical.GetProperty("interactionsCardColor").GetString(), "reset restores card color");
+                    Equal("#f8e5be", vertical.GetProperty("interactionsCardColor").GetString(), "reset restores card color");
                     Equal(80, vertical.GetProperty("interactionsCardNoise").GetInt32(), "reset restores card texture");
                     AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "horizontal", "interactions"));
                 }
@@ -270,6 +328,12 @@ namespace Gilomx.CupheadBossRoulette
                     new Dictionary<string, object> { { "interactionsCardNoise", 101 } },
                     new Dictionary<string, object> { { "interactionsCardNoise", 18.5 } },
                     new Dictionary<string, object> { { "interactionsCardNoise", "many" } },
+                    new Dictionary<string, object> { { "interactionsImageOutlineColor", "red" } },
+                    new Dictionary<string, object> { { "interactionsTextOutlineColor", "#abc" } },
+                    new Dictionary<string, object> { { "interactionsImageOutlineWidth", -1 } },
+                    new Dictionary<string, object> { { "interactionsTextOutlineWidth", 9 } },
+                    new Dictionary<string, object> { { "interactionsImageOutlineWidth", 1.5 } },
+                    new Dictionary<string, object> { { "interactionsTextOutlineWidth", null } },
                     new Dictionary<string, object> { { "interactionsSize", -1 } },
                     new Dictionary<string, object> { { "interactionsSize", 24 } },
                     new Dictionary<string, object> { { "interactionsSize", 101 } },
@@ -311,7 +375,9 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(saved, File.ReadAllText(path), "rejected legacy API speed preserves saved settings");
                 }
                 foreach (var pair in new Dictionary<string, object> {
-                    { "interactionsSpeed", 40 }, { "interactionsCardColor", "#123456" }, { "interactionsCardNoise", 0 }
+                    { "interactionsSpeed", 40 }, { "interactionsCardColor", "#123456" }, { "interactionsCardNoise", 0 },
+                    { "interactionsImageOutlineColor", "#ffffff" }, { "interactionsImageOutlineWidth", 2 },
+                    { "interactionsTextOutlineColor", "#12345680" }, { "interactionsTextOutlineWidth", 3 }
                 })
                 {
                     var command = new Dictionary<string, object> {
@@ -397,7 +463,7 @@ namespace Gilomx.CupheadBossRoulette
                     False(parsed.FindComponent("interactions").Enabled, "partial legacy component remains disabled");
                     var vertical = parsed.Id == "vertical";
                     Equal(vertical ? 96 : 0, parsed.FindComponent("interactions").InteractionsSize, "missing size receives the profile default");
-                    Equal(vertical ? "#662effa6" : "#23262bee", parsed.FindComponent("interactions").InteractionsCardColor, "old scenes receive the default card color");
+                    Equal("#f8e5be", parsed.FindComponent("interactions").InteractionsCardColor, "old scenes receive the default card color");
                     Equal(vertical ? 80 : 18, parsed.FindComponent("interactions").InteractionsCardNoise, "old scenes receive the default card texture");
                     Equal("strip",
                         parsed.FindComponent("interactions").InteractionsLayout, "missing fields retain per-profile layout defaults");
@@ -437,7 +503,7 @@ namespace Gilomx.CupheadBossRoulette
                         "preview accepts legacy speed and absent texture fields");
                     Equal(Math.Max(40, speed), preview.FindComponent("interactions").InteractionsSpeed,
                         "preview migrates only speeds below the new minimum");
-                    Equal(preview.Id == "vertical" ? "#662effa6" : "#23262bee", preview.FindComponent("interactions").InteractionsCardColor, "preview receives the default card color");
+                    Equal("#f8e5be", preview.FindComponent("interactions").InteractionsCardColor, "preview receives the default card color");
                     Equal(preview.Id == "vertical" ? 80 : 18, preview.FindComponent("interactions").InteractionsCardNoise, "preview receives the default texture strength");
                 }
                 var legacyJson = legacy.ToJsonString();
@@ -449,7 +515,7 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     var component = profile["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
                     component["interactionsSpeed"] = Math.Max(40, speed);
-                    component["interactionsCardColor"] = profile["id"].GetValue<string>() == "vertical" ? "#662effa6" : "#23262bee";
+                    component["interactionsCardColor"] = "#f8e5be";
                     component["interactionsCardNoise"] = profile["id"].GetValue<string>() == "vertical" ? 80 : 18;
                 }
                 using (var state = JsonDocument.Parse(controller.GetConfigState()))

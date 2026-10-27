@@ -83,7 +83,7 @@ test("card appearance and expanded strip speeds persist through the mock API and
   const mock = mockComposer();
   const card = (state, id = "vertical") => state.profiles.find(profile => profile.id === id).components.find(component => component.id === "interactions");
   const send = command => mock.send({ schemaVersion: 1, expectedRevision: mock.state().revision, profileId: "vertical", operation: "update", componentId: "interactions", ...command });
-  assert.equal(card(mock.state()).interactionsCardColor, "#662effa6");
+  assert.equal(card(mock.state()).interactionsCardColor, "#f8e5be");
   assert.equal(card(mock.state()).interactionsCardNoise, 80);
   const saved = send({ interactionsTemplate: "cards", interactionsCardColor: "#ABCDEF80", interactionsCardNoise: 77, interactionsSpeed: 140 });
   assert.equal(saved.status, 200);
@@ -108,7 +108,7 @@ test("card appearance and expanded strip speeds persist through the mock API and
   assert.equal(send({ interactionsCardNoise: 100 }).status, 200);
   const reset = send({ operation: "reset" });
   assert.equal(reset.status, 200);
-  assert.equal(card(reset.body).interactionsCardColor, "#662effa6");
+  assert.equal(card(reset.body).interactionsCardColor, "#f8e5be");
   assert.equal(card(reset.body).interactionsCardNoise, 80);
 });
 
@@ -122,9 +122,37 @@ test("old slow strip values migrate to the new minimum and missing card settings
     delete legacy.interactionsCardNoise;
     mock.normalize(legacy, profile.canvas);
     assert.equal(legacy.interactionsSpeed, 40);
-    assert.equal(legacy.interactionsCardColor, "#23262bee");
+    assert.equal(legacy.interactionsCardColor, "#f8e5be");
     assert.equal(legacy.interactionsCardNoise, 18);
   }
+});
+
+test("item outlines persist and copy independently while invalid edits leave the mock scene untouched", () => {
+  const mock = mockComposer();
+  const card = (state, profile = "vertical") => state.profiles.find(item => item.id === profile).components.find(item => item.id === "interactions");
+  const send = command => mock.send({ operation: "update", expectedRevision: mock.state().revision,
+    profileId: "vertical", componentId: "interactions", ...command });
+  const saved = send({ interactionsImageOutlineColor: "#ABCDEF80", interactionsImageOutlineWidth: 8,
+    interactionsTextOutlineColor: "#65432100", interactionsTextOutlineWidth: 3 });
+  assert.equal(saved.status, 200);
+  assert.equal(card(saved.body).interactionsImageOutlineColor, "#abcdef80");
+  assert.equal(card(saved.body).interactionsTextOutlineColor, "#65432100");
+  assert.equal(card(saved.body).interactionsImageOutlineWidth, 8);
+  const copied = send({ operation: "copy", profileId: "horizontal", sourceProfileId: "vertical" });
+  assert.equal(copied.status, 200);
+  assert.equal(card(copied.body, "horizontal").interactionsTextOutlineWidth, 3);
+  assert.equal(card(copied.body, "horizontal").interactionsImageOutlineColor, "#abcdef80");
+  const before = JSON.stringify(mock.state());
+  for (const invalid of [{ interactionsImageOutlineWidth: -1 }, { interactionsTextOutlineWidth: 9 },
+    { interactionsImageOutlineWidth: 1.5 }, { interactionsTextOutlineWidth: null },
+    { interactionsImageOutlineColor: "red" }, { interactionsTextOutlineColor: "#abc" },
+    { componentId: "roulette", interactionsImageOutlineWidth: 2 }]) {
+    assert.equal(send(invalid).status, 400);
+    assert.equal(JSON.stringify(mock.state()), before);
+  }
+  const reset = send({ operation: "reset" });
+  assert.equal(card(reset.body).interactionsImageOutlineWidth, 0);
+  assert.equal(card(reset.body).interactionsTextOutlineWidth, 0);
 });
 
 test("global battle visibility changes independently of scene defaults and rejects malformed updates", () => {

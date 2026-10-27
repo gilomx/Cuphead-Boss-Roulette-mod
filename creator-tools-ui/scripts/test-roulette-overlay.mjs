@@ -113,7 +113,9 @@ test('interaction designer previews a disabled layer and forwards its independen
     interactionsTemplate: 'cards', interactionsLayout: 'pages',
     interactionsTikTok: true, interactionsTwitch: false, interactionsYouTube: false,
     interactionsPageSeconds: 12, interactionsSpeed: 140, interactionsAdaptive: true, interactionsSize: 65,
-    interactionsCardColor: '#3f2b20aa', interactionsCardNoise: 35 });
+    interactionsCardColor: '#3f2b20aa', interactionsCardNoise: 35,
+    interactionsImageOutlineColor: '#fedcba80', interactionsImageOutlineWidth: 8,
+    interactionsTextOutlineColor: '#12345600', interactionsTextOutlineWidth: 3 });
   const rules = [{ id: 1, enabled: true, platform: 'tiktok', eventType: 'gift',
     giftId: '5655', every: 1, interaction: 'help_extra_life', quantity: 1 }];
   view.design('interactions', { interactions: { rules, examples: true } });
@@ -131,6 +133,10 @@ test('interaction designer previews a disabled layer and forwards its independen
   assert.equal(message.state.presentation.interactionsSpeed, 140);
   assert.equal(message.state.presentation.interactionsCardColor, '#3f2b20aa');
   assert.equal(message.state.presentation.interactionsCardNoise, 35);
+  assert.equal(message.state.presentation.interactionsImageOutlineColor, '#fedcba80');
+  assert.equal(message.state.presentation.interactionsImageOutlineWidth, 8);
+  assert.equal(message.state.presentation.interactionsTextOutlineColor, '#12345600');
+  assert.equal(message.state.presentation.interactionsTextOutlineWidth, 3);
   assert.match(view.interactionsFrame.src, /profile=horizontal/);
   view.design('roulette');
   assert.equal(view.interactionsHost.dataset.enabled, 'false');
@@ -141,7 +147,7 @@ test('OBS interaction layout preview uses real rules and restores the saved visi
   const rules = [{ id: 9, enabled: true, platform: 'youtube', eventType: 'jewels',
     every: 500, interaction: 'challenge_no_dash', quantity: 1 }];
   const view = await bootComposer(false, { fetch: url => url === '/api/config/interactions/rules'
-    ? { ok: true, json: async () => ({ ready: true, rules }) } : undefined });
+    ? { ok: true, json: async () => ({ ready: true, engineActive: false, rules }) } : undefined });
   view.profile.components.push({ id: 'interactions', enabled: false,
     interactionsTemplate: 'floating', interactionsLayout: 'strip' });
   await view.setPreview({ active: true, simulationActive: true,
@@ -149,11 +155,30 @@ test('OBS interaction layout preview uses real rules and restores the saved visi
   assert.equal(view.interactionsHost.dataset.enabled, 'true');
   const message = view.interactionsFrame.posted.at(-1);
   assert.equal(message.state.preview, false);
+  assert.equal(message.state.engineActive, false, 'OBS preview retains the real master state');
+  assert.equal(message.state.battlePreview, true, 'explicit OBS preview remains available while Interactions is off');
   assert.equal(message.state.examples, undefined);
   assert.equal(message.state.rules[0].id, 9);
   assert.equal(message.state.presentation.interactionsLayout, 'strip');
   await view.setPreview({ active: false, revision: 2 });
   assert.equal(view.interactionsHost.dataset.enabled, 'false');
+  view.close();
+});
+
+test('composed OBS source forwards master interaction switches without changing its saved layer', async () => {
+  let engineActive = true;
+  const rules = [{ id: 1, enabled: true, platform: 'twitch', eventType: 'currency', every: 100, interaction: 'help_extra_life' }];
+  const view = await bootComposer(false, { fetch: url => url === '/api/config/interactions/rules'
+    ? { ok: true, json: async () => ({ ready: true, engineActive, rules }) } : undefined });
+  view.profile.components.push({ id: 'interactions', enabled: true, interactionsLayout: 'strip' });
+  for (const active of [true, false, true]) {
+    engineActive = active;
+    view.intervals.get(500)(); await flush();
+    const state = view.interactionsFrame.posted.at(-1).state;
+    assert.equal(state.engineActive, active);
+    assert.equal(state.rules[0].id, 1, 'hiding the overlay retains its configured offers');
+    assert.equal(view.interactionsHost.dataset.enabled, 'true', 'the saved layer stays enabled');
+  }
   view.close();
 });
 

@@ -421,11 +421,25 @@ namespace Gilomx.CupheadBossRoulette
             }
             foreach (var key in new[] { "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
                 "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
-                "interactionsCardColor", "interactionsCardNoise" })
+                "interactionsCardColor", "interactionsCardNoise", "interactionsImageOutlineColor", "interactionsImageOutlineWidth",
+                "interactionsTextOutlineColor", "interactionsTextOutlineWidth" })
             {
                 if (!values.ContainsKey(key)) continue;
                 if (component.Id != CreatorToolsOverlayComposerSettings.InteractionsComponentId) return false;
-                if (key == "interactionsCardColor")
+                if (key == "interactionsImageOutlineColor" || key == "interactionsTextOutlineColor")
+                {
+                    var color = CreatorToolsOverlayComposerSettings.NormalizeColor(Value(values, key));
+                    if (color.Length == 0) return false;
+                    if (key == "interactionsImageOutlineColor") component.InteractionsImageOutlineColor = color;
+                    else component.InteractionsTextOutlineColor = color;
+                }
+                else if (key == "interactionsImageOutlineWidth" || key == "interactionsTextOutlineWidth")
+                {
+                    if (!TryReadInt(values, key, out number) || number < 0 || number > 8) return false;
+                    if (key == "interactionsImageOutlineWidth") component.InteractionsImageOutlineWidth = number;
+                    else component.InteractionsTextOutlineWidth = number;
+                }
+                else if (key == "interactionsCardColor")
                 {
                     var color = CreatorToolsOverlayComposerSettings.NormalizeColor(Value(values, key));
                     if (color.Length == 0) return false;

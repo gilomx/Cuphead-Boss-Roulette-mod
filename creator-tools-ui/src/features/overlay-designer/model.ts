@@ -50,6 +50,10 @@ export interface OverlayComposerComponent {
   interactionsAdaptive?: boolean;
   interactionsCardColor?: string;
   interactionsCardNoise?: number;
+  interactionsImageOutlineColor?: string;
+  interactionsImageOutlineWidth?: number;
+  interactionsTextOutlineColor?: string;
+  interactionsTextOutlineWidth?: number;
 }
 
 export interface OverlayComposerProfile {
@@ -116,6 +120,10 @@ export interface OverlayComposerCommand {
   interactionsAdaptive?: boolean;
   interactionsCardColor?: string;
   interactionsCardNoise?: number;
+  interactionsImageOutlineColor?: string;
+  interactionsImageOutlineWidth?: number;
+  interactionsTextOutlineColor?: string;
+  interactionsTextOutlineWidth?: number;
 }
 
 export interface OverlayPreviewCommand {

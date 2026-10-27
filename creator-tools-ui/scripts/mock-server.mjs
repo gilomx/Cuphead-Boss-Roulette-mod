@@ -389,7 +389,9 @@ function defaultOverlayProfiles() {
     interactionsTemplate: "floating", interactionsLayout: "strip",
     interactionsTikTok: profile.id !== "vertical", interactionsTwitch: true, interactionsYouTube: true,
     interactionsPageSeconds: 8, interactionsSpeed: profile.id === "vertical" ? 80 : 40, interactionsAdaptive: true, interactionsSize: profile.id === "vertical" ? 96 : 0,
-    interactionsCardColor: profile.id === "vertical" ? "#662effa6" : "#23262bee", interactionsCardNoise: profile.id === "vertical" ? 80 : 18,
+    interactionsCardColor: "#f8e5be", interactionsCardNoise: profile.id === "vertical" ? 80 : 18,
+    interactionsImageOutlineColor: "#000000", interactionsImageOutlineWidth: 0,
+    interactionsTextOutlineColor: "#000000", interactionsTextOutlineWidth: 0,
   }].map(component => ({ ...component, voteOutlineColor: "#ffffff", textFont: "clean", textWeight: 700,
     textShadowColor: "#00000000", textShadowX: 2, textShadowY: 3, textShadowBlur: 2 })) }));
 }
@@ -1075,6 +1077,13 @@ function normalizeOverlayComponent(component, canvas) {
     ? String(component.voteOutlineColor).toLowerCase()
     : "#ffffff";
   if (component.id === "interactions") {
+    for (const key of ["interactionsImageOutlineColor", "interactionsTextOutlineColor"]) {
+      component[key] = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(String(component[key] ?? "")) ? component[key].toLowerCase() : "#000000";
+    }
+    for (const key of ["interactionsImageOutlineWidth", "interactionsTextOutlineWidth"]) {
+      const value = Number(component[key] ?? 0);
+      component[key] = Number.isFinite(value) ? Math.max(0, Math.min(8, Math.round(value))) : 0;
+    }
     const vertical = canvas.height > canvas.width;
     component.interactionsTemplate = component.interactionsTemplate === "cards" ? "cards" : "floating";
     component.interactionsLayout = ["strip", "pages"].includes(component.interactionsLayout)
@@ -1084,7 +1093,7 @@ function normalizeOverlayComponent(component, canvas) {
     component.interactionsYouTube = component.interactionsYouTube ?? !vertical;
     component.interactionsAdaptive = component.interactionsAdaptive !== false;
     component.interactionsCardColor = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(String(component.interactionsCardColor ?? ""))
-      ? component.interactionsCardColor.toLowerCase() : "#23262bee";
+      ? component.interactionsCardColor.toLowerCase() : "#f8e5be";
     component.interactionsSize = Number(component.interactionsSize) > 0
       ? Math.max(25, Math.min(100, Math.round(Number(component.interactionsSize)))) : 0;
     for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 40, 140], ["interactionsCardNoise", 18, 0, 100]]) {
@@ -1168,7 +1177,8 @@ function applyOverlayComposerCommand(command, res) {
         ["interactionsTikTok", "interactionsTwitch", "interactionsYouTube", "interactionsAdaptive"].some(key => command[key] != null && typeof command[key] !== "boolean") ||
         command.interactionsSize != null && (!Number.isInteger(command.interactionsSize) ||
           command.interactionsSize !== 0 && (command.interactionsSize < 25 || command.interactionsSize > 100)) ||
-        [["interactionsPageSeconds", 3, 60], ["interactionsSpeed", 40, 140], ["interactionsCardNoise", 0, 100]].some(([key, minimum, maximum]) =>
+        [["interactionsPageSeconds", 3, 60], ["interactionsSpeed", 40, 140], ["interactionsCardNoise", 0, 100],
+          ["interactionsImageOutlineWidth", 0, 8], ["interactionsTextOutlineWidth", 0, 8]].some(([key, minimum, maximum]) =>
           command[key] != null && (!Number.isInteger(command[key]) || command[key] < minimum || command[key] > maximum))) {
       json(res, { ok: false, error: "invalid_interactions_options" }, 400);
       return;
@@ -1179,7 +1189,14 @@ function applyOverlayComposerCommand(command, res) {
         return;
       }
     }
-    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor", "textShadowColor", "interactionsCardColor"]) {
+    const itemOutlineKeys = ["interactionsImageOutlineColor", "interactionsImageOutlineWidth", "interactionsTextOutlineColor", "interactionsTextOutlineWidth"];
+    if (itemOutlineKeys.some(key => Object.prototype.hasOwnProperty.call(command, key) &&
+        (component.id !== "interactions" || command[key] == null))) {
+      json(res, { ok: false, error: "invalid_interactions_options" }, 400);
+      return;
+    }
+    for (const key of ["liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor", "textShadowColor", "interactionsCardColor",
+      "interactionsImageOutlineColor", "interactionsTextOutlineColor"]) {
       if (Object.prototype.hasOwnProperty.call(command, key) &&
           !/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(String(command[key] ?? ""))) {
         json(res, { ok: false, error: "invalid_color" }, 400);
@@ -1195,6 +1212,7 @@ function applyOverlayComposerCommand(command, res) {
       "interactionsTemplate", "interactionsLayout", "interactionsTikTok", "interactionsTwitch", "interactionsYouTube",
       "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
       "interactionsCardColor", "interactionsCardNoise",
+      ...itemOutlineKeys,
       "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",
     ]) {
       if (Object.prototype.hasOwnProperty.call(command, key)) component[key] = command[key];

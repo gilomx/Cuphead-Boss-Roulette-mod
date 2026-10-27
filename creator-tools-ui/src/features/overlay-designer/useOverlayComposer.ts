@@ -45,6 +45,7 @@ const EDITABLE_KEYS = [
   "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds",
   "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
   "interactionsCardColor", "interactionsCardNoise",
+  "interactionsImageOutlineColor", "interactionsImageOutlineWidth", "interactionsTextOutlineColor", "interactionsTextOutlineWidth",
 ] as const;
 
 function sameComponent(
@@ -99,8 +100,12 @@ function updateCommand(
       interactionsSpeed: component.interactionsSpeed ?? 40,
       interactionsSize: component.interactionsSize ?? 0,
       interactionsAdaptive: component.interactionsAdaptive ?? true,
-      interactionsCardColor: component.interactionsCardColor ?? "#23262bee",
+      interactionsCardColor: component.interactionsCardColor ?? "#f8e5be",
       interactionsCardNoise: component.interactionsCardNoise ?? 18,
+      interactionsImageOutlineColor: component.interactionsImageOutlineColor ?? "#000000",
+      interactionsImageOutlineWidth: component.interactionsImageOutlineWidth ?? 0,
+      interactionsTextOutlineColor: component.interactionsTextOutlineColor ?? "#000000",
+      interactionsTextOutlineWidth: component.interactionsTextOutlineWidth ?? 0,
     } : {}),
   };
 }

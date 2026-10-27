@@ -68,6 +68,16 @@ function colorWithBase(value: string, base: string) {
   return `${base}${alpha}`.toLowerCase();
 }
 
+function interactionsTextColor(component: OverlayComposerComponent) {
+  const color = component.textColor ?? "#ffffff";
+  if (component.interactionsTemplate !== "cards" || !["#ffffff", "#fff4dc"].includes(color.toLowerCase())) return color;
+  // Match the legacy paper ink in the renderer. Color picker edits include
+  // alpha, so explicitly choosing white remains white on the card.
+  const paper = (component.interactionsCardColor ?? "#f8e5be").slice(1, 7);
+  const brightness = .299 * parseInt(paper.slice(0, 2), 16) + .587 * parseInt(paper.slice(2, 4), 16) + .114 * parseInt(paper.slice(4, 6), 16);
+  return brightness > 160 ? "#321c10" : color;
+}
+
 interface OverlayColorPickerProps {
   label: string;
   value: string;
@@ -237,6 +247,7 @@ export function OverlayDesignerInspector({
   const [attackPlayer, setAttackPlayer] = useState(0);
   const [voteNumber, setVoteNumber] = useState(1);
   const colorGroup = component.id === "chat_chooses" ? "chatColors" : component.id === "pesky_battle" ? "battleColors" : "colors";
+  const typographyColorKeys = component.id === "interactions" ? ["textShadowColor"] as const : ["textColor", "textShadowColor"] as const;
   const targetSlot = battleState.participants.some(player => player.slot === attackPlayer) ? attackPlayer : 0;
   const numberLocale = locale === "es" ? "es-MX" : "en-US";
   const geometryDisabled = disabled || component.locked;
@@ -387,16 +398,44 @@ export function OverlayDesignerInspector({
               <select disabled={disabled} value={component.interactionsTemplate ?? "floating"}
                 onChange={event => {
                   const template = event.target.value as "cards" | "floating";
-                  onChange({ interactionsTemplate: template, showTitle: false, showDetails: false });
+                  const previousPaper = component.interactionsCardColor?.toLowerCase();
+                  onChange({ interactionsTemplate: template, showTitle: false, showDetails: false,
+                    ...(template === "cards" && ["#23262bee", "#662effa6"].includes(previousPaper ?? "")
+                      ? { interactionsCardColor: "#f8e5be" } : {}),
+                  });
                 }}>
                 <option value="cards">{t("overlayDesigner.interactions.cards")}</option>
                 <option value="floating">{t("overlayDesigner.interactions.floating")}</option>
               </select>
             </label>
+            <label><span>{t("overlayDesigner.interactions.layout")}</span>
+              <select disabled={disabled} value={interactionsLayout}
+                onChange={event => {
+                  const layout = event.target.value as "strip" | "pages";
+                  const width = Math.min(profile.canvas.width, 960);
+                  const height = Math.min(profile.canvas.height, layout === "pages" ? 620 : 280);
+                  onChange({ interactionsLayout: layout, width, height,
+                    x: Math.min(component.x, profile.canvas.width - width),
+                    y: Math.min(component.y, profile.canvas.height - height) });
+                }}>
+                <option value="strip">{t("overlayDesigner.interactions.strip")}</option>
+                <option value="pages">{t("overlayDesigner.interactions.pages")}</option>
+              </select>
+            </label>
+            <OverlayColorPicker
+              label={t("overlayDesigner.inspector.typography.textColor")}
+              value={interactionsTextColor(component)}
+              disabled={disabled}
+              alphaLabel={t("overlayDesigner.inspector.colors.alpha")}
+              hexLabel={t("overlayDesigner.inspector.colors.hex")}
+              openLabel={t("overlayDesigner.inspector.colors.open")}
+              closeLabel={t("overlayDesigner.inspector.colors.close")}
+              onChange={value => onChange({ textColor: value })}
+            />
             {component.interactionsTemplate === "cards" ? <>
               <OverlayColorPicker
                 label={t("overlayDesigner.interactions.cardColor")}
-                value={component.interactionsCardColor ?? "#23262bee"}
+                value={component.interactionsCardColor ?? "#f8e5be"}
                 disabled={disabled}
                 alphaLabel={t("overlayDesigner.inspector.colors.alpha")}
                 hexLabel={t("overlayDesigner.inspector.colors.hex")}
@@ -412,20 +451,29 @@ export function OverlayDesignerInspector({
               </label>
               <small>{t("overlayDesigner.interactions.cardNoiseHint")}</small>
             </> : null}
-            <label><span>{t("overlayDesigner.interactions.layout")}</span>
-              <select disabled={disabled} value={interactionsLayout}
-                onChange={event => {
-                  const layout = event.target.value as "strip" | "pages";
-                  const width = Math.min(profile.canvas.width, 960);
-                  const height = Math.min(profile.canvas.height, layout === "pages" ? 620 : 280);
-                  onChange({ interactionsLayout: layout, width, height,
-                    x: Math.min(component.x, profile.canvas.width - width),
-                    y: Math.min(component.y, profile.canvas.height - height) });
-                }}>
-                <option value="strip">{t("overlayDesigner.interactions.strip")}</option>
-                <option value="pages">{t("overlayDesigner.interactions.pages")}</option>
-              </select>
-            </label>
+            <strong>{t("overlayDesigner.interactions.itemOutlines")}</strong>
+            <small>{t("overlayDesigner.interactions.itemOutlinesHint")}</small>
+            {([
+              ["interactionsImageOutlineColor", "interactionsImageOutlineWidth", "imageOutlineColor", "imageOutlineWidth"],
+              ["interactionsTextOutlineColor", "interactionsTextOutlineWidth", "textOutlineColor", "textOutlineWidth"],
+            ] as const).map(([colorKey, widthKey, colorLabelKey, widthLabelKey]) => <div key={colorKey} className="overlay-designer-simulation__body">
+              <label><span>{t(`overlayDesigner.interactions.${widthLabelKey}`)}</span>
+                <input type="range" min="0" max="8" step="1" disabled={disabled}
+                  value={component[widthKey] ?? 0}
+                  onChange={event => onChange({ [widthKey]: Number(event.target.value) })} />
+                <output>{component[widthKey] ?? 0} px</output>
+              </label>
+              <OverlayColorPicker
+                label={t(`overlayDesigner.interactions.${colorLabelKey}`)}
+                value={component[colorKey] ?? "#000000"}
+                disabled={disabled}
+                alphaLabel={t("overlayDesigner.inspector.colors.alpha")}
+                hexLabel={t("overlayDesigner.inspector.colors.hex")}
+                openLabel={t("overlayDesigner.inspector.colors.open")}
+                closeLabel={t("overlayDesigner.inspector.colors.close")}
+                onChange={value => onChange({ [colorKey]: value })}
+              />
+            </div>)}
             <strong>{t("overlayDesigner.interactions.platforms")}</strong>
             {interactionsPlatforms.map(([key, label, checked]) => (
               <label className="overlay-designer-properties__checkbox" key={key}>
@@ -490,7 +538,7 @@ export function OverlayDesignerInspector({
             </select>
           </label>
           </>}
-          {(["textColor", "textShadowColor"] as const).map(key => <OverlayColorPicker
+          {typographyColorKeys.map(key => <OverlayColorPicker
             key={key}
             label={t(`overlayDesigner.inspector.typography.${key}`)}
             value={component[key] ?? (key === "textColor" ? "#ffffff" : "#00000000")}

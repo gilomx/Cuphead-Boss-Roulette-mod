@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const source = name => readFileSync(new URL(`../../assets/creator-tools/${name}`, import.meta.url), 'utf8');
 const modelCode = source('interactions-overlay.model.js');
 const runtimeCode = source('interactions-overlay.js');
-const scope = {};
+const scope = { URL };
 vm.runInNewContext(modelCode, scope);
 const model = scope.CreatorToolsInteractionsOverlayModel;
 const artwork = Object.fromEntries(Array.from({ length: 20 }, (_, index) => [`effect_${index}`, {
@@ -42,14 +42,22 @@ test('duplicate offers collapse; distinct gift quantities and redemption names s
   assert.match(items[0].offers[2].rewardName, /<img/);
 });
 
-test('gift images come from trusted local catalog paths and custom community placeholder, never rule URLs', () => {
+test('ordinary gift images stay local while observed Community Gift images use the current HTTPS metadata', () => {
   const items = project([rule({ giftId: 'custom', imagePath: 'https://evil.test/x.png', giftName: 'Custom' })]);
   assert.equal(items[0].offers[0].image, '');
   const communityGift = { giftId: '999', name: 'Comunidad', imagePath: 'https://gift.test/custom.png',
     placeholderImagePath: '/assets/creator-tools/gifts/images/0.webp' };
   const custom = project([rule({ giftId: '999' })], {}, { communityGift });
-  assert.equal(custom[0].offers[0].image, communityGift.placeholderImagePath);
+  assert.equal(custom[0].offers[0].image, communityGift.imagePath);
+  assert.equal(custom[0].offers[0].fallbackImage, communityGift.placeholderImagePath);
   assert.equal(custom[0].offers[0].giftName, 'Comunidad');
+  for (const imagePath of ['http://gift.test/custom.png', '//gift.test/custom.png', 'javascript:alert(1)',
+    'data:image/svg+xml,test', 'https://name:password@gift.test/image.png', 'https://gift.test/' + 'x'.repeat(2048)]) {
+    const fallback = project([rule({ giftId: '999' })], {}, { communityGift: { ...communityGift, imagePath } });
+    assert.equal(fallback[0].offers[0].image, communityGift.placeholderImagePath);
+  }
+  const untrustedCatalog = { gifts: [{ giftId: '999', name: 'Untrusted', imagePath: 'https://gift.test/other.png' }] };
+  assert.equal(model.items({ rules: [rule({ giftId: '999' })] }, {}, untrustedCatalog, artwork, 'es')[0].offers[0].image, '');
   for (const value of ['https://evil.test/image.png', '//evil.test/image.png', '/assets/creator-tools/interactions/../secret.png',
     '/assets/creator-tools/interactions/%2e%2e.png', 'data:image/png;base64,a', '/assets/creator-tools/interactions/test.svg']) assert.equal(model.localImage(value), '');
 });
@@ -72,12 +80,12 @@ test('strip speed has the saved 40 to 140 range and preserves intermediate value
 
 test('card appearance accepts only full hex colors and bounded integer paper intensity', () => {
   const defaults = model.presentation();
-  assert.equal(defaults.interactionsCardColor, '#23262bee');
+  assert.equal(defaults.interactionsCardColor, '#f8e5be');
   assert.equal(defaults.interactionsCardNoise, 18);
   assert.equal(model.presentation({ interactionsCardColor: '#faf3d8' }).interactionsCardColor, '#faf3d8');
   assert.equal(model.presentation({ interactionsCardColor: '#10203080' }).interactionsCardColor, '#10203080');
   for (const color of ['#abc', 'red', 'url(https://evil.test/a)', '#123456;opacity:0']) {
-    assert.equal(model.presentation({ interactionsCardColor: color }).interactionsCardColor, '#23262bee');
+    assert.equal(model.presentation({ interactionsCardColor: color }).interactionsCardColor, '#f8e5be');
   }
   assert.equal(model.presentation({ interactionsCardNoise: -10 }).interactionsCardNoise, 0);
   assert.equal(model.presentation({ interactionsCardNoise: 300 }).interactionsCardNoise, 100);
@@ -158,15 +166,16 @@ class Element {
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function boot(search = '?mode=embedded') {
-  const nodes = Object.fromEntries(['interactions-overlay', 'interactions-scene', 'interactions-viewport', 'interactions-content', 'interactions-heading', 'interactions-pagination'].map(id => [id, new Element()]));
+  const nodes = Object.fromEntries(['interactions-overlay', 'interactions-scene', 'interactions-viewport', 'interactions-content', 'interactions-heading', 'interactions-pagination',
+    'interaction-image-outline-radius', 'interaction-image-outline-ink'].map(id => [id, new Element()]));
   nodes['interactions-overlay'].hidden = true;
   const listeners = {}, posted = [], fetched = [], created = [], timers = [], rafs = new Map();
   const parent = { postMessage: message => posted.push(message) };
-  let nextId = 0, nextState = { rules: [rule()] }, component = { id: 'interactions', enabled: true, interactionsTemplate: 'floating', interactionsLayout: 'pages' };
+  let nextId = 0, nextState = { engineActive: true, rules: [rule()] }, component = { id: 'interactions', enabled: true, interactionsTemplate: 'floating', interactionsLayout: 'pages' };
   const document = { getElementById: id => nodes[id], documentElement: { dataset: {} },
     createElement: tag => { const node = new Element(); node.tagName = tag; created.push(node); return node; },
     createElementNS: (_namespace, tag) => { const node = new Element(); node.tagName = tag; created.push(node); return node; } };
-  const scope = { document, location: { search, origin: 'http://overlay.test' }, URLSearchParams, AbortController, console,
+  const scope = { document, location: { search, origin: 'http://overlay.test' }, URL, URLSearchParams, AbortController, console,
     Image: class {},
     requestAnimationFrame: callback => { const id = ++nextId; rafs.set(id, callback); return id; },
     cancelAnimationFrame: id => rafs.delete(id),
@@ -184,8 +193,8 @@ async function boot(search = '?mode=embedded') {
   };
   vm.runInNewContext(modelCode, scope); vm.runInNewContext(runtimeCode, scope); await flush();
   const send = (state, origin = 'http://overlay.test', source = parent) => listeners.message?.({ origin, source,
-    data: { type: 'creator-tools-overlay-preview', version: 1, overlay: 'interactions', state } });
-  return { nodes, fetched, posted, created, send, setState: state => { nextState = state; },
+    data: { type: 'creator-tools-overlay-preview', version: 1, overlay: 'interactions', state: { engineActive: true, ...state } } });
+  return { nodes, fetched, posted, created, send, setState: state => { nextState = { engineActive: true, ...state }; },
     finishExit() { const index = timers.findIndex(timer => timer.delay === 280); if (index >= 0) timers.splice(index, 1)[0].callback(); },
     async poll() { const index = timers.findIndex(timer => timer.delay === 1000); assert.ok(index >= 0); timers.splice(index, 1)[0].callback(); await flush(); },
     frame(time) { const callbacks = [...rafs.values()]; rafs.clear(); callbacks.forEach(callback => callback(time)); },
@@ -277,6 +286,64 @@ test('currency artwork uses catalog gifts, official Twitch Bits and YouTube Jewe
   assert.ok(images.includes('/assets/creator-tools/youtube/jewels.png'));
 });
 
+test('Community Gift artwork replaces the placeholder and each previous gift without changing its price', async () => {
+  for (const profile of ['vertical', 'horizontal']) for (const template of ['cards', 'floating']) {
+    const runtime = await boot(`?embedded=1&profile=${profile}`);
+    let previousPayment;
+    for (const [giftId, name, imagePath] of [['0', 'Community Gift', '/assets/creator-tools/gifts/images/0.webp'],
+      ['5655', 'Primera comunidad', 'https://gift.test/community-first.webp?version=1'],
+      ['7002', 'Nueva comunidad', 'https://gift.test/community-next.png?version=2']]) {
+      const before = runtime.created.length;
+      const state = { rules: [rule({ giftId, every: 3 }), rule({ platform: 'twitch', eventType: 'currency', every: 125 })],
+        communityGift: { learned: giftId !== '0', giftId, name, imagePath, coinsPerUnit: 999,
+          placeholderImagePath: '/assets/creator-tools/gifts/images/0.webp' },
+        presentation: { interactionsTemplate: template } };
+      runtime.send(state);
+      const created = runtime.created.slice(before);
+      const payment = created.find(node => node.className === 'interaction-payment' && node.dataset.platform === 'tiktok');
+      const img = payment.children[0].children[0];
+      assert.equal(img.src, imagePath, 'the observed image takes precedence over the static gift catalog');
+      assert.equal(payment.children[1].textContent, '3', 'gift coins never replace the configured exchange price');
+      assert.ok(payment.attributes['aria-label'].endsWith(name));
+      assert.notEqual(payment, previousPayment, 'each learned gift replaces the prior image in the rendered overlay');
+      assert.equal(runtime.nodes['interactions-overlay'].dataset.count, '1', 'equivalent Twitch offers stay on the same item');
+      const after = runtime.created.length;
+      runtime.send(structuredClone(state));
+      assert.equal(runtime.created.length, after, 'unchanged polling does not reload the same image');
+      previousPayment = payment;
+    }
+    runtime.dispose();
+  }
+});
+
+test('a failed Community Gift image falls back once and the next observed image replaces it', async () => {
+  const runtime = await boot();
+  const state = { rules: [rule({ giftId: '7001' })], communityGift: { giftId: '7001', name: 'Comunidad',
+    imagePath: 'https://gift.test/first.png', placeholderImagePath: '/assets/creator-tools/gifts/images/0.webp' } };
+  runtime.send(state);
+  const img = runtime.created.find(node => node.tagName === 'img' && node.src === state.communityGift.imagePath);
+  assert.equal(img.referrerPolicy, 'no-referrer');
+  img.onerror();
+  assert.equal(img.src, state.communityGift.placeholderImagePath);
+  assert.equal(img.onerror, null, 'a missing fallback cannot trigger an image retry loop');
+  runtime.send({ ...state, communityGift: { ...state.communityGift, imagePath: 'https://gift.test/next.png' } });
+  assert.ok(runtime.created.some(node => node.tagName === 'img' && node.src === 'https://gift.test/next.png'));
+});
+
+test('standalone OBS source refreshes successive observed Community Gifts without refetching the static catalog', async () => {
+  const runtime = await boot('');
+  for (const giftId of ['7001', '7002']) {
+    const imagePath = `https://gift.test/community-${giftId}.png`;
+    const before = runtime.created.length;
+    runtime.setState({ engineActive: true, rules: [rule({ giftId })],
+      communityGift: { giftId, name: `Comunidad ${giftId}`, imagePath, placeholderImagePath: '/assets/creator-tools/gifts/images/0.webp' } });
+    await runtime.poll();
+    assert.ok(runtime.created.slice(before).some(node => node.tagName === 'img' && node.src === imagePath));
+  }
+  assert.equal(runtime.fetched.filter(url => url.includes('catalog.json')).length, 1);
+  runtime.dispose();
+});
+
 test('every template and layout shows only exchange artwork plus its value while keeping platform accessibility', async () => {
   const runtime = await boot();
   const rules = [rule(), rule({ platform: 'twitch', eventType: 'currency', every: 125 }),
@@ -313,6 +380,52 @@ test('live card appearance updates its background controls without changing grou
     assert.equal(card.children[0].children[0].children[0].children[0].src, artwork.effect_0.imagePath);
     if (grainPosition) assert.equal(card.style['--card-grain-position'], grainPosition, 'texture stays static when intensity changes');
     grainPosition = card.style['--card-grain-position'];
+  }
+});
+
+test('paper cards use readable stock ink and retain custom colors, alpha and floating typography', async () => {
+  const runtime = await boot();
+  const root = runtime.nodes['interactions-overlay'];
+  for (const [paper, text, expected] of [['#f8e5be', '#ffffff', '#321c10'],
+    ['#10203080', '#ffffff', '#ffffff'], ['#f8e5be', '#67245580', '#67245580'],
+    ['#f8e5be', '#ffffffff', '#ffffffff'], ['#f8e5be', '#fff4dcff', '#fff4dcff'],
+    ['#f8e5be', '#ffffff00', '#ffffff00']]) {
+    runtime.send({ rules: [rule()], presentation: { interactionsTemplate: 'cards', interactionsCardColor: paper, textColor: text } });
+    assert.equal(root.style['--card-ink'], expected);
+    assert.equal(root.style['--ink'], text, 'floating ink is not replaced by the print color');
+    assert.equal(root.style['--paper'], paper);
+  }
+  for (const template of ['cards', 'floating']) {
+    runtime.send({ rules: [rule(), rule({ platform: 'twitch', eventType: 'currency' })], presentation: { interactionsTemplate: template } });
+    const card = runtime.nodes['interactions-content'].children[0].children[0].children[0];
+    assert.equal(card.style['--currency'], template === 'cards' ? '58px' : '46px');
+    assert.equal(card.style['--value-size'], template === 'cards' ? '55px' : '27px');
+  }
+});
+
+test('item outlines validate colors and thickness and remain independent from card styling in both templates', async () => {
+  for (const prefix of ['interactionsImageOutline', 'interactionsTextOutline']) {
+    assert.equal(model.presentation()[`${prefix}Width`], 0);
+    assert.equal(model.presentation({ [`${prefix}Width`]: 99 })[`${prefix}Width`], 8);
+    assert.equal(model.presentation({ [`${prefix}Width`]: -5 })[`${prefix}Width`], 0);
+    assert.equal(model.presentation({ [`${prefix}Width`]: 'bad' })[`${prefix}Width`], 0);
+    assert.equal(model.presentation({ [`${prefix}Color`]: 'url(evil)' })[`${prefix}Color`], '#000000');
+  }
+  const runtime = await boot();
+  for (const interactionsTemplate of ['cards', 'floating']) for (const width of [4, 0, 8]) {
+    runtime.send({ rules: [rule({ quantity: 2 })], presentation: { interactionsTemplate,
+      interactionsImageOutlineWidth: width, interactionsImageOutlineColor: '#fafafa80',
+      interactionsTextOutlineWidth: 2, interactionsTextOutlineColor: '#12ab3400',
+      interactionsCardColor: '#10203080', interactionsCardNoise: 37 } });
+    const root = runtime.nodes['interactions-overlay'];
+    assert.equal(runtime.nodes['interaction-image-outline-radius'].attributes.radius, String(width));
+    assert.equal(runtime.nodes['interaction-image-outline-ink'].attributes['flood-color'], '#fafafa');
+    assert.equal(Number(runtime.nodes['interaction-image-outline-ink'].attributes['flood-opacity']), 128 / 255);
+    assert.equal(root.style['--item-image-outline'], width > 0 ? 'url("#interaction-image-outline")' : 'opacity(1)');
+    assert.equal(root.style['--item-text-outline-width'], '2px');
+    assert.equal(root.style['--item-text-outline-color'], '#12ab3400');
+    assert.equal(root.style['--paper'], '#10203080');
+    assert.equal(root.style['--card-noise'], '0.37');
   }
 });
 
@@ -430,7 +543,32 @@ test('standalone OBS mode reads saved profile and real rules then refreshes pric
   assert.equal(runtime.nodes['interactions-overlay'].dataset.count, '1');
   runtime.setState({ rules: [rule({ every: 23 })] }); await runtime.poll();
   assert.ok(runtime.created.some(node => node.className === 'interaction-cost' && node.textContent === '23'));
+  runtime.setState({ engineActive: false, rules: [rule({ every: 23 })] }); await runtime.poll(); runtime.finishExit();
+  assert.equal(runtime.nodes['interactions-overlay'].hidden, true, 'standalone source hides when Interactions is disabled');
+  runtime.setState({ engineActive: true, rules: [rule({ every: 23 })] }); await runtime.poll();
+  assert.equal(runtime.nodes['interactions-overlay'].hidden, false, 'standalone source reappears when Interactions is enabled');
   runtime.dispose(); assert.equal(runtime.listeners.resize, undefined);
+});
+
+test('live interaction overlays require an active engine with either battle visibility setting', async () => {
+  const runtime = await boot();
+  const root = runtime.nodes['interactions-overlay'];
+  for (const template of ['cards', 'floating']) for (const layout of ['pages', 'strip']) {
+    const state = { rules: [rule()], presentation: { interactionsTemplate: template, interactionsLayout: layout, motion: false } };
+    for (const interactionsBattleOnly of [true, false]) for (const battleActive of [true, false]) {
+      for (const engineActive of [true, false, true, undefined, 'true']) {
+        runtime.send({ ...state, interactionsBattleOnly, battleActive, engineActive });
+        assert.equal(root.hidden, !(engineActive === true && (!interactionsBattleOnly || battleActive)),
+          JSON.stringify({ template, layout, interactionsBattleOnly, battleActive, engineActive }));
+      }
+    }
+    for (const previewFlag of ['preview', 'battlePreview']) {
+      runtime.send({ ...state, engineActive: false, interactionsBattleOnly: true, battleActive: false, [previewFlag]: true });
+      assert.equal(root.hidden, false, 'explicit previews remain available with the engine disabled');
+    }
+    runtime.send({ ...state, engineActive: false, preview: true, rules: [] });
+    assert.equal(root.hidden, true, 'previews still need configured offers');
+  }
 });
 
 test('battle visibility animates exits, cancels stale exits and permits explicit previews', async () => {

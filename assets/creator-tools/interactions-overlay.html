@@ -4,9 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Interacciones — La Pichi Ruleta</title>
-  <link rel="stylesheet" href="/assets/creator-tools/interactions-overlay.css?v=interactions-8">
+  <link rel="stylesheet" href="/assets/creator-tools/interactions-overlay.css?v=interactions-11">
 </head>
 <body>
+  <svg class="interaction-outline-definitions" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="interaction-image-outline" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+        <feMorphology id="interaction-image-outline-radius" in="SourceAlpha" operator="dilate" radius="0" result="expanded" />
+        <feComposite in="expanded" in2="SourceAlpha" operator="out" result="ring" />
+        <feFlood id="interaction-image-outline-ink" flood-color="#000000" result="ink" />
+        <feComposite in="ink" in2="ring" operator="in" result="outline" />
+        <feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+    </defs>
+  </svg>
   <main id="interactions-overlay" hidden aria-label="Canjes de interacciones">
     <div id="interactions-scene">
       <div id="interactions-viewport"><div id="interactions-content"></div></div>
@@ -14,7 +25,7 @@
   </main>
   <script src="/assets/creator-tools/overlay-interactions.js"></script>
   <script src="/assets/creator-tools/overlay-text-style.js"></script>
-  <script src="/assets/creator-tools/interactions-overlay.model.js?v=interactions-8"></script>
-  <script src="/assets/creator-tools/interactions-overlay.js?v=interactions-8"></script>
+  <script src="/assets/creator-tools/interactions-overlay.model.js?v=interactions-12"></script>
+  <script src="/assets/creator-tools/interactions-overlay.js?v=interactions-12"></script>
 </body>
 </html>

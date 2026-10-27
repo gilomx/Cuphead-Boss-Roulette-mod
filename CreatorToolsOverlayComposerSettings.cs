@@ -50,6 +50,10 @@ namespace Gilomx.CupheadBossRoulette
         internal bool InteractionsAdaptive = true;
         internal string InteractionsCardColor = CreatorToolsOverlayComposerSettings.DefaultInteractionsCardColor;
         internal int InteractionsCardNoise = 18;
+        internal string InteractionsImageOutlineColor = "#000000";
+        internal int InteractionsImageOutlineWidth;
+        internal string InteractionsTextOutlineColor = "#000000";
+        internal int InteractionsTextOutlineWidth;
 
         internal CreatorToolsOverlayComposerComponent Clone()
         {
@@ -100,7 +104,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string ChatChoosesComponentId = "chat_chooses";
         internal const string RouletteComponentId = "roulette";
         internal const string InteractionsComponentId = "interactions";
-        internal const string DefaultInteractionsCardColor = "#23262bee";
+        internal const string DefaultInteractionsCardColor = "#f8e5be";
         internal const string DefaultLiquidColor = "#ff4f92";
         internal const string DefaultCollectingColor = "#f4c95d";
         internal const string DefaultTextColor = "#ffffff";
@@ -524,6 +528,12 @@ namespace Gilomx.CupheadBossRoulette
                 var cardColor = NormalizeColor(component.InteractionsCardColor);
                 component.InteractionsCardColor = cardColor.Length == 0 ? DefaultInteractionsCardColor : cardColor;
                 component.InteractionsCardNoise = Math.Max(0, Math.Min(100, component.InteractionsCardNoise));
+                var imageOutline = NormalizeColor(component.InteractionsImageOutlineColor);
+                component.InteractionsImageOutlineColor = imageOutline.Length == 0 ? "#000000" : imageOutline;
+                var textOutline = NormalizeColor(component.InteractionsTextOutlineColor);
+                component.InteractionsTextOutlineColor = textOutline.Length == 0 ? "#000000" : textOutline;
+                component.InteractionsImageOutlineWidth = Math.Max(0, Math.Min(8, component.InteractionsImageOutlineWidth));
+                component.InteractionsTextOutlineWidth = Math.Max(0, Math.Min(8, component.InteractionsTextOutlineWidth));
             }
         }
 
@@ -626,7 +636,11 @@ namespace Gilomx.CupheadBossRoulette
                         .Append(",\"interactionsSize\":").Append(component.InteractionsSize)
                         .Append(",\"interactionsAdaptive\":").Append(component.InteractionsAdaptive ? "true" : "false")
                         .Append(",\"interactionsCardColor\":\"").Append(component.InteractionsCardColor)
-                        .Append("\",\"interactionsCardNoise\":").Append(component.InteractionsCardNoise);
+                        .Append("\",\"interactionsCardNoise\":").Append(component.InteractionsCardNoise)
+                        .Append(",\"interactionsImageOutlineColor\":\"").Append(component.InteractionsImageOutlineColor)
+                        .Append("\",\"interactionsImageOutlineWidth\":").Append(component.InteractionsImageOutlineWidth)
+                        .Append(",\"interactionsTextOutlineColor\":\"").Append(component.InteractionsTextOutlineColor)
+                        .Append("\",\"interactionsTextOutlineWidth\":").Append(component.InteractionsTextOutlineWidth);
                 builder.Append('}');
             }
             builder.Append("]}");
@@ -724,7 +738,7 @@ namespace Gilomx.CupheadBossRoulette
                 InteractionsLayout = "strip", InteractionsTikTok = !vertical,
                 InteractionsTwitch = true, InteractionsYouTube = true,
                 InteractionsSpeed = vertical ? 80 : 40, InteractionsSize = vertical ? 96 : 0,
-                InteractionsCardColor = vertical ? "#662effa6" : DefaultInteractionsCardColor,
+                InteractionsCardColor = DefaultInteractionsCardColor,
                 InteractionsCardNoise = vertical ? 80 : 18
             });
             return profile;
@@ -781,6 +795,10 @@ namespace Gilomx.CupheadBossRoulette
             destination.InteractionsAdaptive = source.InteractionsAdaptive;
             destination.InteractionsCardColor = source.InteractionsCardColor;
             destination.InteractionsCardNoise = source.InteractionsCardNoise;
+            destination.InteractionsImageOutlineColor = source.InteractionsImageOutlineColor;
+            destination.InteractionsImageOutlineWidth = source.InteractionsImageOutlineWidth;
+            destination.InteractionsTextOutlineColor = source.InteractionsTextOutlineColor;
+            destination.InteractionsTextOutlineWidth = source.InteractionsTextOutlineWidth;
         }
 
         private static double ComponentFitScale(
@@ -1149,6 +1167,22 @@ namespace Gilomx.CupheadBossRoulette
                 int noise;
                 if (!node.TryInteger("interactionsCardNoise", out noise) || noise < 0 || noise > 100) return false;
                 component.InteractionsCardNoise = noise;
+            }
+            foreach (var key in new[] { "interactionsImageOutlineColor", "interactionsTextOutlineColor" })
+            {
+                if (node.Property(key) == null) continue;
+                var color = NormalizeColor(node.String(key));
+                if (color.Length == 0) return false;
+                if (key == "interactionsImageOutlineColor") component.InteractionsImageOutlineColor = color;
+                else component.InteractionsTextOutlineColor = color;
+            }
+            foreach (var key in new[] { "interactionsImageOutlineWidth", "interactionsTextOutlineWidth" })
+            {
+                if (node.Property(key) == null) continue;
+                int width;
+                if (!node.TryInteger(key, out width) || width < 0 || width > 8) return false;
+                if (key == "interactionsImageOutlineWidth") component.InteractionsImageOutlineWidth = width;
+                else component.InteractionsTextOutlineWidth = width;
             }
             return true;
         }

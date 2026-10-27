@@ -6,6 +6,8 @@
   const scene = document.getElementById('interactions-scene');
   const viewport = document.getElementById('interactions-viewport');
   const content = document.getElementById('interactions-content');
+  const imageOutlineRadius = document.getElementById('interaction-image-outline-radius');
+  const imageOutlineInk = document.getElementById('interaction-image-outline-ink');
   const query = new URLSearchParams(location.search);
   const embedded = query.get('mode') === 'embedded' || query.get('embedded') === '1';
   const profileId = query.get('profile') === 'vertical' ? 'vertical' : 'horizontal';
@@ -135,12 +137,43 @@
     const denomination = offer.giftName || labels[locale][offer.eventType];
     node.setAttribute('aria-label', `${platformNames[offer.platform]}: ${offer.every} ${denomination}${offer.rewardName ? ` · ${offer.rewardName}` : ''}`);
     const icon = element('span', 'interaction-currency');
-    if (offer.image) icon.append(image(offer.image));
+    if (offer.image) {
+      const artwork = image(offer.image);
+      if (offer.fallbackImage && offer.fallbackImage !== offer.image) {
+        artwork.referrerPolicy = 'no-referrer';
+        artwork.onerror = () => {
+          artwork.onerror = null;
+          artwork.src = offer.fallbackImage;
+        };
+      }
+      icon.append(artwork);
+    }
     else if (offer.platform === 'twitch' && offer.eventType === 'currency') icon.append(image('/assets/creator-tools/twitch/bits.png'));
     else if (offer.eventType === 'jewels') icon.append(image('/assets/creator-tools/youtube/jewels.png'));
     else icon.append(svgIcon(paths[offer.eventType] || paths.gift));
     node.append(icon, element('span', 'interaction-cost', String(offer.every)));
     return node;
+  }
+  function cardFrame() {
+    const frame = document.createElementNS(SVG, 'svg');
+    frame.setAttribute('class', 'interaction-card-frame');
+    frame.setAttribute('viewBox', '0 0 360 180');
+    frame.setAttribute('preserveAspectRatio', 'none');
+    frame.setAttribute('aria-hidden', 'true');
+    const addPath = (d, className, transform) => {
+      const path = document.createElementNS(SVG, 'path');
+      path.setAttribute('d', d); path.setAttribute('class', className);
+      if (transform) path.setAttribute('transform', transform);
+      frame.append(path);
+    };
+    addPath('M31 4 Q13 4 7 20 Q3 29 4 43 L4 140 Q3 170 31 175 L165 175 Q180 185 195 175 L330 175 Q356 171 356 146 L356 36 Q355 7 329 4 Z', 'interaction-card-paper');
+    addPath('M194 168 L327 168 Q349 167 349 145 L349 34 Q349 12 328 11 L32 11 Q12 11 11 33 L11 146 Q11 167 33 168 L166 168', 'interaction-card-rule');
+    const flourish = 'M21 19 C15 21 14 27 17 31 C21 31 22 25 21 19 Z M24 18 C25 24 29 26 32 25 C33 21 29 18 24 18 Z M19 34 C14 34 13 39 16 42 C20 41 21 37 19 34 Z';
+    for (const transform of ['', 'translate(360 0) scale(-1 1)', 'translate(0 180) scale(1 -1)', 'translate(360 180) scale(-1 -1)']) {
+      addPath(flourish, 'interaction-card-ornament', transform);
+    }
+    addPath('M179 174 C174 168 174 157 179 156 C184 158 183 167 181 174 Z M175 174 C168 173 163 166 166 163 C171 161 175 168 175 174 Z M185 174 C186 167 192 161 195 165 C197 170 191 173 185 174 Z M171 176 C166 172 159 172 159 175 C161 179 168 178 171 176 Z M189 176 C193 172 200 172 201 175 C199 179 192 178 189 176 Z', 'interaction-card-ornament');
+    return frame;
   }
   function card(item, measure = true) {
     const node = element('article', 'interaction-item');
@@ -152,9 +185,10 @@
     const payments = element('div', 'interaction-payments');
     const size = model.paymentSize(item.offers.length, view.interactionsAdaptive, view.interactionsTemplate);
     node.style.setProperty('--currency', `${size}px`);
-    node.style.setProperty('--value-size', `${Math.round(size * .58)}px`);
+    node.style.setProperty('--value-size', `${Math.round(size * (view.interactionsTemplate === 'cards' ? .94 : .58))}px`);
     for (const offer of item.offers) payments.append(payment(offer));
     node.append(effect(item), payments);
+    if (view.interactionsTemplate === 'cards') node.append(cardFrame());
     if (measure) measuredCards.push(node);
     return node;
   }
@@ -267,8 +301,10 @@
     document.title = `${labels[locale].title} — La Pichi Ruleta`;
     const normalized = model.presentation(state.presentation);
     const nextItems = model.items(state, normalized, catalog, artwork, locale);
+    const preview = state.preview === true || state.battlePreview === true;
     const visible = (state.preview === true || (state.visible !== false && state.enabled !== false && state.active !== false)) && nextItems.length > 0 &&
-      (state.preview === true || state.battlePreview === true || state.interactionsBattleOnly !== true || state.battleActive === true);
+      (preview || state.engineActive === true) &&
+      (preview || state.interactionsBattleOnly !== true || state.battleActive === true);
     const signature = JSON.stringify([visible, normalized, nextItems, locale]);
     if (signature === lastSignature) return;
     const previousKey = allPages[page]?.[0]?.key;
@@ -283,7 +319,21 @@
     root.dataset.count = String(allItems.length);
     root.style.setProperty('--ink', view.textColor);
     root.style.setProperty('--paper', view.interactionsCardColor);
+    // The stock white overlay ink becomes brown print on light paper. Explicit
+    // custom inks and dark card backgrounds retain the designer's colors.
+    const paper = view.interactionsCardColor.slice(1, 7);
+    const lightPaper = .299 * parseInt(paper.slice(0, 2), 16) + .587 * parseInt(paper.slice(2, 4), 16) + .114 * parseInt(paper.slice(4, 6), 16) > 160;
+    const stockInk = ['#ffffff', '#fff4dc'].includes(view.textColor.toLowerCase());
+    root.style.setProperty('--card-ink', stockInk && lightPaper ? '#321c10' : view.textColor);
+    root.style.setProperty('--card-font-family', view.textFont === 'clean' ? 'Impact, "Arial Narrow", sans-serif' : 'var(--overlay-font-family)');
     root.style.setProperty('--card-noise', String(view.interactionsCardNoise / 100));
+    const imageOutlineColor = view.interactionsImageOutlineColor;
+    imageOutlineRadius.setAttribute('radius', String(view.interactionsImageOutlineWidth));
+    imageOutlineInk.setAttribute('flood-color', imageOutlineColor.slice(0, 7));
+    imageOutlineInk.setAttribute('flood-opacity', String(imageOutlineColor.length === 9 ? parseInt(imageOutlineColor.slice(7), 16) / 255 : 1));
+    root.style.setProperty('--item-image-outline', view.interactionsImageOutlineWidth > 0 ? 'url("#interaction-image-outline")' : 'opacity(1)');
+    root.style.setProperty('--item-text-outline-width', `${view.interactionsTextOutlineWidth}px`);
+    root.style.setProperty('--item-text-outline-color', view.interactionsTextOutlineColor);
     window.CreatorToolsOverlayText?.apply(root, view);
     allPages = model.pages(allItems);
     const retainedPage = previousKey ? allPages.findIndex(entries => entries.some(entry => entry.key === previousKey)) : -1;

@@ -159,6 +159,8 @@
           interactionsAdaptive: true,
           interactionsCardColor: vertical ? "#662effa6" : "#23262bee",
           interactionsCardNoise: vertical ? 80 : 18,
+          interactionsImageOutlineColor: "#000000", interactionsImageOutlineWidth: 0,
+          interactionsTextOutlineColor: "#000000", interactionsTextOutlineWidth: 0,
         } : {}),
       })),
     };
@@ -246,6 +248,10 @@
       interactionsAdaptive: component.interactionsAdaptive !== false,
       interactionsCardColor: normalizeHexColor(component.interactionsCardColor, "#23262bee"),
       interactionsCardNoise: Math.round(clamp(finiteNumber(component.interactionsCardNoise, 18), 0, 100)),
+      interactionsImageOutlineColor: normalizeHexColor(component.interactionsImageOutlineColor, "#000000"),
+      interactionsImageOutlineWidth: Math.round(clamp(finiteNumber(component.interactionsImageOutlineWidth, 0), 0, 8)),
+      interactionsTextOutlineColor: normalizeHexColor(component.interactionsTextOutlineColor, "#000000"),
+      interactionsTextOutlineWidth: Math.round(clamp(finiteNumber(component.interactionsTextOutlineWidth, 0), 0, 8)),
     };
   }
 

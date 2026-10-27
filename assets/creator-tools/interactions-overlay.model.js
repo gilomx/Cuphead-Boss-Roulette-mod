@@ -21,8 +21,14 @@
       interactionsPageSeconds: Math.round(number(source.interactionsPageSeconds, 8, 3, 60)),
       interactionsSpeed: number(source.interactionsSpeed, 40, 40, 140),
       interactionsCardColor: /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(source.interactionsCardColor || '')
-        ? source.interactionsCardColor : '#23262bee',
+        ? source.interactionsCardColor : '#f8e5be',
       interactionsCardNoise: Math.round(number(source.interactionsCardNoise ?? 18, 18, 0, 100)),
+      interactionsImageOutlineColor: /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(source.interactionsImageOutlineColor || '')
+        ? source.interactionsImageOutlineColor : '#000000',
+      interactionsImageOutlineWidth: Math.round(number(source.interactionsImageOutlineWidth ?? 0, 0, 0, 8)),
+      interactionsTextOutlineColor: /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(source.interactionsTextOutlineColor || '')
+        ? source.interactionsTextOutlineColor : '#000000',
+      interactionsTextOutlineWidth: Math.round(number(source.interactionsTextOutlineWidth ?? 0, 0, 0, 8)),
       interactionsSize: Number(source.interactionsSize) > 0 ? Math.round(number(source.interactionsSize, 75, 25, 100)) : 0,
       interactionsAdaptive: source.interactionsAdaptive !== false,
       // Older scenes may still request labels. This overlay is always image + cost.
@@ -59,8 +65,18 @@
       if (path && /^\d+$/.test(String(gift?.giftId))) map.set(String(gift.giftId), { name: String(gift.name || ''), image: path });
     }
     if (communityGift && /^\d+$/.test(String(communityGift.giftId))) {
-      const image = localImage(communityGift.imagePath, 'gift') || localImage(communityGift.placeholderImagePath, 'gift');
-      if (image) map.set(String(communityGift.giftId), { name: String(communityGift.name || ''), image });
+      // This metadata comes from the server's observed Community Gift state.
+      // Ordinary catalog entries and rules still cannot supply remote images.
+      const fallbackImage = localImage(communityGift.placeholderImagePath, 'gift') || '/assets/creator-tools/gifts/images/0.webp';
+      let image = localImage(communityGift.imagePath, 'gift');
+      if (!image) {
+        const remote = String(communityGift.imagePath || '').trim();
+        try {
+          const url = new URL(remote);
+          if (remote.length <= 2048 && url.protocol === 'https:' && !url.username && !url.password) image = remote;
+        } catch { /* Invalid observed image metadata uses the local placeholder. */ }
+      }
+      map.set(String(communityGift.giftId), { name: String(communityGift.name || ''), image: image || fallbackImage, fallbackImage });
     }
     return map;
   }
@@ -84,6 +100,7 @@
         eventType: rule.eventType,
         every: number(rule.every, 1, 1, 1000000),
         image: gift?.image || '',
+        fallbackImage: gift?.fallbackImage || '',
         giftName: gift?.name || String(rule.giftName || ''),
         rewardName: rule.eventType === 'redemption' ? String(rule.rewardName || '').slice(0, 64) : '',
       };
@@ -101,7 +118,8 @@
     }
     return Array.from(grouped.values());
   }
-  function paymentSize(count, adaptive = true) {
+  function paymentSize(count, adaptive = true, template = 'floating') {
+    if (template === 'cards') return !adaptive ? 44 : count <= 1 ? 78 : count === 2 ? 58 : count === 3 ? 42 : 34;
     const size = !adaptive ? 34 : count <= 1 ? 62 : count === 2 ? 46 : count === 3 ? 34 : 28;
     return size;
   }
