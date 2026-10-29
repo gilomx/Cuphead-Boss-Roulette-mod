@@ -1,5 +1,4 @@
 import type { StreamRule, StreamRuleDraft, StreamRulePlatform, StreamRuleTrigger, TikTokGift } from "../../model";
-import { interactionItems } from "./interactionCatalog";
 
 export const platformTriggers: Record<StreamRulePlatform, StreamRuleTrigger[]> = {
   tiktok: ["gift", "like", "follow"],
@@ -16,7 +15,7 @@ export function createStreamRuleDraft(gift?: TikTokGift, platform: StreamRulePla
     eventType: platformTriggers[platform][0],
     giftId: platform === "tiktok" ? gift?.giftId ?? "" : "",
     every: platform === "youtube" ? 100 : 1,
-    interaction: interactionItems.find((item) => item.category === "attack")!.id,
+    interaction: "",
     durationSeconds: 15,
     countdownSeconds: 3,
     quantity: 1,

@@ -10,11 +10,6 @@
   align-items: end;
 }
 
-.stream-rule-group-form .searchable-select-menu {
-  top: calc(100% + 0.35rem);
-  bottom: auto;
-}
-
 .stream-rule-group-form__values,
 .stream-rule-group-form__cooldowns {
   display: grid;

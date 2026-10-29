@@ -1,15 +1,25 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 type SearchableSelectKey = string | number;
+
+interface MenuPosition {
+  left: number;
+  top: number;
+  width: number;
+  maxHeight: number;
+  above: boolean;
+}
 
 interface SearchableSelectFieldProps<T> {
   id: string;
@@ -64,9 +74,11 @@ export function SearchableSelectField<T>({
   const reactId = useId().replace(/:/g, "");
   const listboxId = `${id}-${reactId}-listbox`;
   const rootRef = useRef<HTMLDivElement>(null);
+  const controlRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<SearchableSelectKey | null>(null);
   const selected = options.find((option) => getKey(option) === selectedKey);
@@ -84,15 +96,95 @@ export function SearchableSelectField<T>({
 
   useEffect(() => {
     if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+    const closeOutside = (event: Event) => {
+      if (!rootRef.current?.contains(event.target as Node) &&
+          !menuRef.current?.contains(event.target as Node)) {
         setOpen(false);
         setQuery("");
         setActiveKey(null);
       }
     };
     document.addEventListener("pointerdown", closeOutside);
-    return () => document.removeEventListener("pointerdown", closeOutside);
+    document.addEventListener("focusin", closeOutside);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("focusin", closeOutside);
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return;
+    }
+    const control = controlRef.current;
+    const menu = menuRef.current;
+    if (!control || !menu) return;
+
+    // Measure the CSS limit before applying the available viewport height.
+    const menuStyle = window.getComputedStyle(menu);
+    const preferredMaxHeight = Number.parseFloat(menuStyle.maxHeight);
+    const borderHeight = Number.parseFloat(menuStyle.borderTopWidth) +
+      Number.parseFloat(menuStyle.borderBottomWidth);
+    let frame = 0;
+    const updatePosition = () => {
+      const anchor = control.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportWidth = viewport?.width ?? document.documentElement.clientWidth;
+      const viewportHeight = viewport?.height ?? document.documentElement.clientHeight;
+      if (anchor.bottom <= viewportTop || anchor.top >= viewportTop + viewportHeight ||
+          anchor.right <= viewportLeft || anchor.left >= viewportLeft + viewportWidth) {
+        setOpen(false);
+        setQuery("");
+        setActiveKey(null);
+        return;
+      }
+      const margin = 8;
+      const gap = 6;
+      const below = Math.max(0, viewportTop + viewportHeight - anchor.bottom - gap - margin);
+      const above = Math.max(0, anchor.top - viewportTop - gap - margin);
+      const preferredHeight = Math.min(preferredMaxHeight, menu.scrollHeight + borderHeight);
+      const opensAbove = below < preferredHeight && above > below;
+      const width = Math.min(anchor.width, Math.max(0, viewportWidth - margin * 2));
+      const next: MenuPosition = {
+        left: Math.max(viewportLeft + margin,
+          Math.min(anchor.left, viewportLeft + viewportWidth - margin - width)),
+        top: opensAbove ? anchor.top - gap : anchor.bottom + gap,
+        width,
+        maxHeight: Math.min(preferredMaxHeight, opensAbove ? above : below),
+        above: opensAbove,
+      };
+      setMenuPosition(current => current &&
+        current.left === next.left && current.top === next.top &&
+        current.width === next.width && current.maxHeight === next.maxHeight &&
+        current.above === next.above ? current : next);
+    };
+    const schedulePosition = (event?: Event) => {
+      // Scrolling the options must not move the menu or the surrounding page.
+      if (event?.target instanceof Node && menu.contains(event.target)) return;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(updatePosition);
+    };
+    updatePosition();
+    const observer = new ResizeObserver(() => schedulePosition());
+    observer.observe(control);
+    observer.observe(menu);
+    window.addEventListener("scroll", schedulePosition, true);
+    window.addEventListener("resize", schedulePosition);
+    window.addEventListener("animationend", schedulePosition, true);
+    window.visualViewport?.addEventListener("resize", schedulePosition);
+    window.visualViewport?.addEventListener("scroll", schedulePosition);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedulePosition, true);
+      window.removeEventListener("resize", schedulePosition);
+      window.removeEventListener("animationend", schedulePosition, true);
+      window.visualViewport?.removeEventListener("resize", schedulePosition);
+      window.visualViewport?.removeEventListener("scroll", schedulePosition);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -130,7 +222,7 @@ export function SearchableSelectField<T>({
     } else if (optionBottom > viewportBottom) {
       menu.scrollTop = optionBottom - menu.clientHeight;
     }
-  }, [activeIndex, open]);
+  }, [activeIndex, open, menuPosition?.maxHeight]);
 
   const openList = () => {
     if (disabled) return;
@@ -222,7 +314,7 @@ export function SearchableSelectField<T>({
   return (
     <div className="searchable-select-field" ref={rootRef}>
       <label htmlFor={id}>{label}</label>
-      <div className="searchable-select-control" data-open={open} data-disabled={disabled}>
+      <div ref={controlRef} className="searchable-select-control" data-open={open} data-disabled={disabled}>
         {selectedIcon ? <span className="searchable-select-icon" aria-hidden="true">{selectedIcon}</span> : null}
         {selectedImage ? (
           <img
@@ -270,13 +362,20 @@ export function SearchableSelectField<T>({
         <ChevronDown className="searchable-select-control__chevron" aria-hidden="true" />
       </div>
 
-      {open ? (
+      {open ? createPortal(
         <div
           ref={menuRef}
           className="searchable-select-menu"
           id={listboxId}
           role="listbox"
           aria-label={label}
+          style={menuPosition ? {
+            left: menuPosition.left,
+            top: menuPosition.top,
+            width: menuPosition.width,
+            maxHeight: menuPosition.maxHeight,
+            transform: menuPosition.above ? "translateY(-100%)" : undefined,
+          } : { visibility: "hidden" }}
         >
           {filteredOptions.length === 0 ? (
             <p className="searchable-select-menu__empty" role="status">{noResults}</p>
@@ -326,7 +425,8 @@ export function SearchableSelectField<T>({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

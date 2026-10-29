@@ -61,7 +61,7 @@ test("shared settings must match exactly, with legacy duration/countdown default
   assert.deepEqual(groupStreamRules([]), []);
 });
 
-test("new groups start with one useful network value and editing keeps independent row state", () => {
+test("new groups require an interaction selection and editing keeps the saved selection and row state", () => {
   for (const [platform, eventType, every] of [["tiktok", "gift", 1], ["twitch", "currency", 100], ["youtube", "jewels", 100]]) {
     const draft = createStreamRuleGroupDraft(gift, platform);
     assert.equal(draft.values.length, 1);
@@ -69,10 +69,15 @@ test("new groups start with one useful network value and editing keeps independe
     assert.equal(draft.values[0].eventType, eventType);
     assert.equal(draft.values[0].every, every);
     assert.equal(draft.values[0].enabled, true);
+    assert.equal(draft.interaction, "");
+    assert.equal(validStreamRuleGroupDraft(draft, [gift], limits), false);
+    draft.interaction = "help_extra_life";
     assert.equal(validStreamRuleGroupDraft(draft, [gift], limits), true);
   }
   const original = groupStreamRules([rule(1, "tiktok"), rule(2, "twitch", { enabled: false })])[0];
   const draft = draftForStreamRuleGroup(original);
+  assert.equal(draft.interaction, original.interaction);
+  assert.equal(validStreamRuleGroupDraft(draft, [gift], limits), true);
   draft.values[1].enabled = true;
   draft.values[0].every = 17;
   draft.ruleIds.pop();
@@ -86,7 +91,8 @@ test("draft dirty tracking ignores revision metadata but detects row and shared 
   const copy = structuredClone(initial);
   copy.expectedRevision = 99;
   assert.equal(sameStreamRuleGroupDraft(initial, copy), true);
-  for (const change of [draft => { draft.quantity = 2; }, draft => { draft.values[0].enabled = false; },
+  for (const change of [draft => { draft.interaction = "help_extra_life"; },
+    draft => { draft.quantity = 2; }, draft => { draft.values[0].enabled = false; },
     draft => { draft.values[0].every = 5; }, draft => { draft.values.push(createStreamRuleValueDraft(gift, "twitch")); },
     draft => { draft.ruleIds.push(7); }, draft => { draft.countdownSeconds = 0; }]) {
     const changed = structuredClone(initial);
@@ -99,6 +105,7 @@ test("draft dirty tracking ignores revision metadata but detects row and shared 
 
 test("group validation checks every network, capacity, identities and shared settings before saving", () => {
   const draft = createStreamRuleGroupDraft(gift);
+  draft.interaction = "help_extra_life";
   draft.values.push(createStreamRuleValueDraft(gift, "twitch"), createStreamRuleValueDraft(gift, "youtube"));
   assert.equal(validStreamRuleGroupDraft(draft, [gift], limits), true);
   assert.equal(validStreamRuleGroupDraft(draft, [gift], { ...limits, maxValues: 2 }), false);
@@ -106,6 +113,7 @@ test("group validation checks every network, capacity, identities and shared set
   disabled.values.forEach(value => { value.enabled = false; });
   assert.equal(validStreamRuleGroupDraft(disabled, [gift], limits), true, "disabling a value does not delete its configured cost");
   for (const change of [
+    value => { value.interaction = ""; },
     value => { value.values[1].platform = "tiktok"; },
     value => { value.values[1].eventType = "jewels"; },
     value => { value.values[0].giftId = "missing"; },

@@ -81,6 +81,9 @@ en `/config` y `/dashboard`. Complementa el README técnico de
   `Nada` usan `assets/creator-tools/empty.png`, el mismo recurso del overlay.
 - El área de forzado conserva espacio inferior equivalente al menú de un select
   para que las últimas listas puedan abrirse sin quedar cortadas.
+- Los selectores con búsqueda dibujan sus listas sobre los paneles para evitar
+  recortes de los contenedores. Se anclan al campo, eligen arriba o abajo según
+  el espacio de la ventana y limitan su altura con desplazamiento interno.
 - Los retos usan los iconos estáticos de `assets/creator-tools/modifiers`,
   compartidos con el Stream Overlay. Pulsarlos cambia su elegibilidad y guarda
   la lista en `Juego/RetosDesactivados` dentro de la configuración de BepInEx.
@@ -388,6 +391,8 @@ resultados puede producir la ruleta.
 - Los IDs recibidos desde el mod son estables; el panel resuelve sus etiquetas.
 - El estado inicial de un control debe ser explícito y venir del mod. En los
   selects de catálogo, el valor predeterminado es la primera opción válida.
+  Al crear una interacción, «Ataque, ayuda o reto» empieza sin selección y
+  requiere elegir una opción antes de guardar. Editar conserva la opción guardada.
 - Los estilos reutilizan los tokens y componentes existentes. Las vistas no
   crean colores, espaciados ni controles paralelos para resolver casos locales.
 - Los cambios visuales compartidos se hacen en el componente o token base.

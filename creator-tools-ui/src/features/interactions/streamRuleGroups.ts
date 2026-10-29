@@ -1,5 +1,5 @@
 import type { StreamRule, StreamRulePlatform, StreamRuleTrigger, TikTokGift } from "../../model";
-import { interactionItemFor, interactionItems } from "./interactionCatalog";
+import { interactionItemFor } from "./interactionCatalog";
 import { platformTriggers } from "./streamRuleDraft";
 
 export interface StreamRuleGroupShared {
@@ -90,7 +90,7 @@ export function createStreamRuleGroupDraft(
 ): StreamRuleGroupDraft {
   return {
     ruleIds: [],
-    interaction: interactionItems.find(item => item.category === "attack")!.id,
+    interaction: "",
     quantity: 1,
     userCooldownSeconds: 0,
     globalCooldownSeconds: 0,

@@ -1110,10 +1110,9 @@ textarea:focus-visible {
 }
 
 .searchable-select-menu {
-  position: absolute;
-  z-index: 50;
-  top: calc(100% + 0.35rem);
-  right: 0;
+  position: fixed;
+  z-index: 1000;
+  top: 0;
   left: 0;
   max-height: 18rem;
   padding: 0.32rem;
@@ -1985,20 +1984,10 @@ textarea:focus-visible {
   letter-spacing: 0.065em;
 }
 
-.stream-rule-form .searchable-select-menu {
-  top: auto;
-  bottom: calc(100% + 0.35rem);
-}
-
 .stream-rule-trigger {
   display: grid;
   align-content: start;
   gap: 0.35rem;
-}
-
-.stream-rule-trigger .searchable-select-menu {
-  top: calc(100% + 0.35rem);
-  bottom: auto;
 }
 
 .stream-rule-form__actions {
@@ -2144,10 +2133,6 @@ textarea:focus-visible {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-}
-
-.interaction-test-form .searchable-select-menu {
-  max-height: 16rem;
 }
 
 .interaction-catalog-note {
