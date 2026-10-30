@@ -32,7 +32,7 @@ al mismo espacio cuadrado, ignorando los márgenes transparentes y conservando s
 proporción. Una imagen ancha o alta nunca agranda la tarjeta ni sale de ese espacio.
 Ninguna plantilla muestra nombres, categorías, títulos ni duración de los retos.
 No hay una opción para activarlos; los ajustes antiguos tampoco los reactivan.
-Los canjes muestran primero el símbolo y después la cantidad; en Iconos flotantes
+Los canjes con icono muestran primero el símbolo y después la cantidad; en Iconos flotantes
 se superponen al borde del efecto. Los iconos flotantes ajustan cada ancho a su
 imagen y precios, con los valores de separación aprobados para cada perfil. Las imágenes estrechas
 reservan menos ancho sin deformarse. Todas las tarjetas comparten ancho y alto,
@@ -62,6 +62,12 @@ configurados. Los nombres de recompensas de Twitch se conservan sólo en las
 etiquetas de accesibilidad, sin texto visible junto al precio. Los regalos usan
 las imágenes reales del catálogo local; Bits usa el Cheermote oficial de Twitch
 y Gemas el recurso de YouTube, sin insignias adicionales con el logotipo de la red.
+En TikTok, los eventos sin regalo muestran texto: **follow**, sin número ni icono,
+y **N taps**, con la cantidad configurada y la palabra «taps» más pequeña.
+Comparten tipografía, tinta, contorno, sombra y altura de fila con los precios de
+regalos. En Iconos flotantes, estas filas dejan el texto fuera de la imagen del
+efecto; los regalos conservan su superposición. Se aplica a tarjetas y flotantes,
+tanto en páginas como en franja, en ambos perfiles.
 Las reglas con distinta cantidad de efectos o distinta duración se
 mantienen separadas aunque compartan la misma imagen.
 

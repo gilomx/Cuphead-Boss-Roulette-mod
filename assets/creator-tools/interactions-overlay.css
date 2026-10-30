@@ -31,10 +31,13 @@ body { pointer-events:none; }
 .interaction-payment[data-platform="tiktok"] .interaction-currency { color:#82f3e9; }
 .interaction-payment[data-platform="youtube"] .interaction-currency { color:#80aafc; }
 .interaction-cost { font-weight:var(--overlay-font-weight,900); font-size:var(--value-size,21px); line-height:1; letter-spacing:-.035em; font-variant-numeric:tabular-nums; text-shadow:var(--overlay-text-shadow,none); padding:var(--item-text-outline-width,0px); }
+.interaction-trigger-label { font-size:.66em; letter-spacing:0; }
 .interaction-cost,.interaction-quantity { -webkit-text-stroke:calc(var(--item-text-outline-width,0px) * 2) var(--item-text-outline-color,#000000); paint-order:stroke fill; }
 #interactions-overlay[data-template="floating"] .interaction-item { isolation:isolate; padding:8px 4px; }
 #interactions-overlay[data-template="floating"] .interaction-art { width:max(44px,calc(var(--effect) * var(--crop-width,1))); }
 #interactions-overlay[data-template="floating"] .interaction-payments { margin-left:var(--floating-payment-offset,-12px); }
+/* Text has no currency artwork to overlap the effect: keep its first letter clear. */
+#interactions-overlay[data-template="floating"] .interaction-payment[data-kind="text"] { padding-left:calc(4px - var(--floating-payment-offset,-12px)); }
 #interactions-overlay[data-template="cards"] .interaction-item {
   --effect:132px; display:grid; grid-template-columns:var(--effect) max-content;
   min-width:304px; min-height:180px; border-radius:27px; padding:24px 27px;

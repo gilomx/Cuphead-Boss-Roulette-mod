@@ -134,8 +134,16 @@
   function payment(offer) {
     const node = element('div', 'interaction-payment');
     node.dataset.platform = offer.platform;
-    const denomination = offer.giftName || labels[locale][offer.eventType];
+    const textTrigger = offer.platform === 'tiktok' && ['like', 'follow'].includes(offer.eventType);
+    const denomination = (!textTrigger && offer.giftName) || labels[locale][offer.eventType];
     node.setAttribute('aria-label', `${platformNames[offer.platform]}: ${offer.every} ${denomination}${offer.rewardName ? ` · ${offer.rewardName}` : ''}`);
+    if (textTrigger) {
+      node.dataset.kind = 'text';
+      const cost = element('span', 'interaction-cost', offer.eventType === 'like' ? String(offer.every) : '');
+      cost.append(element('span', 'interaction-trigger-label', offer.eventType === 'like' ? ' taps' : 'follow'));
+      node.append(cost);
+      return node;
+    }
     const icon = element('span', 'interaction-currency');
     if (offer.image) {
       const artwork = image(offer.image);

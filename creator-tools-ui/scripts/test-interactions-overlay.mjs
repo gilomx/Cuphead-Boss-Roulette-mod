@@ -364,6 +364,54 @@ test('every template and layout shows only exchange artwork plus its value while
   }
 });
 
+test('TikTok taps and follow use text alongside gift and currency artwork in every presentation', async () => {
+  const rules = [rule({ every: 2 }),
+    rule({ eventType: 'like', every: 1, giftName: 'Stale gift name' }),
+    rule({ eventType: 'like', every: 1000000, giftName: 'Stale gift name' }),
+    rule({ eventType: 'follow', every: 1, giftName: 'Stale gift name' }),
+    rule({ platform: 'twitch', eventType: 'currency', every: 125 }),
+    rule({ platform: 'youtube', eventType: 'jewels', every: 400 }),
+    rule({ platform: 'twitch', eventType: 'follow', every: 1 })];
+  const visibleText = node => (node.textContent || '') + node.children.map(visibleText).join('');
+  for (const profile of ['horizontal', 'vertical']) {
+    const runtime = await boot(`?embedded=1&profile=${profile}`);
+    for (const locale of ['es', 'en']) for (const template of ['cards', 'floating']) for (const layout of ['pages', 'strip']) {
+      const before = runtime.created.length;
+      runtime.send({ rules, locale, presentation: { interactionsTemplate: template, interactionsLayout: layout } });
+      const created = runtime.created.slice(before);
+      const payments = created.filter(node => node.className === 'interaction-payment');
+      assert.equal(payments.length, rules.length);
+      assert.equal(runtime.nodes['interactions-overlay'].dataset.count, '1', 'all exchange options remain grouped on one effect');
+      for (const [index, expected] of [[1, '1 taps'], [2, '1000000 taps'], [3, 'follow']]) {
+        const payment = payments[index];
+        assert.equal(payment.dataset.kind, 'text');
+        assert.deepEqual(payment.children.map(node => node.className), ['interaction-cost'], 'text triggers reserve no currency icon slot');
+        assert.equal(visibleText(payment), expected, `${profile}/${locale}/${template}/${layout}`);
+        const unit = payment.children[0].children[0];
+        assert.equal(unit.className, 'interaction-trigger-label', 'trigger wording can share the overlay typography at a smaller size');
+        assert.equal(unit.textContent, index === 3 ? 'follow' : ' taps');
+        assert.ok(!payment.children.some(node => node.className === 'interaction-currency'));
+      }
+      assert.equal(payments[1].attributes['aria-label'], `TikTok: 1 ${locale === 'es' ? 'me gusta' : 'likes'}`);
+      assert.equal(payments[2].attributes['aria-label'], `TikTok: 1000000 ${locale === 'es' ? 'me gusta' : 'likes'}`);
+      assert.equal(payments[3].attributes['aria-label'], `TikTok: 1 ${locale === 'es' ? 'seguimientos' : 'follows'}`);
+      for (const [index, imagePath, value] of [[0, catalog.gifts[0].imagePath, '2'],
+        [4, '/assets/creator-tools/twitch/bits.png', '125'], [5, '/assets/creator-tools/youtube/jewels.png', '400']]) {
+        const payment = payments[index];
+        assert.notEqual(payment.dataset.kind, 'text');
+        assert.deepEqual(payment.children.map(node => node.className), ['interaction-currency', 'interaction-cost']);
+        assert.equal(payment.children[0].children[0].src, imagePath);
+        assert.equal(visibleText(payment), value, 'gift and currency prices keep their numeric display');
+      }
+      assert.notEqual(payments[6].dataset.kind, 'text', 'the TikTok text treatment does not change Twitch follow');
+      assert.deepEqual(payments[6].children.map(node => node.className), ['interaction-currency', 'interaction-cost']);
+      assert.equal(payments[6].children[0].children[0].tagName, 'svg');
+      assert.equal(visibleText(payments[6]), '1');
+    }
+    runtime.dispose();
+  }
+});
+
 test('live card appearance updates its background controls without changing grouped offers or artwork', async () => {
   const runtime = await boot();
   const rules = [rule(), rule({ platform: 'twitch', eventType: 'currency', every: 125 })];
