@@ -86,6 +86,7 @@
       heartAria: "{percent}% de vida; {current} de {total}; {reserve} de reserva",
       heartPendingAria: "100% de vida; esperando datos del jefe; {reserve} de reserva",
       healthPointsShort: "PV",
+      currentArenaHealth: "Vida de la arena actual",
     },
     en: {
       title: "Tap Farming",
@@ -101,6 +102,7 @@
       heartAria: "{percent}% health; {current} of {total}; {reserve} reserve",
       heartPendingAria: "100% health; waiting for boss data; {reserve} reserve",
       healthPointsShort: "HP",
+      currentArenaHealth: "Current arena health",
     },
   };
 
@@ -313,11 +315,12 @@
     const totalHealth = effectiveAvailable
       ? nonnegative(effectiveHealth.total, nativeTotalHealth)
       : 0;
+    const reserveHealth = nonnegative(counters.reserveHealth, state.reserveHealth);
     const currentHealth = effectiveAvailable
-      ? clamp(nonnegative(effectiveHealth.current, nativeCurrentHealth), 0, totalHealth)
-      : nonnegative(counters.reserveHealth, state.reserveHealth);
+      ? nonnegative(effectiveHealth.current, nativeCurrentHealth + reserveHealth)
+      : reserveHealth;
     const effectiveRatio = effectiveAvailable && totalHealth > 0
-      ? progressValue(effectiveHealth.ratio, currentHealth / totalHealth)
+      ? nonnegative(effectiveHealth.ratio, currentHealth / totalHealth)
       : 0;
     const hasOverall = state.overallProgress !== null &&
       state.overallProgress !== undefined &&
@@ -335,7 +338,8 @@
       currentHealth,
       effectiveAvailable,
       effectiveRatio,
-      reserveHealth: nonnegative(counters.reserveHealth, state.reserveHealth),
+      healthScope: effectiveHealth.scope === "arena" ? "arena" : "boss",
+      reserveHealth,
       convertedHealth: nonnegative(
         counters.convertedHealth,
         state.convertedHealth,
@@ -500,7 +504,7 @@
     applyColors(presentation);
     root.style.setProperty("--metric-font-size", "46px");
 
-    liquidLevel.style.transform = `translateY(${258 - healthRatio * 245}px)`;
+    liquidLevel.style.transform = `translateY(${258 - clamp(healthRatio, 0, 1) * 245}px)`;
     const hasBossImage = updateBossImage(snapshot);
     percent.setAttribute("y", hasBossImage ? "191" : "161");
     percent.textContent = metricValue;
@@ -527,6 +531,8 @@
         total: format(snapshot.totalHealth),
         reserve: collectedPoints,
       });
+    if (snapshot.effectiveAvailable && snapshot.healthScope === "arena")
+      heartLabel.textContent = `${text.currentArenaHealth}. ${heartLabel.textContent}`;
     updateTapDelta(snapshot);
     ensureAnimation();
   };
@@ -632,8 +638,8 @@
       effectiveHealth: {
         available: true,
         current: 4594,
-        total: 7742,
-        ratio: 4594 / 7742,
+        total: 3000,
+        ratio: 4594 / 3000,
       },
       phaseIndex: 2,
       phaseCount: 3,

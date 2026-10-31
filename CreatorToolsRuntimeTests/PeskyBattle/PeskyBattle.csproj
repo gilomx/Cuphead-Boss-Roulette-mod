@@ -13,6 +13,7 @@
     <Compile Include="../../CreatorToolsTapFarmingController.cs" />
     <Compile Include="../../CreatorToolsTapFarmingSettings.cs" />
     <Compile Include="../../CreatorToolsTapFarmingEffectiveHealth.cs" />
+    <Compile Include="../../CreatorToolsTapFarmingPhaseReserve.cs" />
     <Compile Include="../../CreatorToolsLiveEventsCoordinator.cs" />
     <Compile Include="../../Interactions/CreatorToolsInteractionContracts.cs" />
     <Compile Include="../../Interactions/CreatorToolsInteractionQueue.cs" />

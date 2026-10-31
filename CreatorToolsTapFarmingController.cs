@@ -25,11 +25,13 @@ namespace Gilomx.CupheadBossRoulette
     /// </summary>
     internal sealed class CreatorToolsTapFarmingController
     {
-        private const int SchemaVersion = 2;
+        private const int SchemaVersion = 3;
         private const double MaximumReserveHealth = 1000000000000d;
         private const float BossSnapshotIntervalSeconds = 0.1f;
         private const int DicePalaceProgressSegmentCount = 4;
         private readonly object stateLock = new object();
+        private readonly CreatorToolsTapFarmingPhaseReserve phaseReserve =
+            new CreatorToolsTapFarmingPhaseReserve();
         private readonly CreatorToolsTapFarmingSettings settings;
         private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly Action<string> logInfo;
@@ -71,6 +73,8 @@ namespace Gilomx.CupheadBossRoulette
         // background stop may atomically clear this handle, but never calls
         // into it; worker projections use the copied primitive fields above.
         private object bossPropertiesMainThread;
+        private CreatorToolsTapFarmingRobotHealth robotHealthMainThread;
+        private int[] nativeStatePhasesMainThread;
         private float nextBossSnapshotAtMainThread;
 
         internal CreatorToolsTapFarmingController(
@@ -133,8 +137,11 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     convertedHealth = SaturatingAdd(
                         convertedHealth, points);
-                    reserveHealth = Math.Min(MaximumReserveHealth,
-                        reserveHealth + points);
+                    var accepted = Math.Min(points,
+                        MaximumReserveHealth - reserveHealth);
+                    if (phaseReserve.IsInitialized)
+                        phaseReserve.AddReserve(accepted);
+                    reserveHealth += accepted;
                 }
                 SetFeedbackLocked("tap_farming_counted", false);
                 return new CreatorToolsTapFarmingObservation(
@@ -278,6 +285,7 @@ namespace Gilomx.CupheadBossRoulette
                 dicePalaceTransition = false;
                 dicePalaceTransitionLevelInstanceId = -1;
                 phase = "active";
+                if (!continuesDicePalace) phaseReserve.Clear();
                 if (dicePalaceAttemptActive)
                     SetDicePalaceProjectionLocked(
                         dicePalaceCurrentSegmentProgress, true);
@@ -286,6 +294,9 @@ namespace Gilomx.CupheadBossRoulette
                 SetFeedbackLocked("tap_farming_battle_started", false);
             }
             bossPropertiesMainThread = null;
+            robotHealthMainThread = null;
+            nativeStatePhasesMainThread = null;
+            TryBindLevelPropertiesMainThread(level);
             nextBossSnapshotAtMainThread = 0f;
         }
 
@@ -314,6 +325,8 @@ namespace Gilomx.CupheadBossRoulette
                     "tap_farming_lost_collecting", false);
             }
             bossPropertiesMainThread = null;
+            robotHealthMainThread = null;
+            nativeStatePhasesMainThread = null;
         }
 
         internal void OnLevelPreWin(Level level)
@@ -381,6 +394,8 @@ namespace Gilomx.CupheadBossRoulette
                 SetFeedbackLocked("tap_farming_completed", false);
             }
             bossPropertiesMainThread = null;
+            robotHealthMainThread = null;
+            nativeStatePhasesMainThread = null;
         }
 
         internal void OnLevelEnded(Level level)
@@ -406,6 +421,8 @@ namespace Gilomx.CupheadBossRoulette
                     "tap_farming_waiting_for_boss", false);
             }
             bossPropertiesMainThread = null;
+            robotHealthMainThread = null;
+            nativeStatePhasesMainThread = null;
         }
 
         internal void OnMapEntered()
@@ -441,7 +458,11 @@ namespace Gilomx.CupheadBossRoulette
         internal bool PrepareBossDamage(
             object properties, ref float damage)
         {
-            if (properties == null || damage <= 0f)
+            if (properties == null || damage <= 0f ||
+                float.IsNaN(damage) || float.IsInfinity(damage))
+                return true;
+            if (robotHealthMainThread != null &&
+                !ReferenceEquals(properties, robotHealthMainThread.Properties))
                 return true;
 
             if (!ReferenceEquals(bossPropertiesMainThread, properties))
@@ -451,18 +472,27 @@ namespace Gilomx.CupheadBossRoulette
                 nextBossSnapshotAtMainThread = 0f;
             }
             bossPropertiesMainThread = properties;
+            RefreshBossSnapshotMainThread();
+            bool advanced;
+            var phaseKnown = TrySynchronizeDamagePhaseMainThread(properties, out advanced);
             lock (stateLock)
             {
                 if (phase != "active" && phase != "transition")
+                    return true;
+                if (dicePalaceAttemptActive && !dicePalaceMainActive &&
+                    dicePalaceCompletedSegments >= DicePalaceProgressSegmentCount - 1)
                     return true;
                 if (phase == "transition")
                 {
                     phase = "active";
                     TouchLocked();
                 }
+                if (!phaseKnown) return true;
 
-                var absorbed = Math.Min(
-                    reserveHealth, Math.Max(0d, (double)damage));
+                // If metadata is unavailable, preserve native damage instead
+                // of spending a future phase's protected reserve.
+                var absorbed = phaseReserve.IsInitialized
+                    ? phaseReserve.Absorb(damage) : 0d;
                 if (absorbed > 0d)
                 {
                     reserveHealth = Math.Max(0d,
@@ -481,6 +511,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (properties == null)
                 return;
+            if (robotHealthMainThread != null &&
+                !ReferenceEquals(properties, robotHealthMainThread.Properties))
+                return;
             if (!ReferenceEquals(bossPropertiesMainThread, properties))
             {
                 if (!BossProgressReader.IsSupported(properties))
@@ -488,6 +521,9 @@ namespace Gilomx.CupheadBossRoulette
                 nextBossSnapshotAtMainThread = 0f;
             }
             bossPropertiesMainThread = properties;
+            bool advanced;
+            if (TrySynchronizeDamagePhaseMainThread(properties, out advanced) && advanced)
+                nextBossSnapshotAtMainThread = 0f;
             RefreshBossSnapshotMainThread();
         }
 
@@ -614,6 +650,8 @@ namespace Gilomx.CupheadBossRoulette
             lock (stateLock)
             {
                 bossPropertiesMainThread = null;
+                robotHealthMainThread = null;
+                nativeStatePhasesMainThread = null;
                 nextBossSnapshotAtMainThread = 0f;
                 if (ReferenceEquals(liveEventLease, lease) &&
                     phase == "stopping")
@@ -637,20 +675,156 @@ namespace Gilomx.CupheadBossRoulette
         {
             var properties = bossPropertiesMainThread;
             if (properties == null)
-                return;
+            {
+                var level = Level.Current;
+                if (level == null) return;
+                TryBindLevelPropertiesMainThread(level);
+                properties = bossPropertiesMainThread;
+                if (properties == null) return;
+            }
             var now = Time.realtimeSinceStartup;
             if (now < nextBossSnapshotAtMainThread)
                 return;
             nextBossSnapshotAtMainThread = now +
                 BossSnapshotIntervalSeconds;
+            if (robotHealthMainThread == null && levelId == "Robot")
+            {
+                CreatorToolsTapFarmingRobotHealth robot;
+                if (!CreatorToolsTapFarmingRobotHealth.TryCapture(
+                        Level.Current, properties, out robot)) return;
+                robotHealthMainThread = robot;
+            }
             BossProgressSnapshot snapshot;
             if (!BossProgressReader.TryRead(properties, out snapshot))
                 return;
+            if (robotHealthMainThread != null)
+            {
+                int robotPhase;
+                double nativeCurrent;
+                double phaseCurrent;
+                if (!robotHealthMainThread.TryRead(out robotPhase,
+                        out nativeCurrent, out phaseCurrent))
+                    return;
+                snapshot = BuildRobotSnapshot(robotHealthMainThread,
+                    robotPhase, nativeCurrent, phaseCurrent);
+            }
+            nativeStatePhasesMainThread = snapshot.StatePhases;
             lock (stateLock)
             {
                 if (phase == "active" || phase == "transition")
+                {
+                    SynchronizePhaseReserveLocked(snapshot);
                     ApplyBossSnapshotLocked(snapshot);
+                }
             }
+        }
+
+        private void TryBindLevelPropertiesMainThread(Level level)
+        {
+            CreatorToolsTapFarmingRobotHealth robot;
+            if (CreatorToolsTapFarmingRobotHealth.TryCapture(level, null,
+                    out robot))
+            {
+                robotHealthMainThread = robot;
+                bossPropertiesMainThread = robot.Properties;
+                return;
+            }
+            // Native levels declare their properties on different bases.
+            // Resolve once per attempt, never scan scene objects per hit.
+            try
+            {
+                for (var type = level.GetType(); type != null;
+                     type = type.BaseType)
+                {
+                    var field = type.GetField("properties",
+                        BindingFlags.Instance | BindingFlags.Public |
+                        BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                    if (field == null) continue;
+                    var candidate = field.GetValue(level);
+                    if (BossProgressReader.IsSupported(candidate))
+                        bossPropertiesMainThread = candidate;
+                    return;
+                }
+            }
+            catch { /* Intro may not have created native properties yet. */ }
+        }
+
+        private bool TrySynchronizeDamagePhaseMainThread(object properties,
+            out bool advanced)
+        {
+            advanced = false;
+            lock (stateLock)
+                if (dicePalaceAttemptActive)
+                {
+                    if (!phaseReserve.IsInitialized) return false;
+                    advanced = phaseReserve.AdvanceTo(dicePalaceMainActive ? 3 :
+                        Math.Min(3, dicePalaceCompletedSegments));
+                    return true;
+                }
+            int currentPhase;
+            if (robotHealthMainThread != null)
+            {
+                double current;
+                double phaseCurrent;
+                if (!robotHealthMainThread.TryRead(out currentPhase,
+                        out current, out phaseCurrent)) return false;
+            }
+            else if (!BossProgressReader.TryReadPhaseIndex(properties,
+                         nativeStatePhasesMainThread, out currentPhase))
+                return false;
+            lock (stateLock)
+                if (phaseReserve.IsInitialized)
+                {
+                    advanced = phaseReserve.AdvanceTo(currentPhase - 1);
+                    return true;
+                }
+            return false;
+        }
+
+        private void SynchronizePhaseReserveLocked(BossProgressSnapshot snapshot)
+        {
+            if (dicePalaceAttemptActive)
+            {
+                // The route is chosen during play. Four equal budgets guard
+                // the three setup fights and Main without guessing future HP.
+                var index = dicePalaceMainActive ? 3 :
+                    Math.Min(3, dicePalaceCompletedSegments);
+                if (!phaseReserve.IsInitialized)
+                    phaseReserve.BeginAttempt(new double[] { 1, 1, 1, 1 },
+                        reserveHealth, index);
+                else phaseReserve.AdvanceTo(index);
+                return;
+            }
+            if (!phaseReserve.IsInitialized)
+                phaseReserve.BeginAttempt(snapshot.NativePhaseHealth,
+                    reserveHealth, snapshot.PhaseIndex - 1);
+            else
+                phaseReserve.AdvanceTo(snapshot.PhaseIndex - 1);
+        }
+
+        private static BossProgressSnapshot BuildRobotSnapshot(
+            CreatorToolsTapFarmingRobotHealth robot, int index,
+            double current, double phaseCurrent)
+        {
+            var weights = robot.OriginalHealth;
+            var total = 0d;
+            for (var i = 0; i < weights.Length; i++) total += weights[i];
+            var phaseTotal = weights[index - 1];
+            var progress = phaseTotal <= 0d ? 0f :
+                Mathf.Clamp01((float)(1d - phaseCurrent / phaseTotal));
+            var phases = new PhaseProgress[weights.Length];
+            for (var i = 0; i < phases.Length; i++)
+                phases[i] = new PhaseProgress(i + 1,
+                    i + 1 < index ? "complete" :
+                    i + 1 == index ? "active" : "pending",
+                    i + 1 < index ? 1f : i + 1 == index ? progress : 0f);
+            return new BossProgressSnapshot {
+                CurrentHealth = (float)current, TotalHealth = (float)total,
+                CurrentPhaseProgress = progress,
+                OverallProgress = (index - 1 + progress) / weights.Length,
+                PhaseIndex = index, PhaseCount = weights.Length,
+                Phases = phases, NativePhaseHealth = weights
+            };
         }
 
         private void TryAttachCurrentLevelMainThread(bool levelAvailable)
@@ -837,7 +1011,10 @@ namespace Gilomx.CupheadBossRoulette
             var effectiveHealth =
                 CreatorToolsTapFarmingEffectiveHealth.Calculate(
                     phase, bossCurrentHealth, bossTotalHealth,
-                    reserveHealth, spentDuringAttempt);
+                    dicePalaceAttemptActive ?
+                        ((!dicePalaceMainActive && dicePalaceCompletedSegments >= 3)
+                            ? 0d : phaseReserve.CurrentRemaining) : reserveHealth,
+                    spentDuringAttempt);
 
             var builder = new StringBuilder(3072);
             builder.Append("{\"ready\":true,\"schemaVersion\":")
@@ -892,6 +1069,9 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(FormatNumber(effectiveHealth.Total, "0.###"))
                 .Append(",\"ratio\":")
                 .Append(FormatNumber(effectiveHealth.Ratio, "0.####"))
+                .Append(",\"scope\":\"")
+                .Append(dicePalaceAttemptActive ? "arena" : "boss")
+                .Append('"')
                 .Append("},\"phaseIndex\":").Append(phaseIndex)
                 .Append(",\"phaseCount\":").Append(phaseCount)
                 .Append(",\"overallProgress\":")
@@ -909,6 +1089,9 @@ namespace Gilomx.CupheadBossRoulette
                 builder.Append("\",\"progress\":")
                     .Append(FormatNumber(
                         phaseProgress[i].Progress, "0.####"))
+                    .Append(",\"reserveHealth\":")
+                    .Append(FormatNumber(
+                        phaseReserve.GetPhaseRemaining(i), "0.###"))
                     .Append('}');
             }
             builder.Append("],\"feedback\":\"");
@@ -925,6 +1108,7 @@ namespace Gilomx.CupheadBossRoulette
             unconvertedTaps = 0L;
             convertedHealth = 0L;
             reserveHealth = 0d;
+            phaseReserve.Clear();
             spentHealth = 0d;
             spentHealthAtAttemptStart = 0d;
             attempt = 0;
@@ -1147,6 +1331,8 @@ namespace Gilomx.CupheadBossRoulette
             internal int PhaseIndex;
             internal int PhaseCount;
             internal PhaseProgress[] Phases = new PhaseProgress[0];
+            internal double[] NativePhaseHealth;
+            internal int[] StatePhases;
         }
 
         private static class BossProgressReader
@@ -1183,6 +1369,25 @@ namespace Gilomx.CupheadBossRoulette
                 catch { return false; }
             }
 
+            internal static bool TryReadPhaseIndex(object instance,
+                int[] statePhases, out int phaseIndex)
+            {
+                phaseIndex = 0;
+                if (instance == null || statePhases == null ||
+                    statePhases.Length == 0) return false;
+                try
+                {
+                    var accessor = GetAccessor(instance.GetType());
+                    var state = Convert.ToInt32(
+                        accessor.stateIndex.GetValue(instance),
+                        CultureInfo.InvariantCulture);
+                    if (state < 0 || state >= statePhases.Length) return false;
+                    phaseIndex = statePhases[state];
+                    return true;
+                }
+                catch { return false; }
+            }
+
             private static BossAccessor GetAccessor(Type type)
             {
                 lock (accessorsLock)
@@ -1200,7 +1405,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 private readonly PropertyInfo currentHealth;
                 private readonly FieldInfo totalHealth;
-                private readonly FieldInfo stateIndex;
+                internal readonly FieldInfo stateIndex;
                 private readonly FieldInfo states;
 
                 private BossAccessor(
@@ -1320,8 +1525,18 @@ namespace Gilomx.CupheadBossRoulette
                         Math.Max(1f, groupStarts.Count));
 
                     var phaseItems = new PhaseProgress[groupStarts.Count];
+                    var weights = new double[groupStarts.Count];
+                    var statePhases = new int[count];
                     for (var i = 0; i < phaseItems.Length; i++)
                     {
+                        var start = i == 0 ? 1f : triggers[groupStarts[i]];
+                        var end = i + 1 < groupStarts.Count ?
+                            triggers[groupStarts[i + 1]] : 0f;
+                        weights[i] = Math.Max(0d, (start - end) * total);
+                        var next = i + 1 < groupStarts.Count ?
+                            groupStarts[i + 1] : count;
+                        for (var state = groupStarts[i]; state < next; state++)
+                            statePhases[state] = i + 1;
                         var progress = i < groupIndex
                             ? 1f
                             : i == groupIndex ? phaseProgress : 0f;
@@ -1336,6 +1551,8 @@ namespace Gilomx.CupheadBossRoulette
                     {
                         CurrentHealth = Math.Max(0f, current),
                         TotalHealth = Math.Max(0f, total),
+                        NativePhaseHealth = weights,
+                        StatePhases = statePhases,
                         CurrentPhaseProgress = phaseProgress,
                         OverallProgress = overall,
                         PhaseIndex = groupIndex + 1,

@@ -464,6 +464,32 @@ demanda. Si Unity está pausado y no ejecuta `Update`, pueden mostrar la última
 fotografía disponible. Esta segunda lectura no repite ningún evento ni cambia
 los controles. Los tiempos HTTP del reporte no miden FPS.
 
+Farmeada reparte la reserva entre fases según su vida original. Cada fase
+consume primero su presupuesto extra y después su vida nativa; los taps nuevos
+se reparten sólo entre la fase actual y las pendientes. Un reintento reparte
+el saldo restante de nuevo, sin recuperar PV ya gastados. El porcentaje usa
+como 100% la vida original total: 1.000 PV originales más 500 extra son 150%.
+Sólo el relleno gráfico se limita al tamaño del corazón o de la barra.
+
+El robot incluye los PV locales de las tres piezas y el corazón, además de
+sus fases posteriores. Los avances internos de fase no gastan reserva.
+Otros jefes con PV locales (por ejemplo, componentes de Train o Veggies)
+requieren un puente específico antes de poder alargar esos componentes;
+sus eventos nativos siguen pasando sin gastar la reserva a posteriori.
+En Dice Palace, la ruta futura es variable: se protegen cuatro presupuestos
+iguales para tres combates y Main; combates adicionales no gastan el de Main.
+El porcentaje indica la **arena actual**, con su vida original y su presupuesto,
+en lugar de atribuir una vida total inventada a toda la ruta.
+
+[`tools/send-tap-farming-test.ps1`](tools/send-tap-farming-test.ps1) repite likes
+simulados de uno en uno para probar Farmeada: por defecto, 20 taps/s durante
+120 segundos en `Robot`. Conserva la reserva existente y la conversión actual;
+requiere Interacciones desactivadas y no cambia ese interruptor. Se detiene al
+cambiar de sesión o jefe, terminar/desactivar Farmeada, activar Interacciones,
+aparecer el archivo opcional `-StopFilePath` o agotar la duración. Continúa entre
+derrota y reintento de la misma sesión. Guarda contadores y muestras por segundo;
+el tráfico real también puede afectar esos datos. No reintenta solicitudes.
+
 ## Notas
 
 - Los retos se muestran y aplican durante el combate cuando la opción `RETO`

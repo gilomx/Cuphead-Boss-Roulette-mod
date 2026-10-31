@@ -72,18 +72,22 @@ export function TapFarmingPanel() {
     bossTotalHealth > 0
   );
   const effectiveCurrent = healthAvailable
-    ? normalized(effectiveHealth?.current ?? tapFarming?.boss?.currentHealth)
+    ? normalized(effectiveHealth?.current ??
+      normalized(tapFarming?.boss?.currentHealth) + reserveHealth)
     : reserveHealth;
   const effectiveTotal = healthAvailable
     ? normalized(effectiveHealth?.total ?? bossTotalHealth)
     : 0;
   const healthRatio = healthAvailable && effectiveTotal > 0
-    ? Math.min(1, Math.max(0, effectiveHealth?.ratio ?? effectiveCurrent / effectiveTotal))
+    ? normalized(effectiveHealth?.ratio ?? effectiveCurrent / effectiveTotal)
     : 0;
+  const healthBarRatio = Math.min(1, healthRatio);
   const healthPercent = Math.round(healthRatio * 100);
   const healthMetric = healthAvailable
     ? `${healthPercent}%`
     : `+${reserveHealth.toLocaleString(numberLocale)} ${t("dashboard.tapFarming.progress.healthPointsShort")}`;
+  const arenaHealth = healthAvailable && effectiveHealth?.scope === "arena";
+  const arenaHealthLabel = t("dashboard.tapFarming.progress.currentArenaHealth");
   const reserveEquivalent = bossTotalHealth > 0 ? reserveHealth / bossTotalHealth : 0;
   const reserveDescription = !healthAvailable
     ? t("dashboard.tapFarming.progress.collected")
@@ -227,6 +231,7 @@ export function TapFarmingPanel() {
                   .replace("{phase}", String(Math.max(1, phaseIndex)))
                   .replace("{count}", String(phaseCount))
                 : t("dashboard.tapFarming.progress.noBoss")}</small>
+              {arenaHealth ? <small>{arenaHealthLabel}</small> : null}
             </div>
             <span data-mode={healthAvailable ? "percent" : "points"}>{healthMetric}</span>
           </div>
@@ -236,14 +241,17 @@ export function TapFarmingPanel() {
             data-mode={healthAvailable ? "percent" : "points"}
             role={healthAvailable ? "progressbar" : "status"}
             aria-label={healthAvailable
-              ? t("dashboard.tapFarming.progress.battle")
+              ? arenaHealth ? arenaHealthLabel : t("dashboard.tapFarming.progress.battle")
               : t("dashboard.tapFarming.progress.collected")
                 .replace("{value}", reserveHealth.toLocaleString(numberLocale))}
             aria-valuemin={healthAvailable ? 0 : undefined}
-            aria-valuemax={healthAvailable ? 100 : undefined}
+            aria-valuemax={healthAvailable ? Math.max(100, healthPercent) : undefined}
             aria-valuenow={healthAvailable ? healthPercent : undefined}
+            aria-valuetext={healthAvailable
+              ? arenaHealth ? `${healthMetric} · ${arenaHealthLabel}` : healthMetric
+              : undefined}
           >
-            <i style={{ width: `${healthRatio * 100}%` }} />
+            <i style={{ width: `${healthBarRatio * 100}%` }} />
           </div>
 
           <div className="dashboard-tap-farming__counter-grid">

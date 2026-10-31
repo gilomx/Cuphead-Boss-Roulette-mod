@@ -82,13 +82,12 @@ function withTapProgress(state: TapFarmingPreviewSnapshot) {
   const phaseIndex = clamp(Math.round(state.phaseIndex), 1, phaseCount);
   const completed = state.phase === "completed";
   const effectiveAvailable = completed || hasBoss;
-  const effectiveTotal = effectiveAvailable
-    ? total + state.counters.reserveHealth + state.counters.spentHealth
-    : 0;
+  const healthScope: "boss" | "arena" = /^DicePalace/i.test(state.levelId) ? "arena" : "boss";
+  const effectiveTotal = effectiveAvailable ? total : 0;
   const effectiveCurrent = completed
     ? 0
     : effectiveAvailable
-      ? Math.min(effectiveTotal, current + state.counters.reserveHealth)
+      ? current + state.counters.reserveHealth
       : state.counters.reserveHealth;
   return {
     ...state,
@@ -99,8 +98,9 @@ function withTapProgress(state: TapFarmingPreviewSnapshot) {
       current: effectiveCurrent,
       total: effectiveTotal,
       ratio: effectiveAvailable && effectiveTotal > 0
-        ? clamp(effectiveCurrent / effectiveTotal, 0, 1)
+        ? effectiveCurrent / effectiveTotal
         : 0,
+      scope: healthScope,
     },
     phaseIndex,
     phaseCount,

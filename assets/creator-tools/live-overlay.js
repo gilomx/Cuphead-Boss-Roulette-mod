@@ -378,13 +378,11 @@
       1,
     )));
     const effectiveAvailable = phase !== "collecting" && totalHealth > 0;
-    const effectiveTotal = effectiveAvailable
-      ? totalHealth + reserveHealth + spentHealth
-      : 0;
+    const effectiveTotal = effectiveAvailable ? totalHealth : 0;
     const effectiveCurrent = phase === "completed"
       ? 0
       : effectiveAvailable
-        ? Math.min(effectiveTotal, currentHealth + reserveHealth)
+        ? currentHealth + reserveHealth
         : reserveHealth;
     return {
       ready: true,
@@ -429,8 +427,9 @@
         current: effectiveCurrent,
         total: effectiveTotal,
         ratio: effectiveAvailable && effectiveTotal > 0
-          ? clamp(effectiveCurrent / effectiveTotal, 0, 1)
+          ? effectiveCurrent / effectiveTotal
           : 0,
+        scope: /^DicePalace/i.test(String(preview.levelId || "")) ? "arena" : "boss",
       },
       phaseIndex,
       phaseCount,

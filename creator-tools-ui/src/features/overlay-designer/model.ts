@@ -204,6 +204,7 @@ export interface TapFarmingPreviewSnapshot {
     current: number;
     total: number;
     ratio: number;
+    scope?: "boss" | "arena";
   };
   phaseIndex: number;
   phaseCount: number;

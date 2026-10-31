@@ -32,6 +32,37 @@ try {
 }
 const { createBattleSimulation, battleSimulationReducer, previewCommand } = exports;
 
+test("tap previews grow above original boss health without raising their denominator", () => {
+  const { createTapSimulation, tapSimulationReducer } = exports;
+  let state = createTapSimulation("active");
+  assert.equal(state.boss.totalHealth, 3000);
+  assert.equal(state.effectiveHealth.total, 3000);
+  assert.equal(state.effectiveHealth.current, 3742);
+  assert.equal(state.effectiveHealth.ratio, 3742 / 3000);
+  assert.equal(state.effectiveHealth.scope, "arena", "Dice Palace's fixture describes its current arena");
+  state = tapSimulationReducer(state, { type: "add_taps", amount: 6000 });
+  assert.equal(state.counters.reserveHealth, 4842);
+  assert.equal(state.effectiveHealth.current, 6742);
+  assert.equal(state.effectiveHealth.total, 3000);
+  assert.equal(state.effectiveHealth.ratio, 6742 / 3000);
+  state = tapSimulationReducer(state, { type: "damage", amount: 1000 });
+  assert.equal(state.boss.currentHealth, 1900);
+  assert.equal(state.effectiveHealth.current, 5742);
+  assert.equal(state.effectiveHealth.total, 3000);
+  assert.equal(state.effectiveHealth.ratio, 5742 / 3000);
+  state = tapSimulationReducer(state, { type: "retry" });
+  assert.equal(state.effectiveHealth.total, 3000);
+  assert.equal(state.effectiveHealth.current, 6842);
+  assert.ok(state.effectiveHealth.ratio > 2);
+  const completed = createTapSimulation("completed");
+  assert.equal(completed.effectiveHealth.total, 3000);
+  assert.equal(completed.effectiveHealth.current, 0);
+  assert.equal(completed.effectiveHealth.ratio, 0);
+  const collecting = createTapSimulation("collecting");
+  assert.equal(collecting.effectiveHealth.available, false);
+  assert.equal(collecting.effectiveHealth.total, 0);
+});
+
 test("designer history retains ten edits, including redo, and branches after a new edit", () => {
   const { createEditHistory, recordEdit, undoEdit, redoEdit } = exports;
   let history = createEditHistory(0);

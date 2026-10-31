@@ -1,0 +1,165 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+
+internal static class Program
+{
+    private static int groups;
+    private static void Main()
+    {
+        Run("Proportional phases protect future HP while the current native gate can open", delegate
+        {
+            var ledger = New(new[] { 200d, 300d, 500d }, 5000d);
+            Near(1000d, ledger.CurrentRemaining);
+            Near(1500d, ledger.GetPhaseRemaining(1));
+            Near(2500d, ledger.GetPhaseRemaining(2));
+            Near(1000d, ledger.Absorb(1200d));
+            Near(0d, ledger.Absorb(200d));
+            Near(4000d, ledger.Remaining);
+            Near(1500d, ledger.GetPhaseRemaining(1));
+            Check(ledger.AdvanceTo(1), "native transition should advance once");
+            Near(1500d, ledger.Absorb(2000d));
+            Near(2500d, ledger.Remaining);
+        });
+        Run("Continuous new taps use only current and future original weights", delegate
+        {
+            var ledger = New(new[] { 200d, 300d, 500d }, 5000d);
+            ledger.Absorb(1000d);
+            ledger.AdvanceTo(1);
+            ledger.Absorb(1500d);
+            Near(800d, ledger.AddReserve(800d));
+            Near(0d, ledger.GetPhaseRemaining(0));
+            Near(300d, ledger.CurrentRemaining);
+            Near(3000d, ledger.GetPhaseRemaining(2));
+            Check(!ledger.AdvanceTo(0), "old snapshots must not reopen an earlier phase");
+            Near(300d, ledger.Absorb(400d));
+            Near(0d, ledger.Absorb(100d));
+            Near(3000d, ledger.Remaining);
+        });
+        Run("Skipped native phases carry unused reserve forward without resurrections", delegate
+        {
+            var ledger = New(new[] { 2d, 3d, 5d }, 100d);
+            ledger.Absorb(5d);
+            Check(ledger.AdvanceTo(2), "scripted skip should advance");
+            Near(0d, ledger.GetPhaseRemaining(0));
+            Near(0d, ledger.GetPhaseRemaining(1));
+            Near(95d, ledger.CurrentRemaining);
+            Near(95d, ledger.Remaining);
+            Check(!ledger.AdvanceTo(2) && !ledger.AdvanceTo(1), "same or stale transition must be inert");
+            Near(95d, ledger.Absorb(200d));
+            Near(0d, ledger.Remaining);
+        });
+        Run("Retries redistribute only the remaining session pool; terminal taps cannot revive phases", delegate
+        {
+            var ledger = New(new[] { 2d, 3d, 5d }, 5000d);
+            ledger.Absorb(1000d);
+            ledger.AdvanceTo(1);
+            ledger.Absorb(500d);
+            ledger.BeginAttempt(new[] { 2d, 3d, 5d }, ledger.Remaining);
+            Near(700d, ledger.CurrentRemaining);
+            Near(1050d, ledger.GetPhaseRemaining(1));
+            Near(1750d, ledger.GetPhaseRemaining(2));
+            ledger.AdvanceTo(3);
+            Near(0d, ledger.Absorb(200d));
+            Near(200d, ledger.AddReserve(200d));
+            Near(3700d, ledger.Remaining);
+            Check(!ledger.AdvanceTo(0), "completion cannot regress to phase one");
+            ledger.BeginAttempt(new[] { 1d, 1d }, ledger.Remaining);
+            Near(1850d, ledger.CurrentRemaining);
+            Near(1850d, ledger.GetPhaseRemaining(1));
+        });
+        Run("Weights are copied, zero-weight phases are respected and malformed weights fall back equally", delegate
+        {
+            var source = new[] { 0d, 1d, 3d };
+            var ledger = New(source, 80d);
+            source[1] = 999d;
+            Near(0d, ledger.Absorb(100d));
+            ledger.AdvanceTo(1);
+            ledger.AddReserve(40d);
+            Near(30d, ledger.CurrentRemaining);
+            Near(90d, ledger.GetPhaseRemaining(2));
+            ledger.BeginAttempt(new[] { double.NaN, -1d, double.PositiveInfinity }, 90d, 1);
+            Near(0d, ledger.GetPhaseRemaining(0));
+            Near(45d, ledger.CurrentRemaining);
+            Near(45d, ledger.GetPhaseRemaining(2));
+            ledger.BeginAttempt(new[] { double.MaxValue, double.MaxValue }, 100d);
+            Near(50d, ledger.CurrentRemaining);
+            Near(50d, ledger.GetPhaseRemaining(1));
+            var threw = false;
+            try { ledger.BeginAttempt(new double[0], 999d); }
+            catch (ArgumentException) { threw = true; }
+            Check(threw, "missing native phase metadata must be explicit");
+            Near(100d, ledger.Remaining);
+        });
+        Run("Invalid damage/deposits are inert; the session cap does not leak or mint reserve", delegate
+        {
+            var ledger = New(new[] { 1d, 2d }, 100d);
+            foreach (var invalid in new[] { -5d, 0d, double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+            {
+                Near(0d, ledger.AddReserve(invalid));
+                Near(0d, ledger.Absorb(invalid));
+            }
+            Near(100d, ledger.Remaining);
+            Near(CreatorToolsTapFarmingPhaseReserve.MaximumReserveHealth - 100d,
+                ledger.AddReserve(double.MaxValue));
+            Near(CreatorToolsTapFarmingPhaseReserve.MaximumReserveHealth, ledger.Remaining);
+            Near(0d, ledger.AddReserve(100d));
+            ledger.Clear();
+            Check(!ledger.IsInitialized && ledger.CurrentPhaseIndex == -1, "clear removes the attempt");
+            Near(0d, ledger.Remaining);
+            Near(0d, ledger.Absorb(100d));
+            Check(!ledger.AdvanceTo(0), "an uninitialized attempt cannot advance");
+        });
+        Run("Many fractional deposits and damage preserve accounting with no per-operation allocation", delegate
+        {
+            var ledger = New(new[] { 1d, 2d, 3d, 4d }, 5000d);
+            double accepted = 5000d, spent = 0d;
+            // Warm the exact production paths before allocation measurement.
+            ledger.AddReserve(0.1d); ledger.Absorb(0.03d);
+            accepted += 0.1d; spent += 0.03d;
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 10000; i++)
+            {
+                accepted += ledger.AddReserve(0.1d);
+                spent += ledger.Absorb(0.03d);
+            }
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Check(allocated == 0, "warmed deposits/damage must not allocate");
+            Near(accepted - spent, ledger.Remaining, 0.000001d);
+            Near(ledger.Remaining, Sum(ledger), 0.000001d);
+            for (var phase = 1; phase < ledger.PhaseCount; phase++)
+            {
+                ledger.AdvanceTo(phase);
+                Near(ledger.Remaining, Sum(ledger), 0.000001d);
+            }
+            Near(ledger.Remaining, ledger.Absorb(double.MaxValue), 0.000001d);
+            Near(0d, ledger.Remaining, 0.000001d);
+        });
+        Console.WriteLine("PASS " + groups + " phase-reserve production-ledger groups; no Unity, game or deployment involved.");
+    }
+
+    private static CreatorToolsTapFarmingPhaseReserve New(double[] weights, double reserve)
+    {
+        var ledger = new CreatorToolsTapFarmingPhaseReserve();
+        ledger.BeginAttempt(weights, reserve);
+        return ledger;
+    }
+    private static double Sum(CreatorToolsTapFarmingPhaseReserve ledger)
+    {
+        var sum = 0d;
+        for (var i = 0; i < ledger.PhaseCount; i++) sum += ledger.GetPhaseRemaining(i);
+        return sum;
+    }
+    private static void Run(string name, Action test)
+    {
+        test(); groups++; Console.WriteLine("PASS " + name);
+    }
+    private static void Near(double expected, double actual, double tolerance = 0.0000001d)
+    {
+        Check(!double.IsNaN(actual) && Math.Abs(expected - actual) <= tolerance,
+            "expected " + expected + ", got " + actual);
+    }
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new Exception(message);
+    }
+}

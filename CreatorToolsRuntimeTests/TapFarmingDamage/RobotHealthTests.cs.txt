@@ -1,0 +1,181 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
+using Gilomx.CupheadBossRoulette;
+using HarmonyLib;
+
+internal static partial class Program
+{
+    private static void TestRobotLocalTranspilers()
+    {
+        using (var fixture = new Fixture())
+        {
+            var bodyHit = CompileLocalHit(fixture.InstalledPlugin, typeof(RobotLevelRobotBodyPart), 0);
+            var heartHit = CompileLocalHit(fixture.InstalledPlugin, typeof(RobotLevelRobotChest), 1);
+            var parts = new RobotLevelRobotBodyPart[] {
+                new RobotLevelRobotHead(), new RobotLevelRobotHatch(), new RobotLevelRobotChest() };
+            foreach (var part in parts)
+            {
+                part.Init(fixture.Properties, 5f, 5f);
+                var info = new DamageDealer.DamageInfo(4f);
+                var before = fixture.Reserve;
+                fixture.WithPlayerContext(() => bodyHit(part, info));
+                Check(part.Health(0) == 5f && fixture.Reserve == before - 4d,
+                    "one base getter protects head/hatch/chest primary and spends exactly one hit");
+                Check(info.damage == 4f, "rewriting the getter never mutates shared DamageInfo");
+            }
+            var heart = new RobotLevelRobotChest(); heart.Init(fixture.Properties, 0f, 5f);
+            var beforeHeart = fixture.Reserve;
+            fixture.WithPlayerContext(() => heartHit(heart, new DamageDealer.DamageInfo(4f)));
+            Check(heart.Health(1) == 5f && fixture.Reserve == beforeHeart - 4d,
+                "heart uses its separate local getter exactly once");
+            bodyHit(parts[0], new DamageDealer.DamageInfo(2f));
+            Check(parts[0].Health(0) == 3f && fixture.Reserve == beforeHeart - 4d,
+                "non-player local damage remains native");
+            parts[0].SetHealth(0, 0f);
+            fixture.WithPlayerContext(() => bodyHit(parts[0], new DamageDealer.DamageInfo(8f)));
+            Check(fixture.Reserve == beforeHeart - 4d, "dead local pool never spends reserve");
+            fixture.WithPlayerContext(() => fixture.WithProgression(() =>
+                heartHit(heart, new DamageDealer.DamageInfo(1f))));
+            Check(heart.Health(1) == 4f && fixture.Reserve == beforeHeart - 4d,
+                "scripted native progression bypasses the local helper too");
+        }
+        using (var fixture = new Fixture(3))
+        {
+            var hit = CompileLocalHit(fixture.InstalledPlugin, typeof(RobotLevelRobotChest), 1);
+            var heart = new RobotLevelRobotChest(); heart.Init(fixture.Properties, 0f, 5f);
+            var before = fixture.Reserve;
+            fixture.WithPlayerContext(() => hit(heart, new DamageDealer.DamageInfo(8f)));
+            var absorbed = before - fixture.Reserve;
+            Check(absorbed > 0d && absorbed <= 3d &&
+                Math.Abs(heart.Health(1) - (5d - (8d - absorbed))) < 0.0001d,
+                "only the exact partial remainder reaches native heart HP");
+            Check(heart.Health(1) <= 0f, "a lethal remainder can still destroy the heart");
+            var reserveAfterHit = fixture.Reserve;
+            fixture.WithPlayerContext(() => fixture.WithProgression(fixture.Properties.DealDamageToNextNamedState));
+            Check(fixture.Properties.stateIndex == 1 && fixture.Reserve == reserveAfterHit,
+                "heart death advances to the flying phase without draining future reserve");
+        }
+        using (var fixture = new Fixture(0))
+        {
+            var hit = CompileLocalHit(fixture.InstalledPlugin, typeof(RobotLevelRobotBodyPart), 0);
+            var part = new RobotLevelRobotHead(); part.Init(fixture.Properties, 5f, 1f);
+            fixture.WithPlayerContext(() => hit(part, new DamageDealer.DamageInfo(2f)));
+            Check(part.Health(0) == 3f && fixture.Reserve == 0d,
+                "zero reserve exactly preserves native local damage");
+        }
+    }
+
+    private static Action<RobotLevelRobotBodyPart, DamageDealer.DamageInfo> CompileLocalHit(
+        Plugin plugin, Type owner, int healthIndex)
+    {
+        var patch = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == owner && p.Transpiler != null);
+        var health = AccessTools.Field(typeof(RobotLevelRobotBodyPart), "currentHealth");
+        var getter = typeof(DamageDealer.DamageInfo).GetProperty("damage").GetGetMethod();
+        var input = new List<CodeInstruction> {
+            new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldfld, health),
+            new CodeInstruction(healthIndex == 0 ? OpCodes.Ldc_I4_0 : OpCodes.Ldc_I4_1),
+            new CodeInstruction(OpCodes.Ldelem_R4), new CodeInstruction(OpCodes.Stloc_0),
+            new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldfld, health),
+            new CodeInstruction(healthIndex == 0 ? OpCodes.Ldc_I4_0 : OpCodes.Ldc_I4_1),
+            new CodeInstruction(OpCodes.Ldelema, typeof(float)), new CodeInstruction(OpCodes.Dup),
+            new CodeInstruction(OpCodes.Ldind_R4), new CodeInstruction(OpCodes.Ldarg_1),
+            new CodeInstruction(OpCodes.Callvirt, getter), new CodeInstruction(OpCodes.Sub),
+            new CodeInstruction(OpCodes.Stind_R4), new CodeInstruction(OpCodes.Ret) };
+        var output = ((IEnumerable<CodeInstruction>)patch.Transpiler.Invoke(null,
+            new object[] { input, patch.Original })).ToList();
+        Check(output.Count == input.Count + 3 &&
+            output.Count(i => i.operand is MethodInfo m && m.Name == "ReadRobotLocalDamage") == 1,
+            "the production transpiler replaces exactly one local damage getter");
+        var malformed = new List<CodeInstruction>(input);
+        malformed[13] = new CodeInstruction(OpCodes.Add);
+        var rejected = false;
+        try { patch.Transpiler.Invoke(null, new object[] { malformed, patch.Original }); }
+        catch (TargetInvocationException e) { rejected = e.InnerException is InvalidOperationException; }
+        Check(rejected, "a changed native subtraction fails closed");
+        var dynamic = new DynamicMethod("robot_local_hit", typeof(void),
+            new[] { typeof(RobotLevelRobotBodyPart), typeof(DamageDealer.DamageInfo) }, typeof(Program).Module, true);
+        var il = dynamic.GetILGenerator(); il.DeclareLocal(typeof(float));
+        foreach (var instruction in output)
+        {
+            if (instruction.operand is FieldInfo field) il.Emit(instruction.opcode, field);
+            else if (instruction.operand is MethodInfo method) il.Emit(instruction.opcode, method);
+            else if (instruction.operand is Type type) il.Emit(instruction.opcode, type);
+            else il.Emit(instruction.opcode);
+        }
+        return (Action<RobotLevelRobotBodyPart, DamageDealer.DamageInfo>)dynamic.CreateDelegate(
+            typeof(Action<RobotLevelRobotBodyPart, DamageDealer.DamageInfo>));
+    }
+
+    private static void TestRobotLocalPatchFailure()
+    {
+        using (var fixture = new Fixture())
+        {
+            var hit = CompileLocalHit(fixture.InstalledPlugin, typeof(RobotLevelRobotBodyPart), 0);
+            var failed = new Plugin();
+            failed.harmony.RejectPatch = method => method.DeclaringType == typeof(RobotLevelRobotChest);
+            failed.InstallDamagePatches();
+            var part = new RobotLevelRobotHead(); part.Init(fixture.Properties, 5f, 1f);
+            fixture.WithPlayerContext(() => hit(part, new DamageDealer.DamageInfo(2f)));
+            Check(part.Health(0) == 3f && fixture.Reserve == 1000d && failed.Logger.Warnings.Count > 0,
+                "if either local patch fails, even the installed first getter remains native");
+        }
+    }
+
+    private static void TestRobotNativeHealthAdapter()
+    {
+        var properties = new LevelProperties.Robot { TotalHealth = 1800f,
+            states = new[] { new RobotState { stateName = RobotStateName.Main, healthTrigger = 10f },
+                new RobotState { stateName = RobotStateName.HeliHead, healthTrigger = .9f },
+                new RobotState { stateName = RobotStateName.Inventor, healthTrigger = .8f } } };
+        var head = new RobotLevelRobotHead(); var chest = new RobotLevelRobotChest(); var hatch = new RobotLevelRobotHatch();
+        var robot = new RobotLevelRobot(head, chest, hatch);
+        var level = new RobotLevel(properties, robot) { Id = 81 };
+        Level.Current = level;
+        CreatorToolsTapFarmingRobotHealth adapter;
+        Check(CreatorToolsTapFarmingRobotHealth.TryCapture(level, null, out adapter) &&
+            ReferenceEquals(adapter.Properties, properties), "capture discovers only the current level's properties");
+        Check(adapter.OriginalHealth.Length == 3 && Near(adapter.OriginalHealth[0], 840d) &&
+            Near(adapter.OriginalHealth[1], 180d) && Near(adapter.OriginalHealth[2], 1440d),
+            "Expert original phases use local 840 plus generic 180/1440 rather than a synthetic phase-one threshold");
+        int phase; double remaining, current;
+        Check(adapter.TryRead(out phase, out remaining, out current) && phase == 1 && Near(current, 840d) && Near(remaining, 2460d),
+            "zeroed pre-intro arrays do not pretend the four local pools are already dead");
+        head.Init(properties, 180f, 1f); chest.Init(properties, 180f, 300f); hatch.Init(properties, 180f, 1f);
+        head.SetHealth(0, -10f); chest.SetHealth(0, 100f); hatch.SetHealth(0, 20f);
+        Check(adapter.TryRead(out phase, out remaining, out current) && Near(current, 420d),
+            "phase one sums living primary pools plus hidden heart and excludes dummy secondary HP");
+        properties.stateIndex = 1;
+        typeof(AbstractLevelProperties<RobotState, RobotStateName, Difficulty>).GetProperty("CurrentHealth")
+            .SetValue(properties, 1500f);
+        Check(adapter.TryRead(out phase, out remaining, out current) && phase == 2 && Near(current, 60d) && Near(remaining, 1500d),
+            "flying head remaining subtracts the Inventor threshold and holds future native HP");
+        properties.stateIndex = 2;
+        Check(adapter.TryRead(out phase, out remaining, out current) && phase == 3 && Near(current, 1440d),
+            "current generic HP is clamped to the current phase's original capacity");
+        Level.Current = new Level { Id = 82 };
+        Check(!adapter.TryRead(out phase, out remaining, out current), "retry/scene change invalidates old actor references");
+        var simple = new LevelProperties.Robot { states = new[] { new RobotState { stateName = RobotStateName.Main } } };
+        simple.states[0].hose.health = simple.states[0].orb.chestHP = simple.states[0].shotBot.hatchGateHealth = 250;
+        simple.states[0].heart.heartHP = 500;
+        Level.Current = new RobotLevel(simple, robot) { Id = 83 };
+        Check(CreatorToolsTapFarmingRobotHealth.TryCapture(Level.Current, simple, out adapter) &&
+            adapter.OriginalHealth.Length == 1 && Near(adapter.OriginalHealth[0], 1250d),
+            "Simple has only one real local phase");
+        Check(!CreatorToolsTapFarmingRobotHealth.TryCapture(Level.Current, properties, out adapter),
+            "an unrelated properties instance cannot attach to this level");
+        properties.TotalHealth = 1400f;
+        properties.states[0].hose.health = properties.states[0].orb.chestHP =
+            properties.states[0].shotBot.hatchGateHealth = 150;
+        properties.states[0].heart.heartHP = 225;
+        Level.Current = new RobotLevel(properties, robot) { Id = 84 };
+        Check(CreatorToolsTapFarmingRobotHealth.TryCapture(Level.Current, null, out adapter) &&
+            Near(adapter.OriginalHealth.Sum(), 1935d) && Near(adapter.OriginalHealth[0], 675d) &&
+            Near(adapter.OriginalHealth[1], 140d) && Near(adapter.OriginalHealth[2], 1120d),
+            "Normal original HP is 1935 from local 675 plus generic 140/1120");
+        Level.Current = null;
+    }
+    private static bool Near(double left, double right) { return Math.Abs(left - right) < .001d; }
+}

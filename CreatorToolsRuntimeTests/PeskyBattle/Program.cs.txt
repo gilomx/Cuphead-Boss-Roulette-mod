@@ -20,6 +20,7 @@ internal static class Program
         TestPublicationCaching();
         TestTapPublicationCaching();
         TestTapPhaseTransitionPublication();
+        TapPhaseDistributionTests.Run();
         QueueSelectionTests.Run();
         foreach (var item in CreatorToolsTimedChallenge.Items) TestChallenge(item);
         Console.WriteLine("All Pesky Battle / Tap Farming tests passed (2–5 slots, activation notices, bounded history, worker snapshots, cached publications, live heartbeat, coordinator invalidation and 12 timed challenges).");

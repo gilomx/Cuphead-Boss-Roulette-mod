@@ -346,6 +346,7 @@
         "battle": "Effective health remaining across the boss and reserve",
         "collected": "The community has collected {value} health points for the next boss.",
         "healthPointsShort": "HP",
+        "currentArenaHealth": "Current arena health",
         "reserveEquivalent": "The current reserve equals {value}× this boss's full health.",
         "reservePercent": "The current reserve equals {value} of this boss's full health.",
         "converted": "The community has converted {value} health points."

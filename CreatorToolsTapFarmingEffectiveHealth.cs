@@ -28,15 +28,12 @@ namespace Gilomx.CupheadBossRoulette
             nativeCurrent = NonNegative(nativeCurrent);
             nativeTotal = NonNegative(nativeTotal);
             reserve = NonNegative(reserve);
-            spentDuringAttempt = NonNegative(spentDuringAttempt);
 
             if (string.Equals(phase, "completed",
                     StringComparison.OrdinalIgnoreCase))
             {
-                var completedTotal = NonNegative(
-                    nativeTotal + reserve + spentDuringAttempt);
                 return new CreatorToolsTapFarmingEffectiveHealth(
-                    true, 0d, completedTotal, 0d);
+                    true, 0d, nativeTotal, 0d);
             }
 
             if (nativeTotal <= 0d ||
@@ -47,17 +44,16 @@ namespace Gilomx.CupheadBossRoulette
                 return new CreatorToolsTapFarmingEffectiveHealth(
                     false, reserve, 0d, 0d);
 
-            var total = NonNegative(
-                nativeTotal + reserve + spentDuringAttempt);
+            // The original native HP remains the reference for 100%.
+            // Deposits and absorbed hits only change the numerator.
+            var total = nativeTotal;
             var current = NonNegative(nativeCurrent + reserve);
             if (total <= 0d)
                 return new CreatorToolsTapFarmingEffectiveHealth(
                     false, reserve, 0d, 0d);
 
-            current = Math.Min(current, total);
             return new CreatorToolsTapFarmingEffectiveHealth(
-                true, current, total,
-                Math.Max(0d, Math.Min(1d, current / total)));
+                true, current, total, Math.Max(0d, current / total));
         }
 
         private static double NonNegative(double value)

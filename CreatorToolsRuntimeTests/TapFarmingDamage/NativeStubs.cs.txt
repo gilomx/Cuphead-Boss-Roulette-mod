@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 
 // The real bridge, controller, reserve arithmetic and progress reader are
 // linked into this harness. Only Unity, Harmony patch registration and native
@@ -19,25 +20,37 @@ namespace HarmonyLib
         internal readonly List<PatchRecord> Patches = new List<PatchRecord>();
         internal Func<MethodBase, bool> RejectPatch;
         public void Patch(MethodBase original, HarmonyMethod prefix = null,
-            HarmonyMethod postfix = null, HarmonyMethod finalizer = null)
+            HarmonyMethod postfix = null, HarmonyMethod finalizer = null,
+            HarmonyMethod transpiler = null)
         {
             if (RejectPatch != null && RejectPatch(original))
                 throw new InvalidOperationException("simulated unsupported native helper");
             Patches.Add(new PatchRecord { Original = original,
                 Prefix = prefix == null ? null : prefix.Method,
                 Postfix = postfix == null ? null : postfix.Method,
-                Finalizer = finalizer == null ? null : finalizer.Method });
+                Finalizer = finalizer == null ? null : finalizer.Method,
+                Transpiler = transpiler == null ? null : transpiler.Method });
         }
     }
 
     internal sealed class PatchRecord
     {
         internal MethodBase Original;
-        internal MethodInfo Prefix, Postfix, Finalizer;
+        internal MethodInfo Prefix, Postfix, Finalizer, Transpiler;
     }
 
     public static class AccessTools
     {
+        public static FieldInfo Field(Type type, string name)
+        {
+            for (; type != null; type = type.BaseType)
+            {
+                var result = type.GetField(name, BindingFlags.Instance | BindingFlags.Public |
+                    BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (result != null) return result;
+            }
+            return null;
+        }
         public static MethodInfo Method(Type type, string name, Type[] parameters = null)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static |
@@ -45,6 +58,15 @@ namespace HarmonyLib
             return parameters == null ? type.GetMethod(name, flags) :
                 type.GetMethod(name, flags, null, parameters, null);
         }
+    }
+    public sealed class CodeInstruction
+    {
+        public OpCode opcode;
+        public object operand;
+        public readonly List<Label> labels = new List<Label>();
+        public readonly List<object> blocks = new List<object>();
+        public CodeInstruction(OpCode opcode, object operand = null)
+        { this.opcode = opcode; this.operand = operand; }
     }
 }
 
@@ -61,9 +83,17 @@ namespace UnityEngine
 }
 
 internal enum PlayerId { PlayerOne, None = int.MaxValue }
-internal sealed class DamageDealer { public void DealDamage(UnityEngine.GameObject hit) { } }
+internal sealed class DamageDealer
+{
+    public void DealDamage(UnityEngine.GameObject hit) { }
+    public sealed class DamageInfo
+    {
+        public float damage { get; private set; }
+        public DamageInfo(float damage) { this.damage = damage; }
+    }
+}
 internal enum Levels { Robot, Ground, DicePalaceMain }
-internal sealed class Level
+internal class Level
 {
     internal enum Type { Battle }
     internal static Level Current;
@@ -74,12 +104,20 @@ internal sealed class Level
     internal int GetInstanceID() { return Id; }
 }
 
-internal enum RobotStateName { Components, Flying }
+internal enum RobotStateName { Main = 0, Components = 0, HeliHead = 2, Flying = 2, Inventor = 3 }
 internal sealed class RobotState
 {
     internal RobotStateName stateName;
     internal float healthTrigger;
+    internal RobotHose hose = new RobotHose();
+    internal RobotOrb orb = new RobotOrb();
+    internal RobotShotBot shotBot = new RobotShotBot();
+    internal RobotHeart heart = new RobotHeart();
 }
+internal sealed class RobotHose { internal int health = 180; }
+internal sealed class RobotOrb { internal int chestHP = 180; }
+internal sealed class RobotShotBot { internal int hatchGateHealth = 180; }
+internal sealed class RobotHeart { internal int heartHP = 300; }
 internal sealed class Difficulty { }
 
 internal class AbstractLevelProperties<TState, TName, TDifficulty>
@@ -113,6 +151,51 @@ internal class AbstractLevelProperties<TState, TName, TDifficulty>
 internal sealed class LevelProperties
 {
     internal sealed class Robot : AbstractLevelProperties<RobotState, RobotStateName, Difficulty> { }
+}
+
+internal sealed class RobotLevel : Level
+{
+    private LevelProperties.Robot properties;
+    private RobotLevelRobot robot;
+    internal RobotLevel(LevelProperties.Robot properties, RobotLevelRobot robot)
+    { this.properties = properties; this.robot = robot; CurrentLevel = Levels.Robot; }
+}
+internal sealed class RobotLevelRobot
+{
+    private RobotLevelRobotHead head;
+    private RobotLevelRobotChest chest;
+    private RobotLevelRobotHatch hatch;
+    internal RobotLevelRobot(RobotLevelRobotHead head, RobotLevelRobotChest chest, RobotLevelRobotHatch hatch)
+    { this.head = head; this.chest = chest; this.hatch = hatch; }
+}
+internal class RobotLevelRobotBodyPart
+{
+    protected LevelProperties.Robot properties;
+    protected float[] currentHealth = new float[2];
+    internal void Init(LevelProperties.Robot value, float primary, float secondary)
+    { properties = value; currentHealth[0] = primary; currentHealth[1] = secondary; }
+    internal float Health(int index) { return currentHealth[index]; }
+    internal void SetHealth(int index, float value) { currentHealth[index] = value; }
+    protected virtual void OnDamageTaken(DamageDealer.DamageInfo info)
+    {
+        float old = currentHealth[0];
+        currentHealth[0] -= info.damage;
+        GC.KeepAlive(old);
+    }
+}
+internal sealed class RobotLevelRobotHead : RobotLevelRobotBodyPart { }
+internal sealed class RobotLevelRobotHatch : RobotLevelRobotBodyPart
+{
+    protected override void OnDamageTaken(DamageDealer.DamageInfo info) { base.OnDamageTaken(info); }
+}
+internal sealed class RobotLevelRobotChest : RobotLevelRobotBodyPart
+{
+    protected override void OnDamageTaken(DamageDealer.DamageInfo info)
+    {
+        float old = currentHealth[1];
+        currentHealth[1] -= info.damage;
+        GC.KeepAlive(old);
+    }
 }
 
 namespace Gilomx.CupheadBossRoulette

@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="*.cs.txt" />
     <Compile Include="../../CreatorToolsTapFarmingDamage.cs" />
+    <Compile Include="../../CreatorToolsTapFarmingRobotHealth.cs" />
+    <Compile Include="../../CreatorToolsTapFarmingPhaseReserve.cs" />
     <Compile Include="../../CreatorToolsTapFarmingController.cs" />
     <Compile Include="../../CreatorToolsTapFarmingSettings.cs" />
     <Compile Include="../../CreatorToolsTapFarmingEffectiveHealth.cs" />

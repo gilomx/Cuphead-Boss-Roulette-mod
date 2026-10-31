@@ -1,0 +1,300 @@
+using System;
+using System.IO;
+using System.Text.Json;
+using Gilomx.CupheadBossRoulette;
+
+// Generic native health/state transitions, including changes inside the
+// projection's 100 ms throttle. Robot has its own real adapter harness.
+internal static class TapPhaseDistributionTests
+{
+    public static void Run()
+    {
+        TestGenericDistribution();
+        TestDicePalaceHandoffsAndProtectedMain();
+        TestFailedReaderPreservesNativeDamage();
+    }
+
+    private static void TestGenericDistribution()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "pichi-phase-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var taps = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"),
+            new CreatorToolsLiveEventsCoordinator(), null, null);
+        var server = new CreatorToolsServer();
+        try
+        {
+            taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=1&healthPointsPerConversion=1");
+            var properties = new Properties();
+            var level = new Level { CurrentLevel = Levels.Ground, Id = 400 };
+            taps.OnLevelStarted(level);
+            Deposit(taps, 1000);
+            Hit(taps, properties, 201, 1);
+            Near(800, Reserve(taps, server));
+            // Phase 2 begins before Time.realtimeSinceStartup changes.
+            properties.stateIndex = 1; properties.CurrentHealth = 800;
+            Hit(taps, properties, 100, 0);
+            Near(700, Reserve(taps, server));
+            Deposit(taps, 300); // 150 for phase 2, 150 for phase 3.
+            Hit(taps, properties, 451, 1);
+            Near(550, Reserve(taps, server));
+            properties.stateIndex = 2; properties.CurrentHealth = 400;
+            Hit(taps, properties, 100, 0);
+            Near(450, Reserve(taps, server));
+            taps.OnLevelDefeated(level);
+            properties.stateIndex = 0; properties.CurrentHealth = 1000;
+            taps.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 401 });
+            Hit(taps, properties, 91, 1); // Remaining 450 repartitions 90/180/180.
+            Near(360, Reserve(taps, server));
+            Console.WriteLine("PASS controller phase distribution, new taps, immediate phase changes and retry conservation");
+        }
+        finally
+        {
+            taps.ProcessBackgroundCommand("action=off");
+            Directory.Delete(directory, true);
+        }
+    }
+
+    private static void TestDicePalaceHandoffsAndProtectedMain()
+    {
+        using (var fixture = new Fixture())
+        {
+            var first = fixture.Start(Levels.DicePalaceBooze, 500);
+            Deposit(fixture.Taps, 400);
+            // Native subphases must not replace the logical four-arena split.
+            var properties = new Properties();
+            Hit(fixture.Taps, properties, 50, 0);
+            AssertBalances(fixture, 350, 50, 100, 100, 100);
+            properties.stateIndex = 1; properties.CurrentHealth = 800;
+            Hit(fixture.Taps, properties, 50, 0);
+            properties.stateIndex = 2; properties.CurrentHealth = 400;
+            Hit(fixture.Taps, properties, 1, 1);
+            AssertBalances(fixture, 300, 0, 100, 100, 100);
+
+            fixture.Handoff(first);
+            var second = fixture.Start(Levels.DicePalaceBooze, 501);
+            properties = Arena(500);
+            Hit(fixture.Taps, properties, 101, 1);
+            AssertBalances(fixture, 200, 0, 0, 100, 100);
+            AssertAttemptAndArena(fixture, 1, 500);
+
+            fixture.Handoff(second);
+            var third = fixture.Start(Levels.DicePalaceBooze, 502);
+            properties = Arena(700);
+            Hit(fixture.Taps, properties, 100, 0);
+            AssertBalances(fixture, 100, 0, 0, 0, 100);
+
+            fixture.Handoff(third);
+            var extra = fixture.Start(Levels.DicePalaceBooze, 503);
+            properties = Arena(400);
+            Hit(fixture.Taps, properties, 10, 10);
+            AssertBalances(fixture, 100, 0, 0, 0, 100);
+            Deposit(fixture.Taps, 40);
+            Hit(fixture.Taps, properties, 10, 10);
+            AssertBalances(fixture, 140, 0, 0, 0, 140);
+            UnityEngine.Time.realtimeSinceStartup += 0.2f;
+            fixture.Taps.ObserveBossDamage(properties);
+            using (var state = fixture.State())
+            {
+                Near(380, state.RootElement.GetProperty("effectiveHealth").GetProperty("current").GetDouble());
+                Near(400, state.RootElement.GetProperty("effectiveHealth").GetProperty("total").GetDouble());
+            }
+
+            fixture.Handoff(extra);
+            var main = fixture.Start(Levels.DicePalaceMain, 504);
+            properties = Arena(900);
+            Hit(fixture.Taps, properties, 100, 0);
+            AssertBalances(fixture, 40, 0, 0, 0, 40);
+            AssertAttemptAndArena(fixture, 1, 900);
+            Hit(fixture.Taps, properties, 41, 1);
+            AssertBalances(fixture, 0, 0, 0, 0, 0);
+            Near(899, properties.CurrentHealth);
+
+            // A real defeat is a new logical attempt; an internal scene swap
+            // was not. Repartition the unspent 80, never restore spent HP.
+            Deposit(fixture.Taps, 80);
+            fixture.Taps.OnLevelDefeated(main);
+            fixture.Start(Levels.DicePalaceBooze, 505);
+            properties = Arena(600);
+            Hit(fixture.Taps, properties, 21, 1);
+            AssertBalances(fixture, 60, 0, 20, 20, 20);
+            AssertAttemptAndArena(fixture, 2, 600);
+            Console.WriteLine("PASS Dice Palace four protected budgets, internal handoffs, extra arenas, Main and legitimate retry conservation");
+        }
+    }
+
+    private static void TestFailedReaderPreservesNativeDamage()
+    {
+        using (var fixture = new Fixture())
+        {
+            fixture.Start(Levels.Ground, 600);
+            Deposit(fixture.Taps, 1000);
+            var properties = new FailingProperties();
+            var damage = 100f;
+            Check(!fixture.Taps.PrepareBossDamage(properties, ref damage), "valid initial metadata must absorb");
+            Near(0, damage);
+            AssertBalances(fixture, 900, 100, 400, 400);
+
+            fixture.Taps.OnPhaseTransition();
+            // This models a temporarily unreadable native state while the
+            // last good phase map and reserve ledger still exist.
+            properties.stateIndex = "unreadable-native-state";
+            UnityEngine.Time.realtimeSinceStartup += 0.2f;
+            damage = 12f;
+            Check(fixture.Taps.PrepareBossDamage(properties, ref damage), "failed phase read must preserve the native callback");
+            Near(12, damage);
+            properties.CurrentHealth -= damage;
+            fixture.Taps.ObserveBossDamage(properties);
+            AssertBalances(fixture, 900, 100, 400, 400);
+            using (var state = fixture.State())
+                Check(state.RootElement.GetProperty("phase").GetString() == "active",
+                    "a failed reader must still resume the active lifecycle after the transition");
+
+            properties.stateIndex = 1;
+            properties.CurrentHealth = 800;
+            // No clock advancement: recovery must use the current phase even
+            // while the expensive full snapshot remains throttled.
+            damage = 451f;
+            Check(fixture.Taps.PrepareBossDamage(properties, ref damage), "recovered phase must admit only the unabsorbed remainder");
+            Near(1, damage);
+            properties.CurrentHealth -= damage;
+            AssertBalances(fixture, 450, 0, 0, 450);
+            Near(799, properties.CurrentHealth);
+            Console.WriteLine("PASS failed native phase reads leave damage/reserve intact, resume lifecycle and recover within the snapshot throttle");
+        }
+    }
+
+    private static Properties Arena(float total)
+    {
+        return new Properties { CurrentHealth = total, TotalHealth = total,
+            states = new[] { new State("Main", 1) } };
+    }
+
+    private static void AssertBalances(Fixture fixture, double reserve, params double[] balances)
+    {
+        using (var state = fixture.State())
+        {
+            Near(reserve, state.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble());
+            var phases = state.RootElement.GetProperty("phases");
+            Check(phases.GetArrayLength() == balances.Length, "logical phase count changed");
+            for (var index = 0; index < balances.Length; index++)
+                Near(balances[index], phases[index].GetProperty("reserveHealth").GetDouble());
+        }
+    }
+
+    private static void AssertAttemptAndArena(Fixture fixture, int attempt, double nativeTotal)
+    {
+        using (var state = fixture.State())
+        {
+            Near(attempt, state.RootElement.GetProperty("attempt").GetInt32());
+            var effective = state.RootElement.GetProperty("effectiveHealth");
+            Check(effective.GetProperty("scope").GetString() == "arena", "Dice health percent must identify its per-arena denominator");
+            Near(nativeTotal, effective.GetProperty("total").GetDouble());
+        }
+    }
+
+    private sealed class Fixture : IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "pichi-phase-integration-" + Guid.NewGuid().ToString("N"));
+        private readonly Level previousLevel = Level.Current;
+        private readonly float previousTime = UnityEngine.Time.realtimeSinceStartup;
+        internal readonly CreatorToolsTapFarmingController Taps;
+        internal readonly CreatorToolsServer Server = new CreatorToolsServer();
+
+        internal Fixture()
+        {
+            Directory.CreateDirectory(directory);
+            UnityEngine.Time.realtimeSinceStartup = 0f;
+            Taps = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"),
+                new CreatorToolsLiveEventsCoordinator(), null, null);
+            Taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=1&healthPointsPerConversion=1");
+        }
+        internal Level Start(Levels arena, int id)
+        {
+            var level = new Level { CurrentLevel = arena, Id = id };
+            Level.Current = level;
+            Taps.OnLevelStarted(level);
+            return level;
+        }
+        internal void Handoff(Level previous)
+        {
+            Taps.OnLevelPreWin(previous);
+            Taps.OnLevelEnded(previous);
+        }
+        internal JsonDocument State()
+        {
+            Taps.PublishState(Server);
+            return JsonDocument.Parse(Server.TapState);
+        }
+        public void Dispose()
+        {
+            Taps.ProcessBackgroundCommand("action=off");
+            Level.Current = previousLevel;
+            UnityEngine.Time.realtimeSinceStartup = previousTime;
+            Directory.Delete(directory, true);
+        }
+    }
+
+    private sealed class FailingProperties
+    {
+        public float CurrentHealth { get; set; } = 1000;
+        public float TotalHealth = 1000;
+        public object stateIndex = 0;
+        public State[] states = { new State("A", 1), new State("B", .8f), new State("C", .4f) };
+    }
+
+    private static void Deposit(CreatorToolsTapFarmingController taps, int count)
+    {
+        taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = count });
+    }
+    private static void Hit(CreatorToolsTapFarmingController taps, Properties properties, float hit, float remaining)
+    {
+        var damage = hit;
+        var passes = taps.PrepareBossDamage(properties, ref damage);
+        Near(remaining, damage);
+        if (passes != (remaining > 0)) throw new Exception("native damage admission mismatch");
+        if (passes) properties.CurrentHealth -= damage;
+        taps.ObserveBossDamage(properties);
+    }
+    private static double Reserve(CreatorToolsTapFarmingController taps, CreatorToolsServer server)
+    {
+        taps.PublishState(server);
+        using (var state = JsonDocument.Parse(server.TapState))
+            return state.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble();
+    }
+    private static void Near(double expected, double actual)
+    {
+        if (double.IsNaN(actual) || double.IsInfinity(actual) ||
+            Math.Abs(expected - actual) > 0.0001)
+            throw new Exception("Expected " + expected + ", got " + actual);
+    }
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new Exception(message);
+    }
+    private sealed class Properties
+    {
+        public float CurrentHealth { get; set; } = 1000;
+        public float TotalHealth = 1000;
+        public int stateIndex;
+        public State[] states = { new State("A", 1), new State("B", .8f), new State("C", .4f) };
+    }
+    private sealed class State
+    {
+        public string stateName;
+        public float healthTrigger;
+        public State(string name, float trigger) { stateName = name; healthTrigger = trigger; }
+    }
+}
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal sealed class CreatorToolsTapFarmingRobotHealth
+    {
+        internal object Properties { get { return null; } }
+        internal double[] OriginalHealth { get { return null; } }
+        internal static bool TryCapture(Level level, object properties, out CreatorToolsTapFarmingRobotHealth adapter)
+        { adapter = null; return false; }
+        internal bool TryRead(out int index, out double current, out double phaseCurrent)
+        { index = 0; current = phaseCurrent = 0; return false; }
+    }
+}

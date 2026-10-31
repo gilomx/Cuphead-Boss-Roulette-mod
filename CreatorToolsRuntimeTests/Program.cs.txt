@@ -618,19 +618,19 @@ namespace Gilomx.CupheadBossRoulette
             True(initial.Available, "active health is available");
             Equal(1500d, initial.Current,
                 "initial effective current health");
-            Equal(1500d, initial.Total,
-                "initial effective total health");
-            Equal(1d, initial.Ratio,
-                "initial effective ratio");
+            Equal(1000d, initial.Total,
+                "100 percent always refers to original native health");
+            Equal(1.5d, initial.Ratio,
+                "extra health can exceed 100 percent");
 
             var absorbed =
                 CreatorToolsTapFarmingEffectiveHealth.Calculate(
                     "active", 1000d, 1000d, 400d, 100d);
             Equal(1400d, absorbed.Current,
                 "absorbed damage reduces effective current health");
-            Equal(1500d, absorbed.Total,
+            Equal(1000d, absorbed.Total,
                 "absorbed damage preserves effective total health");
-            True(Math.Abs(absorbed.Ratio - (1400d / 1500d)) < 0.000001d,
+            True(Math.Abs(absorbed.Ratio - 1.4d) < 0.000001d,
                 "absorbed damage changes the ratio before native health");
 
             var nativeDamage =
@@ -638,8 +638,14 @@ namespace Gilomx.CupheadBossRoulette
                     "active", 900d, 1000d, 0d, 500d);
             Equal(900d, nativeDamage.Current,
                 "native damage continues reducing effective health");
-            Equal(1500d, nativeDamage.Total,
-                "effective total includes consumed reserve");
+            Equal(1000d, nativeDamage.Total,
+                "spent reserve does not change the original denominator");
+            Equal(0.9d, nativeDamage.Ratio,
+                "native damage can lower the percentage below 100");
+            var newTaps = CreatorToolsTapFarmingEffectiveHealth.Calculate(
+                "active", 500d, 1000d, 1000d, 500d);
+            Equal(1.5d, newTaps.Ratio,
+                "new deposits can raise a damaged boss above 100 again");
 
             var completed =
                 CreatorToolsTapFarmingEffectiveHealth.Calculate(
@@ -650,6 +656,8 @@ namespace Gilomx.CupheadBossRoulette
                 "completed state ignores leftover reserve");
             Equal(0d, completed.Ratio,
                 "completed state is empty");
+            Equal(1000d, completed.Total,
+                "completion keeps the original baseline");
         }
 
         private static void TestDashboardChatSimulationVoting()

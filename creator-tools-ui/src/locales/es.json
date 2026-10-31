@@ -346,6 +346,7 @@
         "battle": "Vida efectiva restante del jefe y la reserva",
         "collected": "La comunidad ha reunido {value} puntos de vida para el próximo jefe.",
         "healthPointsShort": "PV",
+        "currentArenaHealth": "Vida de la arena actual",
         "reserveEquivalent": "La reserva actual equivale a {value}× la vida completa de este jefe.",
         "reservePercent": "La reserva actual equivale al {value} de la vida completa de este jefe.",
         "converted": "La comunidad ha convertido {value} puntos de vida."

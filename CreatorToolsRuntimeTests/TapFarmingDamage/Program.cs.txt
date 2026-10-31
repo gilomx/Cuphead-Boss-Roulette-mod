@@ -7,7 +7,7 @@ using System.Threading;
 using Gilomx.CupheadBossRoulette;
 using HarmonyLib;
 
-internal static class Program
+internal static partial class Program
 {
     private static void Check(bool condition, string message)
     { if (!condition) throw new Exception(message); }
@@ -16,12 +16,15 @@ internal static class Program
     {
         TestPatchRegistration();
         TestProgressionPatchFailure();
-        TestUnguardedComponentWouldBeStranded();
+        TestUnguardedProgressionWouldSpendReserve();
         TestRobotComponentsAndReserve();
         TestNestedScopesAndFinalizers();
         TestPlayerAndBossExceptionCleanup();
         TestThreadIsolation();
-        Console.WriteLine("All Tap Farming damage bridge tests passed (native registration order, failed guard, Robot component gates, reserve preservation, nested scopes, exception cleanup and thread isolation).");
+        TestRobotLocalTranspilers();
+        TestRobotLocalPatchFailure();
+        TestRobotNativeHealthAdapter();
+        Console.WriteLine("All Tap Farming damage bridge tests passed (scope guards, Robot local IL full/partial/zero damage, future reserve, partial-install failure, native health adapter, exception cleanup and thread isolation).");
     }
 
     private static void TestPatchRegistration()
@@ -32,7 +35,7 @@ internal static class Program
         var advance = patches.FindIndex(p => p.Original.Name == "DealDamageToNextNamedState");
         var damage = patches.FindIndex(p => p.Original.DeclaringType != typeof(DamageDealer) && p.Original.Name == "DealDamage");
         Check(advance >= 0 && damage > advance, "native progression guard is installed before boss damage absorption");
-        Check(patches.All(p => p.Prefix != null && p.Postfix != null && p.Finalizer != null),
+        Check(patches.Where(p => p.Transpiler == null).All(p => p.Prefix != null && p.Postfix != null && p.Finalizer != null),
             "all registered scopes have normal and exceptional cleanup");
     }
 
@@ -93,16 +96,15 @@ internal static class Program
         }
     }
 
-    private static void TestUnguardedComponentWouldBeStranded()
+    private static void TestUnguardedProgressionWouldSpendReserve()
     {
         using (var fixture = new Fixture())
         {
-            // Deliberately omit the new progression prefix to reproduce the
-            // old bridge while keeping the real reserve controller active.
+            // Deliberately omit the progression scope: synthetic native
+            // work must never consume a player's assigned phase balance.
             fixture.WithPlayerContext(fixture.Properties.DealDamageToNextNamedState);
-            Check(fixture.Properties.stateIndex == 0 && fixture.Properties.CurrentHealth == 300f &&
-                fixture.Reserve == 700d,
-                "unguarded synthetic loop spends its entire TotalHealth iteration budget on reserve and strands a destroyed component");
+            Check(fixture.Reserve < 1000d,
+                "unguarded synthetic advancement incorrectly spends real community reserve");
         }
     }
 
@@ -177,18 +179,30 @@ internal static class Program
         private readonly CreatorToolsTapFarmingController taps;
         private readonly CreatorToolsServer server = new CreatorToolsServer();
         private readonly PatchRecord player, boss, progression;
+        internal readonly Plugin InstalledPlugin;
         internal readonly LevelProperties.Robot Properties = new LevelProperties.Robot();
 
-        internal Fixture()
+        internal Fixture(int reserve = 1000)
         {
             Directory.CreateDirectory(directory);
             taps = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"),
                 new CreatorToolsLiveEventsCoordinator(), null, null);
+            Properties.states = new[] {
+                new RobotState { stateName = RobotStateName.Main, healthTrigger = 10f },
+                new RobotState { stateName = RobotStateName.HeliHead, healthTrigger = .5f },
+                new RobotState { stateName = RobotStateName.Inventor, healthTrigger = .2f } };
+            Properties.states[0].hose.health = Properties.states[0].orb.chestHP =
+                Properties.states[0].shotBot.hatchGateHealth = Properties.states[0].heart.heartHP = 5;
+            var head = new RobotLevelRobotHead(); head.Init(Properties, 5f, 1f);
+            var chest = new RobotLevelRobotChest(); chest.Init(Properties, 5f, 5f);
+            var hatch = new RobotLevelRobotHatch(); hatch.Init(Properties, 5f, 1f);
+            Level.Current = new RobotLevel(Properties, new RobotLevelRobot(head, chest, hatch)) { Id = 21 };
             taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=1&healthPointsPerConversion=1");
-            taps.OnLevelStarted(new Level { CurrentLevel = Levels.Robot, Id = 21 });
-            taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = 1000 });
+            taps.OnLevelStarted(Level.Current);
+            taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = reserve });
             var plugin = new Plugin { creatorToolsInteractions = new CreatorToolsInteractionController { Controller = taps } };
             Plugin.activeInstance = plugin;
+            InstalledPlugin = plugin;
             plugin.InstallDamagePatches();
             player = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(DamageDealer));
             boss = plugin.harmony.Patches.Single(p => p.Original.DeclaringType != typeof(DamageDealer) && p.Original.Name == "DealDamage");
@@ -300,6 +314,7 @@ internal static class Program
         {
             Plugin.activeInstance = null;
             taps.ProcessBackgroundCommand("action=off");
+            Level.Current = null;
             Directory.Delete(directory, true);
         }
     }
