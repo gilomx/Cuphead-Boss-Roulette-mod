@@ -1,0 +1,95 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+
+internal static class Program
+{
+    private static void Check(bool condition, string message)
+    { if (!condition) throw new Exception(message); }
+
+    private static void Main()
+    {
+        TestCachedHitsDoNotDiscoverAssets();
+        TestDestroyedSpriteRetryAndFallback();
+        TestMissingAssetDiscoveryIsThrottled();
+        Console.WriteLine("All GameTheme tests passed (1000 cached hits without resource queries, destroyed Unity objects, retry replacement, draw fallback and throttled misses).");
+    }
+
+    private static Sprite NewSprite(string name)
+    {
+        return new Sprite { name = name, texture = new Texture2D(8, 8, TextureFormat.ARGB32, false),
+            textureRect = new Rect(0f, 0f, 8f, 8f) };
+    }
+
+    private static void TestCachedHitsDoNotDiscoverAssets()
+    {
+        Time.realtimeSinceStartup = 0f;
+        var sprite = NewSprite("equip_icon_peashooter_0001");
+        Resources.Loaded = new UnityEngine.Object[] { sprite, new Font { name = "CupheadVogue-ExtraBold-merged" } };
+        var theme = new GameTheme();
+        Resources.ResetCounters();
+        for (var i = 1; i <= 1000; i++)
+        {
+            Time.realtimeSinceStartup = i * 3f;
+            Check(ReferenceEquals(sprite, theme.GetSprite("EQUIP_ICON_PEASHOOTER_0001")), "live cached sprite remains available across scan deadlines");
+        }
+        Check(Resources.FontQueries == 0 && Resources.SpriteQueries == 0,
+            "1000 cached hits must not query any global Resources objects");
+        Check(theme.GetSprite(null) == null && theme.GetSprite(string.Empty) == null &&
+            Resources.FontQueries == 0 && Resources.SpriteQueries == 0,
+            "null and empty sprite names cannot trigger discovery");
+        Console.WriteLine("1000 live cached sprite lookups: 0 font queries, 0 sprite queries.");
+        theme.Dispose();
+    }
+
+    private static void TestDestroyedSpriteRetryAndFallback()
+    {
+        Time.realtimeSinceStartup = 0f;
+        var previousAttempt = NewSprite("equip_icon_empty_0001");
+        Resources.Loaded = new UnityEngine.Object[] { previousAttempt };
+        var theme = new GameTheme();
+        UnityEngine.Object.Destroy(previousAttempt);
+        Check(!ReferenceEquals(previousAttempt, null) && previousAttempt == null,
+            "fixture represents Unity's destroyed-object null semantics");
+        var retrySprite = NewSprite("equip_icon_empty_0001");
+        Resources.Loaded = new UnityEngine.Object[] { previousAttempt, retrySprite };
+        Resources.ResetCounters();
+        Time.realtimeSinceStartup = 0.5f;
+        Check(!theme.DrawSprite("equip_icon_empty_0001", new Rect(), Color.white),
+            "destroyed cached sprites safely use the caller's fallback while discovery is throttled");
+        Check(Resources.SpriteQueries == 0, "retry fallback respects the shared scan timer");
+        Time.realtimeSinceStartup = 2f;
+        Check(ReferenceEquals(retrySprite, theme.GetSprite("equip_icon_empty_0001")),
+            "retry-loaded sprite replaces the old destroyed dictionary entry");
+        Check(Resources.FontQueries == 1 && Resources.SpriteQueries == 1,
+            "recovery performs one shared discovery pass");
+        var otherDuplicate = NewSprite("equip_icon_empty_0001");
+        Resources.Loaded = new UnityEngine.Object[] { otherDuplicate, retrySprite };
+        Time.realtimeSinceStartup = 4f;
+        theme.Refresh();
+        Check(ReferenceEquals(retrySprite, theme.GetSprite("equip_icon_empty_0001")),
+            "explicit refresh preserves a valid cached sprite when duplicate names exist");
+        Check(theme.DrawSprite("equip_icon_empty_0001", new Rect(), Color.white),
+            "recovered native sprite renders after the temporary retry fallback");
+        theme.Dispose();
+    }
+
+    private static void TestMissingAssetDiscoveryIsThrottled()
+    {
+        Time.realtimeSinceStartup = 0f;
+        Resources.Loaded = new UnityEngine.Object[0];
+        var theme = new GameTheme();
+        Resources.ResetCounters();
+        Time.realtimeSinceStartup = 2f;
+        for (var i = 0; i < 1000; i++)
+            Check(theme.GetSprite("not_loaded_yet") == null, "missing sprite remains a safe fallback");
+        Check(Resources.FontQueries == 1 && Resources.SpriteQueries == 1,
+            "1000 misses in the same retry window perform only one discovery pass");
+        var lateSprite = NewSprite("not_loaded_yet");
+        Resources.Loaded = new UnityEngine.Object[] { lateSprite };
+        Time.realtimeSinceStartup = 4f;
+        Check(ReferenceEquals(lateSprite, theme.GetSprite("not_loaded_yet")),
+            "a later native asset can be discovered after the next shared deadline");
+        theme.Dispose();
+    }
+}

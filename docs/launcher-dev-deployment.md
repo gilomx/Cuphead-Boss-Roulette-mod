@@ -116,6 +116,12 @@ La publicación:
    un directorio temporal. Compila la DLL en Release usando las referencias
    locales de Cuphead y Harmony del cargador limpio. Publica el companion
    autocontenido de Windows x64, como un único EXE.
+   Valida también el contrato nativo de avance de fase de Farmeada de taps:
+   la destrucción de componentes del robot y otros cambios programados de fase
+   usan daño interno que debe avanzar sin consumir la reserva de taps.
+   El contrato recorre además las rutas de daño del juego y coteja los
+   inventarios revisados de avances y daño no estándar. Una ruta nueva sin
+   revisar o una familia de salud sin protección detiene la publicación.
 3. Añade los assets versionados del checkout y los archivos recién compilados
    del panel. Los assets nuevos deben añadirse a Git antes de publicar. No
    recoge archivos locales sueltos, otros mods ni contenido de la instalación.

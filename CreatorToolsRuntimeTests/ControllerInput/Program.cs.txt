@@ -1,0 +1,57 @@
+using System;
+using System.Linq;
+using System.Reflection;
+using System.Collections;
+using Gilomx.CupheadBossRoulette;
+
+internal static class Program
+{
+    private static int Main()
+    {
+        try
+        {
+            var names = new[] { null, "", " ", "Right Trigger", "trigger-right", "R2", "pad R_2",
+                "ZR", "Switch Z-R", "LEFT TRIGGER", "trigger:left", "L2", "pad.L-2", "ZL",
+                "left stick", "right stick", "button 2", "a", "Trigger Left / Trigger Right", "Ó R2!" };
+            foreach (var name in names)
+            {
+                Require(ControllerTriggerLabels.IsLeft(name) == Original(name, false), "Left matching changed: " + name);
+                Require(ControllerTriggerLabels.IsRight(name) == Original(name, true), "Right matching changed: " + name);
+            }
+            // Thousands of unchanged Rewired identifier reads must create no
+            // strings while polling the two players across gameplay frames.
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var frame = 0; frame < 10000; frame++)
+                foreach (var name in names)
+                {
+                    ControllerTriggerLabels.IsLeft(name);
+                    ControllerTriggerLabels.IsRight(name);
+                }
+            Require(GC.GetAllocatedBytesForCurrentThread() == before, "Warm controller polling allocated memory.");
+            Console.WriteLine("PASS Existing trigger labels and 400000 cached checks with zero allocated bytes.");
+            for (var index = 0; index < 600; index++)
+            {
+                var label = "Changed device " + index + " Right Trigger";
+                Require(ControllerTriggerLabels.IsRight(label) == Original(label, true), "Overflow changed matching.");
+            }
+            var cache = (IDictionary)typeof(ControllerTriggerLabels).GetField("labels", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Require(cache.Count == 256, "Device churn must keep the label cache bounded.");
+            Require(ControllerTriggerLabels.IsLeft("New device left trigger"), "Uncached identifiers must still work.");
+            Console.WriteLine("PASS Bounded device churn preserves classification after the cache fills.");
+            return 0;
+        }
+        catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+    }
+    private static bool Original(string label, bool right)
+    {
+        if (string.IsNullOrEmpty(label)) return false;
+        var normalized = new string(label.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+        return right
+            ? normalized.Contains("righttrigger") || normalized.Contains("triggerright") || normalized == "r2" || normalized.EndsWith("r2") || normalized == "zr" || normalized.EndsWith("zr")
+            : normalized.Contains("lefttrigger") || normalized.Contains("triggerleft") || normalized == "l2" || normalized.EndsWith("l2") || normalized == "zl" || normalized.EndsWith("zl");
+    }
+    private static void Require(bool condition, string message)
+    {
+        if (!condition) throw new InvalidOperationException(message);
+    }
+}

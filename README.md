@@ -454,6 +454,16 @@ powershell -ExecutionPolicy Bypass -File .\TikFinityCompanion\scripts\test.ps1
 powershell -ExecutionPolicy Bypass -File .\TikFinityCompanion\scripts\publish-win-x64.ps1
 ```
 
+## Pruebas de carga
+
+[`tools/send-stream-stress.ps1`](tools/send-stream-stress.ps1) envía eventos
+simulados al juego de prueba abierto usando sus reglas actuales. Las lecturas
+`queueBefore` y `queueAfter` del reporte hacen una consulta de sólo lectura,
+esperan 100 ms y vuelven a consultar para dar tiempo a la publicación bajo
+demanda. Si Unity está pausado y no ejecuta `Update`, pueden mostrar la última
+fotografía disponible. Esta segunda lectura no repite ningún evento ni cambia
+los controles. Los tiempos HTTP del reporte no miden FPS.
+
 ## Notas
 
 - Los retos se muestran y aplican durante el combate cuando la opción `RETO`

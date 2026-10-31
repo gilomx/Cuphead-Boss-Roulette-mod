@@ -15,6 +15,9 @@
        discovering the harness fakes through its recursive *.cs glob. -->
   <ItemGroup>
     <Compile Include="Program.cs.txt" Link="Program.cs" />
+    <Compile Include="StreamStressTests.cs.txt" Link="StreamStressTests.cs" />
+    <Compile Include="PanelPublicationTests.cs.txt" />
+    <Compile Include="DashboardOnDemandTests.cs.txt" />
     <Compile Include="SettingsTransferTests.cs.txt" Link="SettingsTransferTests.cs" />
     <Compile Include="InteractionsOverlayComposerTests.cs.txt" Link="InteractionsOverlayComposerTests.cs" />
     <Compile Include="..\CreatorToolsSettingsTransfer.cs" Link="Product\CreatorToolsSettingsTransfer.cs" />
@@ -82,6 +85,8 @@
              Link="Product\CreatorToolsDashboardController.cs" />
     <Compile Include="..\CreatorToolsServer.cs"
              Link="Product\CreatorToolsServer.cs" />
+    <Compile Include="..\Streaming\CreatorToolsAudiencePublicationPacing.cs" />
+    <Compile Include="..\Streaming\CreatorToolsJsonSnapshot.cs" />
     <Compile Include="..\CreatorToolsChatChoosesController.cs" />
     <Compile Include="..\CreatorToolsLiveEventsCoordinator.cs" />
     <Compile Include="..\CreatorToolsOverlayComposerController.cs"

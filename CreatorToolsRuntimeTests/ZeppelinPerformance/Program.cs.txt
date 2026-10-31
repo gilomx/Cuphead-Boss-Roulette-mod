@@ -1,0 +1,258 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using HarmonyLib;
+using UnityEngine;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class Program
+    {
+        private static int groups;
+        private static void Main()
+        {
+            CreatorToolsZeppelinProjectilePresentation.InstallPatches(new Harmony(), delegate(string warning) { throw new Exception(warning); });
+            Run("Native single shots stay native outside catalog scopes", delegate
+            {
+                var actor = Actor(false);
+                actor.FireAction = a => a.projectilePrefab.Create(Vector2.zero, 12f, 99f);
+                actor.FireSingle();
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 0, "a native actor must not adopt catalog presentation");
+            });
+            Run("Catalog single shots prepare only their exact ordinary and parryable results", delegate
+            {
+                var actor = Actor(true);
+                var unrelated = new GameObject().AddComponent<FlyingBlimpLevelEnemyProjectile>();
+                var previous = new GameObject().AddComponent<FlyingBlimpLevelEnemyProjectile>();
+                var expected = new List<GameObject>();
+                actor.FireAction = a =>
+                {
+                    expected.Add(a.projectilePrefab.Create(Vector2.zero, 12f, 99f).gameObject);
+                    expected.Add(a.parryablePrefab.Create(Vector2.zero, -15f, 88f).gameObject);
+                    unrelated.Create(Vector2.zero, 33f, 77f);
+                };
+                actor.FireSingle();
+                SameObjects(expected, CreatorToolsInteractionPresentation.Scaled);
+                SameObjects(expected, CreatorToolsInteractionPresentation.Fronted);
+                Check(!CreatorToolsInteractionPresentation.Scaled.Contains(previous.gameObject), "an existing projectile is untouched");
+                Check(expected[0].GetComponent<BasicProjectile>().Speed == 99f &&
+                    expected[0].GetComponent<BasicProjectile>().Angle == 12f,
+                    "native Create keeps its speed and aim");
+            });
+            Run("Every native spread result is prepared without scene searches", delegate
+            {
+                var actor = Actor(true);
+                actor.FireAction = a =>
+                {
+                    for (var i = 0; i < 7; i++) a.projectilePrefab.Create(Vector2.zero, i * 10f, 120f);
+                };
+                actor.FireSpreadshot();
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 7 &&
+                    CreatorToolsInteractionPresentation.Fronted.Count == 7,
+                    "all returned spread projectiles are prepared exactly once");
+                Check(Resources.FindQueries == 0 && UnityEngine.Object.FindQueries == 0,
+                    "firing does not inspect the global object population");
+            });
+            Run("An unmarked nested fire cannot inherit its caller's catalog scope", delegate
+            {
+                var outer = Actor(true);
+                var native = Actor(false);
+                native.projectilePrefab = outer.projectilePrefab;
+                native.FireAction = a => a.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                outer.FireAction = a =>
+                {
+                    a.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                    native.FireSingle();
+                    a.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                };
+                outer.FireSingle();
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 2,
+                    "only the two outer shots are catalog projectiles");
+            });
+            Run("Nested catalog fires restore both prefab identities", delegate
+            {
+                var outer = Actor(true);
+                var inner = Actor(true);
+                var expected = new List<GameObject>();
+                inner.FireAction = a => expected.Add(a.parryablePrefab.Create(Vector2.zero, 0f, 10f).gameObject);
+                outer.FireAction = a =>
+                {
+                    expected.Add(a.projectilePrefab.Create(Vector2.zero, 0f, 10f).gameObject);
+                    inner.FireSpreadshot();
+                    expected.Add(a.parryablePrefab.Create(Vector2.zero, 0f, 10f).gameObject);
+                };
+                outer.FireSingle();
+                SameObjects(expected, CreatorToolsInteractionPresentation.Scaled);
+            });
+            Run("Exceptions restore the previous scope and preserve the native exception", delegate
+            {
+                var outer = Actor(true);
+                var inner = Actor(true);
+                var original = new InvalidOperationException("native fire failure");
+                inner.FireAction = a => { throw original; };
+                outer.FireAction = a =>
+                {
+                    try { inner.FireSingle(); }
+                    catch (Exception error) { Check(ReferenceEquals(original, error), "the finalizer must not replace or swallow a native error"); }
+                    a.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                };
+                outer.FireSingle();
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 1,
+                    "the outer scope survives an inner fire failure");
+                inner.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                outer.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 1,
+                    "a completed scope cannot leak onto later native shots");
+            });
+            Run("Catalog fire scopes do not leak between threads", delegate
+            {
+                var actor = Actor(true);
+                actor.FireAction = a =>
+                {
+                    var thread = new Thread(() => a.projectilePrefab.Create(Vector2.zero, 0f, 10f));
+                    thread.Start(); thread.Join();
+                    a.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                };
+                actor.FireSingle();
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 1,
+                    "only the fire thread inherits its catalog scope");
+            });
+            Run("One thousand catalog fires avoid global projectile enumeration", delegate
+            {
+                var actor = Actor(true);
+                actor.FireAction = a => a.projectilePrefab.Create(Vector2.zero, 0f, 10f);
+                for (var i = 0; i < 1000; i++) actor.FireSingle();
+                Check(CreatorToolsInteractionPresentation.Scaled.Count == 1000 && Resources.FindQueries == 0,
+                    "one thousand new results require zero resource scans");
+            });
+            Run("Warm native templates satisfy availability without finding Hilda every time", delegate
+            {
+                NativeZeppelinCache.ReadyForTests = true;
+                var gameplayChecks = 0;
+                using (var executor = new ZeppelinInteractionExecutor(null, () => false,
+                    () => { gameplayChecks++; return true; }, null, null))
+                {
+                    for (var i = 0; i < 1000; i++) Check(executor.IsAvailable(CreatorToolsInteractionIds.PurpleZeppelin), "the cached purple entry remains available");
+                    Check(UnityEngine.Object.FindQueries == 0 && gameplayChecks == 1000,
+                        "a ready cache performs one gameplay query per check and no global boss scans");
+                }
+                NativeZeppelinCache.ReadyForTests = false;
+                var lady = new GameObject().AddComponent<FlyingBlimpLevelBlimpLady>();
+                using (var executor = new ZeppelinInteractionExecutor(null, () => false, () => true, null, null))
+                    Check(executor.IsAvailable(CreatorToolsInteractionIds.GreenZeppelin), "a live Hilda still supplies uncached native prefabs");
+                using (var executor = new ZeppelinInteractionExecutor(null, () => false, () => false, null, null))
+                {
+                    var before = UnityEngine.Object.FindQueries;
+                    var beforeReady = NativeZeppelinCache.ReadyQueries;
+                    Check(!executor.IsAvailable(CreatorToolsInteractionIds.GreenZeppelin) &&
+                        UnityEngine.Object.FindQueries == before && NativeZeppelinCache.ReadyQueries == beforeReady,
+                        "the gameplay gate still prevents availability, asset checks and scene queries");
+                }
+            });
+            Run("Saltbaker spawns preserve lane occupancy without global discovery", delegate
+            {
+                Level.Current = new Level { CurrentLevel = Levels.Saltbaker };
+                NativeZeppelinCache.ReadyForTests = true;
+                Camera.main = new GameObject().AddComponent<Camera>();
+                Camera.main.transform.position = new Vector3(0f, 100f, 0f);
+                var visible = LabelAt(250f);
+                var inactive = LabelAt(200f);
+                inactive.gameObject.activeInHierarchy = false;
+                var destroyed = LabelAt(150f);
+                UnityEngine.Object.Destroy(destroyed.gameObject);
+                var zeppelin = Actor(true).gameObject.AddComponent<CreatorToolsDonorLabel>();
+                zeppelin.transform.position = new Vector3(0f, 180f, 0f);
+                CreatorToolsDonorLabel.Instances.Add(zeppelin);
+                using (var executor = new ZeppelinInteractionExecutor(null, () => false, () => true, null, null))
+                {
+                    Spawn(executor);
+                    Check(NativeZeppelinSpawnPattern.LastLanes.Count == 1 &&
+                        NativeZeppelinSpawnPattern.LastLanes[0] == 210f,
+                        "only the live visible non-zeppelin contributes the same camera-relative lane as before");
+                    Spawn(executor);
+                    Check(NativeZeppelinSpawnPattern.LastLanes.Count == 2 &&
+                        NativeZeppelinSpawnPattern.LastLanes[0] == 123f &&
+                        NativeZeppelinSpawnPattern.LastLanes[1] == 210f,
+                        "owned zeppelin lanes stay tracked separately from other catalog actors");
+                    Check(NativeZeppelinCache.SpawnCalls == 2 &&
+                        UnityEngine.Object.FindQueries == 0 && Resources.FindQueries == 0,
+                        "known non-Hilda spawns use the prepared cache with zero global actor/lady searches");
+                }
+            });
+            Run("Hilda retains native summoning even when cached templates are ready", delegate
+            {
+                Level.Current = new Level { CurrentLevel = Levels.FlyingBlimp };
+                NativeZeppelinCache.ReadyForTests = true;
+                NativeLady();
+                using (var executor = new ZeppelinInteractionExecutor(null, () => false, () => true, null, null))
+                    Spawn(executor);
+                Check(UnityEngine.Object.FindQueries == 1 &&
+                    FlyingBlimpLevelBlimpLady.SummonCalls == 1 && NativeZeppelinCache.SpawnCalls == 0,
+                    "Hilda performs one boss lookup and keeps her original native summon path");
+            });
+            Run("An unknown level keeps the native boss-discovery fallback", delegate
+            {
+                Level.Current = null;
+                NativeZeppelinCache.ReadyForTests = true;
+                NativeLady();
+                using (var executor = new ZeppelinInteractionExecutor(null, () => false, () => true, null, null))
+                    Spawn(executor);
+                Check(UnityEngine.Object.FindQueries == 1 &&
+                    FlyingBlimpLevelBlimpLady.SummonCalls == 1 && NativeZeppelinCache.SpawnCalls == 0,
+                    "missing level context does not invent a non-Hilda arena");
+            });
+            Console.WriteLine("PASS " + groups + " Zeppelin performance groups (production patches/executor with recording Unity/Harmony stubs; gameplay timing requires in-game verification).");
+        }
+
+        private static CreatorToolsDonorLabel LabelAt(float y)
+        {
+            var label = new GameObject().AddComponent<CreatorToolsDonorLabel>();
+            label.transform.position = new Vector3(0f, y, 0f);
+            CreatorToolsDonorLabel.Instances.Add(label);
+            return label;
+        }
+        private static void NativeLady()
+        {
+            foreach (var previous in UnityEngine.Object.All<FlyingBlimpLevelBlimpLady>())
+                previous.gameObject.activeInHierarchy = false;
+            var lady = new GameObject().AddComponent<FlyingBlimpLevelBlimpLady>();
+            lady.enemyPrefabA = Actor(false);
+            lady.enemyPrefabB = Actor(false);
+        }
+        private static void Spawn(ZeppelinInteractionExecutor executor)
+        {
+            ICreatorToolsInteractionHandle handle;
+            string feedback, error;
+            Check(executor.TrySpawn(CreatorToolsInteractionIds.PurpleZeppelin,
+                "Test donor", "", out handle, out feedback, out error),
+                "expected native spawn: " + feedback + " " + error);
+        }
+        private static FlyingBlimpLevelEnemy Actor(bool catalog)
+        {
+            var actor = new GameObject().AddComponent<FlyingBlimpLevelEnemy>();
+            actor.projectilePrefab = new GameObject().AddComponent<FlyingBlimpLevelEnemyProjectile>();
+            actor.parryablePrefab = new GameObject().AddComponent<FlyingBlimpLevelEnemyProjectile>();
+            if (catalog) actor.gameObject.AddComponent<CreatorToolsInteractionRenderPriority>();
+            return actor;
+        }
+        private static void SameObjects(IList<GameObject> expected, IList<GameObject> actual)
+        {
+            Check(expected.Count == actual.Count, "the number of prepared projectiles differs");
+            for (var i = 0; i < expected.Count; i++)
+                Check(ReferenceEquals(expected[i], actual[i]), "presentation was applied to another projectile");
+        }
+        private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+        private static void Run(string name, Action action)
+        {
+            CreatorToolsInteractionPresentation.Reset();
+            CreatorToolsDonorLabel.Instances.Clear();
+            Level.Current = null;
+            Camera.main = null;
+            NativeZeppelinCache.SpawnCalls = 0;
+            FlyingBlimpLevelBlimpLady.SummonCalls = 0;
+            UnityEngine.Object.FindQueries = 0;
+            Resources.FindQueries = 0;
+            action(); groups++; Console.WriteLine("PASS " + name);
+        }
+    }
+}

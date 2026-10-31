@@ -1,0 +1,18 @@
+namespace Gilomx.CupheadBossRoulette
+{
+    // No HTTP listener, Unity, settings or game process participates in these
+    // serializer regressions. Only the server's immutable publication sink is fake.
+    internal sealed class CreatorToolsServer
+    {
+        internal bool IsRunning = true;
+        internal bool DashboardStateIsOnDemand;
+        internal int Publications;
+        internal string State;
+
+        internal void SetDashboardState(string state)
+        {
+            Publications++;
+            State = state;
+        }
+    }
+}

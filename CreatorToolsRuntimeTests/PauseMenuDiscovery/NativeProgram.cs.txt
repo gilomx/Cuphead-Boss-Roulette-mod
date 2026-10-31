@@ -1,0 +1,141 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+
+internal static class Program
+{
+    private static void Main()
+    {
+        TestWarmResolutionAndLiveState();
+        TestNativeOwnerReplacement();
+        TestPauseEventInvalidation();
+        TestMissingAndDestroyedObjects();
+        TestWarmAllocationBudget();
+        Console.WriteLine("All native pause owner tests passed (5 groups).");
+    }
+
+    private static void TestWarmResolutionAndLiveState()
+    {
+        var scope = new Scope();
+        var owner = new Owner { Menu = new Menu() };
+        Menu found;
+        for (var i = 0; i < 1000; i++)
+            Check(!scope.Cache.TryGetActive(owner, out found), "Closed menu cannot pause gameplay.");
+        Check(scope.Resolutions == 1 && scope.StateReads == 1000,
+            "Resolve the serialized field once, but read state on all 1000 calls/frames.");
+        owner.Menu.State = 2;
+        Check(scope.Cache.TryGetActive(owner, out found) && ReferenceEquals(found, owner.Menu),
+            "Pause animation must be observed immediately in the same frame.");
+        owner.Menu.State = 1;
+        Check(scope.Cache.TryGetActive(owner, out found), "Stable native pause remains active.");
+        owner.Menu.State = 0;
+        Check(!scope.Cache.TryGetActive(owner, out found) && scope.Resolutions == 1,
+            "Resume remains immediate without a boolean cache or new reflection.");
+        Console.WriteLine("PASS  One native field resolution; live state 0→2→1→0 on every query.");
+    }
+
+    private static void TestNativeOwnerReplacement()
+    {
+        var scope = new Scope();
+        var oldOwner = new Owner { Menu = new Menu { State = 1 } };
+        var nextOwner = new Owner { Menu = new Menu { State = 2 } };
+        Menu found;
+        Check(scope.Cache.TryGetActive(oldOwner, out found), "Old scene begins paused.");
+        Check(scope.Cache.TryGetActive(nextOwner, out found) && ReferenceEquals(found, nextOwner.Menu) &&
+            scope.Resolutions == 2, "A new LevelGUI.Current takes effect immediately, even in the same frame.");
+        oldOwner.Destroyed = true;
+        Check(scope.Cache.TryGetActive(nextOwner, out found) && scope.Resolutions == 2,
+            "Destroying the old GUI cannot invalidate the new native owner.");
+        nextOwner.SceneValid = false;
+        Check(!scope.Cache.TryGetActive(nextOwner, out found) && nextOwner.Menu.State == 2,
+            "Invalid native scenes are rejected without resetting the game's menu state.");
+        Console.WriteLine("PASS  Native scene/owner replacement and old-owner destruction.");
+    }
+
+    private static void TestPauseEventInvalidation()
+    {
+        var scope = new Scope();
+        var owner = new Owner { Menu = new Menu() };
+        Menu found;
+        Check(!scope.Cache.TryGetActive(owner, out found), "Warm a closed serialized menu.");
+        var created = new Menu { State = 2 };
+        owner.Menu = created;
+        scope.Cache.Invalidate(); // Existing native pause event callback.
+        Check(scope.Cache.TryGetActive(owner, out found) && ReferenceEquals(found, created) &&
+            scope.Resolutions == 2, "Pause event resolves a replacement menu on the same GUI immediately.");
+        created.State = 0;
+        scope.Cache.Invalidate(); // Existing native unpause callback.
+        Check(!scope.Cache.TryGetActive(owner, out found) && scope.Resolutions == 3,
+            "Unpause invalidation retains the native closed state.");
+        Console.WriteLine("PASS  Pause/unpause events re-resolve same-owner menu replacements.");
+    }
+
+    private static void TestMissingAndDestroyedObjects()
+    {
+        var scope = new Scope();
+        Menu found;
+        Check(!scope.Cache.TryGetActive(null, out found) && scope.Resolutions == 0,
+            "No native owner must not trigger discovery or reflection.");
+        var owner = new Owner();
+        Check(!scope.Cache.TryGetActive(owner, out found), "Temporarily missing serialized menu is safe.");
+        owner.Menu = new Menu { State = 1 };
+        Check(scope.Cache.TryGetActive(owner, out found), "A later native menu can recover without resetting native state.");
+        owner.Menu.Active = false;
+        Check(!scope.Cache.TryGetActive(owner, out found), "Inactive menus cannot pause gameplay.");
+        owner.Menu.Active = true;
+        owner.Menu.Destroyed = true;
+        Check(!scope.Cache.TryGetActive(owner, out found), "Destroyed cached menus cannot remain active.");
+        owner.Menu = new Menu { State = 2 };
+        Check(scope.Cache.TryGetActive(owner, out found), "Destroyed menu replacement is resolved without an event.");
+        owner.Destroyed = true;
+        Check(!scope.Cache.TryGetActive(owner, out found), "Destroyed native owners are rejected.");
+        Check(!scope.Cache.TryGetActive(null, out found), "Clearing LevelGUI.Current is safe.");
+        Console.WriteLine("PASS  Missing, inactive, destroyed and recovered native UI references.");
+    }
+
+    private static void TestWarmAllocationBudget()
+    {
+        var scope = new Scope();
+        var owner = new Owner { Menu = new Menu { State = 1 } };
+        Menu found;
+        scope.Cache.TryGetActive(owner, out found);
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 10000; i++) scope.Cache.TryGetActive(owner, out found);
+        allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+        Check(allocated == 0 && scope.Resolutions == 1,
+            "Warm pause queries allocate no memory and perform no repeated serialized-field reads.");
+        Console.WriteLine("PASS  10000 warm queries: zero allocated bytes, one native field read, no discovery.");
+    }
+
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new InvalidOperationException(message);
+    }
+
+    private sealed class Owner
+    {
+        internal bool Destroyed;
+        internal bool SceneValid = true;
+        internal Menu Menu;
+    }
+    private sealed class Menu
+    {
+        internal bool Active = true;
+        internal bool Destroyed;
+        internal int State;
+    }
+    private sealed class Scope
+    {
+        internal int Resolutions;
+        internal int StateReads;
+        internal readonly CreatorToolsNativePauseMenuCache<Owner, Menu> Cache;
+        internal Scope()
+        {
+            Cache = new CreatorToolsNativePauseMenuCache<Owner, Menu>(
+                owner => { Resolutions++; return owner.Menu; },
+                owner => owner != null && !owner.Destroyed && owner.SceneValid,
+                (left, right) => ReferenceEquals(left, right),
+                menu => menu != null && !menu.Destroyed,
+                menu => { StateReads++; return menu.Active && menu.State != 0; });
+        }
+    }
+}

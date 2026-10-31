@@ -1,0 +1,194 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+
+namespace HarmonyLib
+{
+    public sealed class HarmonyMethod { internal MethodInfo Method; public HarmonyMethod(MethodInfo method) { Method = method; } }
+    public sealed class Harmony
+    {
+        internal sealed class PatchInfo { internal MethodInfo Prefix, Postfix, Finalizer; }
+        internal static readonly Dictionary<MethodBase, PatchInfo> Patches = new Dictionary<MethodBase, PatchInfo>();
+        public void Patch(MethodBase original, HarmonyMethod prefix = null, HarmonyMethod postfix = null, HarmonyMethod finalizer = null)
+        { Patches.Add(original, new PatchInfo { Prefix = prefix?.Method, Postfix = postfix?.Method, Finalizer = finalizer?.Method }); }
+        internal static void Fire(FlyingBlimpLevelEnemy actor, string name, Action action)
+        {
+            var patch = Patches[typeof(FlyingBlimpLevelEnemy).GetMethod(name)];
+            var prefixArgs = new object[] { actor, null };
+            patch.Prefix.Invoke(null, prefixArgs);
+            var state = prefixArgs[1];
+            Exception failure = null;
+            try
+            {
+                action();
+                var args = new object[] { state };
+                patch.Postfix.Invoke(null, args); state = args[0];
+            }
+            catch (Exception error) { failure = error; }
+            var finalizerArgs = new object[] { failure, state };
+            failure = patch.Finalizer.Invoke(null, finalizerArgs) as Exception;
+            if (failure != null) throw failure;
+        }
+        internal static void Created(BasicProjectile prefab, BasicProjectile result)
+        {
+            var method = typeof(BasicProjectile).GetMethod("Create", new[] { typeof(UnityEngine.Vector2), typeof(float), typeof(float) });
+            Patches[method].Postfix.Invoke(null, new object[] { prefab, result });
+        }
+    }
+    public static class AccessTools
+    {
+        public static FieldInfo Field(Type type, string name) { return type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static); }
+        public static MethodInfo Method(Type type, string name, Type[] parameters = null)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+            return parameters == null ? type.GetMethod(name, flags) : type.GetMethod(name, flags, null, parameters, null);
+        }
+    }
+}
+namespace UnityEngine
+{
+    public class Object
+    {
+        private static readonly List<Object> Objects = new List<Object>();
+        private bool destroyed;
+        internal static int FindQueries;
+        public Object() { Objects.Add(this); }
+        public int GetInstanceID() { return Objects.IndexOf(this); }
+        public static bool operator ==(Object a, Object b)
+        {
+            var aNull = ReferenceEquals(a, null) || a.destroyed;
+            var bNull = ReferenceEquals(b, null) || b.destroyed;
+            return aNull || bNull ? aNull == bNull : ReferenceEquals(a, b);
+        }
+        public static bool operator !=(Object a, Object b) { return !(a == b); }
+        public override bool Equals(object value) { return ReferenceEquals(this, value); }
+        public override int GetHashCode() { return base.GetHashCode(); }
+        public static void Destroy(Object value) { if (value != null) value.destroyed = true; }
+        public static T FindObjectOfType<T>() where T : Component
+        { var objects = FindObjectsOfType<T>(); return objects.Length == 0 ? null : objects[0]; }
+        public static T[] FindObjectsOfType<T>() where T : Component
+        {
+            FindQueries++;
+            return Objects.FindAll(o => o is T c && c != null && c.gameObject.activeInHierarchy).ConvertAll(o => (T)o).ToArray();
+        }
+        internal static T[] All<T>() where T : Object
+        { return Objects.FindAll(o => o is T && o != null).ConvertAll(o => (T)o).ToArray(); }
+    }
+    public class GameObject : Object
+    {
+        private readonly List<Component> components = new List<Component>();
+        public string name;
+        public bool activeInHierarchy = true;
+        public readonly Transform transform = new Transform();
+        public T AddComponent<T>() where T : Component, new() { var c = new T { gameObject = this }; components.Add(c); return c; }
+        public T GetComponent<T>() where T : Component { return components.Find(c => c is T && c != null) as T; }
+    }
+    public class Component : Object
+    {
+        public GameObject gameObject;
+        public Transform transform { get { return gameObject.transform; } }
+        public T GetComponent<T>() where T : Component { return gameObject.GetComponent<T>(); }
+    }
+    public class MonoBehaviour : Component { }
+    public sealed class Camera : Component { public static Camera main; }
+    public sealed class Transform { public Vector3 position; }
+    public struct Vector2 { public float x, y; public static Vector2 zero { get { return new Vector2(); } } }
+    public struct Vector3
+    {
+        public float x, y, z;
+        public Vector3(float x, float y, float z) { this.x=x; this.y=y; this.z=z; }
+    }
+    public static class Resources
+    {
+        internal static int FindQueries;
+        public static T[] FindObjectsOfTypeAll<T>() where T : Object { FindQueries++; return Object.All<T>(); }
+    }
+}
+public class BasicProjectile : UnityEngine.MonoBehaviour
+{
+    public float Speed, Angle;
+    public BasicProjectile Create(UnityEngine.Vector2 position, float angle, float speed)
+    {
+        BasicProjectile result = this is FlyingBlimpLevelEnemyProjectile
+            ? new UnityEngine.GameObject().AddComponent<FlyingBlimpLevelEnemyProjectile>()
+            : new UnityEngine.GameObject().AddComponent<BasicProjectile>();
+        result.Speed = speed; result.Angle = angle;
+        HarmonyLib.Harmony.Created(this, result);
+        return result;
+    }
+}
+public sealed class FlyingBlimpLevelEnemyProjectile : BasicProjectile { }
+public sealed class FlyingBlimpLevelEnemy : UnityEngine.MonoBehaviour
+{
+    public FlyingBlimpLevelEnemyProjectile projectilePrefab, parryablePrefab;
+    public float stopPoint;
+    public Action<FlyingBlimpLevelEnemy> FireAction;
+    public void FireSingle() { HarmonyLib.Harmony.Fire(this, "FireSingle", () => FireAction(this)); }
+    public void FireSpreadshot() { HarmonyLib.Harmony.Fire(this, "FireSpreadshot", () => FireAction(this)); }
+}
+public sealed class FlyingBlimpLevelBlimpLady : UnityEngine.MonoBehaviour
+{
+    public static int SummonCalls;
+    public FlyingBlimpLevelEnemy enemyPrefabA, enemyPrefabB;
+    public void SummonEnemy(FlyingBlimpLevelEnemy prefab, UnityEngine.Vector3 start, float stop, bool parryable)
+    { SummonCalls++; new UnityEngine.GameObject().AddComponent<FlyingBlimpLevelEnemy>(); }
+}
+public enum Levels { FlyingBlimp, Saltbaker }
+public sealed class Level : UnityEngine.MonoBehaviour
+{ public static Level Current; public Levels CurrentLevel { get; set; } }
+namespace Gilomx.CupheadBossRoulette
+{
+    internal sealed class CreatorToolsInteractionRenderPriority : UnityEngine.MonoBehaviour { }
+    internal sealed class CreatorToolsDonorLabel : UnityEngine.MonoBehaviour
+    { internal static readonly List<CreatorToolsDonorLabel> Instances = new List<CreatorToolsDonorLabel>(); }
+    internal static class CreatorToolsGameplayCameraCache
+    { internal static UnityEngine.Camera Get() { return UnityEngine.Camera.main; } }
+    internal static class CreatorToolsInteractionPresentation
+    {
+        internal static readonly List<UnityEngine.GameObject> Scaled = new List<UnityEngine.GameObject>();
+        internal static readonly List<UnityEngine.GameObject> Fronted = new List<UnityEngine.GameObject>();
+        internal static void MatchGameplayBodyScale(UnityEngine.GameObject actor, object ignored) { Scaled.Add(actor); }
+        internal static void BringActorToFront(UnityEngine.GameObject actor) { Fronted.Add(actor); }
+        internal static void PrepareActor(UnityEngine.GameObject actor, string donor, Action<string> warning) { }
+        internal static void SetGiftImage(UnityEngine.GameObject actor, string path, Action<string> warning) { }
+        internal static void Reset() { Scaled.Clear(); Fronted.Clear(); }
+    }
+    internal interface ICreatorToolsInteractionExecutor : IDisposable { }
+    internal interface ICreatorToolsInteractionHandle { }
+    internal sealed class CreatorToolsUnityObjectInteractionHandle : ICreatorToolsInteractionHandle
+    { internal CreatorToolsUnityObjectInteractionHandle(UnityEngine.Object actor) { } }
+    internal static class CreatorToolsInteractionIds
+    {
+        internal const string PurpleZeppelin = "hilda_purple_zeppelin";
+        internal const string GreenZeppelin = "hilda_green_zeppelin";
+    }
+    internal enum NativeZeppelinVariant { Purple, Green }
+    internal sealed class NativeZeppelinSpawnParameters
+    {
+        internal float Lane, StopDistance;
+        internal bool Parryable;
+    }
+    internal static class NativeZeppelinSpawnPattern
+    {
+        internal static List<float> LastLanes;
+        internal static bool TryCreate(NativeZeppelinVariant variant, List<float> lanes, ref int counter,
+            out NativeZeppelinSpawnParameters parameters, out string error)
+        { LastLanes = new List<float>(lanes); parameters = new NativeZeppelinSpawnParameters { Lane = 123f, StopDistance = 0f, Parryable = false }; error = null; return true; }
+    }
+    internal sealed class NativeZeppelinCache : IDisposable
+    {
+        internal static bool ReadyForTests;
+        internal static int ReadyQueries;
+        internal static int SpawnCalls;
+        private readonly Func<bool> canSpawn;
+        internal NativeZeppelinCache(UnityEngine.MonoBehaviour host, Func<bool> preload, Func<bool> spawn, Action<string> info, Action<string> warning) { canSpawn = spawn; }
+        internal bool Failed { get { return false; } }
+        internal bool Ready(NativeZeppelinVariant variant) { ReadyQueries++; return ReadyForTests; }
+        internal bool CanSpawn(NativeZeppelinVariant variant) { return ReadyForTests && canSpawn(); }
+        internal void Update() { }
+        internal bool TrySpawn(NativeZeppelinVariant variant, NativeZeppelinSpawnParameters parameters, string donor,
+            out FlyingBlimpLevelEnemy spawned, out string error)
+        { SpawnCalls++; spawned = new UnityEngine.GameObject().AddComponent<FlyingBlimpLevelEnemy>(); error = null; return true; }
+        public void Dispose() { }
+    }
+}

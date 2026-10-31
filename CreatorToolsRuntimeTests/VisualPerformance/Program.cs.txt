@@ -1,0 +1,225 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using Gilomx.CupheadBossRoulette;
+
+internal static class Program
+{
+    private static int groups;
+
+    private static void Main()
+    {
+        Run("Ordinary projectiles keep their damage snapshot without frame callbacks", delegate
+        {
+            Plugin.UseGhost(false);
+            var projectile = Projectile();
+            Plugin.Fire(projectile);
+            var marker = projectile.GetComponent<CreatorToolsGhostProjectileEcho>();
+            Check(marker != null && !marker.IsGhostShot && !marker.enabled,
+                "ordinary shots retain an inactive false marker");
+            Plugin.UseGhost(true);
+            Check(!marker.IsGhostShot,
+                "a ghost arriving after firing cannot change the shot's damage");
+        });
+
+        Run("Ghost visuals expire without erasing their damage snapshot", delegate
+        {
+            Plugin.UseGhost(true);
+            var projectile = Projectile();
+            var before = UnityEngine.Object.LiveCount<SpriteRenderer>();
+            Plugin.Fire(projectile);
+            var marker = projectile.GetComponent<CreatorToolsGhostProjectileEcho>();
+            Check(marker.enabled && marker.IsGhostShot,
+                "ghost shots animate their echo");
+            Check(UnityEngine.Object.LiveCount<SpriteRenderer>() == before + 1,
+                "one detached visual was created");
+            Time.unscaledDeltaTime = 0.23f;
+            Invoke(marker, "Update");
+            Check(!marker.enabled && marker.IsGhostShot,
+                "the visual expires while the firing-time damage snapshot remains");
+            Check(UnityEngine.Object.LiveCount<SpriteRenderer>() == before,
+                "the detached visual was retired");
+        });
+
+        Run("Projectile reuse clears old visuals and restarts the catch-up clock", delegate
+        {
+            Plugin.UseGhost(true);
+            var projectile = Projectile();
+            var before = UnityEngine.Object.LiveCount<SpriteRenderer>();
+            Plugin.Fire(projectile);
+            var marker = projectile.GetComponent<CreatorToolsGhostProjectileEcho>();
+            Time.unscaledDeltaTime = 0.15f;
+            Invoke(marker, "Update");
+            Plugin.Fire(projectile);
+            Check(UnityEngine.Object.LiveCount<SpriteRenderer>() == before + 1,
+                "reusing a ghost shot replaces its old echo");
+            Invoke(marker, "Update");
+            Check(marker.enabled, "a reused shot has a fresh 0.22-second clock");
+            Plugin.UseGhost(false);
+            Plugin.Fire(projectile);
+            Check(!marker.enabled && !marker.IsGhostShot,
+                "an ordinary reuse resets the firing-time damage snapshot");
+            Check(UnityEngine.Object.LiveCount<SpriteRenderer>() == before,
+                "an ordinary reuse removes the old detached echo");
+            Plugin.UseGhost(true);
+            Plugin.Fire(projectile);
+            Check(marker.enabled && marker.IsGhostShot,
+                "a later ghost reuse reactivates animation");
+            projectile.gameObject.SetActive(false);
+            Check(!marker.enabled && UnityEngine.Object.LiveCount<SpriteRenderer>() == before,
+                "returning a projectile to its pool retires its detached echo");
+        });
+
+        Run("Camera discovery is shared while zoom and transforms remain live", delegate
+        {
+            var camera = new GameObject().AddComponent<Camera>();
+            camera.orthographic = true;
+            Camera.Main = camera;
+            Time.frameCount = 10;
+            Camera.MainQueries = 0;
+            for (var i = 0; i < 100; i++)
+                Check(CreatorToolsGameplayCameraCache.Get() == camera, "same camera returned");
+            Check(Camera.MainQueries == 1, "100 same-frame reads discover the main camera once");
+            camera.orthographicSize = 250f;
+            camera.transform.position = new Vector3(12f, 4f, 0f);
+            Check(CreatorToolsGameplayCameraCache.Get().orthographicSize == 250f &&
+                CreatorToolsGameplayCameraCache.Get().transform.position.x == 12f,
+                "the cache shares the live camera, including zoom and movement");
+            Time.frameCount++;
+            CreatorToolsGameplayCameraCache.Get();
+            Check(Camera.MainQueries == 2, "a new frame refreshes camera selection");
+            SceneManager.ActiveHandle++;
+            CreatorToolsGameplayCameraCache.Get();
+            Check(Camera.MainQueries == 3, "a scene change invalidates the same-frame cache");
+        });
+
+        Run("Camera fallback handles disabled, destroyed and missing cameras", delegate
+        {
+            Time.frameCount++;
+            var first = Camera.Main;
+            var fallback = new GameObject().AddComponent<Camera>();
+            fallback.orthographic = true;
+            Check(CreatorToolsGameplayCameraCache.Get() == first, "main camera is preferred");
+            first.gameObject.SetActive(false);
+            Check(CreatorToolsGameplayCameraCache.Get() == fallback,
+                "a deactivated cached camera falls back within the frame");
+            first.gameObject.SetActive(true);
+            Time.frameCount++;
+            Check(CreatorToolsGameplayCameraCache.Get() == first,
+                "reactivating the main camera restores preference next frame");
+            first.enabled = false;
+            Check(CreatorToolsGameplayCameraCache.Get() == fallback,
+                "a disabled cached camera falls back within the frame");
+            UnityEngine.Object.Destroy(fallback.gameObject);
+            Check(CreatorToolsGameplayCameraCache.Get() == null,
+                "a destroyed cached camera cannot be returned");
+            var queries = UnityEngine.Object.FindQueries;
+            for (var i = 0; i < 100; i++)
+                Check(CreatorToolsGameplayCameraCache.Get() == null, "a missing view stays null");
+            Check(UnityEngine.Object.FindQueries == queries,
+                "a missing camera does not rescan the scene for every label");
+        });
+
+        Run("Spawn reservations retain active actors, players and live positions without scene scans", delegate
+        {
+            var label = new GameObject().AddComponent<CreatorToolsDonorLabel>();
+            label.transform.position = new Vector3(10, 20, 0);
+            CreatorToolsDonorLabel.Instances.Add(label);
+            var hidden = new GameObject().AddComponent<CreatorToolsDonorLabel>();
+            hidden.gameObject.SetActive(false);
+            CreatorToolsDonorLabel.Instances.Add(hidden);
+            var dead = new GameObject().AddComponent<CreatorToolsDonorLabel>();
+            CreatorToolsDonorLabel.Instances.Add(dead);
+            UnityEngine.Object.Destroy(dead.gameObject);
+            CreatorToolsDonorLabel.Instances.Add(null);
+            var player = new GameObject().AddComponent<AbstractPlayerController>();
+            player.transform.position = new Vector3(30, 40, 0);
+            PlayerManager.Players.Add(0, player);
+            var hiddenPlayer = new GameObject().AddComponent<AbstractPlayerController>();
+            hiddenPlayer.gameObject.SetActive(false);
+            PlayerManager.Players.Add(1, hiddenPlayer);
+            var deadPlayer = new GameObject().AddComponent<AbstractPlayerController>();
+            PlayerManager.Players.Add(2, deadPlayer);
+            UnityEngine.Object.Destroy(deadPlayer.gameObject);
+            PlayerManager.Players.Add(3, null);
+            var positions = new List<Vector2>(16) { new Vector2(1, 2) };
+            var queries = UnityEngine.Object.FindQueries;
+            CreatorToolsInteractionSpawnPositions.AppendTo(positions);
+            Check(positions.Count == 3 && positions[0].x == 1 && positions[1].x == 10 && positions[2].x == 30,
+                "caller reservations are preserved, inactive/destroyed actors are excluded, real players are appended");
+            label.transform.position = new Vector3(50, 60, 0);
+            player.transform.position = new Vector3(70, 80, 0);
+            positions.Clear();
+            CreatorToolsInteractionSpawnPositions.AppendTo(positions);
+            Check(positions.Count == 2 && positions[0].x == 50 && positions[1].y == 80 &&
+                UnityEngine.Object.FindQueries == queries, "same-frame movement is live and no global query is needed");
+            hidden.gameObject.SetActive(true);
+            positions.Clear();
+            CreatorToolsInteractionSpawnPositions.AppendTo(positions);
+            Check(positions.Count == 3, "same-frame reactivation is immediately included");
+
+            var allocated = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 10000; i++)
+            {
+                positions.Clear();
+                CreatorToolsInteractionSpawnPositions.AppendTo(positions);
+            }
+            allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+            Check(allocated == 0 && UnityEngine.Object.FindQueries == queries,
+                "10000 reservation refreshes allocate no arrays or boxed enumerators and perform no scene queries");
+            CreatorToolsDonorLabel.Instances.Clear();
+            PlayerManager.Players.Clear();
+            UnityEngine.Object.Destroy(player.gameObject);
+        });
+
+        Run("Spawn reservations retain the transition fallback for an unavailable native player registry", delegate
+        {
+            var player = new GameObject().AddComponent<AbstractPlayerController>();
+            player.transform.position = new Vector3(90, 100, 0);
+            var positions = new List<Vector2>();
+            var queries = UnityEngine.Object.FindQueries;
+            PlayerManager.ReturnNull = true;
+            CreatorToolsInteractionSpawnPositions.AppendTo(positions);
+            Check(positions.Count == 1 && positions[0].x == 90 && UnityEngine.Object.FindQueries == queries + 1,
+                "a missing registry preserves discovery of active scene players");
+            PlayerManager.ReturnNull = false;
+            var saved = PlayerManager.Players;
+            PlayerManager.Players = null;
+            positions.Clear();
+            CreatorToolsInteractionSpawnPositions.AppendTo(positions);
+            Check(positions.Count == 1 && positions[0].y == 100 && UnityEngine.Object.FindQueries == queries + 2,
+                "Cuphead's uninitialized player dictionary also preserves the fallback");
+            PlayerManager.Players = saved;
+            UnityEngine.Object.Destroy(player.gameObject);
+        });
+
+        Console.WriteLine("PASS " + groups + " visual performance groups (Unity recording stubs; in-game frame times require gameplay QA).");
+    }
+
+    private static AbstractProjectile Projectile()
+    {
+        var root = new GameObject();
+        root.AddComponent<SpriteRenderer>();
+        return root.AddComponent<AbstractProjectile>();
+    }
+
+    private static void Invoke(object instance, string method)
+    {
+        instance.GetType().GetMethod(method,
+            BindingFlags.Instance | BindingFlags.NonPublic).Invoke(instance, null);
+    }
+
+    private static void Check(bool value, string message)
+    {
+        if (!value) throw new Exception(message);
+    }
+
+    private static void Run(string name, Action test)
+    {
+        test();
+        groups++;
+        Console.WriteLine("PASS " + name);
+    }
+}

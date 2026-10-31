@@ -86,6 +86,7 @@ namespace Gilomx.CupheadBossRoulette
 
             try
             {
+                NativeZeppelinSpawnPattern.PrepareProperties();
                 // Search/copy only in a safe preload window, and only for the
                 // cache that owns the serialized queue.
                 CaptureFromLoadedHilda();
@@ -478,15 +479,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static Camera FindGameplayCamera()
         {
-            var main = Camera.main;
-            if (main != null && main.enabled)
-                return main;
-            var cameras = UnityEngine.Object.FindObjectsOfType<Camera>();
-            for (var i = 0; i < cameras.Length; i++)
-                if (cameras[i] != null && cameras[i].enabled &&
-                    cameras[i].orthographic)
-                    return cameras[i];
-            return null;
+            return CreatorToolsGameplayCameraCache.Get();
         }
 
         private void RemoveDestroyedActors()

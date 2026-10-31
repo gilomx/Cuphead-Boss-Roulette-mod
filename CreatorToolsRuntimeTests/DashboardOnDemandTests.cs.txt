@@ -1,0 +1,102 @@
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
+using System.Threading;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunDashboardOnDemandTests()
+        {
+            Run("Dashboard HTTP reads fresh background events without eager JSON or the server lock", TestDashboardOnDemandHttp);
+            Run("Dashboard readers preserve simulation scheduling and fail without executing gameplay", TestDashboardOnDemandFailures);
+        }
+
+        private static void TestDashboardOnDemandHttp()
+        {
+            using (var scope = new TestScope("dashboard-on-demand-http"))
+            using (var server = scope.StartServer())
+            {
+                var dashboard = new CreatorToolsDashboardController(null);
+                var publications = typeof(CreatorToolsDashboardController).GetField("lastPublishedState",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                var serverLock = typeof(CreatorToolsServer).GetField("dashboardLock",
+                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(server);
+                var callerThread = Thread.CurrentThread.ManagedThreadId;
+                var reads = 0;
+                server.SetDashboardStateReader(() => {
+                    True(!Monitor.IsEntered(serverLock), "HTTP held its own lock while invoking the model");
+                    True(Thread.CurrentThread.ManagedThreadId != callerThread, "HTTP reader did not run on its request thread");
+                    Interlocked.Increment(ref reads);
+                    return dashboard.GetStateJson();
+                });
+                True(server.DashboardStateIsOnDemand, "the reader did not enable on-demand mode");
+                var rejectedNull = false;
+                try { server.SetDashboardStateReader(null); }
+                catch (ArgumentNullException) { rejectedNull = true; }
+                True(rejectedNull && server.DashboardStateIsOnDemand,
+                    "removing a registered model must not silently expose a stale push-mode cache");
+                var evaluated = 0;
+                for (var i = 0; i < 150; i++)
+                {
+                    dashboard.ProcessEvent(NewGiftEvent(i + 1000, 1), entry => {
+                        evaluated++;
+                        return CreatorToolsStreamEvaluation.None;
+                    });
+                    dashboard.Update(server, null);
+                }
+                Equal(150, evaluated, "background events must still be evaluated");
+                True(publications.GetValue(dashboard) == null && reads == 0,
+                    "events eagerly generated dashboard JSON without an HTTP consumer");
+                using (var state = GetJson(server, "/api/dashboard"))
+                {
+                    Equal(150L, state.RootElement.GetProperty("counters").GetProperty("received").GetInt64(),
+                        "the first HTTP read must include all background events immediately");
+                    Equal(30, state.RootElement.GetProperty("events").GetArrayLength(), "bounded event history");
+                }
+                var retained = publications.GetValue(dashboard);
+                using (var state = GetJson(server, "/api/dashboard")) { }
+                True(ReferenceEquals(retained, publications.GetValue(dashboard)), "unchanged HTTP reads rebuilt JSON");
+                Equal(2, reads, "one model read per valid GET");
+                dashboard.ProcessEvent(NewGiftEvent(2000, 1), entry => {
+                    evaluated++;
+                    return CreatorToolsStreamEvaluation.None;
+                });
+                using (var state = GetJson(server, "/api/dashboard"))
+                    Equal(151L, state.RootElement.GetProperty("counters").GetProperty("received").GetInt64(),
+                        "a consumer must see the next event without waiting for an Update publication");
+                Equal(151, evaluated, "reading the dashboard re-evaluated an event");
+            }
+        }
+
+        private static void TestDashboardOnDemandFailures()
+        {
+            using (var scope = new TestScope("dashboard-on-demand-simulations"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                var dashboard = new CreatorToolsDashboardController(null);
+                server.SetDashboardStateReader(dashboard.GetStateJson);
+                server.SetDashboardSimulationHandler(dashboard.ScheduleSimulation);
+                using (var accepted = GetJson(server,
+                    "/api/dashboard/simulate?platform=tiktok&type=like&count=1&user=test&userId=test")) { }
+                var evaluated = 0;
+                using (var state = GetJson(server, "/api/dashboard"))
+                    Equal(0L, state.RootElement.GetProperty("counters").GetProperty("received").GetInt64(),
+                        "a pure HTTP read executed scheduled gameplay work");
+                dashboard.Update(server, entry => { evaluated++; return CreatorToolsStreamEvaluation.None; });
+                Equal(1, evaluated, "on-demand mode blocked the simulation processor");
+                using (var state = GetJson(server, "/api/dashboard"))
+                    Equal(1L, state.RootElement.GetProperty("counters").GetProperty("received").GetInt64(),
+                        "processed simulation did not appear on the next direct read");
+                server.SetDashboardStateReader(() => { throw new InvalidOperationException("fixture"); });
+                using (var response = client.GetAsync("http://127.0.0.1:" + server.Port + "/api/dashboard")
+                    .GetAwaiter().GetResult())
+                    Equal(HttpStatusCode.InternalServerError, response.StatusCode, "reader failure must return a bounded HTTP error");
+                Equal(1, evaluated, "reader failure modified gameplay work");
+            }
+        }
+    }
+}

@@ -1300,38 +1300,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool IsRightTriggerLabel(string label)
         {
-            if (string.IsNullOrEmpty(label))
-                return false;
-
-            var normalized = "";
-            foreach (var character in label.ToLowerInvariant())
-            {
-                if (char.IsLetterOrDigit(character))
-                    normalized += character;
-            }
-
-            return normalized.Contains("righttrigger") ||
-                   normalized.Contains("triggerright") ||
-                   normalized == "r2" || normalized.EndsWith("r2") ||
-                   normalized == "zr" || normalized.EndsWith("zr");
+            return ControllerTriggerLabels.IsRight(label);
         }
 
         private static bool IsLeftTriggerLabel(string label)
         {
-            if (string.IsNullOrEmpty(label))
-                return false;
-
-            var normalized = "";
-            foreach (var character in label.ToLowerInvariant())
-            {
-                if (char.IsLetterOrDigit(character))
-                    normalized += character;
-            }
-
-            return normalized.Contains("lefttrigger") ||
-                   normalized.Contains("triggerleft") ||
-                   normalized == "l2" || normalized.EndsWith("l2") ||
-                   normalized == "zl" || normalized.EndsWith("zl");
+            return ControllerTriggerLabels.IsLeft(label);
         }
 
         private bool CanUseRouletteOnMap()
@@ -1364,6 +1338,18 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private void Update()
+        {
+            var performance = creatorToolsInteractions;
+            var started = performance == null ? 0L : performance.BeginStartupPluginUpdate();
+            try { UpdateCore(); }
+            finally
+            {
+                if (performance != null)
+                    performance.EndStartupPluginUpdate(started);
+            }
+        }
+
+        private void UpdateCore()
         {
             UpdateCreatorTools();
             UpdateTimedInkRainDefeat();
@@ -2698,25 +2684,43 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OnGUI()
         {
-            theme.Refresh();
-            EnsureStyles();
+            var showCard = cardVisibility > 0.001f && CanUseRouletteOnMap();
+            var showLanguageTest = EnableLanguageTestShortcut &&
+                Time.realtimeSinceStartup < languageTestNoticeUntil;
+            if (!showCard && !showLanguageTest)
+                return;
 
-            var scale = Mathf.Min(Screen.width / DesignWidth, Screen.height / DesignHeight);
-            var offsetX = (Screen.width - DesignWidth * scale) * 0.5f;
-            var offsetY = (Screen.height - DesignHeight * scale) * 0.5f;
-            var previousMatrix = GUI.matrix;
-            var previousColor = GUI.color;
-            GUI.matrix = Matrix4x4.TRS(
-                new Vector3(offsetX, offsetY, 0f),
-                Quaternion.identity,
-                new Vector3(scale, scale, 1f));
+            var performance = creatorToolsInteractions;
+            var started = performance == null ? 0L :
+                performance.BeginStartupVisualUpdate();
+            try
+            {
+                theme.Refresh();
+                EnsureStyles();
 
-            DrawLanguageTestNotice();
-            if (CanUseRouletteOnMap() && cardVisibility > 0.001f)
-                DrawRoulette();
+                var scale = Mathf.Min(Screen.width / DesignWidth, Screen.height / DesignHeight);
+                var offsetX = (Screen.width - DesignWidth * scale) * 0.5f;
+                var offsetY = (Screen.height - DesignHeight * scale) * 0.5f;
+                var previousMatrix = GUI.matrix;
+                var previousColor = GUI.color;
+                GUI.matrix = Matrix4x4.TRS(
+                    new Vector3(offsetX, offsetY, 0f),
+                    Quaternion.identity,
+                    new Vector3(scale, scale, 1f));
 
-            GUI.color = previousColor;
-            GUI.matrix = previousMatrix;
+                if (showLanguageTest)
+                    DrawLanguageTestNotice();
+                if (showCard)
+                    DrawRoulette();
+
+                GUI.color = previousColor;
+                GUI.matrix = previousMatrix;
+            }
+            finally
+            {
+                if (performance != null)
+                    performance.EndStartupVisualUpdate(started, true);
+            }
         }
 
         private void DrawRouletteLegacy()

@@ -157,6 +157,24 @@ try {
         (Join-Path $PSScriptRoot 'verify_native_loading_contract.ps1'),
         '-CupheadDir', $CupheadDir,
         '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_prompt_layout_contract.ps1'),
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_screen_cover_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_tap_farming_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_zeppelin_projectile_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
     $pluginRoot = Join-Path $stage 'BepInEx/plugins/GilomxBossRoulette'
     $companion = Join-Path $pluginRoot 'companion'
     $null = [IO.Directory]::CreateDirectory($companion)

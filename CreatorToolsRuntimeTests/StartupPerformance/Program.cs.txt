@@ -1,0 +1,327 @@
+using System;
+using System.Collections.Generic;
+using Gilomx.CupheadBossRoulette;
+
+internal static class Program
+{
+    private static void Main()
+    {
+        TestEmptyQueueWindow();
+        TestPauseAndFocusGaps();
+        TestCostsAndSpawns();
+        TestRetriesAndPartialWindows();
+        TestExceptionCleanupAndLogging();
+        TestInactiveOverhead();
+        TestVisualCosts();
+        TestPreviousFrameCorrelation();
+        TestBoundedFrameDistribution();
+        TestSkippedFrameAndActiveAllocationBudget();
+        Console.WriteLine("All startup diagnostic tests passed (10 groups).");
+    }
+
+    private static void TestEmptyQueueWindow()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        for (var i = 0; i < 200; i++) probe.Frame(false, 2d);
+        Check(probe.Log.Count == 0, "Intro/ineligible frames cannot produce a summary.");
+        probe.Frame(true, 9d); // First eligible delta still includes the intro.
+        for (var i = 0; i < 149; i++) probe.Frame(true, 0.1d);
+        Check(probe.Log.Count == 0, "Do not finish before 15 eligible seconds.");
+        for (var i = 0; i < 3; i++) probe.Frame(true, 0.1d);
+        Check(probe.Log.Count == 1 && probe.Log[0].Contains("partial=false") &&
+            probe.Log[0].Contains("spawnCount=0") && probe.Log[0].Contains("level=Saltbaker"),
+            "A queue with no attacks must still produce one complete attempt summary.");
+        for (var i = 0; i < 100; i++) probe.Frame(true, 0.1d);
+        Check(probe.Log.Count == 1 && !probe.Monitor.Pending, "A completed window stays silent.");
+        Console.WriteLine("PASS  Empty queue, native intro exclusion and bounded 15-second window.");
+    }
+
+    private static void TestPauseAndFocusGaps()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        probe.Frame(true, 20d);
+        probe.Frame(true, 0.05d);
+        probe.Frame(false, 120d);
+        probe.Collections += 20;
+        probe.Frame(true, 120d);
+        probe.Frame(true, 0.05d);
+        probe.Monitor.EndAttempt();
+        var state = probe.Log[0];
+        Check(state.Contains("gameplaySeconds=0.100") && state.Contains("frames=4") &&
+            state.Contains("spikesOver40ms=2") && state.Contains("maxFrameMs=50.00") &&
+            state.Contains("gc0Delta=0"),
+            "Pause/focus gaps and their collections cannot inflate gameplay samples.");
+        Console.WriteLine("PASS  Pauses/focus gaps exclude their delta and GC counts.");
+    }
+
+    private static void TestCostsAndSpawns()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        var plugin = probe.Monitor.BeginPluginUpdate();
+        probe.Now += 1;
+        probe.Monitor.BeginFrame(true, 0.02d, "Saltbaker");
+        var spawn = probe.Monitor.BeginSpawn();
+        probe.Now += 6;
+        probe.Monitor.EndSpawn(spawn, true);
+        spawn = probe.Monitor.BeginSpawn();
+        probe.Now += 2;
+        probe.Monitor.EndSpawn(spawn, false);
+        probe.Now += 1;
+        probe.Monitor.EndInteractionUpdate();
+        probe.Now += 4;
+        probe.Collections++;
+        Check(probe.Log.Count == 0, "EndInteractionUpdate cannot log before all Plugin.Update work.");
+        probe.Monitor.EndPluginUpdate(plugin);
+        probe.Monitor.EndAttempt();
+        var state = probe.Log[0];
+        Check(state.Contains("maxPluginUpdateMs=14.00") &&
+            state.Contains("maxInteractionUpdateMs=9.00") &&
+            state.Contains("maxSpawnMs=6.00") && state.Contains("spawnCount=1") &&
+            state.Contains("spawnAttempts=2") && state.Contains("gc0Delta=1"),
+            "Separate full-plugin, interaction and successful/failed spawn costs.");
+        Console.WriteLine("PASS  Plugin, interaction, spawn and GC measurements remain distinct.");
+    }
+
+    private static void TestRetriesAndPartialWindows()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        probe.Monitor.BeginAttempt();
+        Check(probe.Log.Count == 0, "Early registration followed by native start has no empty summary.");
+        probe.Frame(true, 1d);
+        probe.Frame(true, 0.1d);
+        probe.Monitor.BeginAttempt();
+        Check(probe.Log.Count == 1 && probe.Log[0].Contains("partial=true"), "Retry closes the old window.");
+        probe.Frame(true, 50d);
+        probe.Monitor.EndAttempt();
+        probe.Monitor.EndAttempt();
+        Check(probe.Log.Count == 2 && probe.Log[1].Contains("frames=1") &&
+            probe.Log[1].Contains("gameplaySeconds=0.000"),
+            "Retry resets counters and repeated lifecycle cleanup cannot duplicate summaries.");
+        Console.WriteLine("PASS  Retry rearm, partial attempts and repeated cleanup.");
+    }
+
+    private static void TestExceptionCleanupAndLogging()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        var plugin = probe.Monitor.BeginPluginUpdate();
+        probe.Monitor.BeginFrame(true, 0.02d, "Saltbaker");
+        try
+        {
+            try { probe.Now += 7; throw new InvalidOperationException("fixture"); }
+            finally { probe.Monitor.EndInteractionUpdate(); }
+        }
+        catch (InvalidOperationException) { }
+        finally { probe.Monitor.EndPluginUpdate(plugin); }
+        probe.Monitor.EndAttempt();
+        Check(probe.Log.Count == 1 && probe.Log[0].Contains("maxPluginUpdateMs=7.00"),
+            "Update exceptions still close both measured scopes.");
+        var brokenLogger = new CreatorToolsStartupPerformance(_ => { throw new Exception("logger"); },
+            () => probe.Now, () => 0, 1000);
+        brokenLogger.BeginAttempt();
+        brokenLogger.BeginFrame(true, 0, "Saltbaker");
+        brokenLogger.EndInteractionUpdate();
+        brokenLogger.EndPluginUpdate(1);
+        brokenLogger.EndAttempt();
+        Check(!brokenLogger.Pending, "A broken logger cannot break cleanup.");
+        Console.WriteLine("PASS  Exception finalizers and failed logging preserve cleanup.");
+    }
+
+    private static void TestInactiveOverhead()
+    {
+        var reads = 0;
+        var monitor = new CreatorToolsStartupPerformance(null, () => { reads++; return 10; },
+            () => { reads++; return 0; }, 1000);
+        InactivePass(monitor);
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 10000; i++) InactivePass(monitor);
+        allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+        Check(allocated == 0 && reads == 0, "Inactive diagnostics allocate nothing and never query clocks/GC.");
+        Console.WriteLine("PASS  Inactive diagnostics: zero allocated bytes and zero clock/GC reads.");
+    }
+
+    private static void TestVisualCosts()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        Check(probe.Monitor.BeginVisualUpdate() == 0, "No visual measurements before native gameplay.");
+        probe.Frame(true, 0.02d);
+        var timestamp = probe.Monitor.BeginVisualUpdate();
+        probe.Now += 3;
+        probe.Monitor.EndVisualUpdate(timestamp, true);
+        timestamp = probe.Monitor.BeginVisualUpdate();
+        probe.Now += 4;
+        probe.Monitor.EndVisualUpdate(timestamp, false);
+        probe.Frame(false, 20d);
+        Check(probe.Monitor.BeginVisualUpdate() == 0, "No visual measurements during pause/focus gaps.");
+        probe.Monitor.EndAttempt();
+        Check(probe.Log[0].Contains("maxGuiMs=3.00") &&
+            probe.Log[0].Contains("maxLateUpdateMs=4.00") &&
+            probe.Log[0].Contains("frames=1"),
+            "GUI/LateUpdate measurements stay separate and never create frame samples.");
+        Console.WriteLine("PASS  GUI and LateUpdate metrics remain separate from Update and eligibility.");
+    }
+
+    private static void TestPreviousFrameCorrelation()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        var plugin = probe.Monitor.BeginPluginUpdate();
+        probe.Monitor.BeginFrame(true, 9d, "Saltbaker", 100);
+        var stage = probe.Monitor.BeginStage();
+        probe.Now += 2;
+        probe.Monitor.EndStage(stage, CreatorToolsStartupStage.Executors);
+        stage = probe.Monitor.BeginStage();
+        probe.Now++;
+        probe.Monitor.EndStage(stage, CreatorToolsStartupStage.Commands);
+        stage = probe.Monitor.BeginStage();
+        probe.Now += 7;
+        probe.Monitor.EndStage(stage, CreatorToolsStartupStage.Publication);
+        probe.Monitor.EndInteractionUpdate();
+        // Stream draining occurs after InteractionController.Update returns.
+        stage = probe.Monitor.BeginStage();
+        probe.Now++;
+        probe.Monitor.EndStage(stage, CreatorToolsStartupStage.StreamDrain);
+        probe.Monitor.EndPluginUpdate(plugin);
+        var visual = probe.Monitor.BeginVisualUpdate();
+        stage = probe.Monitor.BeginStage();
+        probe.Now += 3;
+        probe.Monitor.EndStage(stage, CreatorToolsStartupStage.BattleHud);
+        probe.Now += 6;
+        probe.Monitor.EndVisualUpdate(visual, false);
+        visual = probe.Monitor.BeginVisualUpdate();
+        probe.Now += 4;
+        probe.Monitor.EndVisualUpdate(visual, true);
+        probe.Collections++;
+        Check(probe.Log.Count == 0 && probe.Details.Count == 0, "Never emit per-frame diagnostic logs.");
+        plugin = probe.Monitor.BeginPluginUpdate();
+        probe.Monitor.BeginFrame(true, 0.035d, null, 101);
+        stage = probe.Monitor.BeginStage();
+        probe.Now += 3;
+        probe.Monitor.EndStage(stage, CreatorToolsStartupStage.Commands);
+        probe.Monitor.EndInteractionUpdate();
+        probe.Now++;
+        probe.Monitor.EndPluginUpdate(plugin);
+        probe.Monitor.EndAttempt();
+        Check(probe.Details.Count == 1, "Only a frame with a following duration can enter the top list.");
+        var detail = probe.Details[0];
+        Check(detail.Contains("frame=100 frameMs=35.00") && detail.Contains("pluginMs=11.00") &&
+            detail.Contains("interactionMs=10.00") && detail.Contains("lateMs=9.00") &&
+            detail.Contains("guiMs=4.00") && detail.Contains("gc0Delta=1") &&
+            detail.Contains("executorsMs=2.00") && detail.Contains("commandsMs=1.00") &&
+            detail.Contains("publicationMs=7.00") && detail.Contains("streamDrainMs=1.00") &&
+            detail.Contains("battleHudMs=3.00"),
+            "Delta at frame 101 must correlate with Update/Late/GUI/GC and stages from frame 100, never 101.");
+        Console.WriteLine("PASS  Previous-frame delta pairs with the SAME Update, LateUpdate, GUI, GC and stages.");
+    }
+
+    private static void TestBoundedFrameDistribution()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        probe.Monitor.BeginFrame(true, 0, "Saltbaker", 200);
+        var durations = new[] { 0.010d, 0.020d, 0.026d, 0.031d, 0.039d, 0.041d, 0.050d, 0.100d };
+        for (var i = 0; i < durations.Length; i++)
+        {
+            probe.Now++;
+            probe.Monitor.EndInteractionUpdate();
+            probe.Monitor.EndPluginUpdate(probe.Now - 1);
+            probe.Monitor.BeginFrame(true, durations[i], null, 201 + i);
+        }
+        Check(probe.Log.Count == 0 && probe.Details.Count == 0, "Distribution sampling cannot log during frames.");
+        probe.Monitor.EndInteractionUpdate();
+        probe.Monitor.EndPluginUpdate(probe.Now);
+        probe.Monitor.EndAttempt();
+        var summary = probe.Log[0];
+        Check(summary.Contains("pairedFrames=8") && summary.Contains("framesOver25ms=6") &&
+            summary.Contains("framesOver30ms=5") && summary.Contains("spikesOver40ms=3") &&
+            summary.Contains("p50FrameApproxMs=31") && summary.Contains("p95FrameApproxMs=100") &&
+            summary.Contains("p99FrameApproxMs=100"), "Counters and percentile buckets must use paired frame durations.");
+        Check(probe.Details.Count == 5 && probe.Details[0].Contains("rank=1 frame=207 frameMs=100.00") &&
+            probe.Details[4].Contains("frameMs=31.00"), "Retain only the five slowest correlated frames, in order.");
+        Console.WriteLine("PASS  Bounded top-five frames, >25/30/40 ms counts and frame percentiles.");
+    }
+
+    private static void TestSkippedFrameAndActiveAllocationBudget()
+    {
+        var probe = new Probe();
+        probe.Monitor.BeginAttempt();
+        probe.Monitor.BeginFrame(true, 0, "Saltbaker", 1);
+        probe.Monitor.EndInteractionUpdate();
+        probe.Monitor.EndPluginUpdate(probe.Now);
+        probe.Monitor.BeginFrame(true, 30d, null, 10);
+        probe.Monitor.EndInteractionUpdate();
+        probe.Monitor.EndPluginUpdate(probe.Now);
+        probe.Monitor.EndAttempt();
+        Check(probe.Log[0].Contains("pairedFrames=0") && probe.Details.Count == 0,
+            "Never attribute an unobserved frame/focus gap to an earlier measured frame.");
+        probe.Monitor.BeginAttempt();
+        probe.Frame(true, 0.001d);
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1000; i++)
+        {
+            var plugin = probe.Monitor.BeginPluginUpdate();
+            probe.Monitor.BeginFrame(true, 0.001d, null);
+            var stage = probe.Monitor.BeginStage();
+            probe.Now++;
+            probe.Monitor.EndStage(stage, CreatorToolsStartupStage.Publication);
+            probe.Monitor.EndInteractionUpdate();
+            probe.Monitor.EndPluginUpdate(plugin);
+            var late = probe.Monitor.BeginVisualUpdate();
+            probe.Now++;
+            probe.Monitor.EndVisualUpdate(late, false);
+        }
+        allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+        Check(allocated == 0 && probe.Log.Count == 1 && probe.Details.Count == 0,
+            "Active frame correlation, histogram and stage measurements must allocate no memory or logs per frame.");
+        probe.Monitor.EndAttempt();
+        Console.WriteLine("PASS  Skipped frames stay unpaired; 1000 active correlated frames allocate zero bytes.");
+    }
+
+    private static void InactivePass(CreatorToolsStartupPerformance monitor)
+    {
+        monitor.BeginFrame(false, 1, null);
+        monitor.EndInteractionUpdate();
+        monitor.EndSpawn(monitor.BeginSpawn(), false);
+        monitor.EndPluginUpdate(monitor.BeginPluginUpdate());
+        monitor.EndVisualUpdate(monitor.BeginVisualUpdate(), true);
+        monitor.EndVisualUpdate(monitor.BeginVisualUpdate(), false);
+        monitor.EndStage(monitor.BeginStage(), CreatorToolsStartupStage.Publication);
+    }
+
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new InvalidOperationException(message);
+    }
+
+    private sealed class Probe
+    {
+        internal long Now = 10000;
+        internal int Collections;
+        internal readonly List<string> Log = new List<string>();
+        internal readonly List<string> Details = new List<string>();
+        internal readonly CreatorToolsStartupPerformance Monitor;
+        internal Probe()
+        {
+            Monitor = new CreatorToolsStartupPerformance(
+                message =>
+                {
+                    if (message.StartsWith("[StartupPerformanceFrame]", StringComparison.Ordinal)) Details.Add(message);
+                    else Log.Add(message);
+                }, () => Now, () => Collections, 1000);
+        }
+        internal void Frame(bool eligible, double seconds)
+        {
+            var started = Monitor.BeginPluginUpdate();
+            Monitor.BeginFrame(eligible, seconds, Monitor.NeedsLevelName ? "Saltbaker" : null);
+            Now++;
+            Monitor.EndInteractionUpdate();
+            Now++;
+            Monitor.EndPluginUpdate(started);
+        }
+    }
+}

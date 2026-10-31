@@ -619,15 +619,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static Camera FindGameplayCamera()
         {
-            var main = Camera.main;
-            if (main != null && main.enabled && main.orthographic)
-                return main;
-            var cameras = UnityEngine.Object.FindObjectsOfType<Camera>();
-            for (var i = 0; i < cameras.Length; i++)
-                if (cameras[i] != null && cameras[i].enabled &&
-                    cameras[i].orthographic)
-                    return cameras[i];
-            return null;
+            return CreatorToolsGameplayCameraCache.Get();
         }
     }
 
@@ -683,9 +675,6 @@ namespace Gilomx.CupheadBossRoulette
         {
             Instances.Remove(this);
         }
-
-        private static int screenCoverFrame = -1;
-        private static bool screenCoverActive;
 
         private Renderer[] actorRenderers;
         private int[] relativeOrders;
@@ -771,52 +760,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool IsScreenCoverActive()
         {
-            if (screenCoverFrame == Time.frameCount)
-                return screenCoverActive;
-            screenCoverFrame = Time.frameCount;
-            screenCoverActive = false;
-
-            // Brineybeard's native squid ink is not implemented through a
-            // PlayerScreenEffectController. Its renderer is enabled for the
-            // complete hit/fade cycle and disabled again when the ink clears.
-            // Treat the enabled state as the cover boundary so catalog actors
-            // cannot flash over the first splat while its alpha ramps up.
-            var pirateInkOverlay = PirateLevelSquidInkOverlay.Current;
-            if (pirateInkOverlay != null)
-            {
-                var pirateInkRenderer = pirateInkOverlay.GetComponent<
-                    SpriteRenderer>();
-                if (pirateInkRenderer != null &&
-                    pirateInkRenderer.enabled &&
-                    pirateInkRenderer.gameObject.activeInHierarchy)
-                {
-                    screenCoverActive = true;
-                    return true;
-                }
-            }
-
-            var controllers = UnityEngine.Object.FindObjectsOfType<
-                PlayerScreenEffectController>();
-            for (var i = 0; i < controllers.Length; i++)
-            {
-                var controller = controllers[i];
-                if (controller == null ||
-                    !controller.gameObject.activeInHierarchy)
-                    continue;
-                var sprites = controller.GetComponentsInChildren<
-                    SpriteRenderer>(true);
-                for (var j = 0; j < sprites.Length; j++)
-                {
-                    var sprite = sprites[j];
-                    if (sprite == null || !sprite.enabled ||
-                        !sprite.gameObject.activeInHierarchy ||
-                        sprite.sprite == null || sprite.color.a <= 0.01f)
-                        continue;
-                    screenCoverActive = true;
-                    return true;
-                }
-            }
-            return false;
+            return CreatorToolsScreenCoverProbe.IsActive();
         }
     }
 

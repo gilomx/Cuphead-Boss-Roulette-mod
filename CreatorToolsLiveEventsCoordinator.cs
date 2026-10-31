@@ -122,6 +122,15 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        internal int Revision
+        {
+            get
+            {
+                lock (stateLock)
+                    return revision;
+            }
+        }
+
         private bool MatchesLocked(CreatorToolsLiveEventLease lease)
         {
             return lease != null &&

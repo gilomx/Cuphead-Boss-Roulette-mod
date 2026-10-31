@@ -38,6 +38,10 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Queue<string> configCommands =
             new Queue<string>();
         private readonly object interactionsLock = new object();
+        private readonly CreatorToolsAudiencePublicationPacing interactionAudience =
+            new CreatorToolsAudiencePublicationPacing();
+        private readonly CreatorToolsAudiencePublicationPacing peskyAudience =
+            new CreatorToolsAudiencePublicationPacing();
         private readonly object interactionsProcessingLock = new object();
         private readonly Queue<InteractionCommand> interactionControlCommands =
             new Queue<InteractionCommand>();
@@ -75,6 +79,7 @@ namespace Gilomx.CupheadBossRoulette
         private volatile bool running;
         private Func<string, string> streamRuleCommandHandler;
         private Func<string, string> dashboardSimulationHandler;
+        private Func<string> dashboardStateReader;
         private Func<string> twitchStateHandler;
         private Func<string, string> twitchCommandHandler;
         private readonly string twitchControlToken = Guid.NewGuid().ToString("N");
@@ -310,6 +315,16 @@ namespace Gilomx.CupheadBossRoulette
         internal void SetInteractionsState(string json)
         {
             SetInteractionsState(json, -1L, -1L, -1L);
+        }
+
+        internal bool TryBeginInteractionStatePublication(bool urgent)
+        {
+            return interactionAudience.TryBegin(urgent);
+        }
+
+        internal bool TryBeginPeskyStatePublication(bool urgent)
+        {
+            return peskyAudience.TryBegin(urgent);
         }
 
         internal void SetInteractionsState(
@@ -605,6 +620,21 @@ namespace Gilomx.CupheadBossRoulette
                 return;
             lock (dashboardLock)
                 latestDashboardState = json;
+        }
+
+        internal bool DashboardStateIsOnDemand
+        {
+            get { lock (dashboardLock) return dashboardStateReader != null; }
+        }
+
+        // The reader owns only synchronized managed event/counter data. It
+        // must never query Unity, process donations or change gameplay state.
+        internal void SetDashboardStateReader(Func<string> reader)
+        {
+            // Registration opts this server into direct model reads for its
+            // lifetime. Removing it could expose an older push-mode cache.
+            if (reader == null) throw new ArgumentNullException("reader");
+            lock (dashboardLock) dashboardStateReader = reader;
         }
 
         /// <summary>
@@ -1562,6 +1592,9 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (path == "/api/config/interactions")
             {
+                // HTTP only marks demand; Unity owns the physical queue and
+                // builds its next snapshot on the gameplay thread.
+                interactionAudience.ObserveRequest();
                 string json;
                 lock (interactionsLock)
                 {
@@ -1905,8 +1938,26 @@ namespace Gilomx.CupheadBossRoulette
             if (path == "/api/dashboard")
             {
                 string json;
+                Func<string> reader;
                 lock (dashboardLock)
+                {
+                    reader = dashboardStateReader;
                     json = latestDashboardState;
+                }
+                // Do not hold the server lock while acquiring the model's
+                // lock. The pure reader returns current counters immediately,
+                // even when Unity has stopped updating in the background.
+                if (reader != null)
+                {
+                    try { json = reader(); }
+                    catch
+                    {
+                        WriteResponse(stream, 500, "Internal Server Error",
+                            "application/json; charset=utf-8",
+                            Encoding.UTF8.GetBytes("{\"error\":\"dashboard_unavailable\"}"), false);
+                        return;
+                    }
+                }
                 WriteResponse(stream, 200, "OK",
                     "application/json; charset=utf-8",
                     Encoding.UTF8.GetBytes(json), false);
@@ -1963,6 +2014,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (path == "/api/config/pesky")
             {
+                peskyAudience.ObserveRequest();
                 string json;
                 lock (peskyLock)
                     json = latestPeskyState;

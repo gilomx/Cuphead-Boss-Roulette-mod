@@ -30,6 +30,10 @@ namespace Gilomx.CupheadBossRoulette
             new List<ScheduledSimulation>();
         private readonly Func<CreatorToolsStreamEvent, bool>
             resolveSimulationGift;
+        // All projection builds hold stateLock, including callers outside the
+        // stream worker. Reuse scratch buffers without sharing mutable JSON.
+        private readonly CreatorToolsJsonSnapshot stateSnapshot =
+            new CreatorToolsJsonSnapshot(4096);
         private readonly string streamSessionId =
             "stream-" + Guid.NewGuid().ToString("N");
 
@@ -74,7 +78,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             ProcessDueSimulations(evaluate);
 
-            if (server == null || !server.IsRunning)
+            if (server == null || !server.IsRunning ||
+                server.DashboardStateIsOnDemand)
                 return;
             string state;
             lock (stateLock)
@@ -91,6 +96,21 @@ namespace Gilomx.CupheadBossRoulette
                 stateDirty = false;
             }
             server.SetDashboardState(state);
+        }
+
+        // HTTP reads own no Unity state and can serialize this thread-safe
+        // dashboard directly. Event evaluation and simulations keep running
+        // independently; only consumers pay for the immutable JSON snapshot.
+        internal string GetStateJson()
+        {
+            lock (stateLock)
+            {
+                if (!stateDirty && lastPublishedState != null)
+                    return lastPublishedState;
+                lastPublishedState = BuildState();
+                stateDirty = false;
+                return lastPublishedState;
+            }
         }
 
         /// <summary>
@@ -293,10 +313,15 @@ namespace Gilomx.CupheadBossRoulette
             Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation>
                 evaluate)
         {
-            var ready = new List<ScheduledSimulation>();
-            var now = Stopwatch.GetTimestamp();
+            List<ScheduledSimulation> ready;
             lock (simulationLock)
             {
+                if (scheduledSimulations.Count == 0)
+                    return;
+                var now = Stopwatch.GetTimestamp();
+                if (scheduledSimulations[0].DueAt > now)
+                    return;
+                ready = new List<ScheduledSimulation>();
                 while (ready.Count < MaximumCommandsPerUpdate &&
                        scheduledSimulations.Count > 0 &&
                        scheduledSimulations[0].DueAt <= now)
@@ -440,7 +465,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private string BuildState()
         {
-            var builder = new StringBuilder(65536);
+            var builder = stateSnapshot.Begin();
             builder.Append("{\"ready\":true,\"schemaVersion\":")
                 .Append(SchemaVersion)
                 .Append(",\"revision\":")
@@ -480,7 +505,7 @@ namespace Gilomx.CupheadBossRoulette
                 events[index].AppendJson(builder);
             }
             builder.Append("]}");
-            return builder.ToString();
+            return stateSnapshot.Complete();
         }
 
         private string EngineStatus()

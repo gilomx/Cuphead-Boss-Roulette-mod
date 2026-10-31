@@ -1,0 +1,127 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using Gilomx.CupheadBossRoulette;
+
+internal static class QueueSelectionTests
+{
+    internal static void Run()
+    {
+        TestSingleLaneProbeBudget(200);
+        TestSingleLaneProbeBudget(1000);
+        TestRejectedCandidatesAndFifo();
+        TestSelectionMatchesReference(200);
+        TestSelectionMatchesReference(1000);
+        TestNullAndRejectAllPredicates();
+        Console.WriteLine("Queue selection passed (200/1000 entries, one probe for an already resolved lane, rejected candidates, FIFO and both lane outputs).");
+    }
+
+    private static void Check(bool condition, string message)
+    { if (!condition) throw new Exception(message); }
+
+    private static void TestSingleLaneProbeBudget(int count)
+    {
+        using (var queue = CreateQueue(count, index => CreatorToolsInteractionSource.Stream))
+        {
+            var probes = 0;
+            CreatorToolsInteractionQueue.Entry battle, regular;
+            queue.PeekBySource(entry => { probes++; return true; },
+                CreatorToolsInteractionSource.PeskyBattle, out battle, out regular);
+            Check(battle == null && ReferenceEquals(regular, queue.Peek()),
+                "one-lane queue must retain its first eligible entry");
+            Check(probes == 1,
+                "one selected regular lane must cost one eligibility probe, not " + probes + " for " + count + " entries");
+            Check(queue.PendingCount == count, "selection must not consume queued work");
+        }
+    }
+
+    private static void TestRejectedCandidatesAndFifo()
+    {
+        using (var queue = CreateQueue(8, index => index % 3 == 0
+            ? CreatorToolsInteractionSource.Manual : CreatorToolsInteractionSource.Stream))
+        {
+            var probes = 0;
+            CreatorToolsInteractionQueue.Entry stream, manual;
+            queue.PeekBySource(entry => { probes++; return entry.Id >= 3; },
+                CreatorToolsInteractionSource.Stream, out stream, out manual);
+            Check(stream.Id == 3 && manual.Id == 4 && probes == 4,
+                "each lane skips rejected predecessors and selects its own first eligible entry");
+            queue.Reject(stream);
+            queue.Reject(manual);
+            queue.PeekBySource(entry => entry.Id >= 3, CreatorToolsInteractionSource.Stream, out stream, out manual);
+            Check(stream.Id == 5 && manual.Id == 7,
+                "later selections preserve FIFO independently in both lanes");
+        }
+    }
+
+    private static void TestSelectionMatchesReference(int count)
+    {
+        using (var queue = CreateQueue(count, index => index % 4 == 0
+            ? CreatorToolsInteractionSource.Manual : CreatorToolsInteractionSource.Stream))
+        {
+            Func<CreatorToolsInteractionQueue.Entry, bool> eligible =
+                entry => entry.Id % 3 != 1 && entry.Id % 5 != 0;
+            var pending = Pending(queue);
+            for (var selection = 0; selection < 60; selection++)
+            {
+                CreatorToolsInteractionQueue.Entry expectedStream = null, expectedManual = null;
+                foreach (var entry in pending)
+                {
+                    if (!eligible(entry)) continue;
+                    if (entry.Source == CreatorToolsInteractionSource.Stream)
+                    {
+                        if (expectedStream == null) expectedStream = entry;
+                    }
+                    else if (expectedManual == null) expectedManual = entry;
+                }
+                CreatorToolsInteractionQueue.Entry stream, manual;
+                queue.PeekBySource(eligible, CreatorToolsInteractionSource.Stream, out stream, out manual);
+                Check(ReferenceEquals(expectedStream, stream) && ReferenceEquals(expectedManual, manual),
+                    "optimized selection must preserve both reference candidates for caller fairness");
+                var chosen = selection % 2 == 0 ? stream ?? manual : manual ?? stream;
+                if (chosen == null) break;
+                queue.Reject(chosen);
+            }
+        }
+    }
+
+    private static void TestNullAndRejectAllPredicates()
+    {
+        using (var queue = CreateQueue(20, index => index % 2 == 0
+            ? CreatorToolsInteractionSource.Manual : CreatorToolsInteractionSource.Stream))
+        {
+            CreatorToolsInteractionQueue.Entry stream, manual;
+            queue.PeekBySource(null, CreatorToolsInteractionSource.Stream, out stream, out manual);
+            Check(stream.Id == 2 && manual.Id == 1, "null predicate preserves the unfiltered first candidate in each lane");
+            var probes = 0;
+            queue.PeekBySource(entry => { probes++; return false; },
+                CreatorToolsInteractionSource.Stream, out stream, out manual);
+            Check(stream == null && manual == null && probes == 20,
+                "unresolved lanes must still inspect all rejected candidates");
+        }
+    }
+
+    private static CreatorToolsInteractionQueue CreateQueue(int count,
+        Func<int, CreatorToolsInteractionSource> source)
+    {
+        var queue = new CreatorToolsInteractionQueue();
+        for (var index = 0; index < Math.Min(count, 200); index++)
+            Check(queue.Enqueue("hilda_purple_zeppelin", "viewer-" + index, string.Empty,
+                1, 0f, source(index)) == 1, "fixture should use the real admission path within its 200-entry capacity");
+        // Production admits at most 200 regular entries. The oversized case
+        // directly exercises selection complexity without changing that limit
+        // or pretending that a live queue can admit 1000 entries.
+        var pending = Pending(queue);
+        for (var index = 200; index < count; index++)
+            pending.Add(new CreatorToolsInteractionQueue.Entry {
+                Id = index + 1, Item = "hilda_purple_zeppelin", Donor = "viewer-" + index,
+                GiftImagePath = string.Empty, Source = source(index), ReadyAt = 0f });
+        return queue;
+    }
+
+    private static List<CreatorToolsInteractionQueue.Entry> Pending(CreatorToolsInteractionQueue queue)
+    {
+        return (List<CreatorToolsInteractionQueue.Entry>)typeof(CreatorToolsInteractionQueue)
+            .GetField("pending", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(queue);
+    }
+}

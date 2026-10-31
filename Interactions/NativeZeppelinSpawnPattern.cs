@@ -22,6 +22,16 @@ namespace Gilomx.CupheadBossRoulette
         private const float MaximumSafeLane = 610f;
         private const float MinimumLaneSeparation = 165f;
         private const int RandomLaneAttempts = 32;
+        private static readonly NativeInteractionDifficultyCache<LevelProperties.FlyingBlimp>
+            propertiesByDifficulty = new NativeInteractionDifficultyCache<LevelProperties.FlyingBlimp>(
+                LevelProperties.FlyingBlimp.GetMode);
+
+        // Called under the native loading fade, before the first catalog actor
+        // is needed. These managed configurations survive ordinary retries.
+        internal static void PrepareProperties()
+        {
+            propertiesByDifficulty.Prepare();
+        }
 
         internal static bool TryCreate(
             NativeZeppelinVariant variant,
@@ -40,7 +50,7 @@ namespace Gilomx.CupheadBossRoulette
                     mode != Level.Mode.Hard)
                     mode = Level.Mode.Normal;
 
-                var properties = LevelProperties.FlyingBlimp.GetMode(mode);
+                var properties = propertiesByDifficulty.Get(mode);
                 if (properties == null || properties.CurrentState == null ||
                     properties.CurrentState.enemy == null)
                     throw new InvalidOperationException(

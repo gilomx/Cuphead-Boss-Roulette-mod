@@ -1,0 +1,296 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class QueueProjectionTests
+    {
+        internal static void Run()
+        {
+            TestMixedProjectionAndLiveFields();
+            TestEveryCachedInputCanChange();
+            TestRepeatedFullQueueHasNoSerializationAllocations();
+        }
+
+        private static void TestMixedProjectionAndLiveFields()
+        {
+            UnityEngine.Time.realtimeSinceStartup = 0f;
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                queue.Enqueue(CreatorToolsInteractionIds.HomingCarrot,
+                    "Manual \"uno\"\\\n\r\t\u0001", "", 1, 0f,
+                    CreatorToolsInteractionSource.Manual);
+                var ordinary = queue.Peek();
+                queue.Activate(ordinary, new Timer());
+                queue.Enqueue(CreatorToolsHelp.Ghost, "Fantasma", "", 1, 0f,
+                    CreatorToolsInteractionSource.Pesky);
+                queue.Activate(queue.Peek(), new Timer());
+                queue.Enqueue(CreatorToolsTimedChallenge.NoBombs, "Avión", "", 1,
+                    0f, CreatorToolsInteractionSource.PeskyBattle, 17, 4);
+                var timed = queue.Peek();
+                var timer = new Timer
+                {
+                    SecondsRemaining = 17,
+                    CountdownSecondsRemaining = 4,
+                    CountingDown = true
+                };
+                queue.Activate(timed, timer);
+                queue.Enqueue(CreatorToolsHelp.ExtraLife, "Ayuda", "", 1, 0f,
+                    CreatorToolsInteractionSource.Stream);
+                queue.Enqueue(CreatorToolsTimedChallenge.MiniPlaneOnly, "En espera", "",
+                    1, 0f, CreatorToolsInteractionSource.Stream);
+                queue.Enqueue(CreatorToolsInteractionIds.PurpleZeppelin, "Programado", "",
+                    1, 1.23456f, CreatorToolsInteractionSource.Manual);
+                var supplemental = new List<CreatorToolsInteractionQueue.DisplayEntry>
+                {
+                    new CreatorToolsInteractionQueue.DisplayEntry
+                    {
+                        Id = 200, Item = CreatorToolsHelp.Ghost, Donor = "Ayuda activa",
+                        Source = CreatorToolsInteractionSource.Pesky, Active = true
+                    },
+                    new CreatorToolsInteractionQueue.DisplayEntry
+                    {
+                        Id = 201, Item = CreatorToolsHelp.ExtraLife, Donor = "Crédito",
+                        Source = CreatorToolsInteractionSource.Pesky, Active = false
+                    }
+                };
+                var plane = false;
+                Func<string, string> status = item =>
+                    CreatorToolsTimedChallenge.RequiresPlane(item) && !plane
+                        ? "waiting_plane" : "queued";
+                var initial = AssertReference(queue, status, supplemental);
+                Require(initial.Contains("\"status\":\"scheduled\"") &&
+                    initial.Contains("waiting_plane") && initial.Contains("1.235"),
+                    "Scheduled, restricted and rounded delay fields must be present.");
+                using (var json = JsonDocument.Parse(initial))
+                    Require(json.RootElement.GetArrayLength() == 8,
+                        "All active, pending and supplemental donors must remain visible.");
+
+                // None of these changes rebuild or mutate an entry's fixed fields.
+                plane = true;
+                UnityEngine.Time.realtimeSinceStartup = 2f;
+                timer.SecondsRemaining = 16;
+                timer.CountdownSecondsRemaining = 0;
+                timer.CountingDown = false;
+                supplemental[0].Active = false;
+                var changed = AssertReference(queue, status, supplemental);
+                Require(initial != changed && !changed.Contains("scheduled") &&
+                    !changed.Contains("waiting_plane") &&
+                    changed.Contains("\"remainingSeconds\":16"),
+                    "Cached fragments cannot freeze readiness, plane status or live timers.");
+
+                timed.Handle = null;
+                var withoutTimer = AssertReference(queue, status, supplemental);
+                Require(!withoutTimer.Contains("\"remainingSeconds\":16"),
+                    "Removing a timed handle must remove its projected timer fields.");
+                queue.Clear();
+                Require(Serialize(queue, status, null) == "[]",
+                    "Clearing the queue must discard every cached entry.");
+            }
+            Console.WriteLine("PASS  Cached queue JSON matches the previous serializer, including live statuses and timers.");
+        }
+
+        private static void TestEveryCachedInputCanChange()
+        {
+            UnityEngine.Time.realtimeSinceStartup = 0f;
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                queue.Enqueue(CreatorToolsInteractionIds.HomingCarrot, "Antes", "", 1,
+                    0f, CreatorToolsInteractionSource.Manual);
+                var entry = queue.Peek();
+                AssertReference(queue, null, null);
+                Action[] changes =
+                {
+                    () => entry.Id = 12345,
+                    () => entry.Item = CreatorToolsHelp.Ghost,
+                    () => entry.Donor = "Después \"\\\n\u0002",
+                    () => entry.Source = CreatorToolsInteractionSource.Stream,
+                    () => entry.DelaySeconds = 2.12356f,
+                    () => entry.DurationSeconds = 120,
+                    () => entry.CountdownSeconds = 30,
+                    () => entry.Item = null,
+                    () => entry.Donor = null,
+                    () => entry.DelaySeconds = 0f,
+                    () => entry.DelaySeconds = BitConverter.Int32BitsToSingle(unchecked((int)0x80000000)),
+                    () => entry.DelaySeconds = float.NaN,
+                    () => entry.DelaySeconds = float.NaN,
+                    () => entry.DelaySeconds = float.PositiveInfinity
+                };
+                foreach (var change in changes)
+                {
+                    change();
+                    AssertReference(queue, null, null);
+                }
+            }
+            Console.WriteLine("PASS  Every cached queue field invalidates on change; nulls and float edge representations stay exact.");
+        }
+
+        private static void TestRepeatedFullQueueHasNoSerializationAllocations()
+        {
+            UnityEngine.Time.realtimeSinceStartup = 0f;
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                for (var batch = 0; batch < 4; batch++)
+                    Require(queue.Enqueue(CreatorToolsInteractionIds.HomingCarrot,
+                        "Donante \"" + batch + "\"\\\n", "", 50, 1.23456f,
+                        CreatorToolsInteractionSource.Stream) == 50,
+                        "The full production queue must fit before measurement.");
+                AssertReference(queue, null, null);
+                var builder = new StringBuilder(65536);
+                queue.AppendJson(builder);
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var tick = 0; tick < 1000; tick++)
+                {
+                    UnityEngine.Time.realtimeSinceStartup = tick / 10f;
+                    builder.Length = 0;
+                    queue.AppendJson(builder);
+                }
+                var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+                Require(allocated == 0,
+                    "Repeated fixed-entry serialization cannot allocate numeric strings or buffers: " + allocated);
+                Require(queue.PendingCount == 200 && queue.ActiveCount == 0,
+                    "Projection caching cannot consume or activate earned entries.");
+                Require(builder.ToString() == Reference(queue, null, null),
+                    "The final projection must match after readiness changes during repeated polling.");
+                Console.WriteLine("PASS  200 entries x 1000 polls: " + allocated +
+                    " serializer bytes after warmup; all donors retained.");
+            }
+        }
+
+        private static string AssertReference(CreatorToolsInteractionQueue queue,
+            Func<string, string> status,
+            IList<CreatorToolsInteractionQueue.DisplayEntry> supplemental)
+        {
+            var actual = Serialize(queue, status, supplemental);
+            Require(actual == Reference(queue, status, supplemental),
+                "Queue JSON must match the previous production serializer byte for byte.");
+            return actual;
+        }
+
+        private static string Serialize(CreatorToolsInteractionQueue queue,
+            Func<string, string> status,
+            IList<CreatorToolsInteractionQueue.DisplayEntry> supplemental)
+        {
+            var builder = new StringBuilder(4096);
+            queue.AppendJson(builder, status, supplemental);
+            return builder.ToString();
+        }
+
+        // Independent copy of the previous projection, including order and
+        // formatting, to detect data loss or accidental cache staleness.
+        private static string Reference(CreatorToolsInteractionQueue queue,
+            Func<string, string> status,
+            IList<CreatorToolsInteractionQueue.DisplayEntry> supplemental)
+        {
+            var active = Entries(queue, "active");
+            var pending = Entries(queue, "pending");
+            var builder = new StringBuilder(4096);
+            builder.Append('[');
+            var first = true;
+            AppendEntries(builder, active, true, true, status, ref first);
+            AppendSupplemental(builder, supplemental, true, ref first);
+            AppendEntries(builder, pending, false, true, status, ref first);
+            AppendSupplemental(builder, supplemental, false, ref first);
+            AppendEntries(builder, active, true, false, status, ref first);
+            AppendEntries(builder, pending, false, false, status, ref first);
+            return builder.Append(']').ToString();
+        }
+
+        private static List<CreatorToolsInteractionQueue.Entry> Entries(
+            CreatorToolsInteractionQueue queue, string name)
+        {
+            return (List<CreatorToolsInteractionQueue.Entry>)typeof(CreatorToolsInteractionQueue)
+                .GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(queue);
+        }
+
+        private static void AppendEntries(StringBuilder builder,
+            List<CreatorToolsInteractionQueue.Entry> entries, bool active, bool helps,
+            Func<string, string> pendingStatus, ref bool first)
+        {
+            foreach (var entry in entries)
+            {
+                if (CreatorToolsHelp.Supports(entry.Item) != helps) continue;
+                var status = active ? "active" : entry.IsReady
+                    ? pendingStatus == null ? "queued" : pendingStatus(entry.Item) : "scheduled";
+                if (!first) builder.Append(',');
+                first = false;
+                AppendIdentity(builder, entry.Id, entry.Item, entry.Donor);
+                builder.Append("\",\"status\":\"").Append(status)
+                    .Append("\",\"source\":\"").Append(Source(entry.Source))
+                    .Append("\",\"delaySeconds\":")
+                    .Append(entry.DelaySeconds.ToString("0.###", CultureInfo.InvariantCulture))
+                    .Append(",\"durationSeconds\":").Append(entry.DurationSeconds)
+                    .Append(",\"countdownSeconds\":").Append(entry.CountdownSeconds);
+                var timer = entry.Handle as ICreatorToolsTimedInteractionHandle;
+                if (timer != null)
+                    builder.Append(",\"remainingSeconds\":").Append(timer.SecondsRemaining)
+                        .Append(",\"countdownRemaining\":").Append(timer.CountdownSecondsRemaining)
+                        .Append(",\"countingDown\":").Append(timer.CountingDown ? "true" : "false");
+                builder.Append('}');
+            }
+        }
+
+        private static void AppendSupplemental(StringBuilder builder,
+            IList<CreatorToolsInteractionQueue.DisplayEntry> entries, bool active, ref bool first)
+        {
+            if (entries == null) return;
+            foreach (var entry in entries)
+            {
+                if (entry.Active != active) continue;
+                if (!first) builder.Append(',');
+                first = false;
+                AppendIdentity(builder, entry.Id, entry.Item, entry.Donor);
+                builder.Append("\",\"status\":\"").Append(entry.Active ? "active" : "queued")
+                    .Append("\",\"source\":\"").Append(Source(entry.Source))
+                    .Append("\",\"delaySeconds\":0,\"durationSeconds\":0,\"countdownSeconds\":0}");
+            }
+        }
+
+        private static void AppendIdentity(StringBuilder builder, int id, string item, string donor)
+        {
+            builder.Append("{\"id\":").Append(id).Append(",\"item\":\"");
+            Escape(builder, item);
+            builder.Append("\",\"donor\":\"");
+            Escape(builder, donor);
+        }
+
+        private static void Escape(StringBuilder builder, string value)
+        {
+            if (string.IsNullOrEmpty(value)) return;
+            foreach (var character in value)
+            {
+                if (character == '\\' || character == '"') builder.Append('\\').Append(character);
+                else if (character == '\n') builder.Append("\\n");
+                else if (character == '\r') builder.Append("\\r");
+                else if (character == '\t') builder.Append("\\t");
+                else if (character < 32) builder.Append("\\u").Append(((int)character).ToString("x4"));
+                else builder.Append(character);
+            }
+        }
+
+        private static string Source(CreatorToolsInteractionSource source)
+        {
+            return source == CreatorToolsInteractionSource.Stream ? "stream" :
+                source == CreatorToolsInteractionSource.PeskyBattle ? "pesky_battle" :
+                source == CreatorToolsInteractionSource.Pesky ? "pesky" : "manual";
+        }
+
+        private static void Require(bool condition, string message)
+        {
+            if (!condition) throw new InvalidOperationException(message);
+        }
+
+        private sealed class Timer : ICreatorToolsInteractionHandle, ICreatorToolsTimedInteractionHandle
+        {
+            public bool IsComplete { get { return false; } }
+            public int SecondsRemaining { get; set; }
+            public int CountdownSecondsRemaining { get; set; }
+            public bool CountingDown { get; set; }
+            public void Dispose() { }
+        }
+    }
+}

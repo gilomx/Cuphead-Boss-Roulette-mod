@@ -1,0 +1,11 @@
+namespace UnityEngine
+{
+    public struct Vector2 { public float x, y; public Vector2(float x, float y) { this.x=x; this.y=y; } }
+    public class Collider2D { public string name; public bool enabled = true; }
+    public struct RaycastHit2D { public Collider2D collider; public Vector2 point; public float fraction; }
+    public static class Physics2D
+    {
+        public static int LinecastNonAlloc(Vector2 from, Vector2 to, RaycastHit2D[] hits) { return 0; }
+        public static RaycastHit2D[] LinecastAll(Vector2 from, Vector2 to) { throw new System.Exception("Unexpected fallback"); }
+    }
+}

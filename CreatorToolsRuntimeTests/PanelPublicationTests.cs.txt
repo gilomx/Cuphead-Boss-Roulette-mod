@@ -1,0 +1,75 @@
+using System;
+using System.Globalization;
+using System.Net;
+using System.Net.Http;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunPanelPublicationTests()
+        {
+            Run("Panel state GETs activate only their own publication audience", TestPanelPublicationReaders);
+            Run("OBS and rejected requests do not activate panel queue publications", TestPanelPublicationNonReaders);
+        }
+
+        private static void BootstrapPanelPublications(CreatorToolsServer server)
+        {
+            True(server.TryBeginInteractionStatePublication(false), "interaction bootstrap was suppressed");
+            True(server.TryBeginPeskyStatePublication(false), "pesky bootstrap was suppressed");
+            True(!server.TryBeginInteractionStatePublication(false) && !server.TryBeginPeskyStatePublication(false),
+                "headless gameplay should not publish ongoing panel snapshots");
+        }
+
+        private static void TestPanelPublicationReaders()
+        {
+            using (var scope = new TestScope("panel-publication-readers"))
+            using (var server = scope.StartServer())
+            {
+                BootstrapPanelPublications(server);
+                // No Unity update or publisher runs while these requests are
+                // served. HTTP must return cached data, not wait on gameplay.
+                using (var state = GetJson(server, "/api/config/interactions"))
+                    True(!state.RootElement.GetProperty("ready").GetBoolean(), "initial cached state must remain readable");
+                True(server.TryBeginInteractionStatePublication(false), "first interaction reader did not request refresh");
+                True(!server.TryBeginPeskyStatePublication(false), "interaction readers activated the unrelated pesky projection");
+                using (var state = GetJson(server, "/api/config/pesky"))
+                    True(!state.RootElement.GetProperty("ready").GetBoolean(), "pesky cached state must remain readable");
+                True(server.TryBeginPeskyStatePublication(false), "first pesky reader did not request refresh");
+
+                // A reader lease is not required to acknowledge real controls.
+                True(server.TryBeginInteractionStatePublication(true), "urgent interaction ACK was suppressed");
+                True(server.TryBeginPeskyStatePublication(true), "urgent pesky ACK was suppressed");
+            }
+        }
+
+        private static void TestPanelPublicationNonReaders()
+        {
+            using (var scope = new TestScope("panel-publication-nonreaders"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                BootstrapPanelPublications(server);
+                foreach (var path in new[] { "/api/config/interactions/rules", "/api/config/pesky-battle", "/api/config/tap-farming" })
+                {
+                    using (var state = GetJson(server, path)) { }
+                    True(!server.TryBeginInteractionStatePublication(false) && !server.TryBeginPeskyStatePublication(false),
+                        "an independent overlay endpoint activated heavy queue snapshots: " + path);
+                }
+                foreach (var path in new[] { "/api/config/interactions", "/api/config/pesky" })
+                {
+                    using (var body = new StringContent(string.Empty))
+                    using (var response = client.PostAsync("http://127.0.0.1:" +
+                        server.Port.ToString(CultureInfo.InvariantCulture) + path, body).GetAwaiter().GetResult())
+                        Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode, "read-only state must reject POST");
+                    True(!server.TryBeginInteractionStatePublication(false) && !server.TryBeginPeskyStatePublication(false),
+                        "a rejected request activated panel snapshot publication");
+                }
+                True(server.TryBeginInteractionStatePublication(true) && server.TryBeginPeskyStatePublication(true),
+                    "urgent controls must publish with no reader present");
+                True(!server.TryBeginInteractionStatePublication(false) && !server.TryBeginPeskyStatePublication(false),
+                    "control acknowledgements must not create a fake panel audience");
+            }
+        }
+    }
+}

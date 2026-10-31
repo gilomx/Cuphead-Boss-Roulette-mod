@@ -1,0 +1,306 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Threading;
+using Gilomx.CupheadBossRoulette;
+using HarmonyLib;
+
+internal static class Program
+{
+    private static void Check(bool condition, string message)
+    { if (!condition) throw new Exception(message); }
+
+    private static void Main()
+    {
+        TestPatchRegistration();
+        TestProgressionPatchFailure();
+        TestUnguardedComponentWouldBeStranded();
+        TestRobotComponentsAndReserve();
+        TestNestedScopesAndFinalizers();
+        TestPlayerAndBossExceptionCleanup();
+        TestThreadIsolation();
+        Console.WriteLine("All Tap Farming damage bridge tests passed (native registration order, failed guard, Robot component gates, reserve preservation, nested scopes, exception cleanup and thread isolation).");
+    }
+
+    private static void TestPatchRegistration()
+    {
+        var plugin = new Plugin();
+        plugin.InstallDamagePatches();
+        var patches = plugin.harmony.Patches;
+        var advance = patches.FindIndex(p => p.Original.Name == "DealDamageToNextNamedState");
+        var damage = patches.FindIndex(p => p.Original.DeclaringType != typeof(DamageDealer) && p.Original.Name == "DealDamage");
+        Check(advance >= 0 && damage > advance, "native progression guard is installed before boss damage absorption");
+        Check(patches.All(p => p.Prefix != null && p.Postfix != null && p.Finalizer != null),
+            "all registered scopes have normal and exceptional cleanup");
+    }
+
+    private static void TestProgressionPatchFailure()
+    {
+        var plugin = new Plugin();
+        plugin.harmony.RejectPatch = method => method.Name == "DealDamageToNextNamedState";
+        plugin.InstallDamagePatches();
+        Check(!plugin.harmony.Patches.Any(p => p.Original.Name == "DealDamage" &&
+            p.Original.DeclaringType != typeof(DamageDealer)),
+            "unsupported progression guard leaves that boss's native damage unmodified");
+        Check(plugin.Logger.Warnings.Count > 0, "failed native protection is visible in the log");
+    }
+
+    private static void TestRobotComponentsAndReserve()
+    {
+        using (var fixture = new Fixture())
+        {
+            var components = new[] { new RobotPart(), new RobotPart(), new RobotPart() };
+            foreach (var component in components)
+            {
+                fixture.WithPlayerContext(() => component.Hit(5f));
+                Check(component.Destroyed && fixture.Properties.stateIndex == 0 &&
+                    fixture.Properties.CurrentHealth == 300f && fixture.Reserve == 1000d,
+                    "initial Robot components use local HP without spending reserve or aggregate boss health");
+            }
+            var heart = new RobotPart(() => fixture.WithProgression(
+                fixture.Properties.DealDamageToNextNamedState));
+            fixture.WithPlayerContext(() => heart.Hit(5f));
+            Check(components.All(component => component.Destroyed) && heart.Destroyed &&
+                fixture.Properties.stateIndex == 1 && fixture.Reserve == 1000d,
+                "destroying the exposed heart runs the one native phase-advance loop and exposes the flying head");
+            var phaseTwoHealth = fixture.Properties.CurrentHealth;
+            Check(fixture.ProjectedBossHealth == phaseTwoHealth && phaseTwoHealth == 150f,
+                "native progression postfix attaches the boss reader and publishes phase-two HP before the first head hit");
+            fixture.PlayerHit(12f);
+            Check(fixture.Reserve == 988d && fixture.Properties.CurrentHealth == phaseTwoHealth,
+                "phase-two player hits resume absorption with reserve retained across the transition");
+            fixture.BossHit(1f);
+            Check(fixture.Reserve == 988d && fixture.Properties.CurrentHealth == phaseTwoHealth - 1f,
+                "non-player native damage remains outside tap absorption");
+        }
+    }
+
+    private sealed class RobotPart
+    {
+        private float health = 5f;
+        private readonly Action onDestroyed;
+        internal bool Destroyed;
+        internal RobotPart(Action onDestroyed = null) { this.onDestroyed = onDestroyed; }
+        internal void Hit(float damage)
+        {
+            if (Destroyed) return;
+            health -= damage;
+            if (health > 0f) return;
+            if (onDestroyed != null) onDestroyed();
+            Destroyed = true;
+        }
+    }
+
+    private static void TestUnguardedComponentWouldBeStranded()
+    {
+        using (var fixture = new Fixture())
+        {
+            // Deliberately omit the new progression prefix to reproduce the
+            // old bridge while keeping the real reserve controller active.
+            fixture.WithPlayerContext(fixture.Properties.DealDamageToNextNamedState);
+            Check(fixture.Properties.stateIndex == 0 && fixture.Properties.CurrentHealth == 300f &&
+                fixture.Reserve == 700d,
+                "unguarded synthetic loop spends its entire TotalHealth iteration budget on reserve and strands a destroyed component");
+        }
+    }
+
+    private static void TestNestedScopesAndFinalizers()
+    {
+        using (var fixture = new Fixture())
+        {
+            fixture.WithPlayerContext(() =>
+            {
+                var outer = fixture.BeginProgression();
+                var inner = fixture.BeginProgression();
+                fixture.BossHit(1f);
+                fixture.EndProgressionPostfix(ref inner);
+                fixture.EndProgressionFinalizer(null, ref inner);
+                fixture.BossHit(1f);
+                Check(fixture.Reserve == 1000d && fixture.Properties.CurrentHealth == 298f,
+                    "postfix plus finalizer do not release a still-active outer native scope");
+                var failure = new InvalidOperationException("simulated native progression error");
+                Check(ReferenceEquals(fixture.EndProgressionFinalizer(failure, ref outer), failure),
+                    "progression finalizer preserves the native exception");
+                fixture.EndProgressionFinalizer(failure, ref outer);
+                fixture.BossHit(7f);
+                Check(fixture.Reserve == 993d && fixture.Properties.CurrentHealth == 298f,
+                    "exception-only cleanup releases progression exactly once and ordinary absorption resumes");
+            });
+        }
+    }
+
+    private static void TestPlayerAndBossExceptionCleanup()
+    {
+        using (var fixture = new Fixture())
+        {
+            var player = fixture.BeginPlayer();
+            var damage = 3f;
+            var boss = fixture.BeginBoss(ref damage);
+            var failure = new InvalidOperationException("simulated damage callback error");
+            Check(ReferenceEquals(fixture.EndBossFinalizer(failure, ref boss), failure),
+                "boss finalizer preserves the damage exception");
+            fixture.EndBossFinalizer(failure, ref boss);
+            fixture.EndPlayerFinalizer(failure, ref player);
+            fixture.EndPlayerFinalizer(failure, ref player);
+            fixture.PlayerHit(5f);
+            Check(fixture.Reserve == 992d && fixture.Properties.CurrentHealth == 300f,
+                "boss and player finalizers unwind depths without suppressing later normal player hits");
+            fixture.BossHit(2f);
+            Check(fixture.Reserve == 992d && fixture.Properties.CurrentHealth == 298f,
+                "player exception cleanup cannot leak player ownership into unrelated native damage");
+        }
+    }
+
+    private static void TestThreadIsolation()
+    {
+        using (var fixture = new Fixture())
+        {
+            var scope = fixture.BeginProgression();
+            Exception failure = null;
+            var worker = new Thread(() =>
+            {
+                try { fixture.PlayerHit(4f); }
+                catch (Exception exception) { failure = exception; }
+            });
+            worker.Start(); worker.Join();
+            fixture.EndProgressionFinalizer(null, ref scope);
+            Check(failure == null && fixture.Reserve == 996d && fixture.Properties.CurrentHealth == 300f,
+                "a native progression scope is local to its own thread");
+        }
+    }
+
+    private sealed class Fixture : IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "pichi-tap-damage-" + Guid.NewGuid().ToString("N"));
+        private readonly CreatorToolsTapFarmingController taps;
+        private readonly CreatorToolsServer server = new CreatorToolsServer();
+        private readonly PatchRecord player, boss, progression;
+        internal readonly LevelProperties.Robot Properties = new LevelProperties.Robot();
+
+        internal Fixture()
+        {
+            Directory.CreateDirectory(directory);
+            taps = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"),
+                new CreatorToolsLiveEventsCoordinator(), null, null);
+            taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=1&healthPointsPerConversion=1");
+            taps.OnLevelStarted(new Level { CurrentLevel = Levels.Robot, Id = 21 });
+            taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = 1000 });
+            var plugin = new Plugin { creatorToolsInteractions = new CreatorToolsInteractionController { Controller = taps } };
+            Plugin.activeInstance = plugin;
+            plugin.InstallDamagePatches();
+            player = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(DamageDealer));
+            boss = plugin.harmony.Patches.Single(p => p.Original.DeclaringType != typeof(DamageDealer) && p.Original.Name == "DealDamage");
+            progression = plugin.harmony.Patches.Single(p => p.Original.Name == "DealDamageToNextNamedState");
+            Properties.RouteDamage = BossHit;
+        }
+
+        internal double Reserve
+        {
+            get
+            {
+                taps.PublishState(server);
+                using (var json = JsonDocument.Parse(server.State))
+                    return json.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble();
+            }
+        }
+
+        internal double ProjectedBossHealth
+        {
+            get
+            {
+                taps.PublishState(server);
+                using (var json = JsonDocument.Parse(server.State))
+                    return json.RootElement.GetProperty("boss").GetProperty("currentHealth").GetDouble();
+            }
+        }
+
+        internal bool BeginPlayer()
+        {
+            var args = new object[] { new UnityEngine.GameObject(), PlayerId.PlayerOne, false };
+            player.Prefix.Invoke(null, args);
+            return (bool)args[2];
+        }
+
+        internal void WithPlayerContext(Action action)
+        {
+            var state = BeginPlayer();
+            try
+            {
+                action();
+                var args = new object[] { state };
+                player.Postfix.Invoke(null, args);
+                state = (bool)args[0];
+            }
+            finally { EndPlayerFinalizer(null, ref state); }
+        }
+
+        internal void PlayerHit(float damage) { WithPlayerContext(() => BossHit(damage)); }
+
+        internal bool BeginBoss(ref float damage)
+        {
+            var args = new object[] { Properties, damage, false };
+            boss.Prefix.Invoke(null, args);
+            damage = (float)args[1];
+            return (bool)args[2];
+        }
+
+        internal void BossHit(float damage)
+        {
+            var args = new object[] { Properties, damage, false };
+            var runOriginal = (bool)boss.Prefix.Invoke(null, args);
+            var state = (bool)args[2];
+            try
+            {
+                if (runOriginal) Properties.DealDamage((float)args[1]);
+                args = new object[] { Properties, state };
+                boss.Postfix.Invoke(null, args);
+                state = (bool)args[1];
+            }
+            finally { EndBossFinalizer(null, ref state); }
+        }
+
+        internal bool BeginProgression()
+        {
+            var args = new object[] { false };
+            progression.Prefix.Invoke(null, args);
+            return (bool)args[0];
+        }
+
+        internal void WithProgression(Action action)
+        {
+            var state = BeginProgression();
+            try { action(); EndProgressionPostfix(ref state); }
+            finally { EndProgressionFinalizer(null, ref state); }
+        }
+
+        internal void EndProgressionPostfix(ref bool state)
+        {
+            var args = new object[] { Properties, state };
+            progression.Postfix.Invoke(null, args);
+            state = (bool)args[1];
+        }
+
+        internal Exception EndProgressionFinalizer(Exception exception, ref bool state)
+        { return EndFinalizer(progression, exception, ref state); }
+        internal Exception EndPlayerFinalizer(Exception exception, ref bool state)
+        { return EndFinalizer(player, exception, ref state); }
+        internal Exception EndBossFinalizer(Exception exception, ref bool state)
+        { return EndFinalizer(boss, exception, ref state); }
+        private static Exception EndFinalizer(PatchRecord patch, Exception exception, ref bool state)
+        {
+            var args = new object[] { exception, state };
+            var result = patch.Finalizer.Invoke(null, args) as Exception;
+            state = (bool)args[1];
+            return result;
+        }
+
+        public void Dispose()
+        {
+            Plugin.activeInstance = null;
+            taps.ProcessBackgroundCommand("action=off");
+            Directory.Delete(directory, true);
+        }
+    }
+}

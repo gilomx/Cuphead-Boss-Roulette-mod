@@ -45,8 +45,18 @@ namespace Gilomx.CupheadBossRoulette
             var bossFinalizer = AccessTools.Method(
                 typeof(CreatorToolsTapFarmingDamagePatch),
                 "BossDamageFinalizer");
+            var progressionPrefix = AccessTools.Method(
+                typeof(CreatorToolsTapFarmingDamagePatch),
+                "NativeProgressionPrefix");
+            var progressionPostfix = AccessTools.Method(
+                typeof(CreatorToolsTapFarmingDamagePatch),
+                "NativeProgressionPostfix");
+            var progressionFinalizer = AccessTools.Method(
+                typeof(CreatorToolsTapFarmingDamagePatch),
+                "NativeProgressionFinalizer");
             if (bossPrefix == null || bossPostfix == null ||
-                bossFinalizer == null)
+                bossFinalizer == null || progressionPrefix == null ||
+                progressionPostfix == null || progressionFinalizer == null)
             {
                 Logger.LogWarning(
                     "Could not install the Tap Farming boss-damage bridge.");
@@ -73,6 +83,21 @@ namespace Gilomx.CupheadBossRoulette
                     continue;
                 try
                 {
+                    var advance = baseType.GetMethod(
+                        "DealDamageToNextNamedState",
+                        BindingFlags.Instance | BindingFlags.Public |
+                        BindingFlags.NonPublic | BindingFlags.DeclaredOnly,
+                        null, Type.EmptyTypes, null);
+                    if (advance == null)
+                        throw new MissingMethodException(
+                            "Native boss phase progression was not found.");
+                    // Install this guard first. If native progression cannot
+                    // be protected, leave this boss's damage untouched rather
+                    // than risk absorbing an irreversible phase transition.
+                    harmony.Patch(advance,
+                        prefix: new HarmonyMethod(progressionPrefix),
+                        postfix: new HarmonyMethod(progressionPostfix),
+                        finalizer: new HarmonyMethod(progressionFinalizer));
                     harmony.Patch(dealDamage,
                         prefix: new HarmonyMethod(bossPrefix),
                         postfix: new HarmonyMethod(bossPostfix),
@@ -104,6 +129,47 @@ namespace Gilomx.CupheadBossRoulette
             private static int playerDamageDepth;
             [ThreadStatic]
             private static int bossDamageDepth;
+            [ThreadStatic]
+            private static int nativeProgressionDepth;
+
+            private static void NativeProgressionPrefix(out bool __state)
+            {
+                // Destroying a Robot component (and several other native
+                // mechanics) advances the boss with synthetic DealDamage(1)
+                // calls. These are state-machine work, not player hits. The
+                // game's bounded loop must finish without spending tap HP.
+                nativeProgressionDepth++;
+                __state = true;
+            }
+
+            private static void NativeProgressionPostfix(
+                object __instance, ref bool __state)
+            {
+                if (!__state)
+                    return;
+                var plugin = activeInstance;
+                if (plugin != null &&
+                    plugin.creatorToolsInteractions != null)
+                    plugin.creatorToolsInteractions
+                        .ObserveTapFarmingBossDamage(__instance);
+                EndNativeProgression(ref __state);
+            }
+
+            private static Exception NativeProgressionFinalizer(
+                Exception __exception, ref bool __state)
+            {
+                EndNativeProgression(ref __state);
+                return __exception;
+            }
+
+            private static void EndNativeProgression(ref bool state)
+            {
+                if (!state)
+                    return;
+                state = false;
+                if (nativeProgressionDepth > 0)
+                    nativeProgressionDepth--;
+            }
 
             private static void PlayerDamagePrefix(
                 GameObject hit,
@@ -148,7 +214,8 @@ namespace Gilomx.CupheadBossRoulette
                 out bool __state)
             {
                 __state = false;
-                if (playerDamageDepth <= 0 || bossDamageDepth > 0)
+                if (playerDamageDepth <= 0 || bossDamageDepth > 0 ||
+                    nativeProgressionDepth > 0)
                     return true;
                 var plugin = activeInstance;
                 if (plugin == null ||

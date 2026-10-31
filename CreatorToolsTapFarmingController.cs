@@ -64,6 +64,7 @@ namespace Gilomx.CupheadBossRoulette
         private string feedback = "ready";
         private bool error;
         private string lastState;
+        private int lastLiveEventsRevision = -1;
         private CreatorToolsLiveEventLease liveEventLease;
 
         // Unity object references are only inspected on the main thread. A
@@ -187,13 +188,20 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (server == null || !server.IsRunning)
                 return;
-            var liveSnapshot = liveEvents == null
-                ? new CreatorToolsLiveEventsSnapshot(
-                    string.Empty, "idle", 0L, 0)
-                : liveEvents.Snapshot;
+            var liveRevision = liveEvents == null ? 0 : liveEvents.Revision;
             lock (stateLock)
             {
+                // TouchLocked invalidates local changes. The coordinator can
+                // change independently when another Live Event takes over.
+                if (lastState != null &&
+                    lastLiveEventsRevision == liveRevision)
+                    return;
+                var liveSnapshot = liveEvents == null
+                    ? new CreatorToolsLiveEventsSnapshot(
+                        string.Empty, "idle", 0L, 0)
+                    : liveEvents.Snapshot;
                 var state = BuildStateLocked(liveSnapshot);
+                lastLiveEventsRevision = liveSnapshot.Revision;
                 if (state == lastState)
                     return;
                 lastState = state;
@@ -448,7 +456,10 @@ namespace Gilomx.CupheadBossRoulette
                 if (phase != "active" && phase != "transition")
                     return true;
                 if (phase == "transition")
+                {
                     phase = "active";
+                    TouchLocked();
+                }
 
                 var absorbed = Math.Min(
                     reserveHealth, Math.Max(0d, (double)damage));

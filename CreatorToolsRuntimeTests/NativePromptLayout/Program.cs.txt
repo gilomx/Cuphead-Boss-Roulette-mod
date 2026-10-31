@@ -1,0 +1,107 @@
+using System;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class Program
+    {
+        private static int groups;
+        private static void Main()
+        {
+            Run("One layout serves a thousand unchanged manual-prompt frames", delegate
+            {
+                var cache = new NativeChallengePromptLayoutCache();
+                var input = Input();
+                Check(cache.NeedsApply(input, input.Text, 1290f, 206f),
+                    "a freshly cloned prompt must be measured even if its copied text matches");
+                cache.MarkApplied(input, 1290f, 206f);
+                for (var i = 0; i < 1000; i++)
+                    Check(!cache.NeedsApply(input, input.Text, 1290f, 206f),
+                        "stable frames must not force another canvas rebuild");
+            });
+            Run("Language/challenge changes and native text overwrites request layout", delegate
+            {
+                var cache = new NativeChallengePromptLayoutCache();
+                var input = Input();
+                cache.MarkApplied(input, 1290f, 206f);
+                var spanish = input;
+                spanish.Text = "RETO: SIN DASH";
+                Check(cache.NeedsApply(spanish, input.Text, 1290f, 206f),
+                    "localized text cannot retain another language's measured width");
+                cache.MarkApplied(spanish, 1290f, 232f);
+                Check(!cache.NeedsApply(spanish, spanish.Text, 1290f, 232f),
+                    "a translated prompt settles after its layout");
+                Check(cache.NeedsApply(spanish, "VOLVER", 1290f, 232f),
+                    "external native localization overwrites must still be corrected");
+                var anotherChallenge = spanish;
+                anotherChallenge.Text = "RETO: UNA VIDA";
+                Check(cache.NeedsApply(anotherChallenge, spanish.Text, 1290f, 232f),
+                    "equipping another challenge changes the layout");
+            });
+            Run("Font metrics and best-fit settings invalidate prompt layout", delegate
+            {
+                var original = Input();
+                var font = original; font.Font = new object(); Changed(original, font);
+                var size = original; size.FontSize++; Changed(original, size);
+                var style = original; style.FontStyle++; Changed(original, style);
+                var fit = original; fit.BestFit = true; Changed(original, fit);
+                var minimum = original; minimum.BestFitMinimum++; Changed(original, minimum);
+                var maximum = original; maximum.BestFitMaximum++; Changed(original, maximum);
+            });
+            Run("Canvas recreation, screen resizing and live scale invalidate layout", delegate
+            {
+                var original = Input();
+                var target = original; target.Target = new object(); Changed(original, target);
+                var canvas = original; canvas.Canvas = new object(); Changed(original, canvas);
+                var scale = original; scale.CanvasScale = 1.25f; Changed(original, scale);
+                var width = original; width.ScreenWidth = 1920; Changed(original, width);
+                var height = original; height.ScreenHeight = 1080; Changed(original, height);
+            });
+            Run("Unexpected native rect changes are repaired without committing failed layouts", delegate
+            {
+                var cache = new NativeChallengePromptLayoutCache();
+                var input = Input();
+                cache.MarkApplied(input, 1290f, 206f);
+                Check(cache.NeedsApply(input, input.Text, 1280f, 206f),
+                    "a native layout group moving the prompt must be corrected");
+                Check(cache.NeedsApply(input, input.Text, 1290f, 100f),
+                    "a native layout group resizing the prompt must be corrected");
+                var changed = input; changed.Text = "A NEW CHALLENGE";
+                Check(cache.NeedsApply(changed, input.Text, 1290f, 206f), "new layout requested");
+                Check(cache.NeedsApply(changed, input.Text, 1290f, 206f),
+                    "an unsuccessful layout remains dirty until explicitly committed");
+                cache.Reset();
+                Check(cache.NeedsApply(input, input.Text, 1290f, 206f),
+                    "teardown/recreation cannot reuse the previous layout's success");
+            });
+            Run("Prompt discovery preserves map preparation and avoids inactive battle scans", delegate
+            {
+                Check(NativeChallengePromptLayoutCache.CanPrepareTemplate(false, true),
+                    "the map prepares a selected challenge before its Help template disappears");
+                Check(NativeChallengePromptLayoutCache.CanPrepareTemplate(true, false),
+                    "an active manual challenge can recover its missing prompt in battle");
+                Check(NativeChallengePromptLayoutCache.CanPrepareTemplate(true, true),
+                    "an active challenge may use an available map template");
+                Check(!NativeChallengePromptLayoutCache.CanPrepareTemplate(false, false),
+                    "a remembered but incompatible/roulette-owned challenge must not scan a battle every frame");
+            });
+            Console.WriteLine("PASS " + groups + " native prompt layout groups (production allocation-free policy; compiled UI wiring verified separately).");
+        }
+        private static NativeChallengePromptLayoutInput Input()
+        {
+            return new NativeChallengePromptLayoutInput
+            {
+                Text = "CHALLENGE: NO DASH", Target = new object(), Canvas = new object(), Font = new object(),
+                FontSize = 24, FontStyle = 0, BestFit = false, BestFitMinimum = 12, BestFitMaximum = 24,
+                CanvasScale = 1f, ScreenWidth = 1366, ScreenHeight = 768
+            };
+        }
+        private static void Changed(NativeChallengePromptLayoutInput original, NativeChallengePromptLayoutInput changed)
+        {
+            var cache = new NativeChallengePromptLayoutCache();
+            cache.MarkApplied(original, 1290f, 206f);
+            Check(cache.NeedsApply(changed, original.Text, 1290f, 206f), "changed layout inputs must invalidate the cached measurement");
+        }
+        private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+        private static void Run(string name, Action action) { action(); groups++; Console.WriteLine("PASS " + name); }
+    }
+}

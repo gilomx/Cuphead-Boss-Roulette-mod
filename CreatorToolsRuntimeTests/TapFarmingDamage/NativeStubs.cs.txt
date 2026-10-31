@@ -1,0 +1,149 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+
+// The real bridge, controller, reserve arithmetic and progress reader are
+// linked into this harness. Only Unity, Harmony patch registration and native
+// boss property types are substituted; tests invoke the registered patches
+// with Harmony's prefix/postfix/finalizer lifecycle.
+namespace HarmonyLib
+{
+    public sealed class HarmonyMethod
+    {
+        internal readonly MethodInfo Method;
+        public HarmonyMethod(MethodInfo method) { Method = method; }
+    }
+
+    public sealed class Harmony
+    {
+        internal readonly List<PatchRecord> Patches = new List<PatchRecord>();
+        internal Func<MethodBase, bool> RejectPatch;
+        public void Patch(MethodBase original, HarmonyMethod prefix = null,
+            HarmonyMethod postfix = null, HarmonyMethod finalizer = null)
+        {
+            if (RejectPatch != null && RejectPatch(original))
+                throw new InvalidOperationException("simulated unsupported native helper");
+            Patches.Add(new PatchRecord { Original = original,
+                Prefix = prefix == null ? null : prefix.Method,
+                Postfix = postfix == null ? null : postfix.Method,
+                Finalizer = finalizer == null ? null : finalizer.Method });
+        }
+    }
+
+    internal sealed class PatchRecord
+    {
+        internal MethodBase Original;
+        internal MethodInfo Prefix, Postfix, Finalizer;
+    }
+
+    public static class AccessTools
+    {
+        public static MethodInfo Method(Type type, string name, Type[] parameters = null)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static |
+                BindingFlags.Public | BindingFlags.NonPublic;
+            return parameters == null ? type.GetMethod(name, flags) :
+                type.GetMethod(name, flags, null, parameters, null);
+        }
+    }
+}
+
+namespace UnityEngine
+{
+    public sealed class GameObject { }
+    public static class Time { public static float realtimeSinceStartup; }
+    public static class Mathf
+    {
+        public static float Max(float a, float b) { return Math.Max(a, b); }
+        public static float Clamp01(float value) { return Math.Max(0f, Math.Min(1f, value)); }
+        public static bool Approximately(float a, float b) { return Math.Abs(a - b) < 0.00001f; }
+    }
+}
+
+internal enum PlayerId { PlayerOne, None = int.MaxValue }
+internal sealed class DamageDealer { public void DealDamage(UnityEngine.GameObject hit) { } }
+internal enum Levels { Robot, Ground, DicePalaceMain }
+internal sealed class Level
+{
+    internal enum Type { Battle }
+    internal static Level Current;
+    internal Type LevelType;
+    internal bool Ending;
+    internal Levels CurrentLevel;
+    internal int Id;
+    internal int GetInstanceID() { return Id; }
+}
+
+internal enum RobotStateName { Components, Flying }
+internal sealed class RobotState
+{
+    internal RobotStateName stateName;
+    internal float healthTrigger;
+}
+internal sealed class Difficulty { }
+
+internal class AbstractLevelProperties<TState, TName, TDifficulty>
+{
+    public float CurrentHealth { get; private set; } = 300f;
+    public float TotalHealth = 300f;
+    public int stateIndex;
+    public RobotState[] states = new[]
+    {
+        new RobotState { stateName = RobotStateName.Components, healthTrigger = 1f },
+        new RobotState { stateName = RobotStateName.Flying, healthTrigger = 0.5f }
+    };
+    // This callback routes the synthetic 1-damage loop through the real
+    // bridge's patches without requiring runtime method rewriting in tests.
+    internal Action<float> RouteDamage;
+    public void DealDamage(float damage)
+    {
+        CurrentHealth = Math.Max(0f, CurrentHealth - damage);
+        while (stateIndex + 1 < states.Length &&
+            CurrentHealth <= TotalHealth * states[stateIndex + 1].healthTrigger + 0.0001f)
+            stateIndex++;
+    }
+    public void DealDamageToNextNamedState()
+    {
+        var initialName = states[stateIndex].stateName;
+        for (var i = 0; i < TotalHealth && states[stateIndex].stateName == initialName; i++)
+            RouteDamage(1f);
+    }
+}
+
+internal sealed class LevelProperties
+{
+    internal sealed class Robot : AbstractLevelProperties<RobotState, RobotStateName, Difficulty> { }
+}
+
+namespace Gilomx.CupheadBossRoulette
+{
+    public sealed partial class Plugin
+    {
+        internal static Plugin activeInstance;
+        internal CreatorToolsInteractionController creatorToolsInteractions;
+        internal readonly HarmonyLib.Harmony harmony = new HarmonyLib.Harmony();
+        internal readonly LogSink Logger = new LogSink();
+        internal void InstallDamagePatches() { InstallCreatorToolsTapFarmingDamagePatches(); }
+        private static bool IsPlayerOffensiveDamageTarget(UnityEngine.GameObject hit) { return hit != null; }
+    }
+    internal sealed class LogSink
+    {
+        internal readonly List<string> Warnings = new List<string>();
+        internal void LogInfo(string value) { }
+        internal void LogWarning(string value) { Warnings.Add(value); }
+    }
+    internal sealed class CreatorToolsInteractionController
+    {
+        internal CreatorToolsTapFarmingController Controller;
+        internal bool PrepareTapFarmingBossDamage(object properties, ref float damage)
+        { return Controller.PrepareBossDamage(properties, ref damage); }
+        internal void ObserveTapFarmingBossDamage(object properties)
+        { Controller.ObserveBossDamage(properties); }
+    }
+    internal sealed class CreatorToolsServer
+    {
+        internal bool IsRunning { get { return true; } }
+        internal string State;
+        internal void SetTapFarmingState(string state) { State = state; }
+    }
+}

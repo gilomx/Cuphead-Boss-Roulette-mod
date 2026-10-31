@@ -1,0 +1,76 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+
+internal static class Program
+{
+    private static int Main()
+    {
+        try
+        {
+            NativeZeppelinSpawnPattern.PrepareProperties();
+            NativeZeppelinSpawnPattern.PrepareProperties();
+            var observed = new LevelProperties.FlyingBlimp[3];
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                foreach (var mode in new[] { Level.Mode.Easy, Level.Mode.Normal, Level.Mode.Hard })
+                {
+                    Level.CurrentMode = mode;
+                    var purpleCounter = 0;
+                    for (var spawn = 0; spawn < 100; spawn++)
+                    {
+                        NativeZeppelinSpawnParameters parameters;
+                        string error;
+                        Require(NativeZeppelinSpawnPattern.TryCreate(NativeZeppelinVariant.Purple,
+                            new[] { 120f, 610f }, ref purpleCounter, out parameters, out error), error);
+                        var index = (int)mode;
+                        if (observed[index] == null) observed[index] = parameters.Properties;
+                        Require(ReferenceEquals(observed[index], parameters.Properties),
+                            "Retries and repeated spawns must reuse the prepared configuration.");
+                        Require(parameters.Lane >= 120f && parameters.Lane <= 610f &&
+                            parameters.StopDistance >= 390f && parameters.StopDistance <= 535f,
+                            "Native spawn geometry must retain its configured limits.");
+                        Require(parameters.Properties.CurrentState.enemy.stopDistance.RandomFloat() == 390f + index,
+                            "Difficulty-specific configuration must retain its native values.");
+                    }
+                }
+            }
+            for (var index = 0; index < 3; index++)
+                Require(LevelProperties.FlyingBlimp.FactoryCalls[index] == 1,
+                    "A full native factory must run only once per difficulty.");
+            Require(!ReferenceEquals(observed[0], observed[1]) && !ReferenceEquals(observed[1], observed[2]),
+                "Difficulty configurations cannot be mixed.");
+
+            Level.CurrentMode = (Level.Mode)99;
+            var counter = 0;
+            NativeZeppelinSpawnParameters fallback;
+            string fallbackError;
+            Require(NativeZeppelinSpawnPattern.TryCreate(NativeZeppelinVariant.Green, null,
+                ref counter, out fallback, out fallbackError), fallbackError);
+            Require(ReferenceEquals(observed[1], fallback.Properties) && !fallback.Parryable,
+                "Unknown modes preserve the normal fallback and green-shot behavior.");
+            Console.WriteLine("PASS 1200 production spawn plans across difficulties/retries use three factory calls; geometry and fallback preserved.");
+
+            var failures = 0;
+            var cache = new NativeInteractionDifficultyCache<object>(mode => {
+                if (++failures == 1) throw new InvalidOperationException("fixture failure");
+                return new object();
+            });
+            try { cache.Get(Level.Mode.Normal); }
+            catch (InvalidOperationException) { }
+            var recovered = cache.Get(Level.Mode.Normal);
+            Require(ReferenceEquals(recovered, cache.Get(Level.Mode.Normal)) && failures == 2,
+                "A failed factory must remain retryable without corrupting the cache.");
+            Console.WriteLine("PASS Failed preparation recovers without rebuilding healthy entries.");
+            return 0;
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine(error);
+            return 1;
+        }
+    }
+    private static void Require(bool value, string message)
+    {
+        if (!value) throw new InvalidOperationException(message);
+    }
+}

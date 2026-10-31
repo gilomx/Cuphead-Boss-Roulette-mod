@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { startForegroundPolling } from "../../config/foregroundPolling";
 import { InteractionQueuePanel } from "../interactions/InteractionQueuePanel";
 import { StreamPlatformIcon } from "../interactions/StreamRuleIcons";
 import { DashboardEventsPanel } from "./DashboardEventsPanel";
@@ -149,11 +150,11 @@ export function DashboardView({
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadDashboard(controller.signal);
-    const interval = window.setInterval(() => void loadDashboard(controller.signal), 1250);
+    const stopPolling = startForegroundPolling(
+      () => void loadDashboard(controller.signal), 1250);
     return () => {
       controller.abort();
-      window.clearInterval(interval);
+      stopPolling();
     };
   }, [loadDashboard]);
 

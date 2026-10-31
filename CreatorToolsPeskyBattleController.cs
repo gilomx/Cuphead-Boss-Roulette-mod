@@ -28,6 +28,7 @@ namespace Gilomx.CupheadBossRoulette
         private const int MaximumCommandsPerUpdate = 64;
         private const float MinimumIntervalSeconds = 1.25f;
         private const float MaximumIntervalSeconds = 3.25f;
+        private const int ProjectionRefreshMilliseconds = 250;
 
         private readonly CreatorToolsPeskyBattleSettings settings;
         private readonly CreatorToolsInteractionQueue queue;
@@ -36,6 +37,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Func<string, bool> isItemAvailable;
         private readonly Action disableFreePesky;
         private readonly Action<string> logInfo;
+        private readonly Func<long> publicationClock;
         private readonly object stateLock = new object();
         private readonly List<Participant> participants =
             new List<Participant>(CreatorToolsPeskyBattleSettings.MaximumCapacity);
@@ -56,6 +58,8 @@ namespace Gilomx.CupheadBossRoulette
         private string feedback = "ready";
         private bool error;
         private string lastState;
+        private long lastProjectionCheckAt;
+        private CreatorToolsGiftCatalogEntry lastProjectedGift;
         private bool clearBattleEntriesPending;
         private bool disableFreePeskyPending;
         private long deferredGameplayGeneration;
@@ -69,7 +73,8 @@ namespace Gilomx.CupheadBossRoulette
             Func<string, bool> isItemAvailable,
             Action disableFreePesky,
             Action<string> logInfo,
-            Action<string> logWarning)
+            Action<string> logWarning,
+            Func<long> publicationClock = null)
         {
             settings = CreatorToolsPeskyBattleSettings.Load(
                 pluginConfigPath, logWarning);
@@ -79,6 +84,7 @@ namespace Gilomx.CupheadBossRoulette
             this.isItemAvailable = isItemAvailable;
             this.disableFreePesky = disableFreePesky;
             this.logInfo = logInfo;
+            this.publicationClock = publicationClock ?? UtcMilliseconds;
         }
 
         internal bool Exclusive
@@ -196,6 +202,9 @@ namespace Gilomx.CupheadBossRoulette
         {
             lock (stateLock)
             {
+                if (phase != "active" && overlayAttacks.Count == 0 &&
+                    overlayChallenges == "[]")
+                    return;
                 if (overlayAttacks.RemoveAll(attack =>
                         Time.realtimeSinceStartup - attack.ObservedAt > 12f) > 0)
                     TouchLocked();
@@ -256,8 +265,17 @@ namespace Gilomx.CupheadBossRoulette
             while (true)
             {
                 string giftId;
+                var now = publicationClock();
                 lock (stateLock)
+                {
+                    // Commands and gameplay changes clear lastState and
+                    // publish immediately. Unchanged active snapshots retain
+                    // a live serverTime heartbeat without following game FPS.
+                    if (lastState != null && now >= lastProjectionCheckAt &&
+                        now - lastProjectionCheckAt < ProjectionRefreshMilliseconds)
+                        return;
                     giftId = settings.GiftId;
+                }
 
                 CreatorToolsGiftCatalogEntry gift;
                 if (resolveGift == null ||
@@ -272,7 +290,19 @@ namespace Gilomx.CupheadBossRoulette
                     // publishing a mixed snapshot.
                     if (settings.GiftId != giftId)
                         continue;
-                    var state = BuildStateLocked(gift);
+                    // Another publisher may have committed while catalog
+                    // resolution ran outside this lock. Use the current
+                    // clock and gate again before committing its projection.
+                    now = publicationClock();
+                    if (lastState != null && now >= lastProjectionCheckAt &&
+                        now - lastProjectionCheckAt < ProjectionRefreshMilliseconds)
+                        return;
+                    lastProjectionCheckAt = now;
+                    if (lastState != null && phase != "active" &&
+                        SameProjectedGift(lastProjectedGift, gift))
+                        return;
+                    var state = BuildStateLocked(gift, now);
+                    lastProjectedGift = gift;
                     if (state == lastState)
                         return;
                     lastState = state;
@@ -282,6 +312,16 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
             }
+        }
+
+        private static bool SameProjectedGift(
+            CreatorToolsGiftCatalogEntry left,
+            CreatorToolsGiftCatalogEntry right)
+        {
+            return left != null && right != null &&
+                left.Id == right.Id && left.Name == right.Name &&
+                left.ImageUrl == right.ImageUrl &&
+                left.CoinsPerUnit == right.CoinsPerUnit;
         }
 
         internal CreatorToolsPeskyBattleObservation ObserveStreamEvent(
@@ -1116,7 +1156,8 @@ namespace Gilomx.CupheadBossRoulette
             return (value ?? string.Empty).Trim().ToLowerInvariant();
         }
 
-        private string BuildStateLocked(CreatorToolsGiftCatalogEntry gift)
+        private string BuildStateLocked(
+            CreatorToolsGiftCatalogEntry gift, long serverTime)
         {
             var builder = new StringBuilder(4096);
             builder.Append("{\"ready\":true,\"schemaVersion\":")
@@ -1153,7 +1194,7 @@ namespace Gilomx.CupheadBossRoulette
                 participants[i].AppendJson(builder);
             }
             builder.Append("],\"eventEpoch\":").Append(overlayEpoch)
-                .Append(",\"serverTime\":").Append(UtcMilliseconds())
+                .Append(",\"serverTime\":").Append(serverTime)
                 .Append(",\"attacks\":[");
             for (var i = 0; i < overlayAttacks.Count; i++)
             {

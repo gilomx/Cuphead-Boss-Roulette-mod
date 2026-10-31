@@ -1,0 +1,146 @@
+using System;
+using Gilomx.CupheadBossRoulette;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UObject = UnityEngine.Object;
+
+internal static class Program
+{
+    private static int groups;
+    private static void Main()
+    {
+        Run("Same-frame actors share fresh discovery without generic or child-array copies", delegate
+        {
+            var controller = Controller();
+            var renderer = Child(controller);
+            renderer.color = new Color(0f);
+            for (var i = 0; i < 100; i++) Check(!Probe(), "uncovered frame");
+            Check(UObject.UntypedQueries == 1 && UObject.ChildLists == 1,
+                "100 actor reads share one discovery");
+            var buffer = UnityEngine.Component.LastBuffer;
+            for (var i = 0; i < 1000; i++) { NextFrame(); Check(!Probe(), "still uncovered"); }
+            Check(UObject.UntypedQueries == 1001 && UObject.ChildLists == 1001,
+                "each new frame discovers current effects");
+            Check(UObject.GenericQueries == 0 && UObject.ChildArrays == 0,
+                "hot path never asks for typed global or child arrays");
+            Check(ReferenceEquals(buffer, UnityEngine.Component.LastBuffer) && buffer.Count == 0,
+                "one cleared child buffer is reused");
+        });
+        Run("Native visibility filters match the previous array implementation", delegate
+        {
+            var controller = Controller();
+            var sprite = Child(controller);
+            Compare(true);
+            sprite.enabled = false; Compare(false);
+            sprite.enabled = true; sprite.color = new Color(0.01f); Compare(false);
+            sprite.color = new Color(0.0101f); Compare(true);
+            sprite.gameObject.activeSelf = false; Compare(false);
+            sprite.gameObject.activeSelf = true; sprite.sprite = null; Compare(false);
+            sprite.sprite = new Sprite(); controller.enabled = false; Compare(true);
+            controller.gameObject.activeSelf = false; Compare(false);
+        });
+        Run("New effects and children appear next frame and scenes invalidate the same frame", delegate
+        {
+            Check(!Probe(), "initially no controller");
+            var controller = Controller();
+            Check(!Probe(), "same-frame result stays shared");
+            NextFrame(); Check(!Probe(), "new empty controller");
+            var sprite = Child(controller);
+            NextFrame(); Check(Probe(), "new child is discovered");
+            sprite.enabled = false;
+            SceneManager.Id++;
+            Check(!Probe(), "scene change does not reuse the previous positive result");
+            sprite.enabled = true;
+            SceneManager.Id++;
+            Check(Probe(), "scene change does not reuse the previous negative result");
+            UObject.Destroy(controller.gameObject);
+            NextFrame(); Check(!Probe(), "destroyed controller no longer covers");
+        });
+        Run("Pirate ink covers the first transparent splat and releases on native lifetime changes", delegate
+        {
+            var inkObject = new GameObject();
+            PirateLevelSquidInkOverlay.Current = inkObject.AddComponent<PirateLevelSquidInkOverlay>();
+            var sprite = inkObject.AddComponent<SpriteRenderer>();
+            sprite.color = new Color(0f); sprite.sprite = null;
+            Check(Probe() && UObject.UntypedQueries == 0,
+                "enabled native ink covers even before its alpha/sprite appears");
+            sprite.enabled = false; NextFrame(); Check(!Probe(), "disabled ink releases cover");
+            sprite.enabled = true; inkObject.activeSelf = false;
+            NextFrame(); Check(!Probe(), "inactive ink releases cover");
+            inkObject.activeSelf = true; NextFrame(); Check(Probe(), "reactivated ink covers");
+            UObject.Destroy(inkObject); NextFrame(); Check(!Probe(), "destroyed retained singleton is ignored");
+        });
+        Run("The scratch list releases children on true, false and exceptional exits", delegate
+        {
+            var controller = Controller();
+            var sprite = Child(controller);
+            Check(Probe(), "visible cover");
+            var buffer = UnityEngine.Component.LastBuffer;
+            Check(buffer.Count == 0, "early true releases references");
+            sprite.enabled = false; NextFrame(); Check(!Probe(), "invisible cover");
+            Check(buffer.Count == 0, "false releases references");
+            controller.ThrowAfterCollect = true; NextFrame();
+            var threw = false;
+            try { Probe(); } catch (InvalidOperationException) { threw = true; }
+            Check(threw && buffer.Count == 0, "native failure preserves exception and releases references");
+            controller.ThrowAfterCollect = false; sprite.enabled = true;
+            NextFrame(); Check(Probe(), "next frame recovers after failure");
+        });
+        Run("Multiple controllers preserve independent filters without stale children", delegate
+        {
+            var first = Controller();
+            var hidden = Child(first); hidden.enabled = false;
+            var second = Controller();
+            var visible = Child(second);
+            Check(Probe() && UObject.ChildLists == 2, "later controller may cover");
+            UObject.Destroy(hidden); UObject.Destroy(visible);
+            NextFrame(); Check(!Probe(), "destroyed children cannot survive in the scratch list");
+            var added = Child(first);
+            NextFrame(); Check(Probe(), "replacement child can cover");
+            added.gameObject.activeSelf = false;
+            NextFrame(); Check(!Probe(), "inactive replacement is ignored");
+        });
+        Console.WriteLine("PASS " + groups + " screen-cover production-helper groups");
+    }
+    private static PlayerScreenEffectController Controller()
+    {
+        return new GameObject().AddComponent<PlayerScreenEffectController>();
+    }
+    private static SpriteRenderer Child(PlayerScreenEffectController controller)
+    {
+        return controller.gameObject.AddChild().AddComponent<SpriteRenderer>();
+    }
+    private static bool Probe() { return CreatorToolsScreenCoverProbe.IsActive(); }
+    private static void NextFrame() { Time.frameCount++; }
+    private static void Compare(bool expected)
+    {
+        NextFrame();
+        Check(Probe() == expected && Legacy() == expected, "old and new cover decisions agree");
+    }
+    private static bool Legacy()
+    {
+        var controllers = UObject.FindObjectsOfType<PlayerScreenEffectController>();
+        foreach (var controller in controllers)
+        {
+            if (controller == null || !controller.gameObject.activeInHierarchy) continue;
+            foreach (var sprite in controller.GetComponentsInChildren<SpriteRenderer>(true))
+                if (sprite != null && sprite.enabled && sprite.gameObject.activeInHierarchy &&
+                    sprite.sprite != null && sprite.color.a > 0.01f) return true;
+        }
+        return false;
+    }
+    private static void Run(string name, Action body)
+    {
+        UObject.Reset();
+        PirateLevelSquidInkOverlay.Current = null;
+        Time.frameCount += 100;
+        SceneManager.Id++;
+        body();
+        groups++;
+        Console.WriteLine("PASS " + name);
+    }
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new Exception(message);
+    }
+}

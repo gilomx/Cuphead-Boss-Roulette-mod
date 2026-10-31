@@ -601,6 +601,7 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private readonly List<InkDrop> drops = new List<InkDrop>();
+        private readonly InkRainGroundProbe groundProbe = new InkRainGroundProbe();
         private readonly List<InkGroundImpact> groundImpacts =
             new List<InkGroundImpact>();
         private readonly List<InkSplat> splats = new List<InkSplat>();
@@ -1366,41 +1367,38 @@ namespace Gilomx.CupheadBossRoulette
             Vector2 from, Vector2 to, out Vector2 point)
         {
             point = to;
-            var hits = Physics2D.LinecastAll(from, to);
-            for (var i = 0; i < hits.Length; i++)
+            RaycastHit2D ground;
+            RaycastHit2D[] hits;
+            int hitCount;
+            if (groundProbe.TryFindGround(from, to, out ground, out hits, out hitCount))
             {
-                var collider = hits[i].collider;
-                if (collider == null || !collider.enabled ||
-                    collider.name != "Level_Ground")
-                    continue;
-
-                point = hits[i].point;
+                point = ground.point;
                 if (!loggedFirstGroundImpact && log != null)
                 {
                     loggedFirstGroundImpact = true;
                     log.LogInfo(
                         "Lluvia de tinta: suelo Level_Ground detectado en " +
-                        FormatColliderDiagnostic(collider, hits[i].point) +
+                        FormatColliderDiagnostic(ground.collider, point) +
                         ".");
                 }
                 return true;
             }
 
-            LogGroundProbe(from, to, hits);
+            LogGroundProbe(from, to, hits, hitCount);
             return false;
         }
 
         private void LogGroundProbe(
-            Vector2 from, Vector2 to, RaycastHit2D[] hits)
+            Vector2 from, Vector2 to, RaycastHit2D[] hits, int hitCount)
         {
-            if (log == null || hits == null || hits.Length == 0 ||
+            if (log == null || hits == null || hitCount == 0 ||
                 Time.unscaledTime < nextGroundProbeLogAt)
                 return;
 
             nextGroundProbeLogAt = Time.unscaledTime + 2f;
             var message = "Lluvia de tinta: linecast sin Level_Ground de " +
-                          from + " a " + to + "; impactos=" + hits.Length;
-            var count = Mathf.Min(hits.Length, 8);
+                          from + " a " + to + "; impactos=" + hitCount;
+            var count = Mathf.Min(hitCount, 8);
             for (var i = 0; i < count; i++)
             {
                 var collider = hits[i].collider;

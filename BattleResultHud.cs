@@ -23,6 +23,12 @@ namespace Gilomx.CupheadBossRoulette
         private const float BattleHudPulseDuration = 0.38f;
         private const float BattleHudTextRevealDuration = 0.28f;
         private const float BattleHudImpactVolume = 1f;
+        private static readonly System.Reflection.FieldInfo NativePauseMenuField =
+            AccessTools.Field(typeof(LevelGUI), "pause");
+        private static readonly CreatorToolsNativePauseMenuCache<LevelGUI, LevelPauseGUI>
+            nativePauseMenus = new CreatorToolsNativePauseMenuCache<LevelGUI, LevelPauseGUI>(
+                ResolveNativePauseMenu, NativePauseOwnerExists, SameNativePauseOwner,
+                NativePauseMenuExists, IsNativePauseMenuActive);
         private static readonly System.Reflection.FieldInfo
             LevelHudCupheadField = AccessTools.Field(typeof(LevelHUD), "cuphead");
         private static readonly System.Reflection.FieldInfo
@@ -1123,32 +1129,52 @@ namespace Gilomx.CupheadBossRoulette
         private static bool TryGetActiveLevelPauseMenu(
             out LevelPauseGUI activePauseGui)
         {
-            activePauseGui = null;
-            var pauseGuis =
-                Resources.FindObjectsOfTypeAll<LevelPauseGUI>();
-            for (var i = 0; i < pauseGuis.Length; i++)
+            return nativePauseMenus.TryGetActive(LevelGUI.Current, out activePauseGui);
+        }
+
+        private static LevelPauseGUI ResolveNativePauseMenu(LevelGUI owner)
+        {
+            // The field is serialized and private in Cuphead 1.3.4. Resolve
+            // only when its native owner/menu changes, never once per frame.
+            if (NativePauseMenuField == null) return null;
+            try { return NativePauseMenuField.GetValue(owner) as LevelPauseGUI; }
+            catch { return null; }
+        }
+
+        private static bool NativePauseOwnerExists(LevelGUI owner)
+        {
+            return owner != null && owner.gameObject.scene.IsValid();
+        }
+
+        private static bool SameNativePauseOwner(LevelGUI left, LevelGUI right)
+        {
+            return left == right;
+        }
+
+        private static bool NativePauseMenuExists(LevelPauseGUI menu)
+        {
+            return menu != null;
+        }
+
+        private static bool IsNativePauseMenuActive(LevelPauseGUI pauseGui)
+        {
+            if (pauseGui == null ||
+                !pauseGui.gameObject.scene.IsValid() ||
+                !pauseGui.gameObject.activeInHierarchy)
+                return false;
+            try
             {
-                var pauseGui = pauseGuis[i];
-                if (pauseGui == null ||
-                    !pauseGui.gameObject.scene.IsValid() ||
-                    !pauseGui.gameObject.activeInHierarchy)
-                    continue;
-                try
-                {
-                    // Unlike PauseManager.state, this state is not changed by
-                    // parry hit-stop. Both Paused (1) and Animating (2) are a
-                    // real visible pause transition.
-                    if (Convert.ToInt32(pauseGui.state) != 0)
-                    {
-                        activePauseGui = pauseGui;
-                        return true;
-                    }
-                }
-                catch
-                {
-                }
+                // Unlike PauseManager.state, this state is not changed by
+                // parry hit-stop. Both Paused (1) and Animating (2) are a
+                // real visible pause transition. Re-read on every query.
+                return (int)pauseGui.state != 0;
             }
-            return false;
+            catch { return false; }
+        }
+
+        private static void InvalidateNativePauseMenuCandidates()
+        {
+            nativePauseMenus.Invalidate();
         }
 
         private void PlaceBattleHudInsideMenuLayer(Transform layer)
@@ -1371,21 +1397,17 @@ namespace Gilomx.CupheadBossRoulette
 
         private static Transform FindActiveGameOverHudLayer()
         {
-            var gameOverGuis =
-                Resources.FindObjectsOfTypeAll<LevelGameOverGUI>();
-            for (var i = 0; i < gameOverGuis.Length; i++)
-            {
-                var gameOver = gameOverGuis[i];
-                if (gameOver == null || !gameOver.gameObject.scene.IsValid() ||
-                    !gameOver.gameObject.activeInHierarchy)
-                    continue;
+            // Cuphead registers this GUI in Awake and clears it on destroy.
+            // Read its live visibility instead of scanning every loaded object
+            // on every HUD frame, including the entire active fight.
+            var gameOver = LevelGameOverGUI.Current;
+            if (gameOver == null || !gameOver.gameObject.scene.IsValid() ||
+                !gameOver.gameObject.activeInHierarchy)
+                return null;
 
-                var background = FindDescendantByName(
-                    gameOver.transform, "Background");
-                return background ?? gameOver.transform;
-            }
-
-            return null;
+            var background = FindDescendantByName(
+                gameOver.transform, "Background");
+            return background ?? gameOver.transform;
         }
 
         private static Transform FindDescendantByName(Transform root,

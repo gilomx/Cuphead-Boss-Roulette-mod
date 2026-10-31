@@ -20,9 +20,13 @@ namespace Gilomx.CupheadBossRoulette
             bool isGhostShot,
             Vector3 offset)
         {
+            // Native weapons can reuse a projectile. Retire its detached
+            // visuals before replacing the damage snapshot for the next shot.
+            DestroyVisuals();
             projectile = source;
             IsGhostShot = isGhostShot;
             initialOffset = offset;
+            elapsed = 0f;
             if (!IsGhostShot || projectile == null)
                 return;
 
@@ -40,6 +44,7 @@ namespace Gilomx.CupheadBossRoulette
                 echoRenderers[i] = echoObject.AddComponent<SpriteRenderer>();
             }
             CopyVisuals(initialOffset);
+            enabled = true;
         }
 
         private void Update()
@@ -102,6 +107,13 @@ namespace Gilomx.CupheadBossRoulette
             DestroyVisuals();
         }
 
+        private void OnDisable()
+        {
+            // Pooled projectiles can disappear before the catch-up finishes.
+            // Their unparented echo must not survive into a later reuse.
+            DestroyVisuals();
+        }
+
         private void DestroyVisuals()
         {
             if (echoRenderers != null)
@@ -112,6 +124,9 @@ namespace Gilomx.CupheadBossRoulette
             }
             echoRenderers = null;
             sourceRenderers = null;
+            // Keep IsGhostShot available to the damage patch after the visual
+            // expires, without running two Unity callbacks on every bullet.
+            enabled = false;
         }
     }
 

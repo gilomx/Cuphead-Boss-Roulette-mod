@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "namedStateAdvances": [
+    {
+      "caller": "System.Boolean AirplaneLevel/<check_terriers_cr>c__Iterator2::MoveNext()",
+      "family": "Airplane",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Boolean MausoleumLevel/<main_pattern_cr>c__Iterator7::MoveNext()",
+      "family": "Mausoleum",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void DicePalaceBoozeLevelBossBase::AllDead()",
+      "family": "DicePalaceBooze",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Boolean FlyingGenieLevelGenieTransform/<phase2_intro_cr>c__Iterator0::MoveNext()",
+      "family": "FlyingGenie",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void RetroArcadeAlienManager::OnAlienDie(RetroArcadeAlien)",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Boolean RetroArcadeBouncyManager/<spawn_balls_cr>c__Iterator0::MoveNext()",
+      "family": "RetroArcade",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void RetroArcadeCaterpillarManager::OnBodyPartDie(RetroArcadeCaterpillarBodyPart)",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Boolean RetroArcadeChaserManager/<chasers_cr>c__Iterator0::MoveNext()",
+      "family": "RetroArcade",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void RetroArcadeMissileMan::Dead()",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Void RetroArcadePaddleShip::Dead()",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Void RetroArcadeQShip::Dead()",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Void RetroArcadeRobotManager::OnRobotGroupDie()",
+      "family": "RetroArcade",
+      "context": "native_tick"
+    },
+    {
+      "caller": "System.Void RetroArcadeSheriffManager::EndPhase()",
+      "family": "RetroArcade",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Boolean RetroArcadeSnakeManager/<end_phase_cr>c__Iterator1::MoveNext()",
+      "family": "RetroArcade",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Boolean RetroArcadeTentacleManager/<spawn_tentacles_cr>c__Iterator0::MoveNext()",
+      "family": "RetroArcade",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void RetroArcadeToadManager::OnToadDie()",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Void RetroArcadeTrafficManager::EndPhase()",
+      "family": "RetroArcade",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void RetroArcadeUFO::OnAlienDie()",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Void RetroArcadeWorm::Dead()",
+      "family": "RetroArcade",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Void RobotLevelRobotChest::OnDamageTaken(DamageDealer/DamageInfo)",
+      "family": "Robot",
+      "context": "player_damage_sync"
+    },
+    {
+      "caller": "System.Boolean SallyStagePlayLevelBackgroundHandler/<check_bools_cr>c__Iterator7::MoveNext()",
+      "family": "SallyStagePlay",
+      "context": "coroutine"
+    },
+    {
+      "caller": "System.Void SlimeLevelSlime::Die(System.Boolean)",
+      "family": "Slime",
+      "context": "conditional_or_external"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { useLocalization, type Locale } from "../../i18n/LocalizationContext";
+import { startForegroundPolling } from "../../config/foregroundPolling";
 
 interface TransferState { ready: boolean; pendingImport: boolean; controlToken?: string }
 interface SelectedConfiguration { name: string; body: string; locale: Locale }
@@ -28,9 +29,8 @@ export function SettingsTransferPanel() {
         if (request === latest) setState(data);
       } catch { if (!controller.signal.aborted && request === latest) setState((current) => ({ ...current, ready: false })); }
     };
-    void load();
-    const timer = window.setInterval(() => void load(), 1500);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    const stopPolling = startForegroundPolling(() => void load(), 1500);
+    return () => { controller.abort(); stopPolling(); };
   }, []);
 
   const chooseFile = async (file?: File) => {

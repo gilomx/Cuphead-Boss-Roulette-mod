@@ -87,6 +87,98 @@ try {
     })
     Require ($homingCreate.Count -ge 1) 'Root Pack homing projectile Create signature changed'
     Write-Output 'Native loading contract passed: fade completes before lazy scene loading, completion is awaited, and immediate transitions stay covered.'
+
+    $level = $module.Types | Where-Object Name -eq 'Level'
+    $battleStart = ($level.NestedTypes | Where-Object Name -like '<startBattle_cr>*').Methods | Where-Object Name -eq 'MoveNext'
+    $readyComplete = @($battleStart.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'readyComplete'
+    })
+    $started = @(Calls $battleStart 'Level' 'set_Started')
+    $levelStart = @(Calls $battleStart 'Level' '_OnLevelStart')
+    Require ($readyComplete.Count -eq 1 -and $started.Count -eq 1 -and $levelStart.Count -eq 1 -and
+        $readyComplete[0].Next.OpCode.Code -in @('Brfalse', 'Brfalse_S') -and
+        $readyComplete[0].Offset -lt $started[0].Offset -and
+        $started[0].Previous.OpCode.Code -eq 'Ldc_I4_1' -and
+        $started[0].Offset -lt $levelStart[0].Offset) 'Native Started must become true after the ready animation and before the gameplay start callback'
+    $startedGetter = $level.Methods | Where-Object Name -eq 'get_Started'
+    Require (@($startedGetter.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq '<Started>k__BackingField'
+    }).Count -eq 1) 'Native Started no longer exposes the native gameplay flag'
+    Write-Output 'Native interaction start contract passed: Started follows the ready animation and precedes the gameplay start hook.'
+
+    $levelGui = $module.Types | Where-Object Name -eq 'LevelGUI'
+    $currentLevelGui = $levelGui.Methods | Where-Object Name -eq 'get_Current'
+    $nativePause = $levelGui.Fields | Where-Object Name -eq 'pause'
+    Require ($currentLevelGui.IsPublic -and $currentLevelGui.IsStatic -and
+        $currentLevelGui.ReturnType.FullName -eq 'LevelGUI') 'Native LevelGUI must register its current owner publicly'
+    Require ($null -ne $nativePause -and !$nativePause.IsStatic -and
+        $nativePause.FieldType.FullName -eq 'LevelPauseGUI' -and
+        @($nativePause.CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'UnityEngine.SerializeField' }).Count -eq 1) 'Native LevelGUI must retain its serialized pause menu'
+    foreach ($methodName in @('Awake', 'OnDestroy')) {
+        $method = $levelGui.Methods | Where-Object Name -eq $methodName
+        $register = @(Calls $method 'LevelGUI' 'set_Current')
+        $expectedLoad = if ($methodName -eq 'Awake') { 'Ldarg_0' } else { 'Ldnull' }
+        Require ($register.Count -eq 1 -and $register[0].Previous.OpCode.Code -eq $expectedLoad) "Native LevelGUI owner registration changed in $methodName"
+    }
+    $guiDestroyed = $levelGui.Methods | Where-Object Name -eq 'OnDestroy'
+    Require (@($guiDestroyed.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Stfld' -and $_.Operand.FullName -eq $nativePause.FullName -and
+        $_.Previous.OpCode.Code -eq 'Ldnull'
+    }).Count -eq 1) 'Native LevelGUI must clear its serialized pause reference on destruction'
+    Write-Output 'Native pause owner contract passed: LevelGUI.Current owns a serialized menu and clears native references on destruction.'
+
+    $gameOver = $module.Types | Where-Object Name -eq 'LevelGameOverGUI'
+    $currentGameOver = $gameOver.Fields | Where-Object Name -eq 'Current'
+    Require ($null -ne $currentGameOver -and $currentGameOver.IsPublic -and
+        $currentGameOver.IsStatic -and $currentGameOver.FieldType.FullName -eq 'LevelGameOverGUI') 'Native defeat GUI must expose its current instance'
+    foreach ($methodName in @('Awake', 'OnDestroy')) {
+        $method = $gameOver.Methods | Where-Object Name -eq $methodName
+        $stores = @($method.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq 'Stsfld' -and $_.Operand.FullName -eq $currentGameOver.FullName
+        })
+        $expectedLoad = if ($methodName -eq 'Awake') { 'Ldarg_0' } else { 'Ldnull' }
+        Require ($stores.Count -eq 1 -and $stores[0].Previous.OpCode.Code -eq $expectedLoad) "Native defeat GUI no longer maintains Current in $methodName"
+    }
+    $players = ($module.Types | Where-Object Name -eq 'PlayerManager').Methods | Where-Object Name -eq 'GetAllPlayers'
+    Require ($players.ReturnType.FullName.StartsWith('System.Collections.Generic.Dictionary`2/ValueCollection', [StringComparison]::Ordinal) -and
+        @($players.Body.Instructions | Where-Object OpCode -Match 'newobj|newarr').Count -eq 0 -and
+        @($players.Body.Instructions | Where-Object {
+            $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -eq 'get_Values'
+        }).Count -eq 1) 'Native player lookup must expose its live dictionary values without materializing an array'
+    Write-Output 'Native HUD and player registry contract passed: live instances replace scene discovery and retain native lifetime handling.'
+
+    $runtimeCore = [Mono.Cecil.ModuleDefinition]::ReadModule((Join-Path $CupheadDir 'Cuphead_Data/Managed/mscorlib.dll'))
+    try {
+        $nativeBuilder = $runtimeCore.GetType('System.Text.StringBuilder')
+        Require (@($nativeBuilder.Methods | Where-Object {
+            $_.IsPublic -and $_.FullName -eq 'System.Void System.Text.StringBuilder::CopyTo(System.Int32,System.Char[],System.Int32,System.Int32)'
+        }).Count -eq 1) 'Reusable JSON snapshots require the native StringBuilder.CopyTo overload'
+    }
+    finally { $runtimeCore.Dispose() }
+
+    # Catalog zeppelins share prepared settings by difficulty. Their native
+    # methods may read the selected state but must never damage, advance or
+    # modify that shared configuration, including in generated coroutines.
+    $zeppelinEnemy = $module.Types | Where-Object Name -eq 'FlyingBlimpLevelEnemy'
+    $zeppelinConfigCalls = @(foreach ($type in (SelfAndNestedTypes $zeppelinEnemy)) {
+        foreach ($method in ($type.Methods | Where-Object HasBody)) {
+            foreach ($instruction in $method.Body.Instructions) {
+                $operand = $instruction.Operand
+                if ($operand -is [Mono.Cecil.MethodReference] -and
+                    $operand.DeclaringType.Name -eq 'AbstractLevelProperties`3') {
+                    Require ($operand.Name -eq 'get_CurrentState') "Native zeppelin mutates shared boss properties in $($method.FullName)"
+                    $instruction
+                }
+                if ($instruction.OpCode.Code -eq 'Stfld' -and
+                    $operand -is [Mono.Cecil.FieldReference] -and
+                    $operand.DeclaringType.FullName -like 'LevelProperties/FlyingBlimp*') {
+                    throw "Native zeppelin writes shared configuration in $($method.FullName)"
+                }
+            }
+        }
+    })
+    Require ($zeppelinConfigCalls.Count -eq 2) 'Native zeppelin configuration access changed; review sharing prepared settings'
+    Write-Output 'Native zeppelin settings contract passed: actor methods and coroutines only read the prepared configuration.'
 }
 finally {
     $module.Dispose()
@@ -136,6 +228,122 @@ try {
     Write-Output 'Compiled homing carrot contract passed: preload reaches the serialized carrot prefab before boss lifecycle runs.'
 
     $plugin = $mod.Types | Where-Object Name -eq 'Plugin'
+    $pauseQuery = $plugin.Methods | Where-Object Name -eq 'TryGetActiveLevelPauseMenu'
+    Require (@(Calls $pauseQuery 'LevelGUI' 'get_Current').Count -eq 1 -and
+        @($pauseQuery.Body.Instructions | Where-Object {
+            $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -eq 'TryGetActive' -and
+            $_.Operand.DeclaringType.Name -eq 'CreatorToolsNativePauseMenuCache`2'
+        }).Count -eq 1) 'Pause queries must use the native registered GUI and owner-reference cache'
+    Require (@($plugin.Methods | Where-Object Name -eq 'DiscoverNativePauseMenus').Count -eq 0) 'Pause queries must not retain global candidate discovery'
+    $pauseResolve = $plugin.Methods | Where-Object Name -eq 'ResolveNativePauseMenu'
+    Require (@(Calls $pauseResolve 'System.Reflection.FieldInfo' 'GetValue').Count -eq 1 -and
+        @($pauseResolve.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq 'Ldsfld' -and $_.Operand.Name -eq 'NativePauseMenuField'
+        }).Count -ge 1) 'Native pause field must use its cached reflection metadata only when the owner/menu changes'
+    foreach ($callback in @('OnCreatorToolsInteractionPaused', 'OnCreatorToolsInteractionUnpaused')) {
+        $method = $plugin.Methods | Where-Object Name -eq $callback
+        Require (@(Calls $method $plugin.FullName 'InvalidateNativePauseMenuCandidates').Count -eq 1) "Native pause reference cache must invalidate immediately in $callback"
+    }
+    Write-Output 'Compiled native pause owner contract passed: current GUI lookup, warm reference reuse and immediate pause/unpause invalidation.'
+    $gameOverLayer = $plugin.Methods | Where-Object Name -eq 'FindActiveGameOverHudLayer'
+    Require (@($gameOverLayer.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldsfld' -and $_.Operand.FullName -eq 'LevelGameOverGUI LevelGameOverGUI::Current'
+    }).Count -eq 1 -and @($gameOverLayer.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -like 'FindObjectsOfType*'
+    }).Count -eq 0) 'Defeat HUD must use the native current GUI without a global scene scan'
+    $positions = $mod.Types | Where-Object Name -eq 'CreatorToolsInteractionSpawnPositions'
+    $appendPositions = $positions.Methods | Where-Object Name -eq 'AppendTo'
+    Require (@(Calls $appendPositions 'PlayerManager' 'GetAllPlayers').Count -eq 1) 'Spawn reservation positions must read native registered players'
+    foreach ($executorName in @('HomingCarrot', 'CagneyHomingPlant', 'FrogsFirefly', 'RobotHomingBomb', 'TrainBoneRing', 'BeppiBalloonDog')) {
+        $executor = $mod.Types | Where-Object Name -eq ($executorName + 'InteractionExecutor')
+        $reserved = $executor.Methods | Where-Object Name -eq 'ReservedPositions'
+        Require (@(Calls $reserved $positions.FullName 'AppendTo').Count -eq 1 -and
+            @($reserved.Body.Instructions | Where-Object {
+                $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -like 'FindObjectsOfType*'
+            }).Count -eq 0) "Spawn reservations still scan the entire scene in $($executor.Name)"
+    }
+    Write-Output 'Compiled HUD and spawn discovery contract passed: native defeat GUI and registered actors/players are wired into all six spawn planners.'
+    $snapshot = $mod.Types | Where-Object Name -eq 'CreatorToolsJsonSnapshot'
+    $completeSnapshot = $snapshot.Methods | Where-Object Name -eq 'Complete'
+    Require (@(Calls $completeSnapshot 'System.Text.StringBuilder' 'CopyTo').Count -eq 1 -and
+        @(Calls $completeSnapshot 'System.Text.StringBuilder' 'ToString').Count -eq 0) 'Reusable JSON snapshots must copy their output without sharing Mono mutable builder storage'
+    $interactionController = $mod.Types | Where-Object Name -eq 'CreatorToolsInteractionController'
+    foreach ($projection in @('BuildInteractionState', 'BuildPeskyState')) {
+        $method = $interactionController.Methods | Where-Object Name -eq $projection
+        Require (@(Calls $method $snapshot.FullName 'Begin').Count -eq 1 -and
+            @(Calls $method $snapshot.FullName 'Complete').Count -eq 1 -and
+            @(Calls $method 'System.Text.StringBuilder' 'ToString').Count -eq 0) "Panel projection must reuse its immutable snapshot safely: $projection"
+    }
+    Write-Output 'Compiled JSON reuse contract passed: both panel projections preserve immutable output without Mono builder copy-on-write.'
+    foreach ($projection in @(
+        @{ Method = 'PublishInteractionState'; Gate = 'TryBeginInteractionStatePublication'; Build = 'BuildInteractionState' },
+        @{ Method = 'PublishPeskyState'; Gate = 'TryBeginPeskyStatePublication'; Build = 'BuildPeskyState' }
+    )) {
+        $method = $interactionController.Methods | Where-Object { $_.Name -eq $projection.Method -and $_.Parameters.Count -eq 3 }
+        $gate = @(Calls $method 'Gilomx.CupheadBossRoulette.CreatorToolsServer' $projection.Gate)
+        $build = @(Calls $method $interactionController.FullName $projection.Build)
+        Require ($gate.Count -eq 1 -and $build.Count -eq 1 -and
+            $gate[0].Offset -lt $build[0].Offset -and $gate[0].Previous.OpCode.Code -eq 'Ldarg_3' -and
+            $gate[0].Next.OpCode.Code -in @('Brtrue', 'Brtrue_S') -and
+            $gate[0].Next.Next.OpCode.Code -eq 'Ret') "Audience gate must precede only heavy JSON, preserving urgent control publication: $($projection.Method)"
+    }
+    $refreshPanel = $interactionController.Methods | Where-Object Name -eq 'RefreshPanelState'
+    foreach ($publishName in @('PublishInteractionState', 'PublishPeskyState')) {
+        $forced = @(Calls $refreshPanel $interactionController.FullName $publishName)
+        Require ($forced.Count -eq 1 -and $forced[0].Previous.OpCode.Code -eq 'Ldc_I4_1') 'Focus snapshots must force both panel publications without an audience lease'
+    }
+    $focusPanel = $plugin.Methods | Where-Object Name -eq 'OnApplicationFocus'
+    Require (@(Calls $focusPanel $interactionController.FullName 'RefreshPanelState').Count -eq 1) 'Leaving gameplay must capture panel state before Unity can stop background updates'
+    $updateInteractions = $interactionController.Methods | Where-Object Name -eq 'UpdateCore'
+    Require (@(Calls $updateInteractions $interactionController.FullName 'ProcessReadyQueues').Count -eq 1 -and
+        @(Calls $updateInteractions $interactionController.FullName 'UpdatePeskyChallenges').Count -eq 1) 'Gameplay dispatch must remain independent of UI publication demand'
+    Write-Output 'Compiled panel audience contract passed: heavy JSON is demand-paced, urgent ACKs bypass pacing, focus captures state, and gameplay continues independently.'
+    $dashboardController = $mod.Types | Where-Object Name -eq 'CreatorToolsDashboardController'
+    $dashboardUpdate = $dashboardController.Methods | Where-Object Name -eq 'Update'
+    $dueSimulations = @(Calls $dashboardUpdate $dashboardController.FullName 'ProcessDueSimulations')
+    $dashboardGate = @(Calls $dashboardUpdate 'Gilomx.CupheadBossRoulette.CreatorToolsServer' 'get_DashboardStateIsOnDemand')
+    $dashboardBuild = @(Calls $dashboardUpdate $dashboardController.FullName 'BuildState')
+    Require ($dueSimulations.Count -eq 1 -and $dashboardGate.Count -eq 1 -and $dashboardBuild.Count -eq 1 -and
+        $dueSimulations[0].Offset -lt $dashboardGate[0].Offset -and
+        $dashboardGate[0].Offset -lt $dashboardBuild[0].Offset) 'On-demand dashboard JSON must not suspend scheduled event processing'
+    $dashboardReader = $dashboardController.Methods | Where-Object Name -eq 'GetStateJson'
+    Require (@(Calls $dashboardReader 'System.Threading.Monitor' 'Enter').Count -eq 1 -and
+        @(Calls $dashboardReader $dashboardController.FullName 'BuildState').Count -eq 1 -and
+        @(Calls $dashboardReader $dashboardController.FullName 'ProcessDueSimulations').Count -eq 0) 'Dashboard readers must synchronize the managed model without executing simulations'
+    foreach ($method in @($dashboardReader, ($dashboardController.Methods | Where-Object Name -eq 'BuildState'))) {
+        Require (@($method.Body.Instructions | Where-Object {
+            $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.DeclaringType.FullName -like 'UnityEngine.*'
+        }).Count -eq 0) 'HTTP dashboard projections must not access Unity'
+    }
+    $serverSetup = $plugin.Methods | Where-Object Name -eq 'StartCreatorToolsServer'
+    Require (@(Calls $serverSetup 'Gilomx.CupheadBossRoulette.CreatorToolsServer' 'SetDashboardStateReader').Count -eq 1 -and
+        @(Calls $serverSetup $dashboardController.FullName 'GetStateJson').Count -eq 1) 'Runtime setup must register the synchronized dashboard reader'
+    Write-Output 'Compiled dashboard demand contract passed: direct synchronized reads, no Unity access, no eager production JSON, and independent simulation processing.'
+    $canSpawn = $plugin.Methods | Where-Object Name -eq 'CanSpawnCreatorToolsInteraction'
+    $nativeStarted = @(Calls $canSpawn 'Level' 'get_Started')
+    Require ($nativeStarted.Count -eq 1 -and
+        $nativeStarted[0].Next.OpCode.Code -in @('Brtrue', 'Brtrue_S') -and
+        $nativeStarted[0].Next.Next.OpCode.Code -eq 'Ldc_I4_0' -and
+        $nativeStarted[0].Next.Next.Next.OpCode.Code -eq 'Ret') 'Interaction dispatch must return false while the native intro has not started gameplay'
+    Write-Output 'Compiled interaction start contract passed: no actor dispatch before the native Started flag.'
+    $zeppelinPattern = $mod.Types | Where-Object Name -eq 'NativeZeppelinSpawnPattern'
+    $spawnPlan = $zeppelinPattern.Methods | Where-Object Name -eq 'TryCreate'
+    Require (@($spawnPlan.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.Name -eq 'GetMode'
+    }).Count -eq 0) 'Zeppelin spawn plans must not rebuild a full boss configuration'
+    Require (@($spawnPlan.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.DeclaringType.Name -eq 'NativeInteractionDifficultyCache`1' -and
+        $_.Operand.Name -eq 'Get'
+    }).Count -eq 1) 'Zeppelin spawn plans must reuse the prepared difficulty configuration'
+    $zeppelinCache = $mod.Types | Where-Object Name -eq 'NativeZeppelinCache'
+    $zeppelinUpdate = $zeppelinCache.Methods | Where-Object Name -eq 'Update'
+    $configurationWarmup = @(Calls $zeppelinUpdate $zeppelinPattern.FullName 'PrepareProperties')
+    $acquire = @(Calls $zeppelinUpdate $coordinator.FullName 'TryAcquire')
+    Require ($configurationWarmup.Count -eq 1 -and $acquire.Count -eq 1 -and
+        $acquire[0].Offset -lt $configurationWarmup[0].Offset) 'Zeppelin configurations must be prepared inside the covered preload window'
+    Write-Output 'Compiled zeppelin settings contract passed: three difficulty configurations are prepared during loading and reused for spawns/retries.'
     # The live event must hand its result to the existing roulette and wait
     # for the native Play action; no timer/Update callback may start a load.
     $chatType = $mod.Types | Where-Object Name -eq 'CreatorToolsChatChoosesController'

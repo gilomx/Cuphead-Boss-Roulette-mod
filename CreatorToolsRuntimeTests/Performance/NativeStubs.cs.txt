@@ -1,0 +1,9 @@
+// Only the Unity clock and object lifetime API are replaced. The production
+// queue, JSON serialization and panel pacing policy run unmodified.
+namespace UnityEngine
+{
+    public class Object { public static void Destroy(Object value) { } }
+    public class GameObject : Object { public void SetActive(bool value) { } }
+    public class Component : Object { public GameObject gameObject; }
+    public static class Time { public static float realtimeSinceStartup; }
+}

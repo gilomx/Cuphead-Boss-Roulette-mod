@@ -1,0 +1,128 @@
+using System;
+using System.Collections.Generic;
+
+namespace UnityEngine
+{
+    public class Object
+    {
+        internal static readonly List<Object> Objects = new List<Object>();
+        internal static int GenericQueries, UntypedQueries, ChildArrays, ChildLists;
+        internal bool Destroyed;
+        public Object() { Objects.Add(this); }
+        public static bool operator ==(Object left, Object right)
+        {
+            return Missing(left) ? Missing(right) : !Missing(right) && ReferenceEquals(left, right);
+        }
+        public static bool operator !=(Object left, Object right) { return !(left == right); }
+        private static bool Missing(Object value)
+        {
+            return ReferenceEquals(value, null) || value.Destroyed ||
+                (value is Component component && component.gameObject.Destroyed);
+        }
+        public override bool Equals(object value) { return this == value as Object; }
+        public override int GetHashCode() { return base.GetHashCode(); }
+        public static void Destroy(Object value) { value.Destroyed = true; }
+        public static Object[] FindObjectsOfType(Type type)
+        {
+            UntypedQueries++;
+            return Objects.FindAll(value => value != null && type.IsInstanceOfType(value) &&
+                (!(value is Component component) || component.gameObject.activeInHierarchy)).ToArray();
+        }
+        public static T[] FindObjectsOfType<T>() where T : Object
+        {
+            GenericQueries++;
+            return Array.ConvertAll(FindObjectsOfType(typeof(T)), value => (T)value);
+        }
+        internal static void Reset()
+        {
+            Objects.Clear();
+            GenericQueries = UntypedQueries = ChildArrays = ChildLists = 0;
+            Component.LastBuffer = null;
+        }
+    }
+    public class GameObject : Object
+    {
+        private readonly List<Component> components = new List<Component>();
+        internal readonly List<GameObject> Children = new List<GameObject>();
+        public GameObject Parent;
+        public bool activeSelf = true;
+        public bool activeInHierarchy { get { return !Destroyed && activeSelf &&
+            (Parent == null || Parent.activeInHierarchy); } }
+        public T AddComponent<T>() where T : Component, new()
+        {
+            var result = new T { gameObject = this };
+            components.Add(result);
+            return result;
+        }
+        public GameObject AddChild()
+        {
+            var child = new GameObject { Parent = this };
+            Children.Add(child);
+            return child;
+        }
+        internal void Collect<T>(bool includeInactive, List<T> result) where T : Component
+        {
+            if (!includeInactive && !activeInHierarchy) return;
+            foreach (var component in components)
+                if (component != null && component is T typed) result.Add(typed);
+            foreach (var child in Children) child.Collect(includeInactive, result);
+        }
+    }
+    public class Component : Object
+    {
+        public GameObject gameObject;
+        public bool ThrowAfterCollect;
+        internal static List<SpriteRenderer> LastBuffer;
+        public T GetComponent<T>() where T : Component
+        {
+            var result = new List<T>();
+            gameObject.Collect(false, result);
+            return result.Count == 0 ? null : result[0];
+        }
+        public T[] GetComponentsInChildren<T>(bool includeInactive) where T : Component
+        {
+            ChildArrays++;
+            var result = new List<T>();
+            gameObject.Collect(includeInactive, result);
+            return result.ToArray();
+        }
+        public void GetComponentsInChildren<T>(bool includeInactive, List<T> result) where T : Component
+        {
+            ChildLists++;
+            LastBuffer = result as List<SpriteRenderer>;
+            // Append deliberately: production clears before and after each query.
+            gameObject.Collect(includeInactive, result);
+            if (ThrowAfterCollect) throw new InvalidOperationException("native child query failed");
+        }
+    }
+    public class Sprite : Object { }
+    public struct Color { public float a; public Color(float alpha) { a = alpha; } }
+    public class SpriteRenderer : Component
+    {
+        public bool enabled = true;
+        public Sprite sprite = new Sprite();
+        public Color color = new Color(1f);
+    }
+    public static class Time { public static int frameCount; }
+}
+namespace UnityEngine.SceneManagement
+{
+    public struct Scene
+    {
+        internal int Id;
+        public static bool operator ==(Scene left, Scene right) { return left.Id == right.Id; }
+        public static bool operator !=(Scene left, Scene right) { return !(left == right); }
+        public override bool Equals(object value) { return value is Scene scene && this == scene; }
+        public override int GetHashCode() { return Id; }
+    }
+    public static class SceneManager
+    {
+        public static int Id;
+        public static Scene GetActiveScene() { return new Scene { Id = Id }; }
+    }
+}
+public class PlayerScreenEffectController : UnityEngine.Component { public bool enabled = true; }
+public class PirateLevelSquidInkOverlay : UnityEngine.Component
+{
+    public static PirateLevelSquidInkOverlay Current;
+}

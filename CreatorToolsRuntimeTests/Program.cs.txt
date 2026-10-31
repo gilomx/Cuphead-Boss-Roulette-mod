@@ -19,8 +19,15 @@ namespace Gilomx.CupheadBossRoulette
     {
         private static readonly List<string> failures = new List<string>();
 
-        private static int Main()
+        private static int Main(string[] args)
         {
+            if (args.Length > 0)
+            {
+                if (args[0] == "--stress")
+                    return RunStreamStress(args.Skip(1).ToArray());
+                Console.Error.WriteLine("Unknown option. Use --stress --help for the offline event load test.");
+                return 2;
+            }
             RunSettingsTransferTests();
             RunTwitchConnectionTests();
             RunYouTubeConnectionTests();
@@ -41,6 +48,8 @@ namespace Gilomx.CupheadBossRoulette
             RunVisualSnapshotHierarchyTests();
             RunNativeLoadingBarrierTests();
             RunInteractionsOverlayComposerTests();
+            RunPanelPublicationTests();
+            RunDashboardOnDemandTests();
             Run("Evaluate creates backlog without Enqueue",
                 TestEvaluateOnlyCreatesBacklog);
             Run("Explicit drain moves the exact quantity",
@@ -119,6 +128,8 @@ namespace Gilomx.CupheadBossRoulette
                 TestTapFarmingEffectiveHealth);
             Run("Worker processes a fake source and Dispose joins its thread",
                 TestWorkerAndDispose);
+            Run("Stress sender targets an isolated simulator and accounts for every mixed event",
+                TestStressSenderAgainstFixture);
             Run("TikFinity pressure coalesces exact per-viewer like totals",
                 TestTikFinityLikePressureCoalescing);
             Run("TikFinity critical events preserve displaced likes",

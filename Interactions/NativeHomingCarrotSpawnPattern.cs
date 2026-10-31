@@ -118,16 +118,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private static Camera FindGameplayCamera()
         {
-            var main = Camera.main;
-            if (main != null && main.enabled && main.orthographic)
-                return main;
-
-            var cameras = UnityEngine.Object.FindObjectsOfType<Camera>();
-            for (var i = 0; i < cameras.Length; i++)
-                if (cameras[i] != null && cameras[i].enabled &&
-                    cameras[i].orthographic)
-                    return cameras[i];
-            return null;
+            return CreatorToolsGameplayCameraCache.Get();
         }
     }
 }

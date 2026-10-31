@@ -1,0 +1,88 @@
+using System;
+using UnityEngine;
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class Program
+    {
+        private static int groups;
+        private static void Main()
+        {
+            Run("Ground filters preserve null, disabled and non-ground exclusions", delegate
+            {
+                var probe = new InkRainGroundProbe((from,to,hits) => {
+                    hits[0] = new RaycastHit2D(); hits[1] = Hit("Enemy", 1f);
+                    hits[2] = Hit("Level_Ground", 2f, false); hits[3] = Hit("Level_Ground", 3f); return 4;
+                }, (from,to) => { throw new Exception("Non-full casts must not allocate a fallback"); }, 8);
+                RaycastHit2D ground; RaycastHit2D[] results; int count;
+                Check(probe.TryFindGround(new Vector2(), new Vector2(), out ground, out results, out count) &&
+                    ground.point.x == 3f && count == 4, "only the first enabled Level_Ground may be selected");
+            });
+            Run("An empty cast cannot consume a previous buffer hit", delegate
+            {
+                var calls = 0;
+                var probe = new InkRainGroundProbe((from,to,hits) => { hits[0] = Hit("Level_Ground", 4f); return calls++ == 0 ? 1 : 0; },
+                    (from,to) => { throw new Exception("Unexpected fallback"); }, 8);
+                RaycastHit2D ground; RaycastHit2D[] first, second; int count;
+                Check(probe.TryFindGround(new Vector2(), new Vector2(), out ground, out first, out count), "first cast hits");
+                Check(!probe.TryFindGround(new Vector2(), new Vector2(), out ground, out second, out count) && count == 0,
+                    "stale values beyond the current count are ignored");
+                Check(ReferenceEquals(first, second), "casts reuse the runtime's own buffer");
+            });
+            Run("Unordered grounds select the nearest fraction and preserve first ties without reordering", delegate
+            {
+                foreach (var capacity in new[] { 8, 2 })
+                {
+                    var unordered = new[] {
+                        Hit("Level_Ground", 8f, true, 0.8f),
+                        Hit("Enemy", 1f, true, 0.1f),
+                        Hit("Level_Ground", 2f, true, 0.2f),
+                        Hit("Level_Ground", 3f, true, 0.2f)
+                    };
+                    var fallbacks = 0;
+                    var probe = new InkRainGroundProbe((from,to,hits) => {
+                        var count = Math.Min(hits.Length, unordered.Length);
+                        Array.Copy(unordered, hits, count); return count;
+                    }, (from,to) => { fallbacks++; return unordered; }, capacity);
+                    RaycastHit2D ground; RaycastHit2D[] results; int count;
+                    Check(probe.TryFindGround(new Vector2(), new Vector2(), out ground, out results, out count) &&
+                        ground.point.x == 2f && ground.fraction == 0.2f,
+                        "nearest valid ground wins and an equal-distance later hit cannot replace it");
+                    Check(count == 4 && results[0].point.x == 8f && results[2].point.x == 2f && results[3].point.x == 3f,
+                        "diagnostics retain the exact input ordering and count");
+                    Check(fallbacks == (capacity == 2 ? 1 : 0), "selection works in ordinary and overflow paths");
+                }
+            });
+            Run("A full buffer falls back to all hits and preserves exact diagnostic count", delegate
+            {
+                var full = new[] { Hit("Enemy", 1f), Hit("Enemy", 2f), Hit("Level_Ground", 3f), Hit("Other", 4f) };
+                var fallbacks = 0;
+                var probe = new InkRainGroundProbe((from,to,hits) => { hits[0]=full[0]; hits[1]=full[1]; return 2; },
+                    (from,to) => { fallbacks++; return full; }, 2);
+                RaycastHit2D ground; RaycastHit2D[] results; int count;
+                Check(probe.TryFindGround(new Vector2(), new Vector2(), out ground, out results, out count) && ground.point.x == 3f,
+                    "ground beyond buffer capacity cannot disappear");
+                Check(fallbacks == 1 && count == 4 && ReferenceEquals(results, full), "overflow returns the complete native result and count");
+                var exact = new InkRainGroundProbe((from,to,hits) => 2, (from,to) => full, 2);
+                Check(exact.TryFindGround(new Vector2(), new Vector2(), out ground, out results, out count) && count == 4,
+                    "equal-to-capacity is ambiguous and must also use the complete query");
+            });
+            Run("One thousand ordinary casts reuse one buffer without all-hit queries", delegate
+            {
+                var calls = 0;
+                var probe = new InkRainGroundProbe((from,to,hits) => { calls++; hits[0]=Hit("Other", 1f); return 1; },
+                    (from,to) => { throw new Exception("Unexpected allocating fallback"); }, 16);
+                RaycastHit2D ground; RaycastHit2D[] previous = null, results; int count;
+                for (var i=0; i<1000; i++) {
+                    Check(!probe.TryFindGround(new Vector2(), new Vector2(), out ground, out results, out count) && count == 1,
+                        "non-ground query remains empty");
+                    Check(previous == null || ReferenceEquals(previous, results), "buffer identity must stay stable"); previous=results;
+                }
+                Check(calls == 1000, "every drop retains its physical probe");
+            });
+            Console.WriteLine("PASS " + groups + " production Ink Rain ground-probe groups (recording physics stubs; native API verified separately).");
+        }
+        private static RaycastHit2D Hit(string name,float x,bool enabled=true,float fraction=0f) { return new RaycastHit2D { collider=new Collider2D { name=name, enabled=enabled }, point=new Vector2(x,0f), fraction=fraction }; }
+        private static void Check(bool value,string message) { if (!value) throw new Exception(message); }
+        private static void Run(string name,Action action) { action(); groups++; Console.WriteLine("PASS " + name); }
+    }
+}

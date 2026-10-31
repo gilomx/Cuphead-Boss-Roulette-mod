@@ -38,17 +38,26 @@ namespace Gilomx.CupheadBossRoulette
 
             foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
             {
-                if (sprite != null && !string.IsNullOrEmpty(sprite.name) && !sprites.ContainsKey(sprite.name))
-                    sprites.Add(sprite.name, sprite);
+                if (sprite == null || string.IsNullOrEmpty(sprite.name))
+                    continue;
+                Sprite cached;
+                if (!sprites.TryGetValue(sprite.name, out cached) || cached == null)
+                    sprites[sprite.name] = sprite;
             }
         }
 
         internal Sprite GetSprite(string name)
         {
-            Refresh();
+            if (string.IsNullOrEmpty(name))
+                return null;
             Sprite sprite;
-            if (string.IsNullOrEmpty(name) || !sprites.TryGetValue(name, out sprite) ||
-                sprite == null)
+            if (sprites.TryGetValue(name, out sprite) && sprite != null)
+                return sprite;
+
+            // A cached native HUD sprite needs no discovery while a fight
+            // runs. Missing/destroyed assets still retry on the shared timer.
+            Refresh();
+            if (!sprites.TryGetValue(name, out sprite) || sprite == null)
                 return null;
             return sprite;
         }

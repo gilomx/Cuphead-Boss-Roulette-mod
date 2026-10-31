@@ -1,0 +1,318 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class Program
+    {
+        private static int Main()
+        {
+            try
+            {
+                TestProjectionParityAndMutableInputs();
+                TestFiveEventPerSecondWorkload();
+                TestIdleAndSimulationLifecycle();
+                TestOnDemandConsumerAndBackgroundWork();
+                Console.WriteLine("All dashboard projection regressions passed.");
+                return 0;
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine(exception);
+                return 1;
+            }
+        }
+
+        private static CreatorToolsStreamEvent Event(int index)
+        {
+            var identity = "dashboard-test-" + index;
+            return new CreatorToolsStreamEvent
+            {
+                EventId = identity, IdempotencyKey = identity,
+                ConnectionId = "tikfinity-local", Platform = "tiktok", Connector = "fixture",
+                Type = "gift", UserId = "viewer-" + index, UserName = "viewer",
+                UserDisplayName = "Viewer \"\\\n\t\u0001", UserAvatarUrl = "https://example.invalid/avatar.png",
+                ChatText = "Mensaje \"\\\r\n\t\u0002", ItemId = "5655", ItemName = "Rose",
+                ItemImageUrl = "/assets/creator-tools/gifts/images/5655.webp", Count = 1,
+                UnitValue = 2.5m, TotalValue = 2.5m, Unit = "coin", Currency = "USD",
+                IsCommunityGift = index % 3 == 0, StreakId = "streak-" + index,
+                StreakState = index % 2 == 0 ? "final" : "none",
+                ReceivedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    .AddMilliseconds(index * 200).ToString("O", CultureInfo.InvariantCulture),
+                RawEventType = "fixture_gift", Simulated = index % 2 == 0
+            };
+        }
+
+        private static void TestProjectionParityAndMutableInputs()
+        {
+            var dashboard = new CreatorToolsDashboardController(null);
+            var server = new CreatorToolsServer();
+            dashboard.Update(server, null);
+            Check(server.State == Reference(Capture(dashboard)), "empty dashboard differs from previous JSON");
+            var original = server.State;
+            var retained = new List<string>();
+            CreatorToolsStreamEvent latest = null;
+            for (var index = 0; index < 50; index++)
+            {
+                latest = Event(index);
+                if (index == 48) latest.ChatText = new string('ñ', 7000) + "\"\\\n";
+                if (index % 5 == 1) latest.Type = "like";
+                if (index % 5 == 2) { latest.Type = "currency"; latest.Platform = "twitch"; }
+                if (index % 5 == 3) { latest.Type = "chat"; latest.Platform = "youtube"; }
+                if (index % 5 == 4) latest.Type = "follow";
+                dashboard.ProcessEvent(latest, entry => new CreatorToolsStreamEvaluation
+                {
+                    MatchedRules = 2, DeferredInteractions = 3, RuleNames = "Regla \"uno\", dos",
+                    InteractionIds = "attack_a, attack_b", MessageCode = "rules_waiting_queue"
+                });
+                dashboard.Update(server, null);
+                Check(server.State == Reference(Capture(dashboard)), "mixed dashboard fields or JSON escaping changed");
+                retained.Add(server.State);
+            }
+            Check(original.Contains("\"events\":[]"), "an earlier immutable snapshot was mutated after buffer growth");
+            using (var json = JsonDocument.Parse(server.State))
+            {
+                Check(json.RootElement.GetProperty("events").GetArrayLength() == 30, "history must retain exactly 30 events");
+                Check(json.RootElement.GetProperty("events")[1].GetProperty("chatText").GetString().Length > 7000,
+                    "large raw payload was truncated by buffer reuse");
+            }
+            var previous = server.State;
+            latest.UserDisplayName = "Perfil actualizado";
+            latest.UserAvatarUrl = "https://example.invalid/replaced.png";
+            dashboard.ApplyConnectionUpdate(new CreatorToolsStreamConnectionUpdate
+            {
+                ConnectionId = "tikfinity-local", State = "live", Account = "Otra cuenta",
+                Message = "Conexión \"actualizada\"", MessageCode = "live", RetryAttempt = 4
+            });
+            dashboard.Update(server, null);
+            Check(server.State == Reference(Capture(dashboard)) && server.State != previous,
+                "changed profiles and connection metadata cannot reuse stale JSON");
+            Check(server.State.Contains("Perfil actualizado") && server.State.Contains("Otra cuenta"),
+                "profile/connection edits must be visible on the next dirty publication");
+            var unchanged = server.State;
+            var before = server.Publications;
+            dashboard.InvalidateState();
+            dashboard.Update(server, null);
+            Check(server.Publications == before + 1 && ReferenceEquals(unchanged, server.State),
+                "explicit invalidation still publishes, reusing an equal immutable snapshot");
+            Console.WriteLine("PASS Dashboard JSON parity: every field, escapes, 30-event order, large payload, changed profiles/connections and immutable previous snapshots.");
+        }
+
+        private static void TestFiveEventPerSecondWorkload()
+        {
+            var dashboard = new CreatorToolsDashboardController(null);
+            var server = new CreatorToolsServer();
+            for (var index = 0; index < 30; index++) dashboard.ProcessEvent(Event(index), null);
+            dashboard.Update(server, null);
+            dashboard.InvalidateState();
+            dashboard.Update(server, null); // Complete a reset after initial buffer growth.
+            long baselineBytes = 0, reusedBytes = 0;
+            var publicationStart = server.Publications;
+            for (var index = 30; index < 180; index++)
+            {
+                // 150 events timestamped 200 ms apart model a 30-second,
+                // five-event/second input. No game or wall-clock sleep is used.
+                dashboard.ProcessEvent(Event(index), null);
+                var projection = Capture(dashboard);
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                var expected = Reference(projection);
+                baselineBytes += GC.GetAllocatedBytesForCurrentThread() - before;
+                before = GC.GetAllocatedBytesForCurrentThread();
+                dashboard.Update(server, null);
+                reusedBytes += GC.GetAllocatedBytesForCurrentThread() - before;
+                Check(expected == server.State, "allocation optimization changed the live event projection");
+            }
+            Check(server.Publications - publicationStart == 150, "reuse cannot throttle dirty publications");
+            Check(reusedBytes < baselineBytes / 2, "reusable buffers must remove at least half of projection allocations");
+            Console.WriteLine("PASS 150 dirty projections with 30 retained events, 5/s modeled: " +
+                baselineBytes + " -> " + reusedBytes + " bytes. Offline .NET allocations; not game FPS.");
+        }
+
+        private static void TestIdleAndSimulationLifecycle()
+        {
+            var dashboard = new CreatorToolsDashboardController(null);
+            var server = new CreatorToolsServer();
+            dashboard.Update(server, null);
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 10000; index++) dashboard.Update(server, null);
+            Check(GC.GetAllocatedBytesForCurrentThread() - before == 0,
+                "idle updates must not allocate empty scheduled-simulation lists");
+
+            Check(dashboard.ScheduleSimulation("platform=tiktok&type=like&count=1&user=fixture&userId=fixture&delaySeconds=3600") == "",
+                "future simulation fixture was rejected");
+            before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 10000; index++) dashboard.Update(server, null);
+            Check(GC.GetAllocatedBytesForCurrentThread() - before == 0,
+                "future-only simulations cannot allocate per polling tick");
+
+            var evaluated = 0;
+            Func<CreatorToolsStreamEvent, CreatorToolsStreamEvaluation> evaluate = entry =>
+            {
+                evaluated++;
+                return CreatorToolsStreamEvaluation.None;
+            };
+            for (var index = 0; index < 70; index++)
+                Check(dashboard.ScheduleSimulation("platform=tiktok&type=like&count=1&user=fixture&userId=fixture") == "",
+                    "due simulation fixture was rejected");
+            var publications = server.Publications;
+            server.IsRunning = false;
+            dashboard.Update(server, evaluate);
+            Check(evaluated == 64 && server.Publications == publications,
+                "simulation work must run before the server gate and retain its 64-event batch limit");
+            dashboard.Update(null, evaluate);
+            Check(evaluated == 70, "remaining due simulations must run even with no server");
+            server.IsRunning = true;
+            dashboard.Update(server, evaluate);
+            using (var json = JsonDocument.Parse(server.State))
+                Check(json.RootElement.GetProperty("counters").GetProperty("received").GetInt64() == 70,
+                    "restoring publication must include every processed simulation");
+            Console.WriteLine("PASS Idle/future-only 10000 updates allocate zero bytes; due simulations retain ordering, batch limit and server-independent processing.");
+        }
+
+        private static void TestOnDemandConsumerAndBackgroundWork()
+        {
+            var dashboard = new CreatorToolsDashboardController(null);
+            var server = new CreatorToolsServer { DashboardStateIsOnDemand = true };
+            dashboard.Update(server, null);
+            Check(server.Publications == 0, "on-demand initialization cannot eagerly serialize a dashboard");
+            var initial = dashboard.GetStateJson();
+            Check(initial == Reference(Capture(dashboard)), "initial on-demand read must be ready and complete");
+            var input = new CreatorToolsStreamEvent[150];
+            for (var index = 0; index < input.Length; index++) input[index] = Event(index);
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < input.Length; index++)
+            {
+                dashboard.ProcessEvent(input[index], null);
+                dashboard.Update(server, null);
+            }
+            var backgroundBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            Check(server.Publications == 0, "150 background events must not publish JSON without a consumer");
+            Check(ReferenceEquals(initial, Field<string>(dashboard, "lastPublishedState")) &&
+                Field<bool>(dashboard, "stateDirty"), "background processing must retain dirty state without building a new cache");
+            var state = dashboard.GetStateJson();
+            Check(state == Reference(Capture(dashboard)), "a returning consumer must receive every event immediately");
+            using (var json = JsonDocument.Parse(state))
+            {
+                Check(json.RootElement.GetProperty("counters").GetProperty("received").GetInt64() == 150,
+                    "on-demand JSON lost background event counts");
+                Check(json.RootElement.GetProperty("events").GetArrayLength() == 30 &&
+                    json.RootElement.GetProperty("events")[0].GetProperty("eventId").GetString() == input[149].EventId,
+                    "on-demand JSON must retain the latest 30 events in the same order");
+            }
+            before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 1000; index++)
+                Check(ReferenceEquals(state, dashboard.GetStateJson()), "unchanged direct reads must reuse the same immutable snapshot");
+            Check(GC.GetAllocatedBytesForCurrentThread() - before == 0,
+                "unchanged on-demand reads must allocate nothing");
+            input[149].UserDisplayName = "Perfil al regresar";
+            dashboard.ApplyConnectionUpdate(new CreatorToolsStreamConnectionUpdate
+            {
+                ConnectionId = "tikfinity-local", State = "live", Account = "Cuenta al regresar"
+            });
+            var refreshed = dashboard.GetStateJson();
+            Check(refreshed == Reference(Capture(dashboard)) && refreshed.Contains("Perfil al regresar") &&
+                refreshed.Contains("Cuenta al regresar"), "on-demand reads cannot retain dirty connection/profile metadata");
+            Check(state.Contains("Viewer"), "the earlier snapshot cannot change while a reader retains it");
+
+            var evaluated = 0;
+            Check(dashboard.ScheduleSimulation("platform=tiktok&type=like&count=1&user=fixture&userId=fixture") == "",
+                "on-demand simulation fixture was rejected");
+            dashboard.GetStateJson();
+            Check(evaluated == 0, "a pure JSON read cannot evaluate scheduled gameplay work");
+            dashboard.Update(server, entry => { evaluated++; return CreatorToolsStreamEvaluation.None; });
+            Check(evaluated == 1 && server.Publications == 0,
+                "on-demand JSON suppression must not suspend scheduled simulation evaluation");
+            using (var json = JsonDocument.Parse(dashboard.GetStateJson()))
+                Check(json.RootElement.GetProperty("counters").GetProperty("received").GetInt64() == 151,
+                    "the next read must include simulation work processed by the background worker");
+            Console.WriteLine("PASS On-demand dashboard: 150 background events, " + backgroundBytes +
+                " processing bytes, zero JSON publications; immediate complete reads, 1000 cached reads zero bytes, simulations remain live.");
+        }
+
+        private sealed class Projection
+        {
+            internal long Revision;
+            internal string EngineStatus, Session;
+            internal List<CreatorToolsDashboardConnection> Connections;
+            internal CreatorToolsDashboardEventRecord[] Events;
+            internal long[] Counts;
+            internal decimal Coins, Bits;
+        }
+
+        private static readonly string[] CounterNames =
+        {
+            "received", "matched", "queued", "ignored", "gifts", "valued", "likes", "follows", "subscriptions"
+        };
+        private static readonly string[] CounterFields =
+        {
+            "receivedCount", "matchedCount", "queuedCount", "ignoredCount", "giftCount", "valuedCount", "likeCount", "followCount", "subscriptionCount"
+        };
+
+        private static T Field<T>(CreatorToolsDashboardController dashboard, string name)
+        {
+            return (T)typeof(CreatorToolsDashboardController).GetField(name,
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(dashboard);
+        }
+
+        private static Projection Capture(CreatorToolsDashboardController dashboard)
+        {
+            var count = Field<int>(dashboard, "eventCount");
+            var start = Field<int>(dashboard, "eventStart");
+            var history = Field<CreatorToolsDashboardEventRecord[]>(dashboard, "events");
+            var result = new Projection
+            {
+                Revision = Field<long>(dashboard, "revision"), Session = Field<string>(dashboard, "streamSessionId"),
+                EngineStatus = (string)typeof(CreatorToolsDashboardController).GetMethod("EngineStatus",
+                    BindingFlags.Instance | BindingFlags.NonPublic).Invoke(dashboard, null),
+                Connections = Field<List<CreatorToolsDashboardConnection>>(dashboard, "connections"),
+                Events = new CreatorToolsDashboardEventRecord[count], Counts = new long[CounterFields.Length],
+                Coins = Field<decimal>(dashboard, "coinCount"), Bits = Field<decimal>(dashboard, "bitCount")
+            };
+            for (var index = 0; index < count; index++) result.Events[index] = history[(start + count - 1 - index) % 30];
+            for (var index = 0; index < CounterFields.Length; index++) result.Counts[index] = Field<long>(dashboard, CounterFields[index]);
+            return result;
+        }
+
+        // Previous production BuildState, with its private inputs captured
+        // before measuring. Model serializers themselves remain production code.
+        private static string Reference(Projection state)
+        {
+            var builder = new StringBuilder(65536);
+            builder.Append("{\"ready\":true,\"schemaVersion\":2,\"revision\":").Append(state.Revision)
+                .Append(",\"engineStatus\":\"");
+            CreatorToolsJson.AppendEscaped(builder, state.EngineStatus);
+            builder.Append("\",\"streamSessionId\":\"");
+            CreatorToolsJson.AppendEscaped(builder, state.Session);
+            builder.Append("\",\"connections\":[");
+            for (var index = 0; index < state.Connections.Count; index++)
+            {
+                if (index > 0) builder.Append(',');
+                state.Connections[index].AppendJson(builder);
+            }
+            builder.Append("],\"counters\":{");
+            for (var index = 0; index < CounterNames.Length; index++)
+            {
+                if (index > 0) builder.Append(',');
+                builder.Append('"').Append(CounterNames[index]).Append("\":").Append(state.Counts[index]);
+            }
+            builder.Append(",\"coins\":"); CreatorToolsJson.AppendDecimal(builder, state.Coins);
+            builder.Append(",\"bits\":"); CreatorToolsJson.AppendDecimal(builder, state.Bits);
+            builder.Append("},\"events\":[");
+            for (var index = 0; index < state.Events.Length; index++)
+            {
+                if (index > 0) builder.Append(',');
+                state.Events[index].AppendJson(builder);
+            }
+            return builder.Append("]}").ToString();
+        }
+
+        private static void Check(bool condition, string message)
+        {
+            if (!condition) throw new InvalidOperationException(message);
+        }
+    }
+}

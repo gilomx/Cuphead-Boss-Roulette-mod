@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { startForegroundPolling } from "../../config/foregroundPolling";
 
 interface TwitchConnectionState {
   ready: boolean;
@@ -55,9 +56,9 @@ export function TwitchConnectionControls() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
-    const timer = window.setInterval(() => { setNow(Date.now()); void load(controller.signal); }, 1250);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    const stopPolling = startForegroundPolling(
+      () => { setNow(Date.now()); void load(controller.signal); }, 1250);
+    return () => { controller.abort(); stopPolling(); };
   }, [load]);
 
   const command = async (action: "connect" | "disconnect" | "cancel" | "test") => {

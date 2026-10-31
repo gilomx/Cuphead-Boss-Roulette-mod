@@ -12,6 +12,7 @@
     "test:roulette-overlay": "node --test scripts/test-roulette-overlay.mjs",
     "test:overlay-text-style": "node --test scripts/test-overlay-text-style.mjs",
     "test:interactions-overlay": "node --test scripts/test-interactions-overlay.mjs",
+    "test:foreground-polling": "node --test scripts/test-foreground-polling.mjs",
     "test:stream-rule-groups": "node --test scripts/test-stream-rule-groups.mjs scripts/test-stream-rule-group-api.mjs",
     "validate:gifts": "node scripts/validate-gift-catalog.mjs",
     "validate:interactions": "node scripts/validate-interaction-catalog.mjs",

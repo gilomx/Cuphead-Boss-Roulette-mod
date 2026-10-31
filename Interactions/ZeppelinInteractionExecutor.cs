@@ -40,9 +40,9 @@ namespace Gilomx.CupheadBossRoulette
             get
             {
                 return Evaluate(canSpawn) &&
-                    (FindBlimpLady() != null ||
-                     (nativeCache.CanSpawn(NativeZeppelinVariant.Purple) &&
-                      nativeCache.CanSpawn(NativeZeppelinVariant.Green)));
+                    ((nativeCache.Ready(NativeZeppelinVariant.Purple) &&
+                      nativeCache.Ready(NativeZeppelinVariant.Green)) ||
+                     FindBlimpLady() != null);
             }
         }
 
@@ -235,15 +235,17 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < activeSpawns.Count; i++)
                 lanes.Add(activeSpawns[i].Lane);
 
-            var camera = Camera.main;
+            var camera = CreatorToolsGameplayCameraCache.Get();
             if (camera == null)
                 return lanes;
-            var catalogActors = UnityEngine.Object.FindObjectsOfType<
-                CreatorToolsDonorLabel>();
-            for (var i = 0; i < catalogActors.Length; i++)
+            var catalogActors = CreatorToolsDonorLabel.Instances;
+            for (var i = 0; i < catalogActors.Count; i++)
             {
                 var actor = catalogActors[i];
-                if (actor == null ||
+                if (actor == null)
+                    continue;
+                var actorRoot = actor.gameObject;
+                if (actorRoot == null || !actorRoot.activeInHierarchy ||
                     actor.GetComponent<FlyingBlimpLevelEnemy>() != null)
                     continue;
                 lanes.Add(
@@ -313,6 +315,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private static FlyingBlimpLevelBlimpLady FindBlimpLady()
         {
+            // The retained prefab handles known non-Hilda arenas. Searching
+            // all scene objects there cannot provide a native Hilda parent.
+            // Keep discovery when no level is known during a transition.
+            var level = Level.Current;
+            if (level != null && level.CurrentLevel != Levels.FlyingBlimp)
+                return null;
             return UnityEngine.Object.FindObjectOfType<
                 FlyingBlimpLevelBlimpLady>();
         }

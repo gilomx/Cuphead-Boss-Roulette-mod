@@ -132,18 +132,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (activeSpawns[i].Actor != null)
                     result.Add(activeSpawns[i].Actor.transform.position);
 
-            var catalogActors = UnityEngine.Object.FindObjectsOfType<
-                CreatorToolsDonorLabel>();
-            for (var i = 0; i < catalogActors.Length; i++)
-                if (catalogActors[i] != null)
-                    result.Add(catalogActors[i].transform.position);
-
-            var players = UnityEngine.Object.FindObjectsOfType<
-                AbstractPlayerController>();
-            for (var i = 0; i < players.Length; i++)
-                if (players[i] != null &&
-                    players[i].gameObject.activeInHierarchy)
-                    result.Add(players[i].transform.position);
+            CreatorToolsInteractionSpawnPositions.AppendTo(result);
             return result;
         }
 

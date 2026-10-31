@@ -12,6 +12,9 @@ namespace UnityEngine
     {
         public static int CeilToInt(float value) { return (int)Math.Ceiling(value); }
         public static int Max(int a, int b) { return Math.Max(a, b); }
+        public static float Max(float a, float b) { return Math.Max(a, b); }
+        public static float Clamp01(float value) { return Math.Max(0f, Math.Min(1f, value)); }
+        public static bool Approximately(float a, float b) { return Math.Abs(a - b) < 0.00001f; }
     }
     public static class Random
     {
@@ -23,6 +26,10 @@ namespace UnityEngine
 internal enum Levels { Ground, Plane, DicePalaceMain, DicePalaceBooze }
 internal sealed class Level
 {
+    internal enum Type { Battle }
+    internal static Level Current;
+    internal Type LevelType;
+    internal bool Ending;
     internal Levels CurrentLevel;
     internal int Id;
     internal int GetInstanceID() { return Id; }
@@ -34,7 +41,11 @@ namespace Gilomx.CupheadBossRoulette
     {
         internal bool IsRunning { get { return true; } }
         internal string State;
-        internal void SetPeskyBattleState(string state) { State = state; }
+        internal int BattlePublications;
+        internal string TapState;
+        internal int TapPublications;
+        internal void SetPeskyBattleState(string state) { State = state; BattlePublications++; }
+        internal void SetTapFarmingState(string state) { TapState = state; TapPublications++; }
         internal void ApplyPeskyBattleMainThreadActions(Action apply) { apply(); }
         internal bool TryTakePeskyBattleCommand(out string query) { query = null; return false; }
     }

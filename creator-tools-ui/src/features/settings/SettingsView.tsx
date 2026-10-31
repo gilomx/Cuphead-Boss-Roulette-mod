@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Monitor } from "lucide-react";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { startForegroundPolling } from "../../config/foregroundPolling";
 import type { DashboardConnection, DashboardState, StreamPlatform } from "../../model";
 import { TwitchConnectionControls } from "./TwitchConnectionControls";
 import { YouTubeConnectionControls } from "./YouTubeConnectionControls";
@@ -23,9 +24,8 @@ export function SettingsView() {
         if (request === latest && Array.isArray(data.connections)) setConnections(data.connections);
       } catch { /* Each connection retains its last known status. */ }
     };
-    void load();
-    const timer = window.setInterval(() => void load(), 1250);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    const stopPolling = startForegroundPolling(() => void load(), 1250);
+    return () => { controller.abort(); stopPolling(); };
   }, []);
 
   useEffect(() => {

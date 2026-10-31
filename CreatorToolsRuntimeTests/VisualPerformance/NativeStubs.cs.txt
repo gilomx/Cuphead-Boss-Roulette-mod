@@ -1,0 +1,205 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+
+namespace UnityEngine
+{
+    public class Object
+    {
+        private static readonly List<Object> All = new List<Object>();
+        internal bool Destroyed;
+        internal static int FindQueries;
+        protected Object() { All.Add(this); }
+        public static bool operator ==(Object a, Object b)
+        {
+            var aNull = ReferenceEquals(a, null) || a.Destroyed;
+            var bNull = ReferenceEquals(b, null) || b.Destroyed;
+            return aNull || bNull ? aNull == bNull : ReferenceEquals(a, b);
+        }
+        public static bool operator !=(Object a, Object b) { return !(a == b); }
+        public override bool Equals(object other) { return ReferenceEquals(this, other); }
+        public override int GetHashCode() { return base.GetHashCode(); }
+        public static T[] FindObjectsOfType<T>() where T : Object
+        {
+            FindQueries++;
+            return All.FindAll(o => o is T && o != null &&
+                (!(o is Component c) || c.gameObject.activeInHierarchy))
+                .ConvertAll(o => (T)o).ToArray();
+        }
+        internal static int LiveCount<T>() where T : Object
+        {
+            return All.FindAll(o => o is T && o != null).Count;
+        }
+        public static void Destroy(Object target)
+        {
+            if (target == null) return;
+            if (target is GameObject root)
+            {
+                root.SetActive(false);
+                foreach (var component in root.Components)
+                {
+                    component.Invoke("OnDestroy");
+                    component.Destroyed = true;
+                }
+            }
+            target.Destroyed = true;
+        }
+    }
+
+    public class GameObject : Object
+    {
+        internal readonly List<Component> Components = new List<Component>();
+        public int layer;
+        public bool activeInHierarchy = true;
+        public Transform transform = new Transform();
+        public GameObject(string name = "") { }
+        public T AddComponent<T>() where T : Component, new()
+        {
+            var component = new T { gameObject = this };
+            Components.Add(component);
+            return component;
+        }
+        public T GetComponent<T>() where T : Component
+        {
+            return Components.Find(c => c is T && c != null) as T;
+        }
+        public void SetActive(bool active)
+        {
+            if (activeInHierarchy == active) return;
+            activeInHierarchy = active;
+            if (!active)
+                foreach (var component in Components)
+                    if (component is Behaviour behaviour && behaviour.enabled)
+                        component.Invoke("OnDisable");
+        }
+    }
+    public class Component : Object
+    {
+        public GameObject gameObject;
+        public Transform transform { get { return gameObject.transform; } }
+        public T GetComponent<T>() where T : Component { return gameObject.GetComponent<T>(); }
+        public T[] GetComponentsInChildren<T>(bool includeInactive) where T : Component
+        {
+            return gameObject.Components.FindAll(c => c is T && c != null)
+                .ConvertAll(c => (T)c).ToArray();
+        }
+        internal void Invoke(string name)
+        {
+            GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(this, null);
+        }
+    }
+    public class Behaviour : Component
+    {
+        private bool active = true;
+        public bool enabled
+        {
+            get { return active; }
+            set
+            {
+                if (active == value) return;
+                active = value;
+                if (!active) Invoke("OnDisable");
+            }
+        }
+    }
+    public class MonoBehaviour : Behaviour { }
+    public class Camera : Behaviour
+    {
+        internal static Camera Main;
+        internal static int MainQueries;
+        public static Camera main { get { MainQueries++; return Main; } }
+        public bool orthographic;
+        public float orthographicSize;
+    }
+    public class SpriteRenderer : Behaviour
+    {
+        public Object sprite, sharedMaterial;
+        public bool flipX, flipY;
+        public int sortingLayerID, sortingOrder;
+        public Color color = new Color(1f, 1f, 1f, 1f);
+    }
+    public class Transform
+    {
+        public Vector3 position, localScale, lossyScale;
+        public object rotation;
+    }
+    public struct Vector2
+    {
+        public float x, y;
+        public Vector2(float x, float y) { this.x = x; this.y = y; }
+        public static implicit operator Vector2(Vector3 value) { return new Vector2(value.x, value.y); }
+    }
+    public struct Vector3
+    {
+        public float x, y, z;
+        public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        public static Vector3 zero { get { return new Vector3(); } }
+        public static Vector3 operator +(Vector3 a, Vector3 b)
+        { return new Vector3(a.x + b.x, a.y + b.y, a.z + b.z); }
+        public static Vector3 Lerp(Vector3 a, Vector3 b, float t)
+        { return new Vector3(a.x + (b.x-a.x)*t, a.y + (b.y-a.y)*t, a.z + (b.z-a.z)*t); }
+    }
+    public struct Color
+    {
+        public float r, g, b, a;
+        public Color(float r, float g, float b, float a) { this.r=r; this.g=g; this.b=b; this.a=a; }
+        public static Color Lerp(Color a, Color b, float t) { return a; }
+    }
+    public static class Mathf
+    {
+        public static float Max(float a, float b) { return Math.Max(a, b); }
+        public static float Clamp01(float value) { return Math.Max(0f, Math.Min(1f, value)); }
+    }
+    public static class Time { public static int frameCount; public static float unscaledDeltaTime; }
+}
+namespace UnityEngine.SceneManagement
+{
+    public struct Scene
+    {
+        // Cuphead's Unity exposes scene equality but keeps handle nonpublic.
+        internal int handle;
+        public static bool operator ==(Scene first, Scene second)
+        { return first.handle == second.handle; }
+        public static bool operator !=(Scene first, Scene second)
+        { return first.handle != second.handle; }
+        public override bool Equals(object value)
+        { return value is Scene other && this == other; }
+        public override int GetHashCode() { return handle; }
+    }
+    public static class SceneManager
+    {
+        internal static int ActiveHandle;
+        public static Scene GetActiveScene() { return new Scene { handle = ActiveHandle }; }
+    }
+}
+public class AbstractProjectile : UnityEngine.MonoBehaviour { public int PlayerId; }
+public class AbstractPlayerController : UnityEngine.MonoBehaviour { }
+public static class PlayerManager
+{
+    internal static Dictionary<int, AbstractPlayerController> Players = new Dictionary<int, AbstractPlayerController>();
+    internal static bool ReturnNull;
+    public static Dictionary<int, AbstractPlayerController>.ValueCollection GetAllPlayers()
+    { return ReturnNull ? null : Players.Values; }
+}
+public static class CupheadTime { public static float GlobalSpeed = 1f; }
+namespace Gilomx.CupheadBossRoulette
+{
+    internal sealed class CreatorToolsDonorLabel : UnityEngine.MonoBehaviour
+    {
+        internal static readonly List<CreatorToolsDonorLabel> Instances = new List<CreatorToolsDonorLabel>();
+    }
+    internal sealed class RecordingInteractions
+    {
+        internal bool Ghost;
+        internal bool TryGetGhostProjectileOffset(int player, out UnityEngine.Vector3 offset)
+        { offset = UnityEngine.Vector3.zero; return Ghost; }
+    }
+    public sealed partial class Plugin
+    {
+        private static Plugin activeInstance = new Plugin();
+        private RecordingInteractions creatorToolsInteractions = new RecordingInteractions();
+        internal static void UseGhost(bool active) { activeInstance.creatorToolsInteractions.Ghost = active; }
+        internal static void Fire(AbstractProjectile projectile) { GhostProjectileFirePostfix(projectile); }
+    }
+}

@@ -17,8 +17,12 @@ internal static class Program
         foreach (var capacity in new[] { 2, 3, 4, 5 }) TestRecruitment(capacity);
         TestInvalidSettings();
         TestOverlaySignals();
+        TestPublicationCaching();
+        TestTapPublicationCaching();
+        TestTapPhaseTransitionPublication();
+        QueueSelectionTests.Run();
         foreach (var item in CreatorToolsTimedChallenge.Items) TestChallenge(item);
-        Console.WriteLine("All Pesky Battle tests passed (2–5 slots, real activation notices, owner identity, bounded history, pure worker snapshots, cleanup and 12 timed challenges).");
+        Console.WriteLine("All Pesky Battle / Tap Farming tests passed (2–5 slots, activation notices, bounded history, worker snapshots, cached publications, live heartbeat, coordinator invalidation and 12 timed challenges).");
     }
 
     private static void TestSettings()
@@ -48,6 +52,106 @@ internal static class Program
                     "invalid capacity recovers valid settings from the backup");
                 loaded.Save();
             }
+        }
+    }
+
+    private static void TestPublicationCaching()
+    {
+        using (var scope = new Scope())
+        {
+            var now = 1000000L;
+            var resolutions = 0;
+            var giftName = "Rose";
+            CreatorToolsGiftResolver resolver = (string id, out CreatorToolsGiftCatalogEntry gift) =>
+            {
+                resolutions++;
+                gift = new CreatorToolsGiftCatalogEntry(id, giftName, "", 1, "/gift.webp");
+                return true;
+            };
+            var server = new CreatorToolsServer();
+            var battle = new CreatorToolsPeskyBattleController(scope.ConfigPath, scope.Queue,
+                scope.Coordinator, resolver, _ => true, null, null, null, () => now);
+            battle.PublishState(server);
+            var first = server.State;
+            var initialResolutions = resolutions;
+            var allocated = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++) battle.PublishState(server);
+            allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+            Check(server.BattlePublications == 1 && resolutions == initialResolutions && allocated < 1024,
+                "unchanged off mode skips both catalog and JSON allocations across frame/worker calls");
+            Console.WriteLine("Unchanged Battle publications: " + allocated + " bytes allocated across 1000 calls.");
+            now += 1000;
+            battle.PublishState(server);
+            Check(server.BattlePublications == 1 && ReferenceEquals(first, server.State),
+                "off mode does not republish just because wall time changed");
+            giftName = "Updated gift";
+            now += 250;
+            battle.PublishState(server);
+            Check(server.BattlePublications == 2 && server.State.Contains("Updated gift"),
+                "unchanged rule revision still refreshes catalog metadata");
+            battle.ProcessBackgroundCommand("action=arm&giftId=5655&capacity=2");
+            battle.PublishState(server);
+            Check(server.BattlePublications == 3 && battle.Phase == "recruiting",
+                "commands publish immediately inside the heartbeat interval");
+            battle.ObserveStreamEvent(Gift(1)); battle.ObserveStreamEvent(Gift(2));
+            battle.ProcessBackgroundCommand("action=start");
+            battle.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 9 });
+            battle.PublishState(server);
+            var activePublications = server.BattlePublications;
+            now += 249;
+            battle.PublishState(server);
+            Check(server.BattlePublications == activePublications,
+                "unchanged live state does not follow frame FPS");
+            now++;
+            battle.PublishState(server);
+            using (var json = JsonDocument.Parse(server.State))
+                Check(server.BattlePublications == activePublications + 1 &&
+                    json.RootElement.GetProperty("serverTime").GetInt64() == now,
+                    "active overlay retains its live serverTime heartbeat");
+            battle.InvalidateState();
+            battle.PublishState(server);
+            Check(server.BattlePublications == activePublications + 2,
+                "explicit invalidation bypasses the heartbeat gate");
+            battle.Dispose();
+        }
+    }
+
+    private static void TestTapPublicationCaching()
+    {
+        using (var scope = new Scope())
+        {
+            var taps = new CreatorToolsTapFarmingController(scope.ConfigPath, scope.Coordinator, null, null);
+            var server = new CreatorToolsServer();
+            taps.PublishState(server);
+            var allocated = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++) taps.PublishState(server);
+            allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+            Check(server.TapPublications == 1 && allocated < 1024,
+                "unchanged tap mode skips JSON and coordinator snapshot allocations");
+            Console.WriteLine("Unchanged Tap Farming publications: " + allocated + " bytes allocated across 1000 calls.");
+            CreatorToolsLiveEventLease lease;
+            string blocker;
+            Check(scope.Coordinator.TryAcquire(CreatorToolsLiveEventIds.ChatChooses, out lease, out blocker),
+                "another Live Event can own the coordinator while taps remain off");
+            taps.PublishState(server);
+            using (var json = JsonDocument.Parse(server.TapState))
+                Check(server.TapPublications == 2 && json.RootElement.GetProperty("blockedByLiveEvent").GetString() == "chat_chooses",
+                    "coordinator changes invalidate an otherwise unchanged tap snapshot immediately");
+            scope.Coordinator.CompleteRelease(lease);
+            taps.PublishState(server);
+            Check(server.TapPublications == 3, "releasing another event refreshes tap availability");
+            taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=5&healthPointsPerConversion=1");
+            taps.PublishState(server);
+            Check(server.TapPublications == 4 && taps.Phase == "collecting", "tap commands publish immediately");
+            taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = 5 });
+            taps.PublishState(server);
+            using (var json = JsonDocument.Parse(server.TapState))
+                Check(server.TapPublications == 5 && json.RootElement.GetProperty("counters").GetProperty("totalTaps").GetInt64() == 5,
+                    "earned taps immediately invalidate cached counters");
+            taps.InvalidateState();
+            taps.PublishState(server);
+            Check(server.TapPublications == 6, "tap explicit invalidation republishes an unchanged projection");
+            taps.ProcessBackgroundCommand("action=off");
         }
     }
 
@@ -103,6 +207,40 @@ internal static class Program
             Check(CreatorToolsPeskyBattleSettings.Load(scope.ConfigPath, null).Capacity == capacity, "capacity persists after cancellation");
             battle.Dispose();
         }
+    }
+
+    private static void TestTapPhaseTransitionPublication()
+    {
+        using (var scope = new Scope())
+        {
+            var taps = new CreatorToolsTapFarmingController(scope.ConfigPath, scope.Coordinator, null, null);
+            var server = new CreatorToolsServer();
+            taps.ProcessBackgroundCommand("action=activate");
+            taps.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 11 });
+            taps.OnPhaseTransition();
+            taps.PublishState(server);
+            using (var json = JsonDocument.Parse(server.TapState))
+                Check(json.RootElement.GetProperty("phase").GetString() == "transition",
+                    "tap transition was already published before damage arrives");
+            var publications = server.TapPublications;
+            var damage = 1f;
+            Check(taps.PrepareBossDamage(new BossProperties(), ref damage) && damage == 1f,
+                "empty reserve passes native damage through while resuming the active phase");
+            taps.PublishState(server);
+            using (var json = JsonDocument.Parse(server.TapState))
+                Check(server.TapPublications == publications + 1 &&
+                    json.RootElement.GetProperty("phase").GetString() == "active",
+                    "damage without absorbed health invalidates the transition projection before any boss snapshot update");
+            taps.ProcessBackgroundCommand("action=off");
+        }
+    }
+
+    private sealed class BossProperties
+    {
+        public float CurrentHealth { get; set; } = 100f;
+        public float TotalHealth = 100f;
+        public int stateIndex;
+        public object[] states = new object[0];
     }
 
     private static void TestInvalidSettings()

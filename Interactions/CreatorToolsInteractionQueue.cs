@@ -149,9 +149,15 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < pending.Count; i++)
             {
                 var candidate = pending[i];
+                var matchingSource = candidate.Source == source;
+                // Once one lane has its first eligible entry, later entries
+                // in that lane cannot change this selection. Avoid repeating
+                // arena/exclusivity checks while looking for the other lane.
+                if (matchingSource ? matching != null : other != null)
+                    continue;
                 if (predicate != null && !predicate(candidate))
                     continue;
-                if (candidate.Source == source)
+                if (matchingSource)
                 {
                     if (matching == null)
                         matching = candidate;
@@ -445,21 +451,7 @@ namespace Gilomx.CupheadBossRoulette
             var timed = entry.Handle as ICreatorToolsTimedInteractionHandle;
             if (!first)
                 builder.Append(',');
-            builder.Append("{\"id\":")
-                .Append(entry.Id)
-                .Append(",\"item\":\"");
-            AppendJsonValue(builder, entry.Item);
-            builder.Append("\",\"donor\":\"");
-            AppendJsonValue(builder, entry.Donor);
-            builder.Append("\",\"status\":\"")
-                .Append(status)
-                .Append("\",\"source\":\"")
-                .Append(SourceValue(entry.Source))
-                .Append("\",\"delaySeconds\":")
-                .Append(entry.DelaySeconds.ToString(
-                    "0.###", CultureInfo.InvariantCulture))
-                .Append(",\"durationSeconds\":").Append(entry.DurationSeconds);
-            builder.Append(",\"countdownSeconds\":").Append(entry.CountdownSeconds);
+            entry.AppendJsonFragments(builder, status);
             if (timed != null)
             {
                 builder.Append(",\"remainingSeconds\":").Append(timed.SecondsRemaining);
@@ -535,6 +527,60 @@ namespace Gilomx.CupheadBossRoulette
             internal int CountdownSeconds;
             internal float ReadyAt;
             internal ICreatorToolsInteractionHandle Handle;
+
+            private string jsonBeforeStatus;
+            private string jsonAfterStatus;
+            private int jsonId;
+            private string jsonItem;
+            private string jsonDonor;
+            private CreatorToolsInteractionSource jsonSource;
+            private float jsonDelaySeconds;
+            private int jsonDurationSeconds;
+            private int jsonCountdownSeconds;
+
+            internal void AppendJsonFragments(StringBuilder builder, string status)
+            {
+                // The panel polls the same entries repeatedly. Cache only the
+                // fixed fields; readiness, restrictions and timer values are
+                // still projected on every publication. Guard every cached
+                // input because Entry also has internal callers/test fixtures.
+                if (jsonBeforeStatus == null || jsonId != Id ||
+                    jsonItem != Item || jsonDonor != Donor ||
+                    jsonSource != Source ||
+                    !jsonDelaySeconds.Equals(DelaySeconds) ||
+                    (DelaySeconds == 0f &&
+                     1f / jsonDelaySeconds != 1f / DelaySeconds) ||
+                    jsonDurationSeconds != DurationSeconds ||
+                    jsonCountdownSeconds != CountdownSeconds)
+                {
+                    var fragment = new StringBuilder(128);
+                    fragment.Append("{\"id\":").Append(Id)
+                        .Append(",\"item\":\"");
+                    AppendJsonValue(fragment, Item);
+                    fragment.Append("\",\"donor\":\"");
+                    AppendJsonValue(fragment, Donor);
+                    fragment.Append("\",\"status\":\"");
+                    jsonBeforeStatus = fragment.ToString();
+                    fragment.Length = 0;
+                    fragment.Append("\",\"source\":\"")
+                        .Append(SourceValue(Source))
+                        .Append("\",\"delaySeconds\":")
+                        .Append(DelaySeconds.ToString(
+                            "0.###", CultureInfo.InvariantCulture))
+                        .Append(",\"durationSeconds\":").Append(DurationSeconds)
+                        .Append(",\"countdownSeconds\":").Append(CountdownSeconds);
+                    jsonAfterStatus = fragment.ToString();
+                    jsonId = Id;
+                    jsonItem = Item;
+                    jsonDonor = Donor;
+                    jsonSource = Source;
+                    jsonDelaySeconds = DelaySeconds;
+                    jsonDurationSeconds = DurationSeconds;
+                    jsonCountdownSeconds = CountdownSeconds;
+                }
+                builder.Append(jsonBeforeStatus).Append(status)
+                    .Append(jsonAfterStatus);
+            }
 
             internal bool IsReady
             {

@@ -1,0 +1,123 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class SnapshotReuseTests
+    {
+        internal static void Run()
+        {
+            TestImmutableSnapshotsAndBufferReuse();
+            TestFullQueueReuse();
+            TestSettingsCacheAndAtomicUpdates();
+        }
+
+        private static void Check(bool condition, string message)
+        { if (!condition) throw new Exception(message); }
+
+        private static void TestImmutableSnapshotsAndBufferReuse()
+        {
+            var snapshot = new CreatorToolsJsonSnapshot(8);
+            var content = new string('x', 32768);
+            snapshot.Begin().Append(content);
+            var first = snapshot.Complete();
+            Check(first == content, "large snapshots must retain every character after buffer growth");
+            // Modern .NET can consolidate StringBuilder chunks on the first
+            // reset after growth. Warm a complete reuse cycle as well.
+            snapshot.Begin().Append(content);
+            Check(ReferenceEquals(first, snapshot.Complete()), "first reset preserves the snapshot");
+            var allocated = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++)
+            {
+                snapshot.Begin().Append(content);
+                Check(ReferenceEquals(first, snapshot.Complete()), "unchanged snapshots reuse their immutable string");
+            }
+            allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+            Check(allocated == 0, "1000 unchanged large snapshots must allocate zero bytes after warmup");
+            snapshot.Begin().Append(content);
+            snapshot.Begin().Append('y').Append(content, 1, content.Length - 1);
+            var changed = snapshot.Complete();
+            Check(changed[0] == 'y' && first[0] == 'x' && changed.Length == first.Length,
+                "same-length edits are detected without mutating an earlier reader's snapshot");
+            snapshot.Begin().Append("small");
+            Check(snapshot.Complete() == "small", "shrinking a snapshot must not leak trailing characters");
+            snapshot.Begin();
+            Check(snapshot.Complete() == string.Empty, "cleared projections cannot retain old queue content");
+            Console.WriteLine("PASS 1000 unchanged 32 Ki-character snapshots: zero allocations; immutable edits, growth, shrink and clear preserved.");
+        }
+
+        private static void TestFullQueueReuse()
+        {
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                UnityEngine.Time.realtimeSinceStartup = 0;
+                for (var i = 0; i < 4; i++)
+                    queue.Enqueue(CreatorToolsInteractionIds.HomingCarrot, "donor " + i,
+                        "", 50, 0, CreatorToolsInteractionSource.Stream);
+                var snapshot = new CreatorToolsJsonSnapshot();
+                queue.AppendJson(snapshot.Begin());
+                var first = snapshot.Complete();
+                queue.AppendJson(snapshot.Begin());
+                Check(ReferenceEquals(first, snapshot.Complete()), "full queue warmup preserves the snapshot");
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < 1000; i++)
+                {
+                    queue.AppendJson(snapshot.Begin());
+                    Check(ReferenceEquals(first, snapshot.Complete()), "unchanged full queues retain their snapshot");
+                }
+                var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+                Check(allocated == 0 && queue.PendingCount == 200,
+                    "1000 unchanged production queue projections allocate nothing and retain every earned interaction");
+                queue.Clear();
+                queue.AppendJson(snapshot.Begin());
+                Check(snapshot.Complete() == "[]", "queue clearing is visible on the very next projection");
+                Console.WriteLine("PASS 1000 unchanged 200-entry production projections: zero allocations, no donated work consumed.");
+            }
+        }
+
+        private static void TestSettingsCacheAndAtomicUpdates()
+        {
+            var absentPath = Path.Combine(Path.GetTempPath(), "pichi-projection-" + Guid.NewGuid().ToString("N"), "test.cfg");
+            var settings = CreatorToolsInteractionPacingSettings.Load(absentPath, null);
+            var snapshot = new CreatorToolsJsonSnapshot();
+            CreatorToolsInteractionPacingSettings.AppendDefaultsJson(snapshot.Begin());
+            var defaults = snapshot.Complete();
+            settings.AppendJson(snapshot.Begin());
+            Check(ReferenceEquals(defaults, snapshot.Complete()), "new settings preserve the complete defaults projection");
+            Dictionary<string, string> values;
+            Check(CreatorToolsFlatJson.TryParse(defaults, out values), "defaults remain a valid flat settings object");
+            values["enabled"] = "true";
+            values["minimumInterval"] = "1";
+            values["maximumInterval"] = "2";
+            Check(settings.TrySetFromValues(values, ""), "a valid settings update succeeds");
+            settings.AppendJson(snapshot.Begin());
+            var updated = snapshot.Complete();
+            Check(updated != defaults && updated.Contains("\"enabled\":true") && updated.Contains("\"maximumInterval\":2"),
+                "successful updates invalidate cached settings immediately");
+            values["minimumInterval"] = "9";
+            Check(!settings.TrySetFromValues(values, ""), "an invalid range is rejected");
+            settings.AppendJson(snapshot.Begin());
+            Check(ReferenceEquals(updated, snapshot.Complete()), "failed atomic updates preserve the previous settings projection");
+            CreatorToolsInteractionPacingSettings.AppendDefaultsJson(snapshot.Begin());
+            Check(snapshot.Complete() == defaults, "editing current settings cannot change the immutable defaults");
+            var builder = snapshot.Begin();
+            settings.AppendJson(builder);
+            CreatorToolsInteractionPacingSettings.AppendDefaultsJson(builder);
+            var both = snapshot.Complete();
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++)
+            {
+                builder = snapshot.Begin();
+                settings.AppendJson(builder);
+                CreatorToolsInteractionPacingSettings.AppendDefaultsJson(builder);
+                Check(ReferenceEquals(both, snapshot.Complete()), "unchanged settings projections remain reusable");
+            }
+            Check(GC.GetAllocatedBytesForCurrentThread() - before == 0,
+                "1000 unchanged current/default settings projections must allocate zero bytes");
+            Check(!Directory.Exists(Path.GetDirectoryName(absentPath)), "projection tests must not save personal settings");
+            Console.WriteLine("PASS Settings/default projections: zero allocations after warmup; valid/invalid updates and independent defaults preserved.");
+        }
+    }
+}

@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "caller": "System.Boolean AirplaneLevel/<check_terriers_cr>c__Iterator2::MoveNext()",
+      "family": "Airplane",
+      "sites": 1,
+      "kind": "deferred_component_credit",
+      "reason": "Credits terrierHP once for each newly dead terrier, then records deadOnes. The phase's polling coroutine observes local component deaths after yielding, outside the player's DamageDealer call. Keep this structural credit native."
+    },
+    {
+      "caller": "System.Boolean AirplaneLevel/<handle_secret_intro_cr>c__Iterator8::MoveNext()",
+      "family": "Airplane",
+      "sites": 1,
+      "kind": "phase_transition",
+      "reason": "Applies terrierHP multiplied by the terrier count before StartPhase3. This scripted secret-intro step follows multiple coroutine waits, so it has no player damage context."
+    },
+    {
+      "caller": "System.Void ChessPawnLevel::TakeDamage()",
+      "family": "ChessPawn",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies fixed 10 damage from ChessPawnLevelPawn.OnParry after irreversibly removing that pawn's parryable head. Parry callbacks are outside player DamageDealer ownership; do not intercept this finite native contribution."
+    },
+    {
+      "caller": "System.Boolean AirshipJellyLevelJelly/<hurt_cr>c__Iterator3::MoveNext()",
+      "family": "AirshipJelly",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies CurrentState.main.parryDamage in the coroutine started by OnKnobParry. The entry is a knob/parry event rather than player DamageDealer; ordinary shot damage has a separate OnDamageTaken path."
+    },
+    {
+      "caller": "System.Void AirshipStorkLevelStork::OnKnobParry()",
+      "family": "AirshipStork",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies CurrentState.main.parryDamage from the knob's OnActivate callback. This parry mechanic is outside player DamageDealer ownership; normal shots separately forward DamageInfo.damage."
+    },
+    {
+      "caller": "System.Void ChessBOldALevelBishop::GotParried()",
+      "family": "ChessBOldA",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies the configured HPToDecrease amount and enters the stunned coroutine from a parry callback. This legacy chess route has no player DamageDealer damage context."
+    },
+    {
+      "caller": "System.Void ChessBOldBLevelGameManager::ParriedBall(System.Boolean)",
+      "family": "ChessBOldB",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "On a successful parry, clears WaitingForParry and applies fixed 1 damage before HandleHurt. This legacy ball-parry callback is outside player DamageDealer ownership."
+    },
+    {
+      "caller": "System.Void ChessBishopLevelBishop::OnParry(AbstractPlayerController)",
+      "family": "ChessBishop",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies fixed 10 damage or multiplayerDamageNerf from the explicit OnParry callback. Native death and phase checks follow this parry contribution, outside player DamageDealer."
+    },
+    {
+      "caller": "System.Void ChessKingLevelKing::OnParry(AbstractPlayerController)",
+      "family": "ChessKing",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Sets GOT_PARRIED and applies fixed 10 damage or multiplayerDamageNerf from OnParry, outside player DamageDealer ownership."
+    },
+    {
+      "caller": "System.Void ChessKnightLevelKnight::GotParried()",
+      "family": "ChessKnight",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "The pink ParrySwitch OnActivate callback applies fixed 10 damage or multiplayerDamageNerf and starts its parry timer. This is not a player DamageDealer hit."
+    },
+    {
+      "caller": "System.Void ChessQueenLevelQueen::receiveDamage()",
+      "family": "ChessQueen",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies fixed 10 damage or multiplayerDamageNerf from OnCollisionEnemyProjectile after recognizing a ChessQueenLevelCannonball, then consumes the ball with HitQueen. The reflected-cannon collision callback is outside player DamageDealer ownership."
+    },
+    {
+      "caller": "System.Void ChessRookLevelRook::damaged()",
+      "family": "ChessRook",
+      "sites": 1,
+      "kind": "parry",
+      "reason": "Applies fixed 10 damage or multiplayerDamageNerf when OnCollisionEnemyProjectile recognizes a returned pink cannonball, then explodes that ball. This native collision callback is outside player DamageDealer ownership."
+    },
+    {
+      "caller": "System.Boolean DicePalaceFlyingMemoryLevelStuffedToy/<check_boundaries_cr>c__Iterator6::MoveNext()",
+      "family": "DicePalaceFlyingMemory",
+      "sites": 1,
+      "kind": "boundary_cleanup",
+      "reason": "Applies CurrentHealth to finish the stuffed toy when it leaves the level bounds. Its polling coroutine is started after the intro's movement and animation waits, outside player DamageDealer."
+    },
+    {
+      "caller": "System.Void FlyingGenieLevelGenie::DoDamage(System.Single)",
+      "family": "FlyingGenie",
+      "sites": 1,
+      "kind": "player_damage_forwarder",
+      "reason": "The sole caller is FlyingGenieLevelGenieHead.OnDamageTaken, forwarding DamageInfo.damage unchanged while also reducing the head's local projectile HP. The finite obelisk sequence calls StartCoffin after its configured obeliskCount and exit waits, rather than waiting for these aggregate damage credits; consuming reserve here cannot strand the column phase."
+    },
+    {
+      "caller": "System.Boolean FlyingGenieLevelGenieTransform/<move_up_puppet_cr>c__Iterator1::MoveNext()",
+      "family": "FlyingGenie",
+      "sites": 1,
+      "kind": "phase_transition",
+      "reason": "Applies CurrentState.scan.transitionDamage after the puppet movement's coroutine waits. This structural transition amount is outside player DamageDealer ownership."
+    },
+    {
+      "caller": "System.Void RumRunnersLevelAnteater::DoDamage(System.Single)",
+      "family": "RumRunners",
+      "sites": 1,
+      "kind": "player_damage_forwarder",
+      "reason": "The sole caller is RumRunnersLevelSnout.OnDamageTaken, forwarding DamageInfo.damage unchanged. Snout damage is ordinary continuous player damage and should continue to consume reserve."
+    },
+    {
+      "caller": "System.Void RumRunnersLevelWorm::StartWorm(System.Single)",
+      "family": "RumRunners",
+      "sites": 1,
+      "kind": "intro_damage",
+      "reason": "Applies accumulated bugGirlDamage multiplied by CurrentState.worm.introDamageMultiplier. The caller is worm_cr after multiple waits for the old spider and intro animation, outside player DamageDealer ownership."
+    },
+    {
+      "caller": "System.Void SaltbakerLevelSaltbaker::DamageSaltbaker(System.Single,System.Int32)",
+      "family": "Saltbaker",
+      "sites": 1,
+      "kind": "deferred_component_credit",
+      "reason": "The sole caller is SaltbakerLevelFeistTurret.AniEvent_DamageSaltbaker, passing the defeated pepper turret's startHealth. The credit is delivered later by its launch-impact animation event, outside the original player DamageDealer call; normal Saltbaker/pillar hits have separate continuous paths."
+    }
+  ]
+}

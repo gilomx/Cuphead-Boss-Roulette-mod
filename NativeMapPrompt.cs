@@ -27,20 +27,51 @@ namespace Gilomx.CupheadBossRoulette
         private GameObject nativeChallengePrompt;
         private Text nativeChallengePromptAction;
         private RectTransform nativeChallengePromptActionRect;
+        private Canvas nativeChallengePromptCanvas;
+        private readonly NativeChallengePromptLayoutCache nativeChallengePromptLayoutCache =
+            new NativeChallengePromptLayoutCache();
+        private string nativeChallengePromptLabel;
+        private ModifierId nativeChallengePromptLabelModifier;
+        private ModLocalization nativeChallengePromptLabelLocalization;
+        private Localization.Languages nativeChallengePromptLabelLanguage;
 
         private void LateUpdate()
         {
-            UpdateAssetLoadingNotice();
-            UpdateBattleResultHud();
-            UpdateTimedChallengeHud();
-            UpdateNativeRoulettePrompt();
-            UpdateEquippedChallengePrompt();
-            ApplyRgbShiftEffectLate();
+            var performance = creatorToolsInteractions;
+            var started = performance == null ? 0L : performance.BeginStartupVisualUpdate();
+            try
+            {
+                UpdateAssetLoadingNotice();
+                var stageStarted = performance == null ? 0L : performance.BeginStartupStage();
+                UpdateBattleResultHud();
+                if (performance != null)
+                    performance.EndStartupStage(stageStarted, CreatorToolsStartupStage.BattleHud);
+                stageStarted = performance == null ? 0L : performance.BeginStartupStage();
+                UpdateTimedChallengeHud();
+                if (performance != null)
+                    performance.EndStartupStage(stageStarted, CreatorToolsStartupStage.TimedHud);
+                stageStarted = performance == null ? 0L : performance.BeginStartupStage();
+                UpdateNativeRoulettePrompt();
+                UpdateEquippedChallengePrompt();
+                if (performance != null)
+                    performance.EndStartupStage(stageStarted, CreatorToolsStartupStage.NativePrompts);
+                stageStarted = performance == null ? 0L : performance.BeginStartupStage();
+                ApplyRgbShiftEffectLate();
+                if (performance != null)
+                    performance.EndStartupStage(stageStarted, CreatorToolsStartupStage.LateVisuals);
+            }
+            finally
+            {
+                if (performance != null)
+                    performance.EndStartupVisualUpdate(started, false);
+            }
         }
 
         private void UpdateEquippedChallengePrompt()
         {
             if (nativeChallengePrompt == null &&
+                NativeChallengePromptLayoutCache.CanPrepareTemplate(
+                    activeChallengeFromManualEquipment, Map.Current != null) &&
                 GetEquippedManualChallenge() != ModifierId.None)
                 PrepareNativeChallengePrompt();
 
@@ -581,6 +612,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (nativeChallengePrompt != null)
                 return true;
+            nativeChallengePromptLayoutCache.Reset();
             if (activeChallenge == ModifierId.None &&
                 GetEquippedManualChallenge() == ModifierId.None)
                 return false;
@@ -596,6 +628,7 @@ namespace Gilomx.CupheadBossRoulette
                 "Gilomx Persistent Challenge Canvas",
                 typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
             var canvas = nativeChallengeCanvas.GetComponent<Canvas>();
+            nativeChallengePromptCanvas = canvas;
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
             canvas.sortingOrder = sourceCanvas == null
@@ -669,12 +702,47 @@ namespace Gilomx.CupheadBossRoulette
             }
 
             SetNativeChallengePromptVisible(true);
-            ApplyNativeChallengePromptText(
-                LocalizedChallengeLabel(activeChallenge).ToUpperInvariant());
+            var language = modLocalization == null
+                ? default(Localization.Languages)
+                : modLocalization.CurrentLanguage;
+            if (nativeChallengePromptLabel == null ||
+                nativeChallengePromptLabelModifier != activeChallenge ||
+                !ReferenceEquals(nativeChallengePromptLabelLocalization, modLocalization) ||
+                nativeChallengePromptLabelLanguage != language)
+            {
+                nativeChallengePromptLabel =
+                    LocalizedChallengeLabel(activeChallenge).ToUpperInvariant();
+                nativeChallengePromptLabelModifier = activeChallenge;
+                nativeChallengePromptLabelLocalization = modLocalization;
+                nativeChallengePromptLabelLanguage = language;
+            }
+            ApplyNativeChallengePromptText(nativeChallengePromptLabel);
         }
 
         private void ApplyNativeChallengePromptText(string text)
         {
+            var input = new NativeChallengePromptLayoutInput
+            {
+                Text = text,
+                Target = nativeChallengePromptAction,
+                Canvas = nativeChallengePromptCanvas,
+                Font = nativeChallengePromptAction.font,
+                FontSize = nativeChallengePromptAction.fontSize,
+                FontStyle = (int)nativeChallengePromptAction.fontStyle,
+                BestFit = nativeChallengePromptAction.resizeTextForBestFit,
+                BestFitMinimum = nativeChallengePromptAction.resizeTextMinSize,
+                BestFitMaximum = nativeChallengePromptAction.resizeTextMaxSize,
+                CanvasScale = nativeChallengePromptCanvas == null
+                    ? 1f : nativeChallengePromptCanvas.scaleFactor,
+                ScreenWidth = Screen.width,
+                ScreenHeight = Screen.height
+            };
+            if (!nativeChallengePromptLayoutCache.NeedsApply(input,
+                    nativeChallengePromptAction.text,
+                    nativeChallengePromptActionRect.anchoredPosition.x,
+                    nativeChallengePromptActionRect.sizeDelta.x))
+                return;
+
             nativeChallengePromptAction.text = text;
             Canvas.ForceUpdateCanvases();
             const float promptRight = 1290f;
@@ -686,6 +754,9 @@ namespace Gilomx.CupheadBossRoulette
                 new Vector2(
                     Mathf.Ceil(nativeChallengePromptAction.preferredWidth + 6f),
                     nativeChallengePromptActionRect.sizeDelta.y);
+            nativeChallengePromptLayoutCache.MarkApplied(input,
+                nativeChallengePromptActionRect.anchoredPosition.x,
+                nativeChallengePromptActionRect.sizeDelta.x);
         }
 
         private void SetNativeChallengePromptVisible(bool visibleNow)
@@ -703,6 +774,10 @@ namespace Gilomx.CupheadBossRoulette
             nativeChallengePrompt = null;
             nativeChallengePromptAction = null;
             nativeChallengePromptActionRect = null;
+            nativeChallengePromptCanvas = null;
+            nativeChallengePromptLayoutCache.Reset();
+            nativeChallengePromptLabel = null;
+            nativeChallengePromptLabelLocalization = null;
         }
         private static Transform FindDirectChild(Transform parent, string name)
         {

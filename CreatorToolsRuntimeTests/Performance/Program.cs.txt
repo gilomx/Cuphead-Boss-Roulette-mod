@@ -1,0 +1,156 @@
+using System;
+using System.Text;
+using System.Text.Json;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class Program
+    {
+        private static int Main()
+        {
+            try
+            {
+                TestFullDonationQueue(60);
+                TestFullDonationQueue(144);
+                TestUrgentControlsAndCountdowns();
+                TestClockRestart();
+                QueueProjectionTests.Run();
+                SnapshotReuseTests.Run();
+                AudiencePublicationTests.Run();
+                Console.WriteLine("All panel performance regressions passed.");
+                return 0;
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine(exception);
+                return 1;
+            }
+        }
+
+        private static void TestFullDonationQueue(int framesPerSecond)
+        {
+            UnityEngine.Time.realtimeSinceStartup = 0f;
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                for (var batch = 0; batch < 4; batch++)
+                    Require(queue.Enqueue(CreatorToolsInteractionIds.HomingCarrot,
+                        "Donante de prueba " + batch, string.Empty, 50, 0f,
+                        CreatorToolsInteractionSource.Stream) == 50,
+                        "All 200 earned interactions must fit.");
+                // Warm the production serializer before measuring allocations.
+                Serialize(queue);
+                var baseline = RunWorkload(queue, framesPerSecond, false);
+                var paced = RunWorkload(queue, framesPerSecond, true);
+                var reused = RunWorkload(queue, framesPerSecond, true, true);
+                Require(paced.Builds <= 51, "Five seconds must build at most 51 snapshots.");
+                Require(paced.Bytes < baseline.Bytes / 3,
+                    "Snapshot pacing must remove at least two thirds of JSON allocations.");
+                Require(queue.PendingCount == 200 && queue.ActiveCount == 0,
+                    "Panel pacing must never consume, drop or activate a donation.");
+                Require(baseline.LastJson == paced.LastJson,
+                    "The complete donation projection must be preserved.");
+                Require(reused.LastJson == paced.LastJson && reused.Bytes == 0 &&
+                    reused.Builds == paced.Builds,
+                    "Reusing unchanged projections must retain JSON and panel cadence without sampling allocations.");
+                using (var json = JsonDocument.Parse(paced.LastJson))
+                    Require(json.RootElement.GetArrayLength() == 200,
+                        "Every donor must remain in the panel projection.");
+                Console.WriteLine("PASS  Full queue at " + framesPerSecond +
+                    " FPS: " + baseline.Builds + " -> " + paced.Builds +
+                    " JSON builds; " + baseline.Bytes + " -> " + paced.Bytes +
+                    " allocated bytes (five simulated seconds).");
+                Console.WriteLine("PASS  Reused full queue at " + framesPerSecond +
+                    " FPS: " + reused.Builds + " panel ticks, " + reused.Bytes +
+                    " allocated bytes after warmup, identical complete JSON.");
+            }
+        }
+
+        private static Measurement RunWorkload(
+            CreatorToolsInteractionQueue queue, int fps, bool paced, bool reuse = false)
+        {
+            var pacing = new CreatorToolsStatePublicationPacing();
+            var result = new Measurement();
+            var snapshot = reuse ? new CreatorToolsJsonSnapshot() : null;
+            if (reuse)
+            {
+                Serialize(queue, snapshot);
+                Serialize(queue, snapshot);
+            }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var frame = 0; frame < fps * 5; frame++)
+            {
+                var now = (double)frame / fps;
+                UnityEngine.Time.realtimeSinceStartup = (float)now;
+                if (paced && !pacing.TryBegin(now, false)) continue;
+                result.LastJson = Serialize(queue, snapshot);
+                result.Builds++;
+            }
+            result.Bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            return result;
+        }
+
+        private static void TestUrgentControlsAndCountdowns()
+        {
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                UnityEngine.Time.realtimeSinceStartup = 0f;
+                queue.Enqueue(CreatorToolsTimedChallenge.HalfDamage, "Donante", "", 1,
+                    0f, CreatorToolsInteractionSource.Stream);
+                var timer = new TimerHandle { SecondsRemaining = 15 };
+                queue.ActivateFirst(timer);
+                var pacing = new CreatorToolsStatePublicationPacing();
+                Require(pacing.TryBegin(0, false), "Publish the initial state immediately.");
+                var initial = Serialize(queue);
+                timer.SecondsRemaining = 14;
+                Require(!pacing.TryBegin(0.05, false), "Do not serialize every game frame.");
+                Require(pacing.TryBegin(0.1, false), "Refresh countdowns at the next panel tick.");
+                Require(initial != Serialize(queue), "The current timer must reach the panel.");
+                queue.Clear();
+                Require(pacing.TryBegin(0.101, true), "A clear command must acknowledge immediately.");
+                Require(Serialize(queue) == "[]", "A clear command cannot retain the previous queue.");
+                Require(!pacing.TryBegin(0.102, false), "A same-frame backlog pass cannot duplicate work.");
+                Console.WriteLine("PASS  Countdown refreshes and immediate control acknowledgements.");
+            }
+        }
+
+        private static void TestClockRestart()
+        {
+            var pacing = new CreatorToolsStatePublicationPacing();
+            Require(pacing.TryBegin(500, false), "Initial publication.");
+            Require(pacing.TryBegin(0, false), "A restarted clock cannot freeze publication.");
+            Require(!pacing.TryBegin(0, false), "Repeated passes must share the panel tick.");
+            Require(pacing.TryBegin(0.11, false), "Resume normal cadence after restart.");
+            Console.WriteLine("PASS  Clock restart and repeated passes.");
+        }
+
+        private static string Serialize(CreatorToolsInteractionQueue queue,
+            CreatorToolsJsonSnapshot snapshot = null)
+        {
+            var builder = snapshot == null ? new StringBuilder(4096) : snapshot.Begin();
+            queue.AppendJson(builder);
+            return snapshot == null ? builder.ToString() : snapshot.Complete();
+        }
+
+        private static void Require(bool condition, string message)
+        {
+            if (!condition) throw new InvalidOperationException(message);
+        }
+
+        private sealed class Measurement
+        {
+            internal int Builds;
+            internal long Bytes;
+            internal string LastJson;
+        }
+
+        private sealed class TimerHandle : ICreatorToolsInteractionHandle,
+            ICreatorToolsTimedInteractionHandle
+        {
+            public bool IsComplete { get { return false; } }
+            public int SecondsRemaining { get; set; }
+            public bool CountingDown { get { return false; } }
+            public int CountdownSecondsRemaining { get { return 0; } }
+            public void Dispose() { }
+        }
+    }
+}

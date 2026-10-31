@@ -23,6 +23,8 @@ namespace Gilomx.CupheadBossRoulette
         internal const int DefaultMaximumActive = 6;
         private readonly string path;
         private readonly Action<string> warning;
+        private static readonly string defaultsJson = CreateDefaultsJson();
+        private string cachedJson;
         private CreatorToolsSpawnGroupSettings spawnGroups = CreateDefaultSpawnGroups();
         internal bool Enabled { get; private set; }
         internal float MinimumInterval { get; private set; } = DefaultMinimumInterval;
@@ -108,6 +110,7 @@ namespace Gilomx.CupheadBossRoulette
             MiniBossIntervalMultiplier = multiplier;
             MaximumCompanionsDuringMiniBoss = (int)companions;
             spawnGroups = updated;
+            cachedJson = null;
             return true;
         }
 
@@ -125,6 +128,17 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void AppendJson(StringBuilder builder)
         {
+            if (cachedJson == null)
+            {
+                var content = new StringBuilder(512);
+                AppendJsonCore(content);
+                cachedJson = content.ToString();
+            }
+            builder.Append(cachedJson);
+        }
+
+        private void AppendJsonCore(StringBuilder builder)
+        {
             builder.Append("{\"enabled\":").Append(Enabled ? "true" : "false")
                 .Append(",\"minimumInterval\":").Append(MinimumInterval.ToString("R", CultureInfo.InvariantCulture))
                 .Append(",\"maximumInterval\":").Append(MaximumInterval.ToString("R", CultureInfo.InvariantCulture))
@@ -137,7 +151,14 @@ namespace Gilomx.CupheadBossRoulette
 
         internal static void AppendDefaultsJson(StringBuilder builder)
         {
-            new CreatorToolsInteractionPacingSettings(null, null).AppendJson(builder);
+            builder.Append(defaultsJson);
+        }
+
+        private static string CreateDefaultsJson()
+        {
+            var builder = new StringBuilder(512);
+            new CreatorToolsInteractionPacingSettings(null, null).AppendJsonCore(builder);
+            return builder.ToString();
         }
 
         internal void Save()

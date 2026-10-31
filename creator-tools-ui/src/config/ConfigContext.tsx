@@ -26,6 +26,7 @@ import type {
 } from "../model";
 import { validPacing, type PacingValues } from "../features/interactions/pacingValues";
 import type { StreamRuleGroupDraft } from "../features/interactions/streamRuleGroups";
+import { startForegroundPolling } from "./foregroundPolling";
 
 interface ConfigValue {
   config: RouletteConfigState | null;
@@ -562,11 +563,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mountedRef.current = true;
-    void load();
-    const timer = window.setInterval(() => void load(), 900);
+    const stopPolling = startForegroundPolling(() => void load(), 900);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
+      stopPolling();
       if (interactionSettingsStatusTimerRef.current !== null) {
         window.clearTimeout(interactionSettingsStatusTimerRef.current);
       }

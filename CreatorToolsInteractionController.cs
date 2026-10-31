@@ -13,6 +13,8 @@ namespace Gilomx.CupheadBossRoulette
 
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
+        private readonly CreatorToolsStartupPerformance startupPerformance;
+        private bool startupDiagnosticsPaused;
         private readonly List<ICreatorToolsInteractionExecutor> executors =
             new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
@@ -47,6 +49,11 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsPeskyBattleController peskyBattle;
         private readonly CreatorToolsTapFarmingController tapFarming;
         private readonly object liveEventsPublishLock = new object();
+        private readonly CreatorToolsJsonSnapshot interactionSnapshot =
+            new CreatorToolsJsonSnapshot();
+        private readonly CreatorToolsJsonSnapshot peskySnapshot =
+            new CreatorToolsJsonSnapshot();
+        private int lastLiveEventsRevision = -1;
         private string lastInteractionState;
         private string lastPeskyState;
         private string lastLiveEventsState;
@@ -101,6 +108,7 @@ namespace Gilomx.CupheadBossRoulette
             Action<string> logWarning)
         {
             this.logInfo = logInfo;
+            startupPerformance = new CreatorToolsStartupPerformance(logInfo);
             this.timedChallenges = timedChallenges;
             this.logWarning = logWarning;
             this.getMaximumActive = getMaximumActive;
@@ -181,6 +189,8 @@ namespace Gilomx.CupheadBossRoulette
                 logInfo, logWarning);
             tapFarming = new CreatorToolsTapFarmingController(
                 pluginConfigPath, liveEvents, logInfo, logWarning);
+            LevelPauseGUI.OnPauseEvent += OnStartupDiagnosticsPaused;
+            LevelPauseGUI.OnUnpauseEvent += OnStartupDiagnosticsUnpaused;
         }
 
         internal CreatorToolsLiveEventsCoordinator LiveEvents
@@ -191,15 +201,85 @@ namespace Gilomx.CupheadBossRoulette
         internal void Update(
             CreatorToolsServer server, bool gameplayDispatchAllowed)
         {
+            if (startupPerformance.Pending)
+            {
+                Level level = null;
+                var eligible = false;
+                try
+                {
+                    level = Level.Current;
+                    eligible = gameplayDispatchAllowed && gameplayLevelActive &&
+                        !startupDiagnosticsPaused && level != null &&
+                        level.Started && !level.Ending && !SceneLoader.CurrentlyLoading;
+                }
+                catch { }
+                startupPerformance.BeginFrame(eligible, Time.unscaledDeltaTime,
+                    eligible && startupPerformance.NeedsLevelName
+                        ? level.CurrentLevel.ToString() : null, Time.frameCount);
+            }
+            try { UpdateCore(server, gameplayDispatchAllowed); }
+            finally { startupPerformance.EndInteractionUpdate(); }
+        }
+
+        internal long BeginStartupPluginUpdate()
+        {
+            return startupPerformance.BeginPluginUpdate();
+        }
+
+        internal void EndStartupPluginUpdate(long timestamp)
+        {
+            startupPerformance.EndPluginUpdate(timestamp);
+        }
+
+        internal long BeginStartupVisualUpdate()
+        {
+            return startupDiagnosticsPaused ? 0L : startupPerformance.BeginVisualUpdate();
+        }
+
+        internal void EndStartupVisualUpdate(long timestamp, bool isGui)
+        {
+            if (!startupDiagnosticsPaused)
+                startupPerformance.EndVisualUpdate(timestamp, isGui);
+        }
+
+        internal long BeginStartupStage()
+        {
+            return startupPerformance.BeginStage();
+        }
+
+        internal void EndStartupStage(long timestamp, CreatorToolsStartupStage stage)
+        {
+            startupPerformance.EndStage(timestamp, stage);
+        }
+
+        private void OnStartupDiagnosticsPaused() { startupDiagnosticsPaused = true; }
+        private void OnStartupDiagnosticsUnpaused() { startupDiagnosticsPaused = false; }
+
+        private void UpdateCore(
+            CreatorToolsServer server, bool gameplayDispatchAllowed)
+        {
+            var stageStarted = startupPerformance.BeginStage();
             ghosts.SetGameplayAdvancing(
                 gameplayDispatchAllowed && gameplayLevelActive);
             for (var i = 0; i < executors.Count; i++)
-                executors[i].Update();
+            {
+                var timedStarted = executors[i] == timedChallenges
+                    ? startupPerformance.BeginStage() : 0L;
+                try { executors[i].Update(); }
+                finally
+                {
+                    startupPerformance.EndStage(timedStarted,
+                        CreatorToolsStartupStage.TimedExecutor);
+                }
+            }
             var interactionsFinished = interactionQueue.RemoveFinished();
             var peskyFinished = peskyQueue.RemoveFinished();
             if (interactionsFinished || peskyFinished)
                 InvalidateState();
+            startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.Executors);
+            stageStarted = startupPerformance.BeginStage();
             var serverRunning = server != null && server.IsRunning;
+            var urgentPublication = false;
             if (serverRunning)
             {
                 string query;
@@ -248,6 +328,7 @@ namespace Gilomx.CupheadBossRoulette
                         lastProcessedInteractionControlSequence =
                             commandSequence;
                     processedCommands++;
+                    urgentPublication = true;
                 }
                 var processedPeskyCommands = 0;
                 while (processedPeskyCommands < MaximumCommandsPerUpdate &&
@@ -255,9 +336,12 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     ProcessPeskyCommand(ParseQuery(query));
                     processedPeskyCommands++;
+                    urgentPublication = true;
                 }
             }
 
+            startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.Commands);
+            stageStarted = startupPerformance.BeginStage();
             var gameplayAvailable = AnyItemAvailable();
             var interactionsAvailable = gameplayAvailable;
             if (gameplayLevelActive && gameplayAvailable)
@@ -303,23 +387,26 @@ namespace Gilomx.CupheadBossRoulette
             {
                 nextPeskyDispatchAt = -1f;
             }
+            startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.Availability);
+            stageStarted = startupPerformance.BeginStage();
             ProcessReadyQueues(
                 canDispatchInteractions, canDispatchPesky);
             // Earned challenges have first opportunity. The free challenge
             // clock is independent of actor availability and dispatch gaps.
             UpdatePeskyChallenges(gameplayDispatchAllowed);
+            startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.Dispatch);
+            stageStarted = startupPerformance.BeginStage();
             peskyBattle.Update(
                 server, gameplayAvailable, gameplayDispatchAllowed);
             tapFarming.Update(server, gameplayLevelActive);
             PublishLiveEventsState(server);
+            startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.LiveEvents);
+            stageStarted = startupPerformance.BeginStage();
 
-            PublishInteractionState(server, interactionsAvailable);
-            var peskyState = BuildPeskyState(gameplayAvailable);
-            if (serverRunning && peskyState != lastPeskyState)
-            {
-                lastPeskyState = peskyState;
-                server.SetPeskyState(peskyState);
-            }
+            PublishInteractionState(server, interactionsAvailable,
+                urgentPublication);
+            PublishPeskyState(server, gameplayAvailable, urgentPublication);
+            startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.Publication);
         }
 
         internal void InvalidateState()
@@ -417,9 +504,15 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private void PublishInteractionState(
-            CreatorToolsServer server, bool interactionsAvailable)
+            CreatorToolsServer server, bool interactionsAvailable,
+            bool urgent = false)
         {
             if (server == null || !server.IsRunning)
+                return;
+            // UI projection is independent of gameplay. Readers renew a short
+            // lease; no readers means no recurring full-queue serialization.
+            // Actual commands always bypass the UI refresh interval.
+            if (!server.TryBeginInteractionStatePublication(urgent))
                 return;
             var interactionState = BuildInteractionState(
                 interactionsAvailable);
@@ -431,6 +524,26 @@ namespace Gilomx.CupheadBossRoulette
                 masterRevision,
                 queueControlRevision,
                 lastProcessedInteractionControlSequence);
+        }
+
+        private void PublishPeskyState(CreatorToolsServer server, bool available,
+            bool urgent = false)
+        {
+            if (server == null || !server.IsRunning ||
+                !server.TryBeginPeskyStatePublication(urgent))
+                return;
+            var state = BuildPeskyState(available);
+            if (state == lastPeskyState) return;
+            lastPeskyState = state;
+            server.SetPeskyState(state);
+        }
+
+        internal void RefreshPanelState(CreatorToolsServer server)
+        {
+            if (server == null || !server.IsRunning) return;
+            var available = AnyItemAvailable();
+            PublishInteractionState(server, available, true);
+            PublishPeskyState(server, available, true);
         }
 
         internal void PublishPeskyBattleState(CreatorToolsServer server)
@@ -467,7 +580,11 @@ namespace Gilomx.CupheadBossRoulette
             // older revision cannot overtake a newer one in the panel.
             lock (liveEventsPublishLock)
             {
+                if (lastLiveEventsState != null &&
+                    liveEvents.Revision == lastLiveEventsRevision)
+                    return;
                 var snapshot = liveEvents.Snapshot;
+                lastLiveEventsRevision = snapshot.Revision;
                 var stoppingEvent = snapshot.Status == "stopping"
                     ? snapshot.ActiveEvent
                     : string.Empty;
@@ -604,6 +721,8 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void BeginGameplayLevel(bool confirmLoad)
         {
+            startupPerformance.BeginAttempt();
+            startupDiagnosticsPaused = false;
             if (confirmLoad)
                 gameplayLevelLoadPending = false;
             gameplayLevelActive = true;
@@ -638,6 +757,7 @@ namespace Gilomx.CupheadBossRoulette
 
         internal void SuspendGameplayLevel()
         {
+            startupPerformance.EndAttempt();
             timedChallenges.EndGameplayLevel();
             gameplayLevelActive = false;
             gameplayAvailabilityObserved = false;
@@ -1553,6 +1673,21 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsInteractionQueue.Entry entry,
             bool pesky)
         {
+            var timestamp = startupPerformance.BeginSpawn();
+            var spawned = false;
+            try
+            {
+                spawned = TryDispatchEntryCore(queue, entry, pesky);
+                return spawned;
+            }
+            finally { startupPerformance.EndSpawn(timestamp, spawned); }
+        }
+
+        private bool TryDispatchEntryCore(
+            CreatorToolsInteractionQueue queue,
+            CreatorToolsInteractionQueue.Entry entry,
+            bool pesky)
+        {
             if (entry == null || !entry.IsReady)
                 return false;
 
@@ -1775,7 +1910,7 @@ namespace Gilomx.CupheadBossRoulette
 
         private string BuildInteractionState(bool available)
         {
-            var builder = new StringBuilder(4096);
+            var builder = interactionSnapshot.Begin();
             builder.Append("{\"ready\":true,\"available\":")
                 .Append(available ? "true" : "false")
                 .Append(",\"interactionsEnabled\":")
@@ -1836,7 +1971,7 @@ namespace Gilomx.CupheadBossRoulette
             builder.Append(",\"defaultPacing\":");
             CreatorToolsInteractionPacingSettings.AppendDefaultsJson(builder);
             builder.Append('}');
-            return builder.ToString();
+            return interactionSnapshot.Complete();
         }
 
         private string BuildPeskyState(bool available)
@@ -1867,7 +2002,7 @@ namespace Gilomx.CupheadBossRoulette
                 (gameplayLevelLoadPending ||
                  (gameplayLevelActive &&
                   !gameplayAvailabilityObserved));
-            var builder = new StringBuilder(4096);
+            var builder = peskySnapshot.Begin();
             builder.Append("{\"ready\":true,\"available\":")
                 .Append(available ? "true" : "false")
                 .Append(",\"enabled\":")
@@ -1951,7 +2086,7 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"queue\":");
             peskyQueue.AppendJson(builder, null, helpEntries);
             builder.Append('}');
-            return builder.ToString();
+            return peskySnapshot.Complete();
         }
 
         private static void AppendItemList(
@@ -2110,6 +2245,9 @@ namespace Gilomx.CupheadBossRoulette
 
         public void Dispose()
         {
+            LevelPauseGUI.OnPauseEvent -= OnStartupDiagnosticsPaused;
+            LevelPauseGUI.OnUnpauseEvent -= OnStartupDiagnosticsUnpaused;
+            startupPerformance.EndAttempt();
             peskyBattle.Dispose();
             interactionQueue.Dispose();
             peskyQueue.Dispose();

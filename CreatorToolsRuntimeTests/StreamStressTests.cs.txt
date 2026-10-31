@@ -1,0 +1,394 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Threading;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static int RunStreamStress(string[] args)
+        {
+            var eventCount = 10000;
+            var viewers = 100;
+            var rate = 0;
+            string reportPath = null;
+            try
+            {
+                for (var i = 0; i < args.Length; i++)
+                {
+                    if (args[i] == "--help")
+                    {
+                        Console.WriteLine("Offline stress test: --stress [--events 10000] [--viewers 100] [--rate 0] [--report path.json]");
+                        Console.WriteLine("--events counts unique events; each seventh also has an immediate duplicate. --rate limits normalized messages/second, including duplicates; 0 means an unrestricted burst.");
+                        Console.WriteLine("Uses production worker/dashboard/rules/backlog, temporary settings and a standalone local test server. No account, donation, live game or Unity rendering is involved.");
+                        return 0;
+                    }
+                    if (i + 1 >= args.Length)
+                        throw new ArgumentException("Missing value for " + args[i]);
+                    var option = args[i++];
+                    if (option == "--report") reportPath = Path.GetFullPath(args[i]);
+                    else
+                    {
+                        int value;
+                        if (!int.TryParse(args[i], NumberStyles.None, CultureInfo.InvariantCulture, out value))
+                            throw new ArgumentException("Invalid integer for " + option);
+                        if (option == "--events" && value >= 1 && value <= 1000000) eventCount = value;
+                        else if (option == "--viewers" && value >= 1 && value <= 10000) viewers = value;
+                        else if (option == "--rate" && value >= 0 && value <= 1000000) rate = value;
+                        else throw new ArgumentException("Unknown option or value outside its range: " + option);
+                    }
+                }
+                return ExecuteStreamStress(eventCount, viewers, rate, reportPath);
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine("Offline stream stress test failed: " + exception.Message);
+                return 1;
+            }
+        }
+
+        private static int ExecuteStreamStress(int eventCount, int viewers, int rate, string reportPath)
+        {
+            var expected = StressExpectation.Create(eventCount, viewers);
+            using (var scope = new TestScope("offline-stream-stress"))
+            using (var server = scope.StartServer())
+            using (var completed = new ManualResetEventSlim(false))
+            {
+                // These are fixture-only settings, never the mod's installed
+                // config. Keep earned work queued until ingestion finishes.
+                var rules = scope.CreateRules(2);
+                foreach (var query in new[] {
+                    "action=create&name=Stress+likes&eventType=like&every=10&interaction=rootpack_homing_carrot&quantity=1&enabled=true",
+                    "action=create&name=Stress+follows&eventType=follow&every=1&interaction=frogs_firefly&quantity=1&enabled=true" })
+                {
+                    var state = rules.ProcessServerCommand(query);
+                    True(state.Contains("\"feedback\":\"created\""), "stress rule creation failed: " + state);
+                }
+                var dashboard = new CreatorToolsDashboardController(null);
+                var source = new StressStreamSource(eventCount, viewers, rate);
+                var warnings = new List<string>();
+                var evaluated = 0;
+                var peakManaged = 0L;
+                var workerAllocated = 0L;
+                var batches = 0;
+                var managedBefore = GC.GetTotalMemory(true);
+                var collectionsBefore = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
+                var processAllocatedBefore = GC.GetTotalAllocatedBytes(false);
+                var workingSetBefore = Process.GetCurrentProcess().WorkingSet64;
+                var ingestion = Stopwatch.StartNew();
+                using (var worker = new CreatorToolsStreamWorker(source, dashboard, rules, server,
+                    entry => {
+                        var result = rules.Evaluate(entry, true);
+                        Interlocked.Increment(ref evaluated);
+                        return result;
+                    },
+                    () => {
+                        Interlocked.Increment(ref batches);
+                        peakManaged = Math.Max(peakManaged, GC.GetTotalMemory(false));
+                        workerAllocated = GC.GetAllocatedBytesForCurrentThread() - source.WorkerAllocationStart;
+                        if (source.Complete && evaluated == eventCount) completed.Set();
+                    },
+                    warning => { lock (warnings) warnings.Add(warning); }))
+                {
+                    worker.Start();
+                    var scheduledMilliseconds = rate > 0 ? source.TotalMessages * 1000d / rate : 0d;
+                    var timeout = (int)Math.Min(int.MaxValue, Math.Max(30000d, scheduledMilliseconds + 30000d));
+                    True(completed.Wait(timeout), "worker did not finish the deterministic input within the timeout");
+                }
+                ingestion.Stop();
+                var managedAfterIngestion = GC.GetTotalMemory(false);
+                var processAllocated = GC.GetTotalAllocatedBytes(false) - processAllocatedBefore;
+                var workingSetAfter = Process.GetCurrentProcess().WorkingSet64;
+                var ingestionCollections = Enumerable.Range(0, 3)
+                    .Select(generation => GC.CollectionCount(generation) - collectionsBefore[generation]).ToArray();
+                Equal(0, warnings.Count, "worker warnings");
+                Equal(eventCount, evaluated, "exactly-once rule evaluation");
+                Equal(source.TotalMessages, source.Emitted, "all source messages consumed");
+
+                // No HTTP requests are sent, including to a running mod.
+                // Read the standalone fixture server's published projection.
+                var dashboardJson = (string)StressField(server, "latestDashboardState");
+                using (var state = JsonDocument.Parse(dashboardJson))
+                {
+                    var counters = state.RootElement.GetProperty("counters");
+                    Equal((long)eventCount, counters.GetProperty("received").GetInt64(), "accepted unique events");
+                    Equal((long)eventCount / 7, counters.GetProperty("ignored").GetInt64(), "immediate duplicates ignored");
+                    Equal(expected.LikeUnits, counters.GetProperty("likes").GetInt64(), "like units");
+                    Equal(expected.GiftUnits, counters.GetProperty("gifts").GetInt64(), "gift units");
+                    Equal(expected.FollowEvents, counters.GetProperty("follows").GetInt64(), "follow events");
+                    Equal(expected.MatchedEvents, counters.GetProperty("matched").GetInt64(), "matched event count");
+                    Equal(expected.TotalInteractions, counters.GetProperty("queued").GetInt64(), "all earned interactions retained");
+                    var recent = state.RootElement.GetProperty("events");
+                    Equal(Math.Min(30, source.TotalMessages), recent.GetArrayLength(), "dashboard history bound");
+                    for (var index = 0; index < recent.GetArrayLength(); index++)
+                        Equal((long)source.TotalMessages - index, recent[index].GetProperty("sequence").GetInt64(),
+                            "latest events retained in reverse input order");
+                }
+                Equal(expected.TotalInteractions, rules.BacklogCount, "exact pending backlog before draining");
+                var dedupe = StressField(dashboard, "deduplicator");
+                var rememberedKeys = ((HashSet<string>)StressField(dedupe, "keys")).Count;
+                Equal(Math.Min(4096, eventCount), rememberedKeys, "dedupe remains bounded after viewer churn");
+                var backlog = StressField(rules, "dispatchBacklog");
+                var entries = (IList)StressField(backlog, "entries");
+                True(entries.Count <= 3, "backlog groups must follow rules, not event or viewer count");
+                var backlogGroups = entries.Count;
+                var largestDonorSegmentCount = 0;
+                foreach (var entry in entries)
+                    largestDonorSegmentCount = Math.Max(largestDonorSegmentCount,
+                        ((IList)StressField(entry, "donorSegments")).Count);
+                True(largestDonorSegmentCount <= 256, "backlog donor segments remain bounded");
+
+                var backlogBeforeDrain = rules.BacklogCount;
+                var drainedByItem = new Dictionary<string, long>(StringComparer.Ordinal);
+                var drainUpdates = 0;
+                var drain = Stopwatch.StartNew();
+                while (rules.BacklogCount > 0)
+                {
+                    // A fresh recording queue represents 200 slots released
+                    // between deterministic fake gameplay updates.
+                    var gameplay = new CreatorToolsInteractionController(200);
+                    var accepted = rules.Update(null, gameplay, true);
+                    Equal(accepted, gameplay.EnqueuedCount, "drain return matches physical fake queue additions");
+                    True(accepted > 0, "stress backlog drain made no progress");
+                    foreach (var item in gameplay.EnqueuedItems)
+                    {
+                        long count;
+                        drainedByItem.TryGetValue(item, out count);
+                        drainedByItem[item] = count + 1L;
+                    }
+                    drainUpdates++;
+                }
+                drain.Stop();
+                foreach (var pair in expected.Interactions)
+                {
+                    long count;
+                    drainedByItem.TryGetValue(pair.Key, out count);
+                    Equal(pair.Value, count, "lossless drain for " + pair.Key);
+                }
+                var drained = drainedByItem.Values.Sum();
+                Equal(expected.TotalInteractions, drained, "exactly-once materialization without drops");
+                False(IsUnityAssemblyLoaded(), "offline stress mode loaded a Unity assembly");
+                var managedAfterCollection = GC.GetTotalMemory(true);
+                var report = new {
+                    schemaVersion = 1, success = true, mode = "offline_normalized_stream",
+                    parameters = new { uniqueEvents = eventCount, viewers, rateMessagesPerSecond = rate,
+                        duplicateEvery = 7, mix = "60% likes, 30% gifts, 10% follows" },
+                    counts = new { messages = source.Emitted, acceptedUniqueEvents = eventCount,
+                        evaluatedEvents = evaluated, duplicatesIgnored = eventCount / 7,
+                        likeUnits = expected.LikeUnits, giftUnits = expected.GiftUnits,
+                        followEvents = expected.FollowEvents, uniqueFollowViewers = expected.UniqueFollowViewers,
+                        matchedEvents = expected.MatchedEvents, expectedInteractions = expected.TotalInteractions,
+                        backlogBeforeDrain, drainedInteractions = drained, remainingBacklog = rules.BacklogCount,
+                        retainedDashboardEvents = Math.Min(30, source.TotalMessages), rememberedDedupeKeys = rememberedKeys,
+                        backlogGroups, largestDonorSegmentCount, workerBatches = batches, drainUpdates,
+                        interactionsByItem = drainedByItem, workerWarnings = warnings.Count },
+                    observations = new { ingestionMilliseconds = Math.Round(ingestion.Elapsed.TotalMilliseconds, 3),
+                        drainMilliseconds = Math.Round(drain.Elapsed.TotalMilliseconds, 3),
+                        normalizedMessagesPerSecond = Math.Round(source.Emitted / ingestion.Elapsed.TotalSeconds, 1),
+                        workerAllocatedBytes = workerAllocated, processAllocatedBytes = processAllocated,
+                        managedBytesBefore = managedBefore, managedBytesAfterIngestion = managedAfterIngestion,
+                        peakSampledManagedBytes = peakManaged, managedBytesAfterCollection = managedAfterCollection,
+                        workingSetBytesBefore = workingSetBefore, workingSetBytesAfterIngestion = workingSetAfter,
+                        ingestionGcCollectionsByGeneration = ingestionCollections },
+                    boundaries = new[] { "Normalized in-memory source: real TikFinity socket buffering is covered by separate pressure regression tests.",
+                        "Temporary fixture settings and standalone local server; no requests to the game, real platform, account or payment.",
+                        "Unity queues and actor execution are recording fakes. Timings and memory are .NET harness observations, not Cuphead FPS." }
+                };
+                var reportJson = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+                if (reportPath != null)
+                {
+                    var directory = Path.GetDirectoryName(reportPath);
+                    if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+                    File.WriteAllText(reportPath, reportJson);
+                }
+                Console.WriteLine("PASS Offline stress: " + source.Emitted + " messages, " + eventCount +
+                    " unique events, " + (eventCount / 7) + " duplicates ignored, " + drained + " interactions drained without loss.");
+                Console.WriteLine("History: " + Math.Min(30, source.TotalMessages) + "; dedupe keys: " + rememberedKeys +
+                    "; backlog groups: " + backlogGroups + "; donor segments/group: <= " + largestDonorSegmentCount + ".");
+                Console.WriteLine("Ingestion: " + ingestion.Elapsed.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture) +
+                    " ms; worker allocated: " + workerAllocated + " bytes. These are offline .NET measurements, not game FPS.");
+                if (reportPath != null) Console.WriteLine("Report: " + reportPath);
+                return 0;
+            }
+        }
+
+        private static object StressField(object instance, string name)
+        {
+            return instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(instance);
+        }
+
+        private static void TestStressSenderAgainstFixture()
+        {
+            using (var scope = new TestScope("stress-sender-isolated"))
+            using (var server = scope.StartServer())
+            {
+                var rules = scope.CreateRules(1);
+                var dashboard = new CreatorToolsDashboardController(rules.TryResolveSimulationGift);
+                var warningCount = 0;
+                using (var worker = new CreatorToolsStreamWorker(null, dashboard, rules, server,
+                    entry => rules.Evaluate(entry, true), null,
+                    warning => Interlocked.Increment(ref warningCount)))
+                {
+                    server.SetInteractionsState("{\"ready\":true,\"available\":true,\"interactionsEnabled\":true,\"pendingCount\":0,\"backlogCount\":0}");
+                    server.SetDashboardSimulationHandler(worker.ScheduleSimulation);
+                    worker.Start();
+                    WaitUntil(() => {
+                        using (var json = GetJson(server, "/api/dashboard"))
+                            return json.RootElement.GetProperty("ready").GetBoolean();
+                    }, 3000, "isolated simulator did not initialize");
+                    var root = new DirectoryInfo(Directory.GetCurrentDirectory());
+                    while (root != null && !File.Exists(Path.Combine(root.FullName, "tools", "send-stream-stress.ps1")))
+                        root = root.Parent;
+                    True(root != null, "stress sender script not found above the test working directory");
+                    var reportPath = Path.Combine(scope.ConfigDirectory, "sender-report.json");
+                    var start = new ProcessStartInfo("pwsh") {
+                        UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+                        RedirectStandardOutput = true, RedirectStandardError = true,
+                        WorkingDirectory = root.FullName
+                    };
+                    foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-File",
+                        Path.Combine(root.FullName, "tools", "send-stream-stress.ps1"),
+                        "-Events", "20", "-Rate", "1000", "-Type", "Mixed", "-GiftId", "1",
+                        "-Port", server.Port.ToString(CultureInfo.InvariantCulture), "-ReportPath", reportPath })
+                        start.ArgumentList.Add(argument);
+                    using (var process = Process.Start(start))
+                    {
+                        var output = process.StandardOutput.ReadToEndAsync();
+                        var errors = process.StandardError.ReadToEndAsync();
+                        if (!process.WaitForExit(20000))
+                        {
+                            process.Kill();
+                            throw new InvalidOperationException("isolated stress sender timed out");
+                        }
+                        Equal(0, process.ExitCode, "sender failed against the fixture: " +
+                            output.GetAwaiter().GetResult() + errors.GetAwaiter().GetResult());
+                    }
+                    using (var report = JsonDocument.Parse(File.ReadAllText(reportPath)))
+                    {
+                        var result = report.RootElement;
+                        True(result.GetProperty("completed").GetBoolean(), "isolated sender completed");
+                        Equal(20, result.GetProperty("accepted").GetInt32(), "all sender requests accepted");
+                        Equal(0, result.GetProperty("rejected429").GetInt32(), "no fixture queue rejections");
+                        Equal(0, result.GetProperty("uncertain").GetInt32(), "no uncertain fixture responses");
+                        Equal(server.Port, result.GetProperty("port").GetInt32(), "sender used only the standalone fixture port");
+                        foreach (var pair in new[] { new { Type = "like", Count = 16 },
+                            new { Type = "gift", Count = 2 }, new { Type = "follow", Count = 2 } })
+                            Equal(pair.Count, result.GetProperty("acceptedByType").GetProperty(pair.Type).GetInt32(),
+                                "mixed sender accepted " + pair.Type + " requests");
+                        var delta = result.GetProperty("sharedCounterDelta");
+                        Equal(20L, delta.GetProperty("received").GetInt64(), "worker processed every scheduled sender event");
+                        Equal(16L, delta.GetProperty("likes").GetInt64(), "worker processed each like independently");
+                        Equal(2L, delta.GetProperty("gifts").GetInt64(), "fixture gift resolution preserved count one per gift");
+                        Equal(2L, delta.GetProperty("follows").GetInt64(), "worker processed each unique follow");
+                    }
+                    Equal(2L, rules.BacklogCount, "both fixture gifts became earned interactions without touching gameplay");
+                    Equal(0, warningCount, "worker warnings during isolated script simulation");
+                }
+            }
+        }
+
+        private sealed class StressExpectation
+        {
+            internal long LikeUnits, GiftUnits, FollowEvents, UniqueFollowViewers, MatchedEvents;
+            internal readonly Dictionary<string, long> Interactions = new Dictionary<string, long> {
+                { "test_attack", 0L }, { "rootpack_homing_carrot", 0L }, { "frogs_firefly", 0L } };
+            internal long TotalInteractions { get { return Interactions.Values.Sum(); } }
+            internal static StressExpectation Create(int events, int viewers)
+            {
+                var result = new StressExpectation();
+                var likesByViewer = new long[viewers];
+                var followed = new bool[viewers];
+                for (var index = 0; index < events; index++)
+                {
+                    var viewer = StressViewer(index, viewers);
+                    if (index % 10 < 6)
+                    {
+                        var count = 1 + index % 7;
+                        result.LikeUnits += count;
+                        var triggers = (likesByViewer[viewer] + count) / 10 - likesByViewer[viewer] / 10;
+                        likesByViewer[viewer] += count;
+                        result.Interactions["rootpack_homing_carrot"] += triggers;
+                        if (triggers > 0) result.MatchedEvents++;
+                    }
+                    else if (index % 10 < 9)
+                    {
+                        var count = 1 + index % 3;
+                        result.GiftUnits += count;
+                        result.Interactions["test_attack"] += 2L * count;
+                        result.MatchedEvents++;
+                    }
+                    else
+                    {
+                        result.FollowEvents++;
+                        if (followed[viewer]) continue;
+                        followed[viewer] = true;
+                        result.UniqueFollowViewers++;
+                        result.Interactions["frogs_firefly"]++;
+                        result.MatchedEvents++;
+                    }
+                }
+                return result;
+            }
+        }
+
+        private static int StressViewer(int index, int viewers)
+        { return (int)(((long)index * 17 + index / 10) % viewers); }
+
+        private sealed class StressStreamSource : ICreatorToolsStreamSource
+        {
+            private readonly int events, viewers, rate;
+            private int nextUnique;
+            private bool duplicatePending;
+            private CreatorToolsStreamMessage previous;
+            private readonly Stopwatch time = new Stopwatch();
+            internal readonly int TotalMessages;
+            internal int Emitted { get; private set; }
+            internal long WorkerAllocationStart { get; private set; }
+            internal bool Complete { get { return Emitted == TotalMessages; } }
+            internal StressStreamSource(int events, int viewers, int rate)
+            { this.events = events; this.viewers = viewers; this.rate = rate; TotalMessages = events + events / 7; }
+            public void Update()
+            {
+                if (time.IsRunning) return;
+                WorkerAllocationStart = GC.GetAllocatedBytesForCurrentThread();
+                time.Start();
+            }
+            public bool TryTakeMessage(out CreatorToolsStreamMessage message)
+            {
+                message = null;
+                if (Complete || (rate > 0 && Emitted >= time.Elapsed.TotalSeconds * rate)) return false;
+                if (duplicatePending)
+                {
+                    duplicatePending = false;
+                    message = previous;
+                }
+                else
+                {
+                    var index = nextUnique++;
+                    var kind = index % 10 < 6 ? "like" : index % 10 < 9 ? "gift" : "follow";
+                    var count = kind == "like" ? 1 + index % 7 : kind == "gift" ? 1 + index % 3 : 1;
+                    var viewer = StressViewer(index, viewers).ToString(CultureInfo.InvariantCulture);
+                    var identity = "stress-" + index.ToString(CultureInfo.InvariantCulture);
+                    message = previous = new CreatorToolsStreamMessage { Event = new CreatorToolsStreamEvent {
+                        EventId = identity, IdempotencyKey = identity, ConnectionId = "stress-offline",
+                        Platform = "tiktok", Connector = "offline-fixture", Type = kind,
+                        UserId = viewer, UserName = "viewer-" + viewer, UserDisplayName = "Viewer " + viewer,
+                        ItemId = kind == "gift" ? "1" : string.Empty, Count = count,
+                        UnitValue = kind == "gift" ? 1m : 0m, TotalValue = kind == "gift" ? count : 0m,
+                        StreakState = "none", ReceivedAt = "2026-01-01T00:00:00.000Z", RawEventType = "offline_stress"
+                    } };
+                    duplicatePending = nextUnique % 7 == 0;
+                }
+                Emitted++;
+                return true;
+            }
+        }
+    }
+}

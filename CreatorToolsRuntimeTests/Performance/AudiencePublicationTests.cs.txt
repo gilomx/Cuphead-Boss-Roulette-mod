@@ -1,0 +1,199 @@
+using System;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static class AudiencePublicationTests
+    {
+        internal static void Run()
+        {
+            TestBootstrapAndSuspendedIdle();
+            TestSubscribedCadenceAndFirstReader();
+            TestUrgentControlsAndFocusSnapshot();
+            TestConcurrentReadersCoalesceRefresh();
+            TestExpiredDeferredReader();
+            TestClockEpochAndFrequency();
+            TestQueueProjectionAndAllocationBudget();
+            Console.WriteLine("All audience publication tests passed (7 groups).");
+        }
+
+        private static void TestBootstrapAndSuspendedIdle()
+        {
+            var time = new TestClock();
+            var policy = time.Create();
+            Require(policy.TryBegin(false), "The server needs an initial ready snapshot without readers.");
+            for (var i = 1; i <= 10000; i++)
+            {
+                time.Now = i * 100L;
+                Require(!policy.TryBegin(false), "No reader may produce ongoing gameplay JSON work.");
+            }
+            Console.WriteLine("PASS  Bootstrap once; idle publication remains suspended across 10000 owner frames.");
+        }
+
+        private static void TestSubscribedCadenceAndFirstReader()
+        {
+            var time = new TestClock();
+            var policy = time.Create();
+            Require(policy.TryBegin(false), "Bootstrap.");
+            time.Now = 1;
+            policy.ObserveRequest();
+            Require(policy.TryBegin(false), "The first GET must request a next-frame refresh even inside the idle interval.");
+            for (var i = 2; i <= 500; i++)
+            {
+                time.Now = i;
+                policy.ObserveRequest(); // Multiple readers cannot defeat the 500-ms publication cadence.
+                Require(!policy.TryBegin(false), "Frequent GETs inside one lease must not force extra publications.");
+            }
+            time.Now = 501;
+            Require(policy.TryBegin(false), "An observed panel receives a 500-ms refresh.");
+            time.Now = 2500; // Last GET was at 500, so the lease expires exactly here.
+            Require(!policy.TryBegin(false), "Publication stops as soon as the audience lease expires.");
+            time.Now = 2501;
+            policy.ObserveRequest();
+            for (var i = 0; i < 1000; i++) policy.ObserveRequest();
+            Require(policy.TryBegin(false) && !policy.TryBegin(false),
+                "Returning readers coalesce into exactly one immediate owner refresh.");
+            Console.WriteLine("PASS  Active readers get 500-ms snapshots; expired leases suspend and returning GETs refresh once.");
+        }
+
+        private static void TestUrgentControlsAndFocusSnapshot()
+        {
+            var time = new TestClock();
+            var policy = time.Create();
+            Require(policy.TryBegin(false), "Bootstrap.");
+            time.Now = 1;
+            Require(policy.TryBegin(true), "Idle controls and focus-loss snapshots must be immediate.");
+            Require(policy.TryBegin(true), "No cadence may swallow a second urgent acknowledgement.");
+            Require(!policy.TryBegin(false), "Urgency does not create a fake audience.");
+            policy.ObserveRequest();
+            Require(policy.TryBegin(false), "Reader activation refreshes the projected state.");
+            time.Now++;
+            Require(policy.TryBegin(true), "Controls must bypass an active panel's 500-ms interval too.");
+            Require(!policy.TryBegin(false), "An ordinary same-frame pass must not duplicate the control snapshot.");
+            Console.WriteLine("PASS  Urgent control acknowledgements and focus-loss snapshots bypass every audience gate.");
+        }
+
+        private static void TestConcurrentReadersCoalesceRefresh()
+        {
+            var time = new TestClock();
+            var policy = time.Create();
+            policy.TryBegin(false);
+            time.Now = 20;
+            Parallel.For(0, 16, _ =>
+            {
+                for (var i = 0; i < 1000; i++) policy.ObserveRequest();
+            });
+            var admitted = 0;
+            Parallel.For(0, 16, _ =>
+            {
+                if (policy.TryBegin(false)) Interlocked.Increment(ref admitted);
+            });
+            Require(admitted == 1, "Concurrent HTTP readers must request only one next-owner refresh.");
+            time.Now += 500;
+            Require(policy.TryBegin(false), "The lease survives request contention and preserves the active interval.");
+            Console.WriteLine("PASS  16000 cross-thread requests coalesce without losing the next owner refresh.");
+        }
+
+        private static void TestClockEpochAndFrequency()
+        {
+            var time = new TestClock { Frequency = 10000000, Now = 9000000000 };
+            var policy = time.Create();
+            policy.ObserveRequest();
+            Require(policy.TryBegin(false), "High-resolution clock bootstrap.");
+            time.Now += 4999999;
+            Require(!policy.TryBegin(false), "Cadence must use Stopwatch frequency rather than milliseconds.");
+            time.Now++;
+            Require(policy.TryBegin(false), "Exactly half a second is eligible at native Stopwatch resolution.");
+            time.Now = 0;
+            Require(!policy.TryBegin(false), "A restarted clock cannot keep an old audience lease alive.");
+            policy.ObserveRequest();
+            Require(policy.TryBegin(false), "A fresh request after a clock epoch change must refresh immediately.");
+            Console.WriteLine("PASS  Stopwatch frequency and restarted test clocks preserve lease semantics.");
+        }
+
+        private static void TestExpiredDeferredReader()
+        {
+            var time = new TestClock();
+            var policy = time.Create();
+            Require(policy.TryBegin(false), "A server bootstrap snapshot exists before backgrounding Unity.");
+            time.Now = 10;
+            policy.ObserveRequest(); // HTTP continues while Unity has no Update frames.
+            time.Now += 120000;
+            Require(!policy.TryBegin(false) && !policy.TryBegin(false),
+                "A pending reader refresh must not manufacture an audience after its lease expires in the background.");
+            Require(policy.TryBegin(true), "An explicit focus-loss/control snapshot still bypasses idle suspension.");
+            policy.ObserveRequest();
+            Require(policy.TryBegin(false), "An actually returning reader requests a fresh next-Update snapshot.");
+            Console.WriteLine("PASS  An expired background GET cannot trigger a stale deferred refresh on game resume.");
+        }
+
+        private static void TestQueueProjectionAndAllocationBudget()
+        {
+            UnityEngine.Time.realtimeSinceStartup = 0f;
+            using (var queue = new CreatorToolsInteractionQueue())
+            {
+                for (var i = 0; i < 4; i++)
+                    Require(queue.Enqueue(CreatorToolsInteractionIds.HomingCarrot,
+                        "Donor " + i, "", 50, 0f, CreatorToolsInteractionSource.Stream) == 50,
+                        "The production donation queue must retain all 200 earned entries.");
+                var idle = RunQueueWorkload(queue, false);
+                var observed = RunQueueWorkload(queue, true);
+                Require(idle.Builds == 1 && observed.Builds == 10 && idle.Json == observed.Json &&
+                    queue.PendingCount == 200 && queue.ActiveCount == 0,
+                    "Only panel snapshot frequency changes; donor payload and gameplay queue stay intact.");
+                var time = new TestClock();
+                var policy = time.Create();
+                policy.ObserveRequest();
+                policy.TryBegin(false);
+                var allocated = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < 10000; i++)
+                {
+                    policy.ObserveRequest();
+                    policy.TryBegin(false);
+                }
+                allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+                Require(allocated == 0, "Warm audience observations/admissions cannot allocate per frame or request.");
+                Console.WriteLine("PASS  Production queue: 1 idle vs 10 observed snapshots/five seconds; 10000 warm audience checks allocate zero bytes.");
+            }
+        }
+
+        private static Workload RunQueueWorkload(CreatorToolsInteractionQueue queue, bool observed)
+        {
+            var time = new TestClock();
+            var policy = time.Create();
+            var result = new Workload();
+            for (var tick = 0; tick < 5000; tick += 10)
+            {
+                time.Now = tick;
+                if (observed && tick % 500 == 0) policy.ObserveRequest();
+                if (!policy.TryBegin(false)) continue;
+                var builder = new StringBuilder(4096);
+                queue.AppendJson(builder);
+                result.Json = builder.ToString();
+                result.Builds++;
+            }
+            return result;
+        }
+
+        private static void Require(bool condition, string message)
+        {
+            if (!condition) throw new InvalidOperationException(message);
+        }
+        private sealed class TestClock
+        {
+            internal long Now;
+            internal long Frequency = 1000;
+            internal CreatorToolsAudiencePublicationPacing Create()
+            {
+                return new CreatorToolsAudiencePublicationPacing(() => Now, Frequency);
+            }
+        }
+        private sealed class Workload
+        {
+            internal int Builds;
+            internal string Json;
+        }
+    }
+}

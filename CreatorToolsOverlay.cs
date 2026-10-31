@@ -287,6 +287,11 @@ namespace Gilomx.CupheadBossRoulette
             Level level;
             if (!TryGetActiveCreatorToolsGameplayLevel(out level))
                 return false;
+            // Level.Current exists during the native intro. Its duration is
+            // variable, so the elapsed safety wait alone cannot admit actors.
+            // Keep lifecycle registration early, but wait for native play.
+            if (!level.Started)
+                return false;
             var now = Time.realtimeSinceStartup;
             if (level.GetInstanceID() !=
                     creatorToolsInteractionLevelInstanceId ||
@@ -1260,12 +1265,14 @@ namespace Gilomx.CupheadBossRoulette
 
         private void OnCreatorToolsInteractionPaused()
         {
+            InvalidateNativePauseMenuCandidates();
             if (creatorToolsInteractions != null)
                 creatorToolsInteractions.InvalidateState();
         }
 
         private void OnCreatorToolsInteractionUnpaused()
         {
+            InvalidateNativePauseMenuCandidates();
             if (creatorToolsInteractions != null)
                 creatorToolsInteractions.InvalidateState();
         }
@@ -1367,10 +1374,14 @@ namespace Gilomx.CupheadBossRoulette
                 InitializeChatChooses();
             }
             if (creatorToolsDashboard != null)
+            {
+                creatorToolsServer.SetDashboardStateReader(
+                    creatorToolsDashboard.GetStateJson);
                 creatorToolsServer.SetDashboardSimulationHandler(
                     creatorToolsStreamWorker == null
                         ? creatorToolsDashboard.ScheduleSimulation
                         : creatorToolsStreamWorker.ScheduleSimulation);
+            }
             if (creatorToolsServer.IsRunning)
                 return true;
 
@@ -1610,22 +1621,33 @@ namespace Gilomx.CupheadBossRoulette
                     creatorToolsServer,
                     creatorToolsApplicationFocused);
             }
-            var drainedStreamInteractions = 0;
-            if (creatorToolsStreamRules != null)
-                drainedStreamInteractions = creatorToolsStreamRules.Update(
-                    creatorToolsServer, creatorToolsInteractions,
-                    creatorToolsApplicationFocused &&
-                    (creatorToolsInteractions == null ||
-                     creatorToolsInteractions.StreamAttacksAllowed));
-            if (drainedStreamInteractions > 0 &&
-                creatorToolsInteractions != null)
-                creatorToolsInteractions.PublishInteractionState(
-                    creatorToolsServer);
-            if (creatorToolsServer != null && creatorToolsStreamRules != null)
-                creatorToolsServer.SetInteractionBacklogCount(
-                    creatorToolsStreamRules.BacklogCount);
-            if (creatorToolsStreamWorker != null)
-                creatorToolsStreamWorker.Signal();
+            var performance = creatorToolsInteractions;
+            var streamStarted = performance == null ? 0L : performance.BeginStartupStage();
+            try
+            {
+                var drainedStreamInteractions = 0;
+                if (creatorToolsStreamRules != null)
+                    drainedStreamInteractions = creatorToolsStreamRules.Update(
+                        creatorToolsServer, creatorToolsInteractions,
+                        creatorToolsApplicationFocused &&
+                        (creatorToolsInteractions == null ||
+                         creatorToolsInteractions.StreamAttacksAllowed));
+                if (drainedStreamInteractions > 0 &&
+                    creatorToolsInteractions != null)
+                    creatorToolsInteractions.PublishInteractionState(
+                        creatorToolsServer);
+                if (creatorToolsServer != null && creatorToolsStreamRules != null)
+                    creatorToolsServer.SetInteractionBacklogCount(
+                        creatorToolsStreamRules.BacklogCount);
+            }
+            finally
+            {
+                if (performance != null)
+                    performance.EndStartupStage(streamStarted, CreatorToolsStartupStage.StreamDrain);
+            }
+            // The worker polls transport every 50 ms. Waking it every Unity
+            // frame needlessly rebuilds background projections at game FPS;
+            // focus changes, simulations and controls still signal explicitly.
             PublishCreatorToolsInteractionBattleVisibility();
         }
 
@@ -1649,6 +1671,11 @@ namespace Gilomx.CupheadBossRoulette
             // Focus callbacks still arrive when Unity stops updating in the
             // background, so an interrupted wait cannot elapse while away.
             chatChoosesCardEntrance.Suspend();
+            // Unity may stop Update while Cuphead is unfocused. Capture the
+            // last gameplay state once as the user switches to the panel;
+            // its HTTP readers can then receive fresh cached data immediately.
+            if (!hasFocus && !creatorToolsShuttingDown && creatorToolsInteractions != null)
+                creatorToolsInteractions.RefreshPanelState(creatorToolsServer);
             if (hasFocus && creatorToolsStreamWorker != null)
                 creatorToolsStreamWorker.Signal();
         }

@@ -1,0 +1,57 @@
+using System;
+
+internal sealed class Level
+{
+    internal enum Mode { Easy, Normal, Hard }
+    internal static Mode CurrentMode;
+}
+
+internal sealed class LevelProperties
+{
+    internal sealed class FlyingBlimp
+    {
+        internal static readonly int[] FactoryCalls = new int[3];
+        internal readonly State CurrentState;
+        private FlyingBlimp(Level.Mode mode)
+        {
+            CurrentState = new State { enemy = new Enemy {
+                stopDistance = new NativeRange(390f + (int)mode),
+                APinkOccurance = new NativeRange(2f)
+            } };
+        }
+        internal static FlyingBlimp GetMode(Level.Mode mode)
+        {
+            FactoryCalls[(int)mode]++;
+            return new FlyingBlimp(mode);
+        }
+        internal sealed class State { internal Enemy enemy; }
+        internal sealed class Enemy
+        {
+            internal NativeRange stopDistance;
+            internal NativeRange APinkOccurance;
+        }
+    }
+}
+internal sealed class NativeRange
+{
+    private readonly float value;
+    internal NativeRange(float value) { this.value = value; }
+    internal float RandomFloat() { return value; }
+}
+namespace UnityEngine
+{
+    internal static class Random
+    {
+        internal static float Range(float minimum, float maximum) { return (minimum + maximum) * 0.5f; }
+    }
+    internal static class Mathf
+    {
+        internal static float Abs(float value) { return Math.Abs(value); }
+        internal static float Clamp(float value, float minimum, float maximum)
+        { return Math.Max(minimum, Math.Min(maximum, value)); }
+    }
+}
+namespace Gilomx.CupheadBossRoulette
+{
+    internal enum NativeZeppelinVariant { Purple, Green }
+}
