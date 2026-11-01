@@ -279,6 +279,30 @@ en `/config` y `/dashboard`. Complementa el README técnico de
 
 ## Contrato con el mod
 
+Farmeada conserva sólo la reserva no gastada al perder o reintentar. En el
+overlay, Juntando taps usa `bankedTaps` y `reserveHealth`, en lugar del total
+histórico recibido/convertido. Una victoria real del jefe (Main en Rey Dado)
+reinicia inmediatamente los seis contadores y la reserva. `lastRound` conserva
+`totalTaps`, `spentHealth` y `attempts` sólo para el resumen de victoria. Los
+likes de la pantalla de resultados ya cuentan para el siguiente jefe y volver
+al mapa no vuelve a borrarlos. La entrada del corazón anima contorno, relleno
+y contenido una sola vez al pasar de recolección a batalla, sin reiniciarse
+con cada consulta ni con cambios de fase nativos.
+
+Farmeando taps incluye **Prueba de taps**, apagada al iniciar. El interruptor
+envía por defecto 10 taps cada segundo a la reserva real con la conversión
+vigente, sin activar otras reglas de Interacciones. Cantidad (1–100000) e
+intervalo (0.1–60 segundos) se pueden editar mientras funciona. El reloj vive
+en el mod, continúa al navegar por el panel y entre derrotas/reintentos, y
+se detiene al ganar o desactivar el evento. Los frames atrasados no generan
+ráfagas de recuperación. El contador distingue taps de prueba de taps reales.
+Estos ajustes son temporales y la prueba nunca se reactiva al iniciar otra ronda.
+`GET /api/config/tap-farming` expone `testTaps` (`active`, `quantity`,
+`intervalSeconds`, `sent`). `/api/config/tap-farming/set` acepta
+`operation=test_taps`, `testEnabled`, `testQuantity`, `testIntervalSeconds` y
+`sessionId`; valida todos los datos antes de mutar y rechaza iniciar pruebas
+de una sesión anterior o de un evento inactivo.
+
 `GET /api/config/pesky` expone los campos actuales y sus defaults con prefijo
 `default`. Ambos modos usan `minimumInterval`/`maximumInterval` para molestias
 normales, `miniBossMinimumInterval`/`miniBossMaximumInterval` para el descanso

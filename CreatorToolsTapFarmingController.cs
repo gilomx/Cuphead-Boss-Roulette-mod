@@ -35,6 +35,12 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsTapFarmingSettings settings;
         private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly Action<string> logInfo;
+        private readonly Func<double> testClock;
+        private bool testTapsActive;
+        private int testTapsQuantity = 10;
+        private double testTapsIntervalSeconds = 1d;
+        private double nextTestTapsAt;
+        private long testTapsSent;
 
         private string phase = "off";
         private int sessionId;
@@ -55,6 +61,10 @@ namespace Gilomx.CupheadBossRoulette
         private double reserveHealth;
         private double spentHealth;
         private double spentHealthAtAttemptStart;
+        private long completedRoundTaps;
+        private double completedRoundSpentHealth;
+        private int completedRoundAttempts;
+        private int completedLevelInstanceId = -1;
         private float bossCurrentHealth;
         private float bossTotalHealth;
         private float currentPhaseProgress;
@@ -81,12 +91,16 @@ namespace Gilomx.CupheadBossRoulette
             string pluginConfigPath,
             CreatorToolsLiveEventsCoordinator liveEvents,
             Action<string> logInfo,
-            Action<string> logWarning)
+            Action<string> logWarning,
+            Func<double> testClock = null)
         {
             settings = CreatorToolsTapFarmingSettings.Load(
                 pluginConfigPath, logWarning);
             this.liveEvents = liveEvents;
             this.logInfo = logInfo;
+            this.testClock = testClock ?? (() =>
+                (double)System.Diagnostics.Stopwatch.GetTimestamp() /
+                System.Diagnostics.Stopwatch.Frequency);
         }
 
         internal bool Enabled
@@ -124,29 +138,34 @@ namespace Gilomx.CupheadBossRoulette
                     return new CreatorToolsTapFarmingObservation(
                         string.Empty);
 
-                var incoming = (long)entry.Count;
-                totalTaps = SaturatingAdd(totalTaps, incoming);
-                var combined = SaturatingAdd(unconvertedTaps, incoming);
-                var tapsPerConversion = Math.Max(1,
-                    settings.TapsPerConversion);
-                var conversions = combined / tapsPerConversion;
-                unconvertedTaps = combined % tapsPerConversion;
-                var points = SaturatingMultiply(conversions,
-                    settings.HealthPointsPerConversion);
-                if (points > 0L)
-                {
-                    convertedHealth = SaturatingAdd(
-                        convertedHealth, points);
-                    var accepted = Math.Min(points,
-                        MaximumReserveHealth - reserveHealth);
-                    if (phaseReserve.IsInitialized)
-                        phaseReserve.AddReserve(accepted);
-                    reserveHealth += accepted;
-                }
-                SetFeedbackLocked("tap_farming_counted", false);
+                CountTapsLocked(entry.Count);
                 return new CreatorToolsTapFarmingObservation(
                     "tap_farming_counted");
             }
+        }
+
+        private void CountTapsLocked(int count)
+        {
+            var incoming = (long)count;
+            totalTaps = SaturatingAdd(totalTaps, incoming);
+            var combined = SaturatingAdd(unconvertedTaps, incoming);
+            var tapsPerConversion = Math.Max(1,
+                settings.TapsPerConversion);
+            var conversions = combined / tapsPerConversion;
+            unconvertedTaps = combined % tapsPerConversion;
+            var points = SaturatingMultiply(conversions,
+                settings.HealthPointsPerConversion);
+            if (points > 0L)
+            {
+                convertedHealth = SaturatingAdd(
+                    convertedHealth, points);
+                var accepted = Math.Min(points,
+                    MaximumReserveHealth - reserveHealth);
+                if (phaseReserve.IsInitialized)
+                    phaseReserve.AddReserve(accepted);
+                reserveHealth += accepted;
+            }
+            SetFeedbackLocked("tap_farming_counted", false);
         }
 
         internal bool ProcessBackgroundCommand(string query)
@@ -156,6 +175,9 @@ namespace Gilomx.CupheadBossRoulette
             if (!values.TryGetValue("operation", out action))
                 values.TryGetValue("action", out action);
             action = (action ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (action == "test_taps")
+                return ConfigureTestTaps(values);
 
             if (action == "activate" || action == "arm" ||
                 action == "start")
@@ -180,6 +202,18 @@ namespace Gilomx.CupheadBossRoulette
         {
             lock (stateLock)
             {
+                if (testTapsActive && CountsTapsLocked())
+                {
+                    var now = testClock();
+                    if (now >= nextTestTapsAt)
+                    {
+                        // Emit one batch; missed frames never create a catch-up burst.
+                        nextTestTapsAt = now + testTapsIntervalSeconds;
+                        CountTapsLocked(testTapsQuantity);
+                        testTapsSent = SaturatingAdd(testTapsSent,
+                            testTapsQuantity);
+                    }
+                }
                 if (this.gameplayAvailable != gameplayAvailable)
                 {
                     this.gameplayAvailable = gameplayAvailable;
@@ -189,6 +223,53 @@ namespace Gilomx.CupheadBossRoulette
             TryAttachCurrentLevelMainThread(gameplayAvailable);
             RefreshBossSnapshotMainThread();
             PublishState(server);
+        }
+
+        private bool ConfigureTestTaps(Dictionary<string, string> values)
+        {
+            string enabledValue, quantityValue, intervalValue, sessionValue;
+            bool enabled;
+            int quantity, expectedSession;
+            double interval;
+            if (!values.TryGetValue("testEnabled", out enabledValue) ||
+                !bool.TryParse(enabledValue, out enabled) ||
+                !values.TryGetValue("testQuantity", out quantityValue) ||
+                !int.TryParse(quantityValue, NumberStyles.None,
+                    CultureInfo.InvariantCulture, out quantity) ||
+                quantity < 1 || quantity > 100000 ||
+                !values.TryGetValue("testIntervalSeconds", out intervalValue) ||
+                !double.TryParse(intervalValue, NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out interval) ||
+                double.IsNaN(interval) || double.IsInfinity(interval) ||
+                interval < 0.1d || interval > 60d ||
+                !values.TryGetValue("sessionId", out sessionValue) ||
+                !int.TryParse(sessionValue, NumberStyles.None,
+                    CultureInfo.InvariantCulture, out expectedSession))
+            {
+                SetFeedback("invalid_test_taps", true);
+                return true;
+            }
+            lock (stateLock)
+            {
+                if (enabled &&
+                    (!CountsTapsLocked() || phase == "completed" ||
+                     expectedSession != sessionId))
+                {
+                    SetFeedbackLocked("test_taps_requires_active_event", true);
+                    return true;
+                }
+                var reschedule = !testTapsActive ||
+                    quantity != testTapsQuantity ||
+                    interval != testTapsIntervalSeconds;
+                testTapsQuantity = quantity;
+                testTapsIntervalSeconds = interval;
+                testTapsActive = enabled;
+                if (enabled && reschedule)
+                    nextTestTapsAt = testClock() + interval;
+                SetFeedbackLocked(enabled ? "test_taps_started" :
+                    "test_taps_stopped", false);
+            }
+            return true;
         }
 
         internal void PublishState(CreatorToolsServer server)
@@ -237,6 +318,8 @@ namespace Gilomx.CupheadBossRoulette
             lock (stateLock)
             {
                 if (!CountsTapsLocked())
+                    return;
+                if (levelInstanceId == completedLevelInstanceId)
                     return;
 
                 // Dice Palace swaps Level instances for every internal
@@ -369,28 +452,21 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
 
+                // Close this boss's ledger immediately. The victory card reads
+                // its immutable summary; new likes already belong to the next boss.
+                var roundTaps = totalTaps;
+                var roundSpent = spentHealth;
+                var roundAttempts = attempt;
+                ResetSessionCountersLocked();
+                completedRoundTaps = roundTaps;
+                completedRoundSpentHealth = roundSpent;
+                completedRoundAttempts = roundAttempts;
+                completedLevelInstanceId = instanceId;
+                sessionId = sessionId == int.MaxValue ? 1 : sessionId + 1;
                 phase = "completed";
                 activeLevelInstanceId = -1;
-                dicePalaceTransition = false;
-                dicePalaceTransitionLevelInstanceId = -1;
-                dicePalaceMainActive = false;
-                if (dicePalaceAttemptActive)
-                {
-                    dicePalaceCompletedSegments =
-                        DicePalaceProgressSegmentCount;
-                    dicePalaceCurrentSegmentProgress = 1f;
-                }
-                bossCurrentHealth = 0f;
                 currentPhaseProgress = 1f;
                 overallProgress = 1f;
-                if (phaseProgress.Length > 0)
-                {
-                    for (var i = 0; i < phaseProgress.Length; i++)
-                        phaseProgress[i] = new PhaseProgress(
-                            i + 1, "complete", 1f);
-                    phaseIndex = phaseProgress.Length;
-                    phaseCount = phaseProgress.Length;
-                }
                 SetFeedbackLocked("tap_farming_completed", false);
             }
             bossPropertiesMainThread = null;
@@ -431,7 +507,9 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (phase != "completed")
                     return;
-                ResetSessionCountersLocked();
+                // Likes received during the results screen are already banked
+                // for the next boss. Entering the map must not clear them again.
+                ClearBossProjectionLocked(true);
                 phase = "collecting";
                 SetFeedbackLocked(
                     "tap_farming_waiting_for_boss", false);
@@ -638,6 +716,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (phase == "stopping")
                     return true;
                 phase = "stopping";
+                testTapsActive = false;
                 lease = liveEventLease;
                 SetFeedbackLocked("tap_farming_stopping", false);
             }
@@ -1094,7 +1173,18 @@ namespace Gilomx.CupheadBossRoulette
                         phaseReserve.GetPhaseRemaining(i), "0.###"))
                     .Append('}');
             }
-            builder.Append("],\"feedback\":\"");
+            builder.Append("],\"testTaps\":{\"active\":")
+                .Append(testTapsActive ? "true" : "false")
+                .Append(",\"quantity\":").Append(testTapsQuantity)
+                .Append(",\"intervalSeconds\":")
+                .Append(FormatNumber(testTapsIntervalSeconds, "0.###"))
+                .Append(",\"sent\":").Append(testTapsSent)
+                .Append("},\"lastRound\":{\"totalTaps\":")
+                .Append(completedRoundTaps)
+                .Append(",\"spentHealth\":")
+                .Append(FormatNumber(completedRoundSpentHealth, "0.###"))
+                .Append(",\"attempts\":").Append(completedRoundAttempts)
+                .Append("},\"feedback\":\"");
             CreatorToolsJson.AppendEscaped(builder, feedback);
             builder.Append("\",\"error\":")
                 .Append(error ? "true" : "false")
@@ -1104,6 +1194,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private void ResetSessionCountersLocked()
         {
+            testTapsActive = false;
+            testTapsSent = 0L;
+            completedRoundTaps = 0L;
+            completedRoundSpentHealth = 0d;
+            completedRoundAttempts = 0;
+            completedLevelInstanceId = -1;
             totalTaps = 0L;
             unconvertedTaps = 0L;
             convertedHealth = 0L;
@@ -1143,7 +1239,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool CountsTapsLocked()
         {
             return phase == "collecting" || phase == "active" ||
-                phase == "transition";
+                phase == "transition" || phase == "completed";
         }
 
         private bool MatchesActiveLevelLocked(int instanceId)

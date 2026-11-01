@@ -254,6 +254,17 @@ export interface TapFarmingPhaseProgress {
 }
 
 export interface TapFarmingConfigState {
+  lastRound?: {
+    totalTaps: number;
+    spentHealth: number;
+    attempts: number;
+  };
+  testTaps?: {
+    active: boolean;
+    quantity: number;
+    intervalSeconds: number;
+    sent: number;
+  };
   ready: boolean;
   schemaVersion: number;
   revision: number;

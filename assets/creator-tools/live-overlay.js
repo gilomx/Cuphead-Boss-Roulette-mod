@@ -283,6 +283,7 @@
 
   function embeddedUrl(definition) {
     const params = new URLSearchParams({ embedded: "1" });
+    if (definition.id === "tap_farming") params.set("v", "tap-rounds-35");
     if (definition.id === "interactions") params.set("profile", profileId);
     if (definition.id === "pesky_battle") params.set("v", "battle-icons-10");
     if (definition.id === "chat_chooses") params.set("v", "chat-artwork-13");

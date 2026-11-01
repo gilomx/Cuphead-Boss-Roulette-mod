@@ -307,6 +307,17 @@
       }
     },
     "tapFarming": {
+      "test": {
+        "title": "Tap test",
+        "description": "Adds simulated taps to the real reserve using the current conversion, only for Tap Farming. Keeps running when you change pages and stops when the event ends.",
+        "on": "Sending taps",
+        "off": "Off",
+        "quantity": "Taps per batch",
+        "interval": "Send every (seconds)",
+        "sent": "{count} test taps sent",
+        "ready": "Ready to send taps to the game.",
+        "activateFirst": "Activate Tap Farming to start the test."
+      },
       "eyebrow": "Live game",
       "title": "Tap Farming",
       "description": "The entire community's taps combine to increase the boss's health. The more taps they get, the longer the fight will last.",
@@ -393,6 +404,10 @@
         "tap_farming_setting_locked": "The conversion is locked while the event is active.",
         "blocked_by_live_event": "Finish the other Live Event before activating this one.",
         "invalid_taps_per_health_point": "The tap-to-health equivalence is not valid.",
+        "invalid_test_taps": "Use 1 to 100,000 taps per batch and an interval of 0.1 to 60 seconds.",
+        "test_taps_requires_active_event": "Activate Tap Farming and start the test again.",
+        "test_taps_started": "The test is sending taps to the game.",
+        "test_taps_stopped": "The test is stopped; taps already added are kept.",
         "invalid_action": "This action is not available in the current state."
       }
     },

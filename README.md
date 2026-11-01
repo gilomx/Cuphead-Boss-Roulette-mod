@@ -471,6 +471,12 @@ el saldo restante de nuevo, sin recuperar PV ya gastados. El porcentaje usa
 como 100% la vida original total: 1.000 PV originales más 500 extra son 150%.
 Sólo el relleno gráfico se limita al tamaño del corazón o de la barra.
 
+Al volver a juntar taps después de una derrota, el overlay muestra únicamente
+los taps y PV todavía disponibles, no el total histórico convertido. Al ganar
+se vacían inmediatamente los contadores y la reserva; el resumen de victoria
+se conserva por separado. Los taps nuevos ya se acumulan para el próximo jefe,
+incluso durante los resultados, y no se borran al volver al mapa.
+
 El robot incluye los PV locales de las tres piezas y el corazón, además de
 sus fases posteriores. Los avances internos de fase no gastan reserva.
 Otros jefes con PV locales (por ejemplo, componentes de Train o Veggies)
@@ -480,6 +486,12 @@ En Dice Palace, la ruta futura es variable: se protegen cuatro presupuestos
 iguales para tres combates y Main; combates adicionales no gastan el de Main.
 El porcentaje indica la **arena actual**, con su vida original y su presupuesto,
 en lugar de atribuir una vida total inventada a toda la ruta.
+
+En el panel de **Farmeando taps**, **Prueba de taps** permite activar y detener
+un envío continuo a la reserva real: por defecto, 10 taps cada segundo. Cantidad
+e intervalo se pueden cambiar durante la prueba. Continúa al cambiar de página
+y entre reintentos, se detiene al ganar o desactivar el evento y conserva la
+conversión vigente. Sólo alimenta Farmeada; no dispara reglas de Interacciones.
 
 [`tools/send-tap-farming-test.ps1`](tools/send-tap-farming-test.ps1) repite likes
 simulados de uno en uno para probar Farmeada: por defecto, 20 taps/s durante

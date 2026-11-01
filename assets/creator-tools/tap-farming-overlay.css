@@ -138,7 +138,10 @@ html[data-overlay-mode="embedded"] body {
   transform-origin: center;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 180ms ease, visibility 0s linear 180ms;
+  transition:
+    opacity 420ms ease,
+    transform 560ms cubic-bezier(.18, .86, .24, 1),
+    visibility 0s linear 420ms;
 }
 
 .tap-farming[data-phase="active"] .tap-heart-stage,
@@ -146,6 +149,25 @@ html[data-overlay-mode="embedded"] body {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;
+}
+
+.tap-farming[data-heart-entering="true"] .tap-heart-stage {
+  animation: tap-heart-stage-in 620ms cubic-bezier(.18, .86, .24, 1) 140ms both;
+}
+
+.tap-farming[data-heart-entering="true"] .tap-heart__percent,
+.tap-farming[data-heart-entering="true"][data-health-pending="false"] .tap-heart__remaining {
+  animation: tap-heart-content-in 500ms cubic-bezier(.18, .86, .24, 1) 540ms both;
+}
+
+@keyframes tap-heart-stage-in {
+  from { opacity: 0; transform: translateY(16px) scale(1.02); }
+  to { opacity: 1; transform: translateY(0) scale(1.2); }
+}
+
+@keyframes tap-heart-content-in {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 0.82; transform: translateY(0); }
 }
 
 .tap-farming[data-phase="off"] {

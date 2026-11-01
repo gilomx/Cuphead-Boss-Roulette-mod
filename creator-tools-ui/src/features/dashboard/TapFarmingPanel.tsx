@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useConfig } from "../../config/ConfigContext";
 import { useLocalization } from "../../i18n/LocalizationContext";
+import { TapFarmingTestControls } from "./TapFarmingTestControls";
 
 function normalizeConversionValue(value: number | undefined, fallback = 1) {
   const candidate = Number.isFinite(value) ? Math.floor(value ?? fallback) : fallback;
@@ -282,6 +283,8 @@ export function TapFarmingPanel() {
           </p>
         </section>
       </div>
+
+      <TapFarmingTestControls />
 
       <footer className="dashboard-pesky-battle__footer">
         <div>

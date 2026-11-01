@@ -243,6 +243,18 @@ let tapFarmingTapsPerConversion = 2;
 let tapFarmingHealthPointsPerConversion = 1;
 let tapFarmingFeedback = "ready";
 let tapFarmingError = false;
+let tapFarmingTotalTaps = 0;
+let tapFarmingTest = { active: false, quantity: 10, intervalSeconds: 1, sent: 0 };
+let nextTapFarmingTestAt = 0;
+setInterval(() => {
+  if (!tapFarmingTest.active || !["collecting", "active", "transition"].includes(tapFarmingPhase)) return;
+  const now = performance.now();
+  if (now < nextTapFarmingTestAt) return;
+  nextTapFarmingTestAt = now + tapFarmingTest.intervalSeconds * 1000;
+  tapFarmingTotalTaps += tapFarmingTest.quantity;
+  tapFarmingTest.sent += tapFarmingTest.quantity;
+  tapFarmingRevision += 1;
+}, 25).unref();
 let overlayComposerRevision = 1;
 const overlayComposerPreviews = new Map([
   ["vertical", { profileId: "vertical", revision: 0, runId: 0, sessionId: "", active: false }],
@@ -414,7 +426,7 @@ function overlayComposerState() {
 function tapFarmingState() {
   return {
     ready: true,
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: tapFarmingRevision,
     phase: tapFarmingPhase,
     sessionId: tapFarmingSessionId,
@@ -431,12 +443,13 @@ function tapFarmingState() {
       tapsPerHealthPoint:
         tapFarmingTapsPerConversion / tapFarmingHealthPointsPerConversion,
     },
+    testTaps: { ...tapFarmingTest },
     counters: {
-      totalTaps: 0,
-      bankedTaps: 0,
-      unconvertedTaps: 0,
-      convertedHealth: 0,
-      reserveHealth: 0,
+      totalTaps: tapFarmingTotalTaps,
+      bankedTaps: tapFarmingTotalTaps,
+      unconvertedTaps: tapFarmingTotalTaps % tapFarmingTapsPerConversion,
+      convertedHealth: Math.floor(tapFarmingTotalTaps / tapFarmingTapsPerConversion) * tapFarmingHealthPointsPerConversion,
+      reserveHealth: Math.floor(tapFarmingTotalTaps / tapFarmingTapsPerConversion) * tapFarmingHealthPointsPerConversion,
       spentHealth: 0,
     },
     boss: { currentHealth: 0, totalHealth: 0, progress: 0 },
@@ -2010,6 +2023,33 @@ createServer((req, res) => {
   if (url.pathname === "/api/config/tap-farming/set") {
     const action = (url.searchParams.get("operation") ??
       url.searchParams.get("action") ?? "").trim().toLowerCase();
+    if (action === "test_taps") {
+      const enabled = url.searchParams.get("testEnabled");
+      const quantity = Number(url.searchParams.get("testQuantity"));
+      const intervalSeconds = Number(url.searchParams.get("testIntervalSeconds"));
+      const session = Number(url.searchParams.get("sessionId"));
+      tapFarmingError = false;
+      if (!["true", "false"].includes(enabled) || !Number.isInteger(quantity) ||
+          quantity < 1 || quantity > 100000 || !Number.isFinite(intervalSeconds) ||
+          intervalSeconds < 0.1 || intervalSeconds > 60 || !Number.isInteger(session)) {
+        tapFarmingFeedback = "invalid_test_taps";
+        tapFarmingError = true;
+      } else if (enabled === "true" && (session !== tapFarmingSessionId ||
+          !["collecting", "active", "transition"].includes(tapFarmingPhase))) {
+        tapFarmingFeedback = "test_taps_requires_active_event";
+        tapFarmingError = true;
+      } else {
+        if (!tapFarmingTest.active || quantity !== tapFarmingTest.quantity ||
+            intervalSeconds !== tapFarmingTest.intervalSeconds) {
+          nextTapFarmingTestAt = performance.now() + intervalSeconds * 1000;
+        }
+        tapFarmingTest = { ...tapFarmingTest, active: enabled === "true", quantity, intervalSeconds };
+        tapFarmingFeedback = tapFarmingTest.active ? "test_taps_started" : "test_taps_stopped";
+      }
+      tapFarmingRevision += 1;
+      json(res, tapFarmingState(), 202);
+      return;
+    }
     const hasCanonicalTaps = url.searchParams.has("tapsPerConversion");
     const hasCanonicalHealth = url.searchParams.has("healthPointsPerConversion");
     const hasLegacyRate = url.searchParams.has("tapsPerHealthPoint");
@@ -2046,12 +2086,16 @@ createServer((req, res) => {
         tapFarmingError = true;
       } else {
         tapFarmingSessionId += 1;
+        tapFarmingTotalTaps = 0;
+        tapFarmingTest = { ...tapFarmingTest, active: false, sent: 0 };
         tapFarmingAttempt = 0;
         tapFarmingPhase = "collecting";
         tapFarmingFeedback = "tap_farming_activated";
       }
     } else if (["deactivate", "disable", "off", "cancel", "finish", "reset"].includes(action)) {
       tapFarmingPhase = "off";
+      tapFarmingTotalTaps = 0;
+      tapFarmingTest = { ...tapFarmingTest, active: false, sent: 0 };
       tapFarmingAttempt = 0;
       tapFarmingFeedback = "tap_farming_deactivated";
     }

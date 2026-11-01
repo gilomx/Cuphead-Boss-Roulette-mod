@@ -39,7 +39,7 @@ class Element {
   removeAttribute(name) { delete this.attributes[name]; }
 }
 
-function overlay() {
+function overlay({ motion = false } = {}) {
   const elements = new Map();
   const node = id => {
     if (!elements.has(id)) elements.set(id, new Element());
@@ -52,12 +52,19 @@ function overlay() {
     querySelector: node, querySelectorAll: () => [], addEventListener() {},
   };
   runInNewContext(overlaySource, { document, URLSearchParams, window: {
-    location: { search: "" }, matchMedia: () => ({ matches: true, addEventListener() {} }),
+    location: { search: "" }, matchMedia: () => ({ matches: !motion, addEventListener() {} }),
     LiveEventOverlayRuntime: { create(config) { runtime = config; } },
-    setTimeout(callback) { timers.set(++timerId, callback); return timerId; },
+    setTimeout(callback, delay) { timers.set(++timerId, { callback, delay }); return timerId; },
     clearTimeout(id) { timers.delete(id); }, requestAnimationFrame() { return 1; }, cancelAnimationFrame() {},
   } });
-  return { node, render: runtime.render, initialPreview: runtime.initialPreviewState };
+  return { node, render: runtime.render, initialPreview: runtime.initialPreviewState,
+    timers: delay => [...timers.values()].filter(timer => timer.delay === delay).length,
+    flush(delay) {
+      for (const [id, timer] of [...timers]) if (timer.delay === delay) {
+        timers.delete(id); timer.callback();
+      }
+    },
+  };
 }
 
 function snapshot() {
@@ -80,6 +87,7 @@ function panel(state, locale = "es") {
     if (name === "react") return { useEffect() {}, useMemo: compute => compute(), useState: value => [value, () => {}] };
     if (name === "lucide-react") return new Proxy({}, { get: (_, key) => "icon:" + key });
     if (name.endsWith("/ConfigContext")) return { useConfig: () => ({ tapFarming: state, liveEvents: null }) };
+    if (name.endsWith("/TapFarmingTestControls")) return { TapFarmingTestControls: () => null };
     if (name.endsWith("/LocalizationContext")) return { useLocalization: () => ({ locale,
       t: key => key.split(".").reduce((value, part) => value?.[part], dictionaries[locale]) ?? key }) };
     throw new Error("Unexpected panel dependency: " + name);
@@ -111,6 +119,68 @@ test("OBS displays raw growth above 100% and all effective HP while only liquid 
   assert.equal(view.node("tap-percent").textContent, "250%", "2.5 is a ratio, not a legacy 2.5 percent value");
   assert.equal(view.node("tap-health-remaining").textContent, "2,500 PV");
   assert.equal(view.node("tap-liquid-level").style.transform, "translateY(13px)");
+});
+
+test("retry collection displays only unspent taps/HP and victory reads its closed round summary", () => {
+  const view = overlay();
+  const state = snapshot();
+  state.phase = "collecting";
+  view.render(state);
+  assert.equal(view.node("tap-collecting-total").textContent, "1,000");
+  assert.equal(view.node("tap-collecting-health").textContent, "500");
+  assert.equal(view.node("tap-collecting-health-caption").textContent, "PV DISPONIBLES");
+  delete state.counters.bankedTaps;
+  state.counters.reserveHealth = 100;
+  state.counters.unconvertedTaps = 1;
+  view.render(state);
+  assert.equal(view.node("tap-collecting-total").textContent, "201", "legacy snapshots derive only the remaining balance");
+  assert.equal(view.node("tap-collecting-health").textContent, "100");
+  state.phase = "completed";
+  state.lastRound = { totalTaps: 1200, spentHealth: 600, attempts: 3 };
+  state.counters = { totalTaps: 0, bankedTaps: 0, reserveHealth: 0, convertedHealth: 0, spentHealth: 0 };
+  view.render(state);
+  assert.equal(view.node("tap-victory-taps").textContent, "1,200");
+  assert.equal(view.node("tap-victory-absorbed").textContent, "600 PV");
+  assert.equal(view.node("tap-victory-attempts").textContent, "3");
+  state.counters = { totalTaps: 20, bankedTaps: 20, reserveHealth: 10, convertedHealth: 10, spentHealth: 0 };
+  view.render(state);
+  assert.equal(view.node("tap-victory-taps").textContent, "1,200", "new likes cannot overwrite the victory result");
+  state.phase = "collecting";
+  view.render(state);
+  assert.equal(view.node("tap-collecting-total").textContent, "20");
+  assert.equal(view.node("tap-collecting-health").textContent, "10");
+});
+
+test("heart entry starts empty, fills once, reveals content, and survives live updates and native phase changes", () => {
+  const view = overlay({ motion: true });
+  const state = snapshot();
+  state.presentation.motion = true;
+  state.phase = "collecting";
+  view.render(state);
+  state.phase = "active";
+  view.render(state);
+  assert.equal(view.node("tap-farming").dataset.heartEntering, "true");
+  assert.equal(view.node("tap-liquid-level").style.transform, "translateY(258px)");
+  assert.equal(view.timers(340), 1);
+  assert.equal(view.timers(620), 1, "boss artwork waits for the heart's entrance");
+  state.effectiveHealth = { available: true, current: 400, total: 1000, ratio: .4 };
+  view.render(state);
+  assert.equal(view.timers(340), 1, "polls cannot restart the entrance timer");
+  view.flush(340);
+  assert.equal(view.node("tap-liquid-level").style.transform, "translateY(160px)", "fill uses the newest health sample");
+  state.phase = "transition";
+  view.render(state);
+  state.phase = "active";
+  view.render(state);
+  assert.equal(view.timers(340), 0, "native phase handoffs do not replay the whole heart entry");
+  view.flush(1350);
+  assert.equal(view.node("tap-farming").dataset.heartEntering, "false");
+  state.phase = "collecting"; view.render(state);
+  state.phase = "active"; state.attempt++; view.render(state);
+  assert.equal(view.node("tap-liquid-level").style.transform, "translateY(258px)", "retry re-arms an empty heart");
+  state.phase = "off"; view.render(state);
+  assert.equal(view.timers(340), 0, "leaving the heart phase cancels delayed fills");
+  assert.equal(view.timers(1350), 0);
 });
 
 test("panel retains raw percentage and accessible value above 100% while its bar stays within bounds", () => {
@@ -157,8 +227,8 @@ test("collecting, unavailable boss health, completed and retry preserve their di
   state.phase = "collecting";
   view.render(state);
   assert.equal(view.node("tap-farming").dataset.phase, "collecting");
-  assert.equal(view.node("tap-collecting-total").textContent, "1,200");
-  assert.equal(view.node("tap-collecting-health").textContent, "600");
+  assert.equal(view.node("tap-collecting-total").textContent, "1,000");
+  assert.equal(view.node("tap-collecting-health").textContent, "500");
   state.phase = "completed";
   state.effectiveHealth = { available: true, current: 0, total: 1000, ratio: 0 };
   view.render(state);

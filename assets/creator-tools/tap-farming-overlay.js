@@ -78,7 +78,7 @@
       tapSingular: "TAP",
       tapPlural: "TAPS",
       collectingTaps: "TAPS",
-      convertedHealth: "PV CONVERTIDOS",
+      convertedHealth: "PV DISPONIBLES",
       roundTaps: "TAPS TOTALES",
       victory: "¡VICTORIA!",
       attempts: "Intentos",
@@ -94,7 +94,7 @@
       tapSingular: "TAP",
       tapPlural: "TAPS",
       collectingTaps: "TAPS",
-      convertedHealth: "HP CONVERTED",
+      convertedHealth: "HP AVAILABLE",
       roundTaps: "TOTAL TAPS",
       victory: "VICTORY!",
       attempts: "Attempts",
@@ -127,6 +127,10 @@
   let motionEnabled = true;
   let animationFrame = 0;
   let staticMotionApplied = false;
+  let heartWasVisible = false;
+  let heartEntryFillTimer = 0;
+  let heartEntryEndTimer = 0;
+  let targetLiquidTransform = "translateY(258px)";
 
   const message = (template, values = {}) => Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
@@ -279,6 +283,7 @@
     const boss = objectValue(state.boss);
     const effectiveHealth = objectValue(state.effectiveHealth);
     const conversion = objectValue(state.conversion);
+    const lastRound = objectValue(state.lastRound);
     const rawPhases = Array.isArray(state.phases) ? state.phases : [];
     const phase = normalizedPhase(state.phase);
     const phaseCount = clamp(Math.round(firstNumber(
@@ -348,6 +353,14 @@
       ),
       spentHealth: nonnegative(counters.spentHealth, state.spentHealth),
       totalTaps: nonnegative(counters.totalTaps, state.totalTaps),
+      bankedTaps: nonnegative(counters.bankedTaps, state.bankedTaps,
+        reserveHealth * Math.max(1, firstNumber(conversion.tapsPerConversion,
+          conversion.tapsPerHealthPoint, 1)) /
+          Math.max(1, firstNumber(conversion.healthPointsPerConversion, 1)) +
+          nonnegative(counters.unconvertedTaps)),
+      victoryTaps: nonnegative(lastRound.totalTaps, counters.totalTaps, state.totalTaps),
+      victorySpent: nonnegative(lastRound.spentHealth, counters.spentHealth, state.spentHealth),
+      victoryAttempts: Math.max(1, Math.round(firstNumber(lastRound.attempts, state.attempt, 1))),
       tapsPerConversion: Math.max(1, Math.round(firstNumber(
         conversion.tapsPerConversion,
         conversion.tapsPerHealthPoint,
@@ -449,7 +462,7 @@
     return "";
   };
 
-  const updateBossImage = (snapshot) => {
+  const updateBossImage = (snapshot, entering = false) => {
     const eligiblePhase = ["active", "transition"]
       .includes(snapshot.phase);
     const path = eligiblePhase ? bossImagePath(snapshot) : "";
@@ -474,8 +487,40 @@
       bossImageTimer = 0;
       if (activeBossImageKey !== key) return;
       bossImage.dataset.visible = "true";
-    }, 300);
+    }, entering ? 620 : 300);
     return true;
+  };
+
+  const cancelHeartEntry = () => {
+    if (heartEntryFillTimer) window.clearTimeout(heartEntryFillTimer);
+    if (heartEntryEndTimer) window.clearTimeout(heartEntryEndTimer);
+    heartEntryFillTimer = heartEntryEndTimer = 0;
+    root.dataset.heartEntering = "false";
+  };
+
+  const updateHeartEntry = (heartPhase, animateEntry) => {
+    const entering = heartPhase && !heartWasVisible && animateEntry;
+    heartWasVisible = heartPhase;
+    if (!heartPhase || !animateEntry) cancelHeartEntry();
+    if (entering) {
+      cancelHeartEntry();
+      // Establish the empty state before revealing the heart. Reusing a full
+      // hidden SVG across attempts otherwise skips its filling transition.
+      liquidLevel.style.transition = "none";
+      liquidLevel.style.transform = "translateY(258px)";
+      void root.offsetWidth;
+      liquidLevel.style.transition = "";
+      root.dataset.heartEntering = "true";
+      heartEntryFillTimer = window.setTimeout(() => {
+        heartEntryFillTimer = 0;
+        liquidLevel.style.transform = targetLiquidTransform;
+      }, 340);
+      heartEntryEndTimer = window.setTimeout(() => {
+        heartEntryEndTimer = 0;
+        root.dataset.heartEntering = "false";
+      }, 1350);
+    }
+    return entering;
   };
 
   const render = (state, context = {}) => {
@@ -492,6 +537,8 @@
     const healthPercent = Math.round(healthRatio * 100);
     const collectedPoints = format(snapshot.reserveHealth);
     const metricValue = `${healthPercent}%`;
+    const entering = updateHeartEntry(heartPhase,
+      presentation.motion && !reducedMotion.matches);
 
     root.dataset.phase = snapshot.phase;
     root.dataset.valueMode = "percent";
@@ -504,25 +551,26 @@
     applyColors(presentation);
     root.style.setProperty("--metric-font-size", "46px");
 
-    liquidLevel.style.transform = `translateY(${258 - clamp(healthRatio, 0, 1) * 245}px)`;
-    const hasBossImage = updateBossImage(snapshot);
+    targetLiquidTransform = `translateY(${258 - clamp(healthRatio, 0, 1) * 245}px)`;
+    if (!heartEntryFillTimer) liquidLevel.style.transform = targetLiquidTransform;
+    const hasBossImage = updateBossImage(snapshot, entering);
     percent.setAttribute("y", hasBossImage ? "191" : "161");
     percent.textContent = metricValue;
     healthRemaining.setAttribute("y", hasBossImage ? "217" : "187");
     healthRemaining.textContent = pendingBossHealth
       ? ""
       : `${format(snapshot.currentHealth)} ${text.healthPointsShort}`;
-    collectingTotal.textContent = format(snapshot.totalTaps);
-    collectingHealth.textContent = format(snapshot.convertedHealth);
+    collectingTotal.textContent = format(snapshot.bankedTaps);
+    collectingHealth.textContent = format(snapshot.reserveHealth);
     collectingConversion.textContent = message(text.conversion, {
       taps: format(snapshot.tapsPerConversion),
       tapUnit: snapshot.tapsPerConversion === 1 ? text.tapSingular : text.tapPlural,
       health: format(snapshot.healthPointsPerConversion),
       healthUnit: text.healthPointsShort,
     });
-    victoryTaps.textContent = format(snapshot.totalTaps);
-    victoryAttempts.textContent = format(Math.max(1, snapshot.attempt));
-    victoryAbsorbed.textContent = `${format(snapshot.spentHealth)} ${text.healthPointsShort}`;
+    victoryTaps.textContent = format(snapshot.victoryTaps);
+    victoryAttempts.textContent = format(snapshot.victoryAttempts);
+    victoryAbsorbed.textContent = `${format(snapshot.victorySpent)} ${text.healthPointsShort}`;
     heartLabel.textContent = pendingBossHealth
       ? message(text.heartPendingAria, { reserve: collectedPoints })
       : message(text.heartAria, {

@@ -12,6 +12,7 @@ internal static class TapPhaseDistributionTests
         TestGenericDistribution();
         TestDicePalaceHandoffsAndProtectedMain();
         TestFailedReaderPreservesNativeDamage();
+        TestVictoryStartsNewBalance();
     }
 
     private static void TestGenericDistribution()
@@ -41,6 +42,9 @@ internal static class TapPhaseDistributionTests
             Hit(taps, properties, 100, 0);
             Near(450, Reserve(taps, server));
             taps.OnLevelDefeated(level);
+            Near(450, Reserve(taps, server));
+            using (var retry = JsonDocument.Parse(server.TapState))
+                Near(450, retry.RootElement.GetProperty("counters").GetProperty("bankedTaps").GetDouble());
             properties.stateIndex = 0; properties.CurrentHealth = 1000;
             taps.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 401 });
             Hit(taps, properties, 91, 1); // Remaining 450 repartitions 90/180/180.
@@ -160,6 +164,46 @@ internal static class TapPhaseDistributionTests
             AssertBalances(fixture, 450, 0, 0, 450);
             Near(799, properties.CurrentHealth);
             Console.WriteLine("PASS failed native phase reads leave damage/reserve intact, resume lifecycle and recover within the snapshot throttle");
+        }
+    }
+
+    private static void TestVictoryStartsNewBalance()
+    {
+        using (var fixture = new Fixture())
+        {
+            var first = fixture.Start(Levels.Ground, 700);
+            Deposit(fixture.Taps, 1000);
+            Hit(fixture.Taps, new Properties(), 150, 0);
+            fixture.Taps.OnLevelDefeated(first);
+            AssertBalances(fixture, 850); // No phase projection while collecting.
+            var retry = fixture.Start(Levels.Ground, 701);
+            Hit(fixture.Taps, new Properties(), 160, 0);
+            AssertBalances(fixture, 690, 10, 340, 340);
+            fixture.Taps.OnLevelPreWin(first); // Late notification from a dead attempt.
+            Near(690, Reserve(fixture.Taps, fixture.Server));
+            fixture.Taps.OnLevelPreWin(retry);
+            using (var won = fixture.State())
+            {
+                var root = won.RootElement;
+                foreach (var field in new[] { "totalTaps", "bankedTaps", "unconvertedTaps", "convertedHealth", "reserveHealth", "spentHealth" })
+                    Near(0, root.GetProperty("counters").GetProperty(field).GetDouble());
+                Near(1000, root.GetProperty("lastRound").GetProperty("totalTaps").GetInt64());
+                Near(310, root.GetProperty("lastRound").GetProperty("spentHealth").GetDouble());
+                Near(2, root.GetProperty("lastRound").GetProperty("attempts").GetInt32());
+            }
+            Deposit(fixture.Taps, 9);
+            fixture.Taps.OnMapEntered();
+            fixture.Taps.Update(fixture.Server, true); // The ending Level can still be exposed.
+            using (var collecting = fixture.State())
+            {
+                Check(collecting.RootElement.GetProperty("phase").GetString() == "collecting", "completed native level must not reattach");
+                Near(9, collecting.RootElement.GetProperty("counters").GetProperty("totalTaps").GetInt64());
+                Near(9, collecting.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble());
+            }
+            fixture.Start(Levels.Ground, 702);
+            Hit(fixture.Taps, new Properties(), 1, 0);
+            Near(8, Reserve(fixture.Taps, fixture.Server));
+            Console.WriteLine("PASS retry never refunds consumed reserve; victory clears counters and starts a fresh bank without losing results-screen likes");
         }
     }
 

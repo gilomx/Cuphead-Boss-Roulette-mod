@@ -75,6 +75,7 @@ interface ConfigValue {
   ) => void;
   deactivateTapFarming: () => void;
   resetTapFarming: () => void;
+  setTapFarmingTest: (active: boolean, quantity: number, intervalSeconds: number) => Promise<void>;
   saveStreamRule: (draft: StreamRuleDraft) => boolean;
   deleteStreamRule: (id: number) => boolean;
   duplicateStreamRule: (id: number) => void;
@@ -1263,12 +1264,19 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const sendTapFarmingUpdate = useCallback(
     (
-      operation: "activate" | "deactivate" | "finish" | "save",
+      operation: "activate" | "deactivate" | "finish" | "save" | "test_taps",
       tapsPerConversion?: number,
       healthPointsPerConversion?: number,
+      test?: { active: boolean; quantity: number; intervalSeconds: number },
     ) => {
-      if (!tapFarming?.ready) return;
+      if (!tapFarming?.ready) return Promise.resolve();
       const query = new URLSearchParams({ operation });
+      if (test) {
+        query.set("testEnabled", String(test.active));
+        query.set("testQuantity", String(test.quantity));
+        query.set("testIntervalSeconds", String(test.intervalSeconds));
+        query.set("sessionId", String(tapFarming.sessionId));
+      }
       if (tapsPerConversion !== undefined) {
         query.set("tapsPerConversion", String(tapsPerConversion));
       }
@@ -1283,6 +1291,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         .then((response) => {
           if (!response.ok) throw new Error("HTTP " + response.status);
           if (mountedRef.current) setStatus("pending");
+          if (test) return load();
           window.setTimeout(() => void load(), 120);
         })
         .catch(() => {
@@ -1293,6 +1302,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         });
       tapFarmingWriteChainRef.current =
         tapFarmingWriteChainRef.current.then(send, send);
+      return tapFarmingWriteChainRef.current;
     },
     [load, tapFarming],
   );
@@ -1324,6 +1334,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       );
     },
     [sendTapFarmingUpdate, tapFarming],
+  );
+
+  const setTapFarmingTest = useCallback(
+    (active: boolean, quantity: number, intervalSeconds: number) =>
+      sendTapFarmingUpdate("test_taps", undefined, undefined,
+        { active, quantity, intervalSeconds }),
+    [sendTapFarmingUpdate],
   );
 
   const activateTapFarming = useCallback(
@@ -1643,6 +1660,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       activateTapFarming,
       deactivateTapFarming,
       resetTapFarming,
+      setTapFarmingTest,
       saveStreamRule,
       deleteStreamRule,
       duplicateStreamRule,
@@ -1694,6 +1712,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       activateTapFarming,
       deactivateTapFarming,
       resetTapFarming,
+      setTapFarmingTest,
       saveStreamRule,
       deleteStreamRule,
       duplicateStreamRule,

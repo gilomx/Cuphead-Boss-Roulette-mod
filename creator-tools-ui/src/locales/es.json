@@ -307,6 +307,17 @@
       }
     },
     "tapFarming": {
+      "test": {
+        "title": "Prueba de taps",
+        "description": "Añade taps simulados a la reserva real con la conversión actual, sólo para Farmeando taps. Continúa al cambiar de página y se detiene al finalizar el evento.",
+        "on": "Enviando taps",
+        "off": "Desactivada",
+        "quantity": "Taps por envío",
+        "interval": "Enviar cada (segundos)",
+        "sent": "{count} taps de prueba enviados",
+        "ready": "Lista para enviar taps al juego.",
+        "activateFirst": "Activa Farmeando taps para iniciar la prueba."
+      },
       "eyebrow": "Juego del live",
       "title": "Farmeando taps",
       "description": "Los taps de toda la comunidad se combinan y aumentan la vida del jefe. Mientras más taps consigan, más tiempo durará la pelea.",
@@ -393,6 +404,10 @@
         "tap_farming_setting_locked": "La conversión queda congelada mientras el evento está activo.",
         "blocked_by_live_event": "Finaliza el otro Evento Live antes de activar este.",
         "invalid_taps_per_health_point": "La equivalencia entre taps y puntos de vida no es válida.",
+        "invalid_test_taps": "Usa de 1 a 100 000 taps por envío y un intervalo de 0.1 a 60 segundos.",
+        "test_taps_requires_active_event": "Activa Farmeando taps y vuelve a iniciar la prueba.",
+        "test_taps_started": "La prueba está enviando taps al juego.",
+        "test_taps_stopped": "La prueba está detenida; los taps ya añadidos se conservan.",
         "invalid_action": "Esta acción no está disponible en el estado actual."
       }
     },

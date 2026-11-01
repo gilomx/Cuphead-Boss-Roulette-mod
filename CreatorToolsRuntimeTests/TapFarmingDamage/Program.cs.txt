@@ -24,6 +24,8 @@ internal static partial class Program
         TestRobotLocalTranspilers();
         TestRobotLocalPatchFailure();
         TestRobotNativeHealthAdapter();
+        TestTapGenerator();
+        TestRobotRetryKeepsOnlyUnspentReserve();
         Console.WriteLine("All Tap Farming damage bridge tests passed (scope guards, Robot local IL full/partial/zero damage, future reserve, partial-install failure, native health adapter, exception cleanup and thread isolation).");
     }
 
@@ -218,6 +220,17 @@ internal static partial class Program
                 using (var json = JsonDocument.Parse(server.State))
                     return json.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble();
             }
+        }
+
+        internal void RetryRobot()
+        {
+            taps.OnLevelDefeated(Level.Current);
+            Properties.stateIndex = 0;
+            var head = new RobotLevelRobotHead(); head.Init(Properties, 5f, 1f);
+            var chest = new RobotLevelRobotChest(); chest.Init(Properties, 5f, 5f);
+            var hatch = new RobotLevelRobotHatch(); hatch.Init(Properties, 5f, 1f);
+            Level.Current = new RobotLevel(Properties, new RobotLevelRobot(head, chest, hatch)) { Id = 22 };
+            taps.OnLevelStarted(Level.Current);
         }
 
         internal double ProjectedBossHealth

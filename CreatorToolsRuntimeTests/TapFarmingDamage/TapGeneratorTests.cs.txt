@@ -1,0 +1,112 @@
+using System;
+using System.Globalization;
+using System.IO;
+using System.Text.Json;
+using Gilomx.CupheadBossRoulette;
+
+internal static partial class Program
+{
+    private static void TestTapGenerator()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "pichi-tap-generator-" + Guid.NewGuid().ToString("N"));
+        var previousLevel = Level.Current;
+        Directory.CreateDirectory(directory);
+        try
+        {
+            Level.Current = null;
+            double now = 0d;
+            var server = new CreatorToolsServer();
+            var farm = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"),
+                new CreatorToolsLiveEventsCoordinator(), null, null, () => now);
+            Func<JsonElement> snapshot = () => {
+                farm.PublishState(server);
+                using (var json = JsonDocument.Parse(server.State)) return json.RootElement.Clone();
+            };
+            Func<long> total = () => snapshot().GetProperty("counters").GetProperty("totalTaps").GetInt64();
+            Func<bool, int, double, int, string> command = (enabled, quantity, interval, session) =>
+                "operation=test_taps&testEnabled=" + enabled.ToString().ToLowerInvariant() +
+                "&testQuantity=" + quantity + "&testIntervalSeconds=" + interval.ToString(CultureInfo.InvariantCulture) + "&sessionId=" + session;
+            var defaults = snapshot().GetProperty("testTaps");
+            Check(!defaults.GetProperty("active").GetBoolean() && defaults.GetProperty("quantity").GetInt32() == 10 &&
+                defaults.GetProperty("intervalSeconds").GetDouble() == 1, "tap generator defaults to off, 10 taps every second");
+            farm.ProcessBackgroundCommand(command(true, 10, 1, 0));
+            Check(snapshot().GetProperty("error").GetBoolean(), "starting a test while farming is off is rejected");
+            farm.ProcessBackgroundCommand("operation=activate&tapsPerConversion=3&healthPointsPerConversion=2");
+            var sessionId = snapshot().GetProperty("sessionId").GetInt32();
+            farm.ProcessBackgroundCommand(command(true, 10, 1, sessionId));
+            now = 0.99; farm.Update(server, false);
+            Check(total() == 0, "no test taps before the configured interval");
+            now = 1; farm.Update(server, false);
+            var first = snapshot();
+            Check(total() == 10 && first.GetProperty("counters").GetProperty("reserveHealth").GetDouble() == 6 &&
+                first.GetProperty("counters").GetProperty("unconvertedTaps").GetInt64() == 1,
+                "test taps use the real conversion and retain conversion remainders");
+            farm.Update(server, false);
+            Check(total() == 10, "multiple updates at the same time cannot duplicate a batch");
+            now = 100; farm.Update(server, false);
+            Check(total() == 20, "a delayed frame emits one batch, without a catch-up burst");
+            farm.ProcessBackgroundCommand(command(true, 3, 0.5, sessionId));
+            now = 100.49; farm.Update(server, false);
+            Check(total() == 20, "editing an active test reschedules its next batch");
+            now = 100.5; farm.Update(server, false);
+            Check(total() == 23, "new quantity and frequency take effect while running");
+            foreach (var invalid in new[] { command(true, 0, .5, sessionId), command(true, 100001, .5, sessionId),
+                command(true, 3, .09, sessionId), command(true, 3, 61, sessionId),
+                command(true, 3, .5, sessionId).Replace("0.5", "NaN"),
+                command(true, 3, .5, sessionId).Replace("0.5", "Infinity") })
+            {
+                farm.ProcessBackgroundCommand(invalid);
+                var rejected = snapshot();
+                Check(rejected.GetProperty("error").GetBoolean() && rejected.GetProperty("testTaps").GetProperty("active").GetBoolean() &&
+                    rejected.GetProperty("testTaps").GetProperty("quantity").GetInt32() == 3 &&
+                    rejected.GetProperty("testTaps").GetProperty("intervalSeconds").GetDouble() == .5,
+                    "invalid test settings leave the running generator unchanged");
+            }
+            farm.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = 4 });
+            Check(total() == 27 && snapshot().GetProperty("testTaps").GetProperty("sent").GetInt64() == 23,
+                "real taps coexist with test taps without inflating the test counter");
+            farm.ProcessBackgroundCommand(command(false, 3, .5, sessionId));
+            now = 200; farm.Update(server, false);
+            Check(total() == 27 && !snapshot().GetProperty("testTaps").GetProperty("active").GetBoolean(),
+                "switching off immediately stops future taps while keeping the reserve");
+            farm.ProcessBackgroundCommand(command(true, 3, .5, sessionId));
+            var level = new Level { Id = 145, CurrentLevel = Levels.Ground, LevelType = Level.Type.Battle };
+            Level.Current = level; farm.OnLevelStarted(level);
+            farm.OnLevelEnded(level);
+            Check(snapshot().GetProperty("testTaps").GetProperty("active").GetBoolean(), "test continues through defeat and retry within the event");
+            Level.Current = level; farm.OnLevelStarted(level);
+            farm.OnLevelPreWin(level);
+            Check(!snapshot().GetProperty("testTaps").GetProperty("active").GetBoolean(), "victory stops the generator immediately");
+            now = 300; farm.Update(server, false);
+            Check(total() == 0, "winning resets the round and stops the test generator");
+            var victory = snapshot();
+            Check(victory.GetProperty("lastRound").GetProperty("totalTaps").GetInt64() == 27 &&
+                victory.GetProperty("counters").GetProperty("reserveHealth").GetDouble() == 0,
+                "victory summary is separate from the cleared live counters");
+            farm.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = 6 });
+            Check(total() == 6, "real likes during the victory screen already collect for the next boss");
+            farm.OnMapEntered();
+            Check(total() == 6 && snapshot().GetProperty("counters").GetProperty("reserveHealth").GetDouble() == 4,
+                "entering the map preserves taps gathered after the victory");
+            farm.ProcessBackgroundCommand("operation=finish");
+            farm.ProcessBackgroundCommand("operation=activate");
+            farm.ProcessBackgroundCommand(command(true, 3, .5, sessionId));
+            Check(snapshot().GetProperty("error").GetBoolean() && !snapshot().GetProperty("testTaps").GetProperty("active").GetBoolean(),
+                "a delayed start from an earlier event cannot enable a new session's test");
+            sessionId = snapshot().GetProperty("sessionId").GetInt32();
+            farm.ProcessBackgroundCommand(command(true, 100000, .1, sessionId));
+            now = 300.1; farm.Update(server, false);
+            Check(total() == 100000, "configured upper quantity and lower interval bounds are accepted");
+            farm.ProcessBackgroundCommand("operation=deactivate");
+            now = 400; farm.Update(server, false);
+            Check(total() == 0 && !snapshot().GetProperty("testTaps").GetProperty("active").GetBoolean(),
+                "deactivating the event clears the generator and cannot leak taps into the next session");
+        }
+        finally
+        {
+            Level.Current = previousLevel;
+            Directory.Delete(directory, true);
+        }
+        Console.WriteLine("Tap generator tests passed: clock, live edits, conversion, stop, completion, retries and stale-session rejection.");
+    }
+}

@@ -8,6 +8,19 @@ using HarmonyLib;
 
 internal static partial class Program
 {
+    private static void TestRobotRetryKeepsOnlyUnspentReserve()
+    {
+        using (var fixture = new Fixture())
+        {
+            fixture.PlayerHit(7f);
+            Check(Near(fixture.Reserve, 993), "Robot damage consumes only its current reserve budget");
+            fixture.RetryRobot();
+            Check(Near(fixture.Reserve, 993), "fresh Robot parts on retry cannot refund consumed reserve");
+            fixture.PlayerHit(7f);
+            Check(Near(fixture.Reserve, 986), "retry spends the remaining reserve without reusing the original deposit");
+        }
+    }
+
     private static void TestRobotLocalTranspilers()
     {
         using (var fixture = new Fixture())
