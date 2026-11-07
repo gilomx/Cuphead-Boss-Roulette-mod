@@ -1,0 +1,51 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Pipes;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Gilomx.CupheadBossRoulette
+{
+    internal static partial class Program
+    {
+        private static void RunOverlayReadyTests()
+        {
+            Run("Overlay-ready pipe names match the Node receiver for the same Windows user", TestOverlayReadyPipeName);
+            Run("Overlay readiness sends one UTF-8 notification over the local pipe", TestOverlayReadyPipe);
+            Run("Overlay readiness tolerates an absent Gililili without ongoing retries", TestOverlayReadyAbsent);
+        }
+
+        private static void TestOverlayReadyPipeName()
+        {
+            True(CreatorToolsOverlayReady.PipeName("Streamer") == "gililili-overlay-ready-2425f1cb1d9da41d84c61595", "Node and .NET pipe names differ");
+            True(CreatorToolsOverlayReady.PipeName("STREAMER") == CreatorToolsOverlayReady.PipeName("streamer"), "Windows username case changed the channel");
+        }
+
+        private static void TestOverlayReadyPipe()
+        {
+            string name = "gililili-ready-test-" + Guid.NewGuid().ToString("N");
+            string instance = Guid.NewGuid().ToString("N");
+            using (var server = new NamedPipeServerStream(name, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+            {
+                var received = Task.Run(async () =>
+                {
+                    await server.WaitForConnectionAsync();
+                    using (var reader = new StreamReader(server, Encoding.UTF8))
+                        return new[] { await reader.ReadLineAsync(), await reader.ReadLineAsync() };
+                });
+                True(CreatorToolsOverlayReady.TryNotify(name, instance, 18081, 500), "notification did not connect");
+                True(received.Wait(3000), "pipe notification did not complete");
+                True(received.Result[0] == "{\"version\":1,\"server\":\"pichi-ruleta\",\"instanceId\":\"" + instance + "\",\"port\":18081}", "unexpected readiness payload");
+                True(received.Result[1] == null, "publisher sent more than one message");
+            }
+        }
+
+        private static void TestOverlayReadyAbsent()
+        {
+            var timer = Stopwatch.StartNew();
+            True(!CreatorToolsOverlayReady.TryNotify("gililili-absent-" + Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), 18081, 20), "absent Gililili should be optional");
+            True(timer.ElapsedMilliseconds < 1500, "optional notification blocked startup");
+        }
+    }
+}

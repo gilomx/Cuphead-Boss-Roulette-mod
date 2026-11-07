@@ -81,6 +81,14 @@ la conexión, conserva el último estado, usa consultas HTTP independientes cada
 250 ms y vuelve a conectar automáticamente. Las vistas del diseñador siguen
 recibiendo sólo su simulación y no abren conexiones al estado de la partida.
 
+Con Gililili actualizado y conectado a OBS, el servidor de la ruleta avisa una
+sola vez al terminar de arrancar. Gililili recupera sus fuentes de navegador
+al recibir ese aviso, incluso si el juego se abre horas después. El aviso usa
+un canal local de Windows por usuario y no requiere configurar puertos ni
+mantener consultas periódicas de disponibilidad. Si la ruleta se abre primero,
+Gililili comprueba las fuentes una vez cuando conecta con OBS. Gililili es
+opcional: su ausencia no retrasa el juego ni genera errores en el panel.
+
 Validación sin iniciar Cuphead:
 
 ```powershell

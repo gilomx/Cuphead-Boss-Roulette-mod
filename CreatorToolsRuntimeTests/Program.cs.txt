@@ -49,6 +49,7 @@ namespace Gilomx.CupheadBossRoulette
             RunNativeLoadingBarrierTests();
             RunInteractionsOverlayComposerTests();
             RunPanelPublicationTests();
+            RunOverlayReadyTests();
             RunDashboardOnDemandTests();
             Run("Evaluate creates backlog without Enqueue",
                 TestEvaluateOnlyCreatesBacklog);

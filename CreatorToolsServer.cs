@@ -261,6 +261,8 @@ namespace Gilomx.CupheadBossRoulette
             broadcastThread.Name = "La Pichi Ruleta Creator Tools WebSocket";
             broadcastThread.Start();
 
+            CreatorToolsOverlayReady.Publish(Port);
+
             if (logInfo != null)
                 logInfo("Creator Tools listening on http://127.0.0.1:" +
                     Port + "/.");

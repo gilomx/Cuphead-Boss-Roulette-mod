@@ -17,6 +17,8 @@
     <Compile Include="Program.cs.txt" Link="Program.cs" />
     <Compile Include="StreamStressTests.cs.txt" Link="StreamStressTests.cs" />
     <Compile Include="PanelPublicationTests.cs.txt" />
+    <Compile Include="OverlayReadyTests.cs.txt" />
+    <Compile Include="..\CreatorToolsOverlayReady.cs" Link="Product\CreatorToolsOverlayReady.cs" />
     <Compile Include="DashboardOnDemandTests.cs.txt" />
     <Compile Include="SettingsTransferTests.cs.txt" Link="SettingsTransferTests.cs" />
     <Compile Include="InteractionsOverlayComposerTests.cs.txt" Link="InteractionsOverlayComposerTests.cs" />
