@@ -22,10 +22,11 @@ static class Program
         catalog.Pools["modifier"] = new List<ChatChoice> { Option(0, kind: "ground"), Option(1, kind: "plane"), Option(2, true) };
         return catalog;
     }
-    static CreatorToolsChatChoosesController New(bool challenge = true, bool plane = false, CreatorToolsLiveEventsCoordinator coordinator = null, bool dev = false)
+    static CreatorToolsChatChoosesController New(bool challenge = true, bool plane = false, CreatorToolsLiveEventsCoordinator coordinator = null, bool dev = false, Action<string> publishVoteRound = null)
     {
         now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
-        var c = new CreatorToolsChatChoosesController(coordinator ?? new CreatorToolsLiveEventsCoordinator(), challenge, new Random(123), () => now, dev);
+        var c = new CreatorToolsChatChoosesController(coordinator ?? new CreatorToolsLiveEventsCoordinator(),
+            challenge, new Random(123), () => now, dev, publishVoteRound);
         c.SetCatalog(Catalog(plane), true);
         Assert(c.Command("operation=start&mode=" + (challenge ? "with" : "without")), "start");
         return c;
@@ -45,6 +46,26 @@ static class Program
         var state = State(c);
         return $"operation=test_votes&sessionId={state.GetProperty("sessionId")}&round={state.GetProperty("round")}";
     }
+    static void TestVoteNotices()
+    {
+        var notices = new List<string>();
+        var c = New(publishVoteRound: notices.Add);
+        var state = State(c);
+        var notice = JsonDocument.Parse(notices.Single()).RootElement;
+        Assert(notice.GetProperty("stage").GetString() == "boss", "start announces the boss round");
+        Assert(notice.GetProperty("openedAt").GetInt64() == new DateTimeOffset(now).ToUnixTimeMilliseconds(), "announce opening time");
+        Assert(notice.GetProperty("options").EnumerateArray().Select(x => x.GetString())
+            .SequenceEqual(state.GetProperty("options").EnumerateArray().Select(x => x.GetProperty("name").GetString())),
+            "announce options in ballot order");
+        Assert(c.Observe(Vote("viewer", "1")) == "chat_vote_counted" && notices.Count == 1, "count locally without publishing ballots");
+        Close(c);
+        Assert(notices.Count == 2 && notices[1] == "null", "stop matching votes when the winner is revealed");
+        Advance(c);
+        Assert(notices.Count == 3 && JsonDocument.Parse(notices[2]).RootElement.GetProperty("stage").GetString() == "weapon1",
+            "announce the next round");
+        Assert(c.Command("operation=stop") && notices.Count == 4 && notices[3] == "null", "cancellation closes voting");
+    }
+
     static void TestDevVotes()
     {
         var c = New();
@@ -295,6 +316,7 @@ static class Program
         Assert(c.Observe(invalid) == "", "invalid timestamp remains rejected");
         invalid.ReceivedAt = "2026-10-05T11:59:59.999Z";
         Assert(c.Observe(invalid) == "", "old millisecond timestamp remains rejected");
+        TestVoteNotices();
         TestDevVotes();
         TestRoundReceiptFence();
         TestCardEntrance();

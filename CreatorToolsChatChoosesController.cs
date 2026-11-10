@@ -33,6 +33,7 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Random random;
         private readonly Func<DateTime> clock;
         private readonly bool developmentTools;
+        private readonly Action<string> publishVoteRound;
         private readonly Dictionary<string, int> votes = new Dictionary<string, int>();
         private readonly ChatChoice[] selected = new ChatChoice[6];
         private ChatChoosesCatalog catalog;
@@ -62,13 +63,15 @@ namespace Gilomx.CupheadBossRoulette
 
         internal CreatorToolsChatChoosesController(
             CreatorToolsLiveEventsCoordinator coordinator, bool withChallenge,
-            Random random = null, Func<DateTime> clock = null, bool developmentTools = false)
+            Random random = null, Func<DateTime> clock = null, bool developmentTools = false,
+            Action<string> publishVoteRound = null)
         {
             this.coordinator = coordinator;
             this.withChallenge = withChallenge;
             this.random = random ?? new Random();
             this.clock = clock ?? delegate { return DateTime.UtcNow; };
             this.developmentTools = developmentTools;
+            this.publishVoteRound = publishVoteRound;
         }
 
         internal bool WithChallenge { get { lock (stateLock) return withChallenge; } }
@@ -102,6 +105,7 @@ namespace Gilomx.CupheadBossRoulette
                     return RejectLocked("development_only");
                 if (action == "stop" || action == "finish")
                 {
+                    if (phase == "voting") publishVoteRound?.Invoke("null");
                     ReleaseLocked(); phase = "off"; feedback = "ready"; error = false;
                     votes.Clear(); choices.Clear(); counts = new int[0];
                     Array.Clear(selected, 0, selected.Length); revision++;
@@ -146,6 +150,7 @@ namespace Gilomx.CupheadBossRoulette
                 selected[stage] = choices[winner];
                 if (stage == 0) plane = selected[0].Plane;
                 phase = "reveal"; until = clock().AddSeconds(1.5);
+                publishVoteRound?.Invoke("null");
                 feedback = "ready"; error = false; revision++;
                 return true;
             }
@@ -312,6 +317,23 @@ namespace Gilomx.CupheadBossRoulette
             { ReleaseLocked(); phase = "off"; RejectLocked("no_options"); return; }
             counts = new int[choices.Count]; votes.Clear(); winner = -1; outcome = string.Empty;
             openedAt = clock(); round++; phase = "voting"; feedback = "ready"; error = false; revision++;
+            if (publishVoteRound != null) publishVoteRound(VoteRoundNoticeLocked());
+        }
+
+        private string VoteRoundNoticeLocked()
+        {
+            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var timestamp = (openedAt.Ticks - epoch.Ticks) / TimeSpan.TicksPerMillisecond;
+            var builder = new StringBuilder("{\"openedAt\":");
+            builder.Append(timestamp.ToString(CultureInfo.InvariantCulture)).Append(",\"stage\":");
+            AppendString(builder, Stages[stage]);
+            builder.Append(",\"options\":[");
+            for (var i = 0; i < choices.Count; i++)
+            {
+                if (i > 0) builder.Append(',');
+                AppendString(builder, choices[i].Name);
+            }
+            return builder.Append("]}").ToString();
         }
 
         internal bool TryGetResult(out int[] result)

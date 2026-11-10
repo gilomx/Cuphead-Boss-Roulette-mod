@@ -1563,6 +1563,7 @@ namespace Gilomx.CupheadBossRoulette
         {
             creatorToolsShuttingDown = true;
             StopCreatorToolsServer();
+            creatorToolsChatChooses?.Command("operation=stop");
             DisposeCreatorTools();
         }
 

@@ -37,6 +37,14 @@ ganador durante 1.5 segundos. Si hay empate, se sortea entre los líderes; si
 nadie votó, se sortea entre todos los candidatos mostrados. Los votos y mensajes
 anteriores al comienzo de la siguiente ronda no se arrastran a ella.
 
+Si Gililili está actualizado y abierto en la misma sesión de Windows, el mod
+le anuncia cada ronda y sus opciones por el canal local que ya usa el aviso
+de inicio del overlay. Gililili conserva los mensajes válidos como votos
+silenciosos en el chat. Al revelar al ganador o detener el evento, los
+números vuelven a leerse con las reglas normales. Cada ronda abierta renueva
+el aviso cada 5 segundos y el aviso caduca a los 15 segundos. El mod sigue
+recibiendo y contando los votos por su cuenta, incluso si Gililili está cerrado.
+
 Al terminar, la tarjeta espera 1.5 segundos continuos con el juego enfocado y
 el mapa disponible. Luego entra mediante la misma animación de la ruleta,
 incluyendo su inclinación aleatoria y sonido. Si se pierde el foco durante la

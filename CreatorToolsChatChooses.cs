@@ -30,7 +30,8 @@ namespace Gilomx.CupheadBossRoulette
 #endif
                 creatorToolsChatChooses = new CreatorToolsChatChoosesController(
                     creatorToolsInteractions.LiveEvents, chatChoosesChallengeSetting.Value,
-                    developmentTools: developmentTools);
+                    developmentTools: developmentTools,
+                    publishVoteRound: CreatorToolsOverlayReady.PublishVoteRound);
             }
             creatorToolsServer.SetChatChoosesController(creatorToolsChatChooses,
                 delegate(string query)
