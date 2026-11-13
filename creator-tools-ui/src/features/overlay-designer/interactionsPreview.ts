@@ -1,24 +1,33 @@
 import type { StreamRule, StreamRulesConfigState } from "../../model";
-import { interactionItems } from "../interactions/interactionCatalog";
-import type { InteractionsPreviewSnapshot } from "./model";
+import { interactionItemFor, interactionItems } from "../interactions/interactionCatalog";
+import { platformTriggers } from "../interactions/streamRuleDraft";
+import type { InteractionsPreviewSnapshot, OverlayComposerComponent } from "./model";
+
+type InteractionsPreviewPresentation = Pick<OverlayComposerComponent,
+  "interactionsLayout" | "interactionsTikTok" | "interactionsTwitch" | "interactionsYouTube">;
+
+const platformSettings = [
+  ["tiktok", "interactionsTikTok"],
+  ["twitch", "interactionsTwitch"],
+  ["youtube", "interactionsYouTube"],
+] as const;
 
 /** Examples stay inside the designer message; they never become saved rules. */
 export function createInteractionsPreview(
   config: StreamRulesConfigState | null,
   translate: (key: string) => string,
-  paginated = false,
+  presentation: InteractionsPreviewPresentation = {},
 ): InteractionsPreviewSnapshot {
-  const configured = config?.rules.filter(rule => rule.enabled) ?? [];
-  const platforms = ["tiktok", "twitch", "youtube"] as const;
-  const usedEffects = Object.fromEntries(platforms.map(platform => [platform,
-    new Set(configured.filter(rule => rule.platform === platform).map(rule => rule.interaction)),
-  ])) as Record<typeof platforms[number], Set<string>>;
-  if (config?.rules.length && (!paginated || platforms.every(platform => usedEffects[platform].size >= 18))) {
+  const platforms = platformSettings.filter(([, key]) => presentation[key] !== false).map(([platform]) => platform);
+  const configured = config?.rules.filter(rule => rule.enabled === true && platforms.includes(rule.platform) &&
+    platformTriggers[rule.platform].includes(rule.eventType) && rule.every > 0 && interactionItemFor(rule.interaction)) ?? [];
+  const paginated = presentation.interactionsLayout === "pages";
+  if (platforms.length === 0 || (!paginated && configured.length > 0)) {
     return {
       preview: true,
       examples: false,
       rules: configured,
-      communityGift: config.communityGift,
+      communityGift: config?.communityGift,
     };
   }
   const examples = interactionItems.filter(item => [
@@ -32,10 +41,13 @@ export function createInteractionsPreview(
     ["5655", "Rosa"], ["5487", "Corazón coreano"], ["5658", "Perfume"],
     ["5827", "Cono de helado"], ["6064", "GG"], ["6093", "Fútbol"],
   ];
+  const usedEffects = platforms.map(platform =>
+    new Set(configured.filter(rule => rule.platform === platform).map(rule => rule.interaction)));
   const rules: StreamRule[] = items.flatMap((item, index) =>
     platforms.flatMap((platform, platformIndex) => {
-      if (usedEffects[platform].size >= 18 || usedEffects[platform].has(item.id)) return [];
-      usedEffects[platform].add(item.id);
+      const effects = usedEffects[platformIndex];
+      if (effects.size >= 18 || effects.has(item.id)) return [];
+      effects.add(item.id);
       return [{
         id: -1 - index * 3 - platformIndex,
         name: translate(item.titleKey),
@@ -52,5 +64,5 @@ export function createInteractionsPreview(
         globalCooldownSeconds: 0,
       }];
     }));
-  return { preview: true, examples: true, rules: [...configured, ...rules], communityGift: config?.communityGift };
+  return { preview: true, examples: rules.length > 0, rules: [...configured, ...rules], communityGift: config?.communityGift };
 }

@@ -446,8 +446,8 @@ test('paper cards use readable stock ink and retain custom colors, alpha and flo
   for (const template of ['cards', 'floating']) {
     runtime.send({ rules: [rule(), rule({ platform: 'twitch', eventType: 'currency' })], presentation: { interactionsTemplate: template } });
     const card = runtime.nodes['interactions-content'].children[0].children[0].children[0];
-    assert.equal(card.style['--currency'], template === 'cards' ? '58px' : '46px');
-    assert.equal(card.style['--value-size'], template === 'cards' ? '55px' : '27px');
+    assert.equal(card.style['--currency'], template === 'cards' ? '58px' : '52px');
+    assert.equal(card.style['--value-size'], template === 'cards' ? '55px' : '39px');
   }
 });
 
@@ -492,12 +492,12 @@ test('one to four items remain fully static without duplicate copies in both tem
   }
 });
 
-test('five or more items loop through a four-item window and return to a complete static group when reduced', async () => {
-  const runtime = await boot();
+test('vertical automatic sizing keeps a four-item window and stops scrolling for a smaller group', async () => {
+  const runtime = await boot('?embedded=1&profile=vertical');
   runtime.send({ rules: Array.from({ length: 20 }, (_, index) => rule({ interaction: `effect_${index}` })),
     presentation: { interactionsLayout: 'strip' } });
   assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 20);
-  assert.equal(runtime.nodes['interactions-viewport'].style.width, `${4 * 600 + 3 * 6 + 24}px`);
+  assert.equal(runtime.nodes['interactions-viewport'].style.width, `${4 * 600 + 3 * 35 + 24}px`);
   assert.equal(runtime.nodes['interactions-overlay'].dataset.scrolling, 'true');
   assert.ok(runtime.nodes['interactions-content'].children.length >= 2);
   runtime.frame(1); runtime.frame(1001);
@@ -511,6 +511,88 @@ test('five or more items loop through a four-item window and return to a complet
   assert.equal(runtime.nodes['interactions-content'].children.length, 1);
   assert.equal(runtime.nodes['interactions-overlay'].dataset.scrolling, 'false');
   assert.equal(runtime.nodes['interactions-content'].style.transform, 'translateX(12px)');
+});
+
+test('automatic horizontal scrolling clips at the rectangle edges at wide and compact sizes', async () => {
+  const runtime = await boot('?embedded=1&profile=horizontal');
+  const root = runtime.nodes['interactions-overlay'], scene = runtime.nodes['interactions-scene'];
+  const viewport = runtime.nodes['interactions-viewport'], content = runtime.nodes['interactions-content'];
+  const rules = Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` }));
+  for (const template of ['cards', 'floating']) {
+    runtime.send({ rules, presentation: { interactionsLayout: 'strip', interactionsTemplate: template } });
+    for (const card of content.children[0].children) { card.offsetWidth = 150; card.offsetHeight = 130; }
+    for (const [width, height] of [[1800, 230], [120, 100]]) {
+      root.clientWidth = width;
+      root.clientHeight = height;
+      runtime.listeners.resize();
+      const scale = Number(scene.style.transform.match(/scale\(([^)]+)\)/)[1]);
+      const clipWidth = Number.parseFloat(viewport.style.width);
+      assert.ok(Math.abs(clipWidth * scale - width) < 1e-8, `${template} clip fills the rectangle width`);
+      assert.equal(scene.style.left, '0px');
+      const cycleWidth = 5 * (150 + Number.parseFloat(root.style['--strip-gap']));
+      assert.ok((content.children.length - 1) * cycleWidth >= clipWidth, 'no gap at the end of a cycle');
+    }
+  }
+});
+
+test('horizontal donation artwork and amounts grow with the scrolling strip', async () => {
+  const rules = Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` }));
+  for (const profile of ['horizontal', 'vertical']) {
+    const runtime = await boot(`?embedded=1&profile=${profile}`);
+    const root = runtime.nodes['interactions-overlay'], scene = runtime.nodes['interactions-scene'];
+    const content = runtime.nodes['interactions-content'];
+    const scale = () => Number(scene.style.transform.match(/scale\(([^)]+)\)/)[1]);
+    for (const interactionsTemplate of ['floating', 'cards']) {
+      runtime.send({ rules, presentation: { interactionsLayout: 'strip', interactionsTemplate, interactionsAdaptive: false } });
+      const originals = content.children[0].children;
+      for (const card of originals) { card.offsetWidth = 150; card.offsetHeight = 130; }
+      const card = originals[0];
+      const icon = Number.parseFloat(card.style['--currency']);
+      const amount = Number.parseFloat(card.style['--value-size']);
+      const floating = interactionsTemplate === 'floating';
+      const horizontal = profile === 'horizontal';
+      assert.equal(icon, horizontal ? (floating ? 46 : 58) : (floating ? 34 : 44));
+      assert.equal(amount, horizontal ? (floating ? 35 : 55) : (floating ? 20 : 41));
+      root.clientWidth = 375;
+      root.clientHeight = 100;
+      runtime.listeners.resize();
+      const before = [icon * scale(), amount * scale()];
+      root.clientHeight = 230;
+      runtime.listeners.resize();
+      const after = [icon * scale(), amount * scale()];
+      if (horizontal) assert.ok(after.every((size, index) => size > before[index] * 2));
+      else assert.deepEqual(after, before, 'vertical still fits its four-item automatic window');
+    }
+    runtime.dispose();
+  }
+});
+
+test('exchange size scales icon and amount together before fitting inside the overlay', async () => {
+  assert.equal(model.presentation().interactionsPaymentSize, 100);
+  assert.equal(model.presentation({ interactionsPaymentSize: 250 }).interactionsPaymentSize, 200);
+  assert.equal(model.presentation({ interactionsPaymentSize: 80 }).interactionsPaymentSize, 100);
+  const runtime = await boot('?embedded=1&profile=horizontal');
+  const root = runtime.nodes['interactions-overlay'], viewport = runtime.nodes['interactions-viewport'];
+  const content = runtime.nodes['interactions-content'], scene = runtime.nodes['interactions-scene'];
+  root.clientWidth = 120;
+  root.clientHeight = 100;
+  for (const interactionsTemplate of ['cards', 'floating']) {
+    for (const interactionsLayout of ['strip', 'pages']) {
+      const rules = Array.from({ length: 5 }, (_, index) => rule({ interaction: `effect_${index}` }));
+      const presentation = { interactionsLayout, interactionsTemplate, interactionsAdaptive: false };
+      const firstCard = () => interactionsLayout === 'strip' ? content.children[0].children[0]
+        : content.children[0].children[0].children[0];
+      runtime.send({ rules, presentation });
+      const icon = Number.parseFloat(firstCard().style['--currency']);
+      const amount = Number.parseFloat(firstCard().style['--value-size']);
+      runtime.send({ rules, presentation: { ...presentation, interactionsPaymentSize: 200 } });
+      assert.equal(Number.parseFloat(firstCard().style['--currency']), icon * 2);
+      assert.ok(Math.abs(Number.parseFloat(firstCard().style['--value-size']) - amount * 2) <= 1);
+      const scale = Number(scene.style.transform.match(/scale\(([^)]+)\)/)[1]);
+      assert.ok(Number.parseFloat(scene.style.left) + Number.parseFloat(viewport.style.width) * scale <= root.clientWidth + 1e-8);
+      assert.ok(Number.parseFloat(scene.style.top) + Number.parseFloat(viewport.style.height) * scale <= root.clientHeight + 1e-8);
+    }
+  }
 });
 
 test('all cards share the largest natural width and height across pages and strips', async () => {

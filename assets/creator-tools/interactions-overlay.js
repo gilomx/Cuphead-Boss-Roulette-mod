@@ -191,9 +191,11 @@
     const grainSeed = Array.from(item.key).reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0, 17);
     node.style.setProperty('--card-grain-position', `${grainSeed % 397}px ${Math.floor(grainSeed / 397) % 313}px`);
     const payments = element('div', 'interaction-payments');
-    const size = model.paymentSize(item.offers.length, view.interactionsAdaptive, view.interactionsTemplate);
+    const baseSize = model.paymentSize(item.offers.length, view.interactionsAdaptive, view.interactionsTemplate, profileId);
+    const size = baseSize * view.interactionsPaymentSize / 100;
+    const valueScale = view.interactionsTemplate === 'cards' ? .94 : profileId === 'horizontal' ? .75 : .58;
     node.style.setProperty('--currency', `${size}px`);
-    node.style.setProperty('--value-size', `${Math.round(size * (view.interactionsTemplate === 'cards' ? .94 : .58))}px`);
+    node.style.setProperty('--value-size', `${Math.round(size * valueScale)}px`);
     for (const offer of item.offers) payments.append(payment(offer));
     node.append(effect(item), payments);
     if (view.interactionsTemplate === 'cards') node.append(cardFrame());
@@ -266,17 +268,18 @@
     let naturalWidth = windowWidth + (visibleCount - 1) * stripGap + stripInset * 2;
     const naturalHeight = size.height + stripInset * 2;
     const moving = allItems.length > stripCapacity;
-    if (view.interactionsSize > 0) {
-      // Small groups must fit completely. Moving strips can show fewer/larger
-      // items, but even at maximum height one full item must fit horizontally.
-      scale = Math.min(height * view.interactionsSize / 100 / naturalHeight,
-        width / (moving ? size.width + stripInset * 2 : naturalWidth));
-      if (moving) naturalWidth = width / scale;
-    } else scale = Math.min(width / naturalWidth, height / naturalHeight, 4);
+    const fullWidth = moving && (profileId === 'horizontal' || view.interactionsSize > 0);
+    // A full-width loop can show fewer items as they grow, while still fitting
+    // its widest item. Static groups and the vertical automatic window fit together.
+    const widthScale = width / (fullWidth ? size.width + stripInset * 2 : naturalWidth);
+    scale = view.interactionsSize > 0
+      ? Math.min(widthScale, height * view.interactionsSize / 100 / naturalHeight)
+      : Math.min(widthScale, height / naturalHeight, 4);
+    if (fullWidth) naturalWidth = width / scale;
     viewport.style.width = `${naturalWidth}px`;
     viewport.style.height = `${naturalHeight}px`;
     scene.style.width = `${naturalWidth}px`;
-    scene.style.left = `${Math.max(0, (width - naturalWidth * scale) / 2)}px`;
+    scene.style.left = fullWidth ? '0px' : `${Math.max(0, (width - naturalWidth * scale) / 2)}px`;
     scene.style.top = `${Math.max(0, (height - naturalHeight * scale) / 2)}px`;
     // A whole cycle includes its trailing gap, matching the gap between copies.
     cycleWidth = widths.reduce((sum, value) => sum + value + stripGap, 0);

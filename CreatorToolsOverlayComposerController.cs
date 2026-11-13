@@ -142,7 +142,7 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 else if (operation == "update")
                 {
-                    if (!ApplyComponentUpdate(candidate, values, profileId))
+                    if (!ApplyComponentUpdate(candidate, values, profileId, body))
                         return new CreatorToolsOverlayComposerResponse(
                             400, "Bad Request",
                             settings.BuildStateJson(
@@ -338,7 +338,8 @@ namespace Gilomx.CupheadBossRoulette
         private static bool ApplyComponentUpdate(
             CreatorToolsOverlayComposerSettings candidate,
             Dictionary<string, string> values,
-            string profileId)
+            string profileId,
+            string body)
         {
             var componentId =
                 CreatorToolsOverlayComposerSettings.NormalizeComponentId(
@@ -421,6 +422,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             foreach (var key in new[] { "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
                 "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
+                "interactionsPaymentSize",
                 "interactionsCardColor", "interactionsCardNoise", "interactionsImageOutlineColor", "interactionsImageOutlineWidth",
                 "interactionsTextOutlineColor", "interactionsTextOutlineWidth" })
             {
@@ -466,6 +468,13 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     if (!TryReadInt(values, key, out number) || !CreatorToolsOverlayComposerSettings.IsValidInteractionsSize(number)) return false;
                     component.InteractionsSize = number;
+                }
+                else if (key == "interactionsPaymentSize")
+                {
+                    CreatorToolsJsonValue command;
+                    if (!CreatorToolsJsonParser.TryParse(body, out command) || !command.TryInteger(key, out number) ||
+                        !CreatorToolsOverlayComposerSettings.IsValidInteractionsPaymentSize(number)) return false;
+                    component.InteractionsPaymentSize = number;
                 }
                 else if (key == "interactionsPageSeconds" || key == "interactionsSpeed")
                 {

@@ -3,20 +3,23 @@
 En **Panel → Overlays → Interacciones** hay dos plantillas: **Tarjetas** e
 **Iconos flotantes**. Cada una permite elegir **Franja continua** o **Paginado**.
 Hasta cuatro elementos, la franja muestra todo el grupo estático, centrado y sin
-copias repetidas. Con más de cuatro, el tamaño automático reserva espacio para cuatro y enlaza el último
-con el primero sin huecos. Los cambios de reglas que reduzcan el grupo a cuatro
-eliminan el desplazamiento anterior y vuelven a mostrar el grupo completo.
+copias repetidas. Con más de cuatro, la franja enlaza el último ítem con el
+primero sin huecos. En el perfil horizontal, entra y sale por los bordes del
+rectángulo incluso con tamaño automático. Los cambios de reglas que reduzcan
+el grupo a cuatro eliminan el desplazamiento y vuelven a mostrar el grupo completo.
 El paginado organiza hasta nueve elementos en tres columnas, con filas ajustadas
 al contenido, deslizamiento entre páginas e intervalo configurable de 3 a 60 segundos.
 Las páginas conservan la misma escala al avanzar; desactivar animaciones o reducir
 movimiento en el sistema cambia de página sin deslizamiento.
 
 Cada perfil conserva sus propias redes visibles, plantilla, formato, velocidad,
-intervalo y tamaño. **Tamaño automático** conserva el ajuste anterior. Al
+intervalo y tamaño. **Tamaño automático** ajusta la escala al rectángulo. Al
 desactivarlo, **Altura del contenido** permite ocupar del 25% al 100% de la altura
 del overlay, incluyendo el margen exterior. El contenido queda centrado y nunca
-excede sus límites. Hasta cuatro ítems también se limitan al ancho necesario para
-mostrar el grupo completo y siguen quietos. Con más de cuatro, la franja ocupa
+excede sus límites. En el diseñador, el ancho y el alto del rectángulo se pueden
+ajustar por separado, con un mínimo de 120 × 100 px. Hasta cuatro ítems también
+se limitan al ancho necesario para mostrar el grupo completo y siguen quietos.
+Con más de cuatro, la franja ocupa
 todo el ancho y deja pasar menos ítems al agrandarlos; repite suficientes ciclos
 para evitar huecos. En paginado el porcentaje se aplica a la página completa,
 conservando todos sus ítems visibles y la misma escala al avanzar. Las escenas
@@ -25,9 +28,13 @@ antiguas mantienen el tamaño automático.
 La velocidad de la franja se ajusta entre **40 y 140 px/s**. Las escenas guardadas
 con una velocidad menor conservan el resto de su diseño y pasan al mínimo de 40.
 
-El ajuste **Agrandar canjes cuando hay menos opciones** sigue siendo independiente
-del tamaño general. Al mostrar menos redes, los iconos de canje y sus cantidades crecen
-automáticamente. Las imágenes de los efectos conservan su proporción y se ajustan
+**Tamaño de los canjes** aumenta los iconos y montos del 100% al 200% del tamaño
+base. Se guarda por perfil y funciona con ambas plantillas y distribuciones.
+Al ocupar más espacio los canjes, el contenido se ajusta para seguir dentro del
+rectángulo. En horizontal, los iconos y montos de donación parten de un tamaño
+base mayor. **Agrandar canjes cuando hay menos opciones** ajusta
+el tamaño base de cada canje según cuántos se muestren junto a su efecto. Las
+imágenes de los efectos conservan su proporción y se ajustan
 al mismo espacio cuadrado, ignorando los márgenes transparentes y conservando su
 proporción. Una imagen ancha o alta nunca agranda la tarjeta ni sale de ese espacio.
 Ninguna plantilla muestra nombres, categorías, títulos ni duración de los retos.
@@ -74,13 +81,13 @@ mantienen separadas aunque compartan la misma imagen.
 El editor permite [configurar un ataque con valores por red](interaction-values.md)
 mediante una sola ficha. El overlay reúne esos valores en el mismo ítem.
 
-Si aún no hay reglas configuradas, el diseñador muestra ejemplos señalados como
-tales, con regalos reales variados e iconos propios de cada red. La vista previa
-paginada completa al menos dieciocho efectos por red para poder ver dos páginas,
-incluso si hay pocas reglas guardadas. OBS nunca recibe esos ejemplos ni precios.
-Una capa sin reglas habilitadas o sin
-redes seleccionadas permanece vacía. El overlay sólo lee las reglas y no ejecuta
-interacciones ni cambia la configuración de los canjes.
+Si las redes seleccionadas no tienen reglas visibles, el diseñador muestra
+ejemplos identificados como tales, con regalos reales variados e iconos de cada
+red. La vista previa paginada completa al menos dieciocho efectos por red
+seleccionada para mostrar dos páginas. La capa en OBS, incluida su prueba,
+muestra únicamente las reglas habilitadas de las redes seleccionadas. Si no hay
+redes seleccionadas, también se vacía el lienzo del diseñador. El overlay sólo
+lee las reglas y no ejecuta interacciones ni cambia la configuración de los canjes.
 
 Los valores predeterminados toman el diseño guardado: en vertical, franja flotante
 en X=4, Y=1077, de 1072 × 313, tamaño al 96%, velocidad 80, Twitch y YouTube

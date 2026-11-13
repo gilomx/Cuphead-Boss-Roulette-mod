@@ -293,6 +293,8 @@ namespace Gilomx.CupheadBossRoulette
             if (template.ObjectValue != null) foreach (var pair in template.ObjectValue)
             {
                 var value = node.Property(pair.Key);
+                // Bundles saved before this optional per-layer setting use its loader default.
+                if (value == null && pair.Key == "interactionsPaymentSize") continue;
                 if (value == null) throw new FormatException("Missing settings field.");
                 ValidateShape(value, pair.Value);
             }

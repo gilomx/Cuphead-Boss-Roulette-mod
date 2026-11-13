@@ -48,6 +48,7 @@ export interface OverlayComposerComponent {
   interactionsSpeed?: number;
   interactionsSize?: number;
   interactionsAdaptive?: boolean;
+  interactionsPaymentSize?: number;
   interactionsCardColor?: string;
   interactionsCardNoise?: number;
   interactionsImageOutlineColor?: string;
@@ -118,6 +119,7 @@ export interface OverlayComposerCommand {
   interactionsSpeed?: number;
   interactionsSize?: number;
   interactionsAdaptive?: boolean;
+  interactionsPaymentSize?: number;
   interactionsCardColor?: string;
   interactionsCardNoise?: number;
   interactionsImageOutlineColor?: string;
@@ -298,9 +300,9 @@ export const COMPONENT_IDS: OverlayComponentId[] = [
 export function minimumComponentSize(
   componentId: OverlayComponentId,
 ): OverlayCanvasSize {
-  return componentId !== "tap_farming"
-    ? { width: 320, height: 180 }
-    : { width: 120, height: 100 };
+  return componentId === "tap_farming" || componentId === "interactions"
+    ? { width: 120, height: 100 }
+    : { width: 320, height: 180 };
 }
 
 export function proportionalComponentSize(
@@ -347,6 +349,47 @@ export function proportionalComponentSize(
         Math.round(sourceHeight * scale),
       ),
     ),
+  };
+}
+
+export type OverlayResizeHandle = "nw" | "ne" | "sw" | "se";
+
+export function resizeOverlayComponent(
+  start: Pick<OverlayComposerComponent, "id" | "x" | "y" | "width" | "height">,
+  handle: OverlayResizeHandle,
+  dx: number,
+  dy: number,
+  canvas: OverlayCanvasSize,
+) {
+  const fromWest = handle.includes("w");
+  const fromNorth = handle.includes("n");
+  const right = start.x + start.width;
+  const bottom = start.y + start.height;
+  const requestedWidth = start.width + (fromWest ? -dx : dx);
+  const requestedHeight = start.height + (fromNorth ? -dy : dy);
+  const maximum = {
+    width: fromWest ? right : canvas.width - start.x,
+    height: fromNorth ? bottom : canvas.height - start.y,
+  };
+  let size: OverlayCanvasSize;
+  if (start.id === "interactions") {
+    const minimum = minimumComponentSize(start.id);
+    size = {
+      width: Math.min(maximum.width, Math.max(minimum.width, Math.round(requestedWidth))),
+      height: Math.min(maximum.height, Math.max(minimum.height, Math.round(requestedHeight))),
+    };
+  } else {
+    const horizontalScale = requestedWidth / Math.max(1, start.width);
+    const verticalScale = requestedHeight / Math.max(1, start.height);
+    const requestedScale = Math.abs(horizontalScale - 1) >= Math.abs(verticalScale - 1)
+      ? horizontalScale
+      : verticalScale;
+    size = proportionalComponentSize(start, requestedScale, maximum);
+  }
+  return {
+    x: fromWest ? right - size.width : start.x,
+    y: fromNorth ? bottom - size.height : start.y,
+    ...size,
   };
 }
 

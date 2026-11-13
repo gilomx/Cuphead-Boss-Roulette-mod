@@ -190,11 +190,16 @@ export function OverlayDesignerView({ onBack }: OverlayDesignerViewProps) {
 
   const profile = profileById(profiles, profileId);
   const component = componentById(profile, selectedComponentId);
-  const interactionsLayout = componentById(profile, "interactions")?.interactionsLayout;
+  const { interactionsLayout, interactionsTikTok, interactionsTwitch, interactionsYouTube } =
+    componentById(profile, "interactions") ?? {};
   const interactionsState = useMemo(
-    () => createInteractionsPreview(streamRules, t,
-      (interactionsLayout ?? (profileId === "vertical" ? "pages" : "strip")) === "pages"),
-    [streamRules, t, interactionsLayout, profileId],
+    () => createInteractionsPreview(streamRules, t, {
+      interactionsLayout,
+      interactionsTikTok: interactionsTikTok ?? profileId === "horizontal",
+      interactionsTwitch,
+      interactionsYouTube,
+    }),
+    [streamRules, t, interactionsLayout, interactionsTikTok, interactionsTwitch, interactionsYouTube, profileId],
   );
   profileRef.current = profile;
   selectedComponentIdRef.current = selectedComponentId;

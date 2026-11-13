@@ -43,7 +43,7 @@ const EDITABLE_KEYS = [
   "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
   "interactionsTemplate", "interactionsLayout", "interactionsTikTok",
   "interactionsTwitch", "interactionsYouTube", "interactionsPageSeconds",
-  "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
+  "interactionsSpeed", "interactionsAdaptive", "interactionsSize", "interactionsPaymentSize",
   "interactionsCardColor", "interactionsCardNoise",
   "interactionsImageOutlineColor", "interactionsImageOutlineWidth", "interactionsTextOutlineColor", "interactionsTextOutlineWidth",
 ] as const;
@@ -100,6 +100,7 @@ function updateCommand(
       interactionsSpeed: component.interactionsSpeed ?? 40,
       interactionsSize: component.interactionsSize ?? 0,
       interactionsAdaptive: component.interactionsAdaptive ?? true,
+      interactionsPaymentSize: component.interactionsPaymentSize ?? 100,
       interactionsCardColor: component.interactionsCardColor ?? "#f8e5be",
       interactionsCardNoise: component.interactionsCardNoise ?? 18,
       interactionsImageOutlineColor: component.interactionsImageOutlineColor ?? "#000000",

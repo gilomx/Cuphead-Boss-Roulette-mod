@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
-import { matchesOverlayPreviewLayout } from "./mock-overlay-layout.mjs";
+import { matchesOverlayPreviewLayout, validInteractionPaymentSize } from "./mock-overlay-layout.mjs";
 
 // Run the production reducer on every supported Node version, including Node 20.
 const uiRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -107,8 +107,66 @@ function mockComposer() {
     normalize: normalizeOverlayComponent,
     state: overlayComposerState,
     send(command) { const response = {}; applyOverlayComposerCommand(command, response); return response; }
-  })`, { json(response, body, status = 200) { response.body = body; response.status = status; } });
+  })`, { validInteractionPaymentSize, json(response, body, status = 200) { response.body = body; response.status = status; } });
 }
+
+test("interaction corner dragging resizes both axes independently inside the canvas", () => {
+  const { minimumComponentSize, resizeOverlayComponent } = exports;
+  const start = { id: "interactions", x: 244, y: 69, width: 1409, height: 180 };
+  const canvas = { width: 1920, height: 1080 };
+  assert.deepEqual(minimumComponentSize(start.id), { width: 120, height: 100 });
+  assert.deepEqual(resizeOverlayComponent(start, "se", -1000, 0, canvas),
+    { x: 244, y: 69, width: 409, height: 180 });
+  assert.deepEqual(resizeOverlayComponent(start, "se", 0, -500, canvas),
+    { x: 244, y: 69, width: 1409, height: 100 });
+  assert.deepEqual(resizeOverlayComponent(start, "nw", 1500, 500, canvas),
+    { x: 1533, y: 149, width: 120, height: 100 });
+  assert.deepEqual(resizeOverlayComponent(start, "nw", -2000, -2000, canvas),
+    { x: 0, y: 0, width: 1653, height: 249 });
+  assert.deepEqual(resizeOverlayComponent(start, "se", 2000, 2000, canvas),
+    { x: 244, y: 69, width: 1676, height: 1011 });
+  assert.deepEqual(resizeOverlayComponent({ ...start, id: "roulette", width: 600, height: 400 }, "se", -300, 0, canvas),
+    { x: 244, y: 69, width: 320, height: 213 });
+});
+
+test("mock composer keeps compact interaction frames when saving either profile", () => {
+  const mock = mockComposer();
+  for (const profileId of ["horizontal", "vertical"]) {
+    const response = mock.send({ operation: "update", expectedRevision: mock.state().revision,
+      profileId, componentId: "interactions", width: 140, height: 110 });
+    assert.equal(response.status, 200);
+    const item = response.body.profiles.find(profile => profile.id === profileId).components.find(component => component.id === "interactions");
+    assert.equal(item.width, 140);
+    assert.equal(item.height, 110);
+  }
+});
+
+test("exchange size saves per profile and validates draft layouts", () => {
+  const mock = mockComposer();
+  const profile = id => mock.state().profiles.find(entry => entry.id === id);
+  const component = id => profile(id).components.find(entry => entry.id === "interactions");
+  const send = updates => mock.send({ operation: "update", expectedRevision: mock.state().revision,
+    profileId: "horizontal", componentId: "interactions", ...updates });
+  assert.equal(component("horizontal").interactionsPaymentSize, 100);
+  assert.equal(send({ interactionsPaymentSize: 180 }).status, 200);
+  assert.equal(component("horizontal").interactionsPaymentSize, 180);
+  assert.equal(component("vertical").interactionsPaymentSize, 100);
+  assert.equal(matchesOverlayPreviewLayout(profile("horizontal"), profile("horizontal")), true);
+  const layout = JSON.parse(JSON.stringify(profile("horizontal")));
+  const item = layout.components.find(entry => entry.id === "interactions");
+  const revision = mock.state().revision;
+  for (const invalid of [99, 201, 150.5, "180", null]) {
+    item.interactionsPaymentSize = invalid;
+    assert.equal(matchesOverlayPreviewLayout(layout, profile("horizontal")), false);
+    assert.equal(send({ interactionsPaymentSize: invalid }).status, 400);
+    assert.equal(mock.state().revision, revision);
+  }
+  assert.equal(send({ operation: "copy", profileId: "vertical", sourceProfileId: "horizontal" }).status, 200);
+  assert.equal(component("vertical").interactionsPaymentSize, 180);
+  assert.equal(send({ operation: "reset" }).status, 200);
+  assert.equal(component("horizontal").interactionsPaymentSize, 100);
+  assert.equal(component("vertical").interactionsPaymentSize, 180);
+});
 
 test("card appearance and expanded strip speeds persist through the mock API and copying profiles", () => {
   const mock = mockComposer();
@@ -216,32 +274,33 @@ test("mock preview accepts the complete five-component designer profile and reje
 });
 
 test("interaction designer examples remain separate from configured rules", () => {
-  const example = exports.createInteractionsPreview({ rules: [] }, key => `translated:${key}`);
+  const { createInteractionsPreview } = exports;
+  const example = createInteractionsPreview({ rules: [] }, key => `translated:${key}`);
   assert.equal(example.examples, true);
   assert.equal(example.preview, true);
-  assert.equal(new Set(example.rules.map(rule => rule.interaction)).size, 18, "two complete nine-item pages");
   assert.deepEqual([...new Set(example.rules.map(rule => rule.platform))], ["tiktok", "twitch", "youtube"]);
   assert.ok(example.rules.every(rule => rule.id < 0 && rule.enabled));
   assert.equal(exports.isOverlayComponentId("interactions"), true);
   assert.ok(exports.COMPONENT_IDS.includes("interactions"));
 
-  const actual = { id: 1, enabled: true, name: "My price", every: 17, interaction: "help_extra_life", platform: "tiktok" };
+  const actual = { id: 1, enabled: true, name: "My price", every: 17,
+    interaction: "help_extra_life", platform: "tiktok", eventType: "gift", giftId: "5655" };
   const disabled = { ...actual, id: 2, enabled: false };
   const config = { rules: [actual, disabled], communityGift: { giftId: "123", imagePath: "/gift.webp" } };
   const before = JSON.stringify(config);
-  const preview = exports.createInteractionsPreview(config, key => key);
+  const preview = createInteractionsPreview(config, key => key);
   assert.equal(preview.examples, false);
   assert.deepEqual(preview.rules, [actual]);
   assert.equal(preview.communityGift, config.communityGift);
-  assert.equal(JSON.stringify(config), before, "preview does not alter saved prices or rules");
-  const allDisabled = exports.createInteractionsPreview({ rules: [disabled] }, key => key);
-  assert.equal(allDisabled.examples, false, "disabled rules must not be replaced by sample prices");
-  assert.deepEqual(allDisabled.rules, []);
 
-  const paginated = exports.createInteractionsPreview(config, key => key, true);
+  const paginated = createInteractionsPreview(config, key => key, { interactionsLayout: "pages", interactionsYouTube: false });
   assert.equal(paginated.examples, true);
-  assert.equal(new Set(paginated.rules.map(rule => rule.interaction)).size, 18);
   assert.ok(paginated.rules.includes(actual));
+  for (const platform of ["tiktok", "twitch"]) {
+    const rules = paginated.rules.filter(rule => rule.platform === platform);
+    assert.equal(new Set(rules.map(rule => rule.interaction)).size, 18, `${platform} shows two complete pages`);
+  }
+  assert.ok(paginated.rules.every(rule => rule.platform !== "youtube"));
   const gifts = new Set(paginated.rules.filter(rule => rule.platform === "tiktok" && rule.id < 0).map(rule => rule.giftId));
   assert.ok(gifts.size >= 6, "samples rotate through real gifts rather than repeating one placeholder");
   const catalog = JSON.parse(readFileSync(join(uiRoot, "../assets/creator-tools/gifts/catalog.json"), "utf8"));
@@ -249,14 +308,37 @@ test("interaction designer examples remain separate from configured rules", () =
     const gift = catalog.gifts.find(gift => gift.giftId === id);
     assert.ok(gift && existsSync(join(uiRoot, "..", gift.imagePath)), `real gift ${id} has bundled artwork`);
   }
-  const twitchOnly = paginated.rules.filter(rule => rule.platform === "twitch");
-  const everyNetwork = exports.createInteractionsPreview({ rules: twitchOnly }, key => key, true);
-  for (const platform of ["tiktok", "twitch", "youtube"])
-    assert.ok(new Set(everyNetwork.rules.filter(rule => rule.platform === platform).map(rule => rule.interaction)).size >= 18,
-      `any platform selection still demonstrates pagination: ${platform}`);
-  const emptyPages = exports.createInteractionsPreview({ rules: [disabled] }, key => key, true);
-  assert.equal(new Set(emptyPages.rules.map(rule => rule.interaction)).size, 18);
-  assert.equal(JSON.stringify(config), before);
+  assert.equal(JSON.stringify(config), before, "previews do not alter saved prices or rules");
+});
+
+test("interaction strip previews show samples when no configured rule can render", () => {
+  const { createInteractionsPreview } = exports;
+  const actual = { id: 1, enabled: true, every: 10, interaction: "robot_homing_bomb", platform: "tiktok", eventType: "like" };
+  const tiktokOnly = { interactionsLayout: "strip", interactionsTwitch: false, interactionsYouTube: false };
+  const excluded = [
+    { ...actual, id: 2, enabled: false },
+    { ...actual, id: 3, platform: "twitch", eventType: "currency" },
+    { ...actual, id: 4, eventType: "currency" },
+    { ...actual, id: 5, every: 0 },
+    { ...actual, id: 6, interaction: "missing" },
+  ];
+  for (const rule of excluded) {
+    const sample = createInteractionsPreview({ rules: [rule] }, key => key, tiktokOnly);
+    assert.equal(sample.examples, true, `rule ${rule.id} cannot render`);
+    assert.ok(sample.rules.length > 0);
+    assert.ok(sample.rules.every(entry => entry.id < 0 && entry.platform === "tiktok"));
+  }
+
+  const configured = createInteractionsPreview({ rules: [...excluded, actual] }, key => key, tiktokOnly);
+  assert.equal(configured.examples, false);
+  assert.deepEqual(configured.rules, [actual]);
+
+  for (const interactionsLayout of ["strip", "pages"]) {
+    const empty = createInteractionsPreview({ rules: [actual] }, key => key,
+      { ...tiktokOnly, interactionsLayout, interactionsTikTok: false });
+    assert.equal(empty.examples, false, "turning every network off leaves the layer empty");
+    assert.deepEqual(empty.rules, []);
+  }
 });
 
 test("chat designer scenarios and votes travel to OBS independently of real events", () => {

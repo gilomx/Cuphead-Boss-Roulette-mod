@@ -502,6 +502,13 @@ export function OverlayDesignerInspector({
               <span>{t("overlayDesigner.interactions.adaptive")}</span>
             </label>
             <small>{t("overlayDesigner.interactions.adaptiveHint")}</small>
+            <label><span>{t("overlayDesigner.interactions.paymentSize")}</span>
+              <input type="range" min="100" max="200" step="1" disabled={disabled}
+                value={component.interactionsPaymentSize ?? 100}
+                onChange={event => onChange({ interactionsPaymentSize: Number(event.target.value) })} />
+              <output>{component.interactionsPaymentSize ?? 100}%</output>
+            </label>
+            <small>{t("overlayDesigner.interactions.paymentSizeHint")}</small>
             <label className="overlay-designer-properties__checkbox">
               <input type="checkbox" disabled={disabled} checked={interactionsSize === 0}
                 onChange={event => onChange({ interactionsSize: event.target.checked ? 0 : 75 })} />

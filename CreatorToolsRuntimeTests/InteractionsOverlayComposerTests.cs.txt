@@ -12,6 +12,7 @@ namespace Gilomx.CupheadBossRoulette
         private static void RunInteractionsOverlayComposerTests()
         {
             Run("Interactions overlay defaults match the saved design and normalize bounds safely", TestInteractionsOverlayDefaults);
+            Run("Compact interactions geometry survives saving and previewing either profile", TestCompactInteractionsGeometry);
             Run("Retired floating controls preserve saved scenes without remaining adjustable", TestRetiredFloatingControls);
             Run("Interactions battle visibility persists globally and validates atomically", TestInteractionsOverlayBattleVisibility);
             Run("Interactions overlay persists, copies and resets independently per profile", TestInteractionsOverlayPersistence);
@@ -168,6 +169,7 @@ namespace Gilomx.CupheadBossRoulette
                 Equal("#f8e5be", component.InteractionsCardColor, "saved card color includes opacity");
                 Equal(vertical ? 80 : 18, component.InteractionsCardNoise, "saved texture strength default");
                 Equal(vertical ? 96 : 0, component.InteractionsSize, "saved size follows profile");
+                Equal(100, component.InteractionsPaymentSize, "canjes default to their original size");
                 Equal(vertical ? 4 : 60, component.X, "saved left position");
                 Equal(vertical ? 1077 : 800, component.Y, "saved top position");
                 Equal(vertical ? 1072 : 1800, component.Width, "saved width");
@@ -206,6 +208,46 @@ namespace Gilomx.CupheadBossRoulette
                 "candidate clone cannot mutate the active card texture");
         }
 
+        private static void TestCompactInteractionsGeometry()
+        {
+            foreach (var profileId in new[] { "horizontal", "vertical" })
+            using (var scope = new TestScope("compact-interactions-" + profileId))
+            {
+                var controller = scope.CreateOverlayComposer(null);
+                Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
+                    operation = "update", expectedRevision = 0, profileId, componentId = "interactions",
+                    x = 9999, y = 9999, width = 140, height = 110
+                })).StatusCode, "save an interactions frame smaller than 320 by 180");
+                controller = scope.CreateOverlayComposer(null);
+                var layout = JsonNode.Parse(controller.GetConfigState())["profiles"].AsArray()
+                    .First(profile => profile["id"].GetValue<string>() == profileId);
+                var item = layout["components"].AsArray().First(component => component["id"].GetValue<string>() == "interactions");
+                Equal(140, item["width"].GetValue<int>(), "compact width persists after reload");
+                Equal(110, item["height"].GetValue<int>(), "compact height persists after reload");
+                Equal(layout["canvas"]["width"].GetValue<int>() - 140, item["x"].GetValue<int>(), "save clamps to right edge");
+                Equal(layout["canvas"]["height"].GetValue<int>() - 110, item["y"].GetValue<int>(), "save clamps to bottom edge");
+
+                item["width"] = 1;
+                item["height"] = 1;
+                item["interactionsPaymentSize"] = 180;
+                var preview = controller.ProcessPreviewCommand(JsonSerializer.Serialize(new {
+                    operation = "start", profileId, componentId = "interactions", sessionId = "compact-interactions",
+                    layoutJson = layout.ToJsonString()
+                }));
+                Equal(200, preview.StatusCode, "preview accepts compact draft");
+                using (var state = JsonDocument.Parse(preview.Json))
+                {
+                    var component = FindProfileComponent(state.RootElement.GetProperty("layout"), "interactions");
+                    Equal(120, component.GetProperty("width").GetInt32(), "preview clamps at the compact minimum width");
+                    Equal(100, component.GetProperty("height").GetInt32(), "preview clamps at the compact minimum height");
+                    Equal(180, component.GetProperty("interactionsPaymentSize").GetInt32(), "preview carries the draft payment size");
+                }
+                using (var state = JsonDocument.Parse(controller.GetConfigState()))
+                    Equal(100, FindComposerComponent(state.RootElement, profileId, "interactions").GetProperty("interactionsPaymentSize").GetInt32(),
+                        "draft payment size stays out of saved settings");
+            }
+        }
+
         private static void TestInteractionsOverlayPersistence()
         {
             using (var scope = new TestScope("interactions-overlay-persistence"))
@@ -216,6 +258,7 @@ namespace Gilomx.CupheadBossRoulette
                     enabled = true, interactionsTemplate = "cards", interactionsLayout = "pages",
                     interactionsTikTok = false, interactionsTwitch = true, interactionsYouTube = false,
                     interactionsPageSeconds = 17, interactionsSpeed = 73, interactionsAdaptive = false, interactionsSize = 67,
+                    interactionsPaymentSize = 157,
                     interactionsCardColor = "#AABBCC80", interactionsCardNoise = 67,
                     x = 77, y = 850, width = 1700, height = 200, opacity = 87, locked = true
                 }));
@@ -232,6 +275,7 @@ namespace Gilomx.CupheadBossRoulette
                     True(vertical.GetProperty("enabled").GetBoolean(), "vertical activation stays independent");
                     False(vertical.GetProperty("interactionsTikTok").GetBoolean(), "vertical networks stay independent");
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "vertical timing stays independent");
+                    Equal(100, vertical.GetProperty("interactionsPaymentSize").GetInt32(), "vertical payment size stays independent");
                     Equal("#f8e5be", vertical.GetProperty("interactionsCardColor").GetString(), "vertical card color stays independent");
                     Equal(80, vertical.GetProperty("interactionsCardNoise").GetInt32(), "vertical texture stays independent");
                 }
@@ -264,6 +308,7 @@ namespace Gilomx.CupheadBossRoulette
                     Equal(8, vertical.GetProperty("interactionsPageSeconds").GetInt32(), "reset restores page timing");
                     Equal(80, vertical.GetProperty("interactionsSpeed").GetInt32(), "reset restores strip speed");
                     Equal(96, vertical.GetProperty("interactionsSize").GetInt32(), "reset restores saved size");
+                    Equal(100, vertical.GetProperty("interactionsPaymentSize").GetInt32(), "reset restores payment size");
                     Equal("#f8e5be", vertical.GetProperty("interactionsCardColor").GetString(), "reset restores card color");
                     Equal(80, vertical.GetProperty("interactionsCardNoise").GetInt32(), "reset restores card texture");
                     AssertCustomizedInteractionsSettings(FindComposerComponent(state.RootElement, "horizontal", "interactions"));
@@ -288,6 +333,7 @@ namespace Gilomx.CupheadBossRoulette
             Equal(17, component.GetProperty("interactionsPageSeconds").GetInt32(), "page seconds persist");
             Equal(73, component.GetProperty("interactionsSpeed").GetInt32(), "strip speed persists");
             Equal(67, component.GetProperty("interactionsSize").GetInt32(), "manual size persists and copies independently");
+            Equal(157, component.GetProperty("interactionsPaymentSize").GetInt32(), "payment size persists and copies independently");
             False(component.GetProperty("interactionsAdaptive").GetBoolean(), "adaptive selection persists");
             Equal("#aabbcc80", component.GetProperty("interactionsCardColor").GetString(), "canonical card color persists and copies with alpha");
             Equal(67, component.GetProperty("interactionsCardNoise").GetInt32(), "texture strength persists and copies");
@@ -338,7 +384,12 @@ namespace Gilomx.CupheadBossRoulette
                     new Dictionary<string, object> { { "interactionsSize", 24 } },
                     new Dictionary<string, object> { { "interactionsSize", 101 } },
                     new Dictionary<string, object> { { "interactionsSize", 75.5 } },
-                    new Dictionary<string, object> { { "interactionsSize", "big" } }
+                    new Dictionary<string, object> { { "interactionsSize", "big" } },
+                    new Dictionary<string, object> { { "interactionsPaymentSize", 99 } },
+                    new Dictionary<string, object> { { "interactionsPaymentSize", 201 } },
+                    new Dictionary<string, object> { { "interactionsPaymentSize", 150.5 } },
+                    new Dictionary<string, object> { { "interactionsPaymentSize", "150" } },
+                    new Dictionary<string, object> { { "interactionsPaymentSize", null } }
                 };
                 foreach (var invalid in invalidValues)
                 {
@@ -377,7 +428,8 @@ namespace Gilomx.CupheadBossRoulette
                 foreach (var pair in new Dictionary<string, object> {
                     { "interactionsSpeed", 40 }, { "interactionsCardColor", "#123456" }, { "interactionsCardNoise", 0 },
                     { "interactionsImageOutlineColor", "#ffffff" }, { "interactionsImageOutlineWidth", 2 },
-                    { "interactionsTextOutlineColor", "#12345680" }, { "interactionsTextOutlineWidth", 3 }
+                    { "interactionsTextOutlineColor", "#12345680" }, { "interactionsTextOutlineWidth", 3 },
+                    { "interactionsPaymentSize", 150 }
                 })
                 {
                     var command = new Dictionary<string, object> {
@@ -390,13 +442,14 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(200, controller.ProcessConfigCommand(JsonSerializer.Serialize(new {
                     operation = "update", expectedRevision = 1, profileId = "vertical", componentId = "interactions",
                     interactionsPageSeconds = 60, interactionsSpeed = 40, interactionsSize = 100,
-                    interactionsCardNoise = 100
+                    interactionsCardNoise = 100, interactionsPaymentSize = 200
                 })).StatusCode, "other range boundaries are accepted");
                 using (var state = JsonDocument.Parse(controller.GetConfigState()))
                 {
                     var current = FindComposerComponent(state.RootElement, "vertical", "interactions");
                     Equal("#abcdef", current.GetProperty("interactionsCardColor").GetString(), "six digit colors retain their opacity semantics");
                     Equal(100, current.GetProperty("interactionsCardNoise").GetInt32(), "maximum texture strength is accepted");
+                    Equal(200, current.GetProperty("interactionsPaymentSize").GetInt32(), "maximum payment size is accepted");
                     False(FindComposerComponent(state.RootElement, "vertical", "roulette").TryGetProperty("interactionsCardColor", out _),
                         "unrelated overlays expose no interactions card fields");
                 }
@@ -463,6 +516,7 @@ namespace Gilomx.CupheadBossRoulette
                     False(parsed.FindComponent("interactions").Enabled, "partial legacy component remains disabled");
                     var vertical = parsed.Id == "vertical";
                     Equal(vertical ? 96 : 0, parsed.FindComponent("interactions").InteractionsSize, "missing size receives the profile default");
+                    Equal(100, parsed.FindComponent("interactions").InteractionsPaymentSize, "old scenes receive the default payment size");
                     Equal("#f8e5be", parsed.FindComponent("interactions").InteractionsCardColor, "old scenes receive the default card color");
                     Equal(vertical ? 80 : 18, parsed.FindComponent("interactions").InteractionsCardNoise, "old scenes receive the default card texture");
                     Equal("strip",

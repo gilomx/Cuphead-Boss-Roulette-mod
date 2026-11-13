@@ -47,6 +47,7 @@ namespace Gilomx.CupheadBossRoulette
         internal int InteractionsPageSeconds = 8;
         internal int InteractionsSpeed = 40;
         internal int InteractionsSize;
+        internal int InteractionsPaymentSize = CreatorToolsOverlayComposerSettings.DefaultInteractionsPaymentSize;
         internal bool InteractionsAdaptive = true;
         internal string InteractionsCardColor = CreatorToolsOverlayComposerSettings.DefaultInteractionsCardColor;
         internal int InteractionsCardNoise = 18;
@@ -104,6 +105,7 @@ namespace Gilomx.CupheadBossRoulette
         internal const string ChatChoosesComponentId = "chat_chooses";
         internal const string RouletteComponentId = "roulette";
         internal const string InteractionsComponentId = "interactions";
+        internal const int DefaultInteractionsPaymentSize = 100;
         internal const string DefaultInteractionsCardColor = "#f8e5be";
         internal const string DefaultLiquidColor = "#ff4f92";
         internal const string DefaultCollectingColor = "#f4c95d";
@@ -461,10 +463,10 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsOverlayComposerProfile profile,
             CreatorToolsOverlayComposerComponent component)
         {
-            var minimumWidth = component.Id != TapFarmingComponentId
-                ? 320 : 120;
-            var minimumHeight = component.Id != TapFarmingComponentId
-                ? 180 : 100;
+            var supportsCompactSize = component.Id == TapFarmingComponentId ||
+                component.Id == InteractionsComponentId;
+            var minimumWidth = supportsCompactSize ? 120 : 320;
+            var minimumHeight = supportsCompactSize ? 100 : 180;
             component.Width = Math.Max(minimumWidth,
                 Math.Min(profile.CanvasWidth, component.Width));
             component.Height = Math.Max(minimumHeight,
@@ -525,6 +527,8 @@ namespace Gilomx.CupheadBossRoulette
                 component.InteractionsPageSeconds = Math.Max(3, Math.Min(60, component.InteractionsPageSeconds));
                 component.InteractionsSpeed = Math.Max(40, Math.Min(140, component.InteractionsSpeed));
                 if (!IsValidInteractionsSize(component.InteractionsSize)) component.InteractionsSize = 0;
+                if (!IsValidInteractionsPaymentSize(component.InteractionsPaymentSize))
+                    component.InteractionsPaymentSize = DefaultInteractionsPaymentSize;
                 var cardColor = NormalizeColor(component.InteractionsCardColor);
                 component.InteractionsCardColor = cardColor.Length == 0 ? DefaultInteractionsCardColor : cardColor;
                 component.InteractionsCardNoise = Math.Max(0, Math.Min(100, component.InteractionsCardNoise));
@@ -634,6 +638,7 @@ namespace Gilomx.CupheadBossRoulette
                         .Append(",\"interactionsPageSeconds\":").Append(component.InteractionsPageSeconds)
                         .Append(",\"interactionsSpeed\":").Append(component.InteractionsSpeed)
                         .Append(",\"interactionsSize\":").Append(component.InteractionsSize)
+                        .Append(",\"interactionsPaymentSize\":").Append(component.InteractionsPaymentSize)
                         .Append(",\"interactionsAdaptive\":").Append(component.InteractionsAdaptive ? "true" : "false")
                         .Append(",\"interactionsCardColor\":\"").Append(component.InteractionsCardColor)
                         .Append("\",\"interactionsCardNoise\":").Append(component.InteractionsCardNoise)
@@ -792,6 +797,7 @@ namespace Gilomx.CupheadBossRoulette
             destination.InteractionsPageSeconds = source.InteractionsPageSeconds;
             destination.InteractionsSpeed = source.InteractionsSpeed;
             destination.InteractionsSize = source.InteractionsSize;
+            destination.InteractionsPaymentSize = source.InteractionsPaymentSize;
             destination.InteractionsAdaptive = source.InteractionsAdaptive;
             destination.InteractionsCardColor = source.InteractionsCardColor;
             destination.InteractionsCardNoise = source.InteractionsCardNoise;
@@ -984,6 +990,14 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsJsonValue node,
             CreatorToolsOverlayComposerComponent component)
         {
+            if (node.Property("interactionsPaymentSize") != null)
+            {
+                int size;
+                if (component.Id != InteractionsComponentId ||
+                    !node.TryInteger("interactionsPaymentSize", out size) || !IsValidInteractionsPaymentSize(size))
+                    return false;
+                component.InteractionsPaymentSize = size;
+            }
             if (component.Id == InteractionsComponentId &&
                 !TryLoadInteractionsSettings(node, component))
                 return false;
@@ -1190,6 +1204,11 @@ namespace Gilomx.CupheadBossRoulette
         internal static bool IsValidInteractionsSize(int value)
         {
             return value == 0 || (value >= 25 && value <= 100);
+        }
+
+        internal static bool IsValidInteractionsPaymentSize(int value)
+        {
+            return value >= 100 && value <= 200;
         }
 
         internal static string NormalizeTextFont(string value)

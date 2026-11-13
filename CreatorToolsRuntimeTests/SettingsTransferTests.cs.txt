@@ -62,6 +62,10 @@ namespace Gilomx.CupheadBossRoulette
                 files[SettingsPrefix + ".pesky-mode.json"] = pesky.ToJsonString();
                 var overlay = JsonNode.Parse(files[SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
                 overlay["profiles"][0]["components"][0]["opacity"] = 43;
+                var verticalInteractions = overlay["profiles"][0]["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                var horizontalInteractions = overlay["profiles"][1]["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                verticalInteractions["interactionsPaymentSize"] = 170;
+                horizontalInteractions.AsObject().Remove("interactionsPaymentSize");
                 files[SettingsPrefix + ".overlay-composer.json"] = overlay.ToJsonString();
                 files[SettingsPrefix + ".tap-farming.json"] = "{\"version\":2,\"tapsPerConversion\":17,\"healthPointsPerConversion\":9}";
                 var path = Path.Combine(scope.ConfigDirectory, SettingsPrefix + ".cfg");
@@ -84,6 +88,12 @@ namespace Gilomx.CupheadBossRoulette
                 Equal(9, taps.HealthPointsPerConversion, "health conversion applied");
                 var savedOverlay = CreatorToolsOverlayComposerSettings.Load(path, null);
                 Equal(43, savedOverlay.Profiles[0].Components[0].Opacity, "overlay presentation applied");
+                Equal(170, savedOverlay.FindProfile("vertical").FindComponent("interactions").InteractionsPaymentSize, "import restores payment size");
+                Equal(100, savedOverlay.FindProfile("horizontal").FindComponent("interactions").InteractionsPaymentSize, "older bundle uses the default payment size");
+                var exported = JsonNode.Parse(transfer.Export());
+                var exportedOverlay = JsonNode.Parse(exported["files"][SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
+                var exportedInteractions = exportedOverlay["profiles"][0]["components"].AsArray().First(item => item["id"].GetValue<string>() == "interactions");
+                Equal(170, exportedInteractions["interactionsPaymentSize"].GetValue<int>(), "export includes customized payment size");
                 var backup = Directory.GetDirectories(Path.Combine(scope.ConfigDirectory, "pichi-settings-backups")).Single();
                 True(File.ReadAllText(Path.Combine(backup, SettingsPrefix + ".cfg")).Contains("later save"), "previous primary backed up");
                 Equal("old recovery config", File.ReadAllText(Path.Combine(backup, SettingsPrefix + ".cfg.bak")), "previous recovery copy retained");
@@ -217,6 +227,12 @@ namespace Gilomx.CupheadBossRoulette
                 var overlay = JsonNode.Parse(hidden["files"][SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
                 overlay["profiles"][0]["components"][0]["accessToken"] = "private";
                 hidden["files"][SettingsPrefix + ".overlay-composer.json"] = overlay.ToJsonString(); cases.Add(hidden.ToJsonString());
+                var invalidPayment = JsonNode.Parse(valid);
+                overlay = JsonNode.Parse(invalidPayment["files"][SettingsPrefix + ".overlay-composer.json"].GetValue<string>());
+                var item = overlay["profiles"][0]["components"].AsArray().First(component => component["id"].GetValue<string>() == "interactions");
+                item["interactionsPaymentSize"] = 201;
+                invalidPayment["files"][SettingsPrefix + ".overlay-composer.json"] = overlay.ToJsonString();
+                cases.Add(invalidPayment.ToJsonString());
                 foreach (var invalid in cases)
                 {
                     Equal("invalid_configuration", transfer.StageImport(invalid), "malformed or nonportable copy rejected");

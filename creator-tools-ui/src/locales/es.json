@@ -713,13 +713,15 @@
       "battleOnlyHint": "Activado: sólo durante batallas contra jefes. Desactivado: siempre que Interacciones esté activo, incluso fuera de una batalla. Si desactivas Interacciones, el overlay se oculta. Se aplica a ambos perfiles; las vistas previas del diseñador y de OBS siguen disponibles.",
       "adaptive": "Agrandar canjes cuando hay menos opciones",
       "adaptiveHint": "Un canje se ve grande; dos, medianos; tres o más, compactos.",
+      "paymentSize": "Tamaño de los canjes",
+      "paymentSizeHint": "Aumenta los iconos y montos. El contenido se ajusta al espacio del overlay.",
       "previewTitle": "Vista previa de interacciones",
       "examples": "Muestra con precios de ejemplo",
       "examplesHint": "Usa regalos reales e iconos de cada red. En paginado se añaden ejemplos para ver al menos dos páginas; sólo aparecen en el diseñador y no se guardan ni se envían a OBS.",
       "configuredRules": "Reglas configuradas",
       "rulesHint": "La vista previa usa tus reglas habilitadas y las redes seleccionadas en este overlay.",
-      "noRules": "Tus reglas están deshabilitadas. Habilita alguna para mostrarla en el overlay.",
-      "obsHint": "La prueba en OBS muestra tus reglas reales guardadas y activa esta capa temporalmente."
+      "noRules": "Selecciona al menos una red para ver los canjes en el diseñador.",
+      "obsHint": "La prueba en OBS activa temporalmente esta capa y muestra las reglas habilitadas de las redes seleccionadas."
     },
     "components": {
       "roulette": "Ruleta",

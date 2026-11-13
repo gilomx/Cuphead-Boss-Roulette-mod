@@ -31,6 +31,7 @@
       interactionsTextOutlineWidth: Math.round(number(source.interactionsTextOutlineWidth ?? 0, 0, 0, 8)),
       interactionsSize: Number(source.interactionsSize) > 0 ? Math.round(number(source.interactionsSize, 75, 25, 100)) : 0,
       interactionsAdaptive: source.interactionsAdaptive !== false,
+      interactionsPaymentSize: Math.round(number(source.interactionsPaymentSize, 100, 100, 200)),
       // Older scenes may still request labels. This overlay is always image + cost.
       showTitle: false,
       motion: source.motion !== false,
@@ -118,7 +119,11 @@
     }
     return Array.from(grouped.values());
   }
-  function paymentSize(count, adaptive = true, template = 'floating') {
+  function paymentSize(count, adaptive = true, template = 'floating', profile) {
+    if (profile === 'horizontal') {
+      if (template === 'cards') return !adaptive ? 58 : count <= 1 ? 78 : count === 2 ? 58 : count === 3 ? 48 : 42;
+      return !adaptive ? 46 : count <= 1 ? 62 : count === 2 ? 52 : count === 3 ? 42 : 36;
+    }
     if (template === 'cards') return !adaptive ? 44 : count <= 1 ? 78 : count === 2 ? 58 : count === 3 ? 42 : 34;
     const size = !adaptive ? 34 : count <= 1 ? 62 : count === 2 ? 46 : count === 3 ? 34 : 28;
     return size;

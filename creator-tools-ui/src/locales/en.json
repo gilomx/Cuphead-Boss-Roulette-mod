@@ -713,13 +713,15 @@
       "itemSizeHint": "Turn off automatic size to use 25% to 100% of the overlay height. Up to four items stay still and also fit its width. Pages always remain fully visible.",
       "adaptive": "Enlarge exchanges when there are fewer options",
       "adaptiveHint": "One exchange is large; two are medium; three or more are compact.",
+      "paymentSize": "Exchange size",
+      "paymentSizeHint": "Enlarge exchange icons and amounts. Content scales to fit the overlay.",
       "previewTitle": "Interaction preview",
       "examples": "Sample with example prices",
       "examplesHint": "Uses real gifts and platform icons. Page previews add examples to show at least two pages; they appear only in the designer and are never saved or sent to OBS.",
       "configuredRules": "Configured rules",
       "rulesHint": "The preview uses your enabled rules and the platforms selected for this overlay.",
-      "noRules": "Your rules are disabled. Enable a rule to display it in the overlay.",
-      "obsHint": "OBS testing shows your real saved rules and enables this layer temporarily."
+      "noRules": "Select at least one platform to preview exchanges in the designer.",
+      "obsHint": "OBS testing temporarily enables this layer and shows enabled rules from the selected platforms."
     },
     "components": {
       "roulette": "Roulette",

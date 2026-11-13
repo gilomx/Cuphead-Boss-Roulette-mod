@@ -18,12 +18,11 @@ import type {
   PeskyBattlePreviewSnapshot,
   TapFarmingPreviewSnapshot,
 } from "./model";
-import { roulettePreview, type RouletteScenario, proportionalComponentSize } from "./model";
+import { roulettePreview, type RouletteScenario, resizeOverlayComponent, type OverlayResizeHandle } from "./model";
 import type { ChatChoosesState } from "../../model";
 
 type PreviewBackground = "alpha" | "light" | "dark";
 type ZoomOption = "fit" | 0.25 | 0.5 | 1;
-type ResizeHandle = "nw" | "ne" | "sw" | "se";
 
 interface OverlayDesignerCanvasProps {
   profile: OverlayComposerProfile;
@@ -50,7 +49,7 @@ interface DragState {
   pointerId: number;
   componentId: OverlayComponentId;
   mode: "move" | "resize";
-  handle?: ResizeHandle;
+  handle?: OverlayResizeHandle;
   clientX: number;
   clientY: number;
   start: OverlayComposerComponent;
@@ -58,41 +57,6 @@ interface DragState {
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
-}
-
-function resizedRect(
-  start: OverlayComposerComponent,
-  handle: ResizeHandle,
-  dx: number,
-  dy: number,
-  canvasWidth: number,
-  canvasHeight: number,
-) {
-  const fromWest = handle.includes("w");
-  const fromNorth = handle.includes("n");
-  const horizontalScale = (
-    start.width + (fromWest ? -dx : dx)
-  ) / Math.max(1, start.width);
-  const verticalScale = (
-    start.height + (fromNorth ? -dy : dy)
-  ) / Math.max(1, start.height);
-  const requestedScale = Math.abs(horizontalScale - 1) >= Math.abs(verticalScale - 1)
-    ? horizontalScale
-    : verticalScale;
-  const maximum = {
-    width: fromWest ? start.x + start.width : canvasWidth - start.x,
-    height: fromNorth ? start.y + start.height : canvasHeight - start.y,
-  };
-  const size = proportionalComponentSize(start, requestedScale, maximum);
-  const right = start.x + start.width;
-  const bottom = start.y + start.height;
-
-  return {
-    x: fromWest ? right - size.width : start.x,
-    y: fromNorth ? bottom - size.height : start.y,
-    width: size.width,
-    height: size.height,
-  };
 }
 
 export function OverlayDesignerCanvas({
@@ -195,7 +159,7 @@ export function OverlayDesignerCanvas({
     event: PointerEvent<HTMLDivElement | HTMLButtonElement>,
     component: OverlayComposerComponent,
     mode: DragState["mode"],
-    handle?: ResizeHandle,
+    handle?: OverlayResizeHandle,
   ) => {
     event.preventDefault();
     event.stopPropagation();
@@ -234,13 +198,12 @@ export function OverlayDesignerCanvas({
       });
       return;
     }
-    onChange(drag.componentId, resizedRect(
+    onChange(drag.componentId, resizeOverlayComponent(
       drag.start,
       drag.handle ?? "se",
       dx,
       dy,
-      profile.canvas.width,
-      profile.canvas.height,
+      profile.canvas,
     ));
   };
 
@@ -336,7 +299,7 @@ export function OverlayDesignerCanvas({
                     <span className="overlay-designer-selection__label">
                       {t(`overlayDesigner.components.${component.id}`)}
                     </span>
-                    {selected && !component.locked ? (["nw", "ne", "sw", "se"] as ResizeHandle[]).map((handle) => (
+                    {selected && !component.locked ? (["nw", "ne", "sw", "se"] as const).map((handle) => (
                       <button
                         type="button"
                         className="overlay-designer-selection__handle"

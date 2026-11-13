@@ -2,7 +2,7 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { createChatChoosesMock } from "./mock-chat-chooses.mjs";
-import { matchesOverlayPreviewLayout } from "./mock-overlay-layout.mjs";
+import { matchesOverlayPreviewLayout, validInteractionPaymentSize } from "./mock-overlay-layout.mjs";
 import { applyStreamRuleGroup } from "./mock-stream-rule-groups.mjs";
 const chatChooses = createChatChoosesMock({ developmentTools: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0" });
 
@@ -401,6 +401,7 @@ function defaultOverlayProfiles() {
     interactionsTemplate: "floating", interactionsLayout: "strip",
     interactionsTikTok: profile.id !== "vertical", interactionsTwitch: true, interactionsYouTube: true,
     interactionsPageSeconds: 8, interactionsSpeed: profile.id === "vertical" ? 80 : 40, interactionsAdaptive: true, interactionsSize: profile.id === "vertical" ? 96 : 0,
+    interactionsPaymentSize: 100,
     interactionsCardColor: "#f8e5be", interactionsCardNoise: profile.id === "vertical" ? 80 : 18,
     interactionsImageOutlineColor: "#000000", interactionsImageOutlineWidth: 0,
     interactionsTextOutlineColor: "#000000", interactionsTextOutlineWidth: 0,
@@ -1036,8 +1037,9 @@ function readJsonBody(req, res, callback, maximumBytes = 65536) {
 }
 
 function normalizeOverlayComponent(component, canvas) {
-  const minimumWidth = component.id !== "tap_farming" ? 320 : 120;
-  const minimumHeight = component.id !== "tap_farming" ? 180 : 100;
+  const supportsCompactSize = component.id === "tap_farming" || component.id === "interactions";
+  const minimumWidth = supportsCompactSize ? 120 : 320;
+  const minimumHeight = supportsCompactSize ? 100 : 180;
   component.width = Math.max(
     minimumWidth,
     Math.min(canvas.width, Math.round(Number(component.width) || minimumWidth)),
@@ -1109,7 +1111,8 @@ function normalizeOverlayComponent(component, canvas) {
       ? component.interactionsCardColor.toLowerCase() : "#f8e5be";
     component.interactionsSize = Number(component.interactionsSize) > 0
       ? Math.max(25, Math.min(100, Math.round(Number(component.interactionsSize)))) : 0;
-    for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 40, 140], ["interactionsCardNoise", 18, 0, 100]]) {
+    for (const [key, fallback, minimum, maximum] of [["interactionsPageSeconds", 8, 3, 60], ["interactionsSpeed", 40, 40, 140],
+      ["interactionsCardNoise", 18, 0, 100], ["interactionsPaymentSize", 100, 100, 200]]) {
       const value = Number(component[key] ?? fallback);
       component[key] = Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, Math.round(value))) : fallback;
     }
@@ -1185,7 +1188,8 @@ function applyOverlayComposerCommand(command, res) {
       json(res, { ok: false, error: "invalid_text_style" }, 400);
       return;
     }
-    if (command.interactionsTemplate != null && !["cards", "floating"].includes(command.interactionsTemplate) ||
+    if (!validInteractionPaymentSize({ ...command, id: component.id }) ||
+        command.interactionsTemplate != null && !["cards", "floating"].includes(command.interactionsTemplate) ||
         command.interactionsLayout != null && !["strip", "pages"].includes(command.interactionsLayout) ||
         ["interactionsTikTok", "interactionsTwitch", "interactionsYouTube", "interactionsAdaptive"].some(key => command[key] != null && typeof command[key] !== "boolean") ||
         command.interactionsSize != null && (!Number.isInteger(command.interactionsSize) ||
@@ -1223,7 +1227,7 @@ function applyOverlayComposerCommand(command, res) {
       "textFont", "textWeight", "textShadowColor", "textShadowX", "textShadowY", "textShadowBlur",
       "rouletteSize", "rouletteAlignment", "rouletteTextFirst", "rouletteLogo", "rouletteRetry",
       "interactionsTemplate", "interactionsLayout", "interactionsTikTok", "interactionsTwitch", "interactionsYouTube",
-      "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize",
+      "interactionsPageSeconds", "interactionsSpeed", "interactionsAdaptive", "interactionsSize", "interactionsPaymentSize",
       "interactionsCardColor", "interactionsCardNoise",
       ...itemOutlineKeys,
       "liquidColor", "collectingColor", "textColor", "outlineColor", "voteOutlineColor",

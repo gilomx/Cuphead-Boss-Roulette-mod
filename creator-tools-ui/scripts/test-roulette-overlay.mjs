@@ -112,7 +112,7 @@ test('interaction designer previews a disabled layer and forwards its independen
   view.profile.components.push({ id: 'interactions', enabled: false,
     interactionsTemplate: 'cards', interactionsLayout: 'pages',
     interactionsTikTok: true, interactionsTwitch: false, interactionsYouTube: false,
-    interactionsPageSeconds: 12, interactionsSpeed: 140, interactionsAdaptive: true, interactionsSize: 65,
+    interactionsPageSeconds: 12, interactionsSpeed: 140, interactionsAdaptive: true, interactionsSize: 65, interactionsPaymentSize: 175,
     interactionsCardColor: '#3f2b20aa', interactionsCardNoise: 35,
     interactionsImageOutlineColor: '#fedcba80', interactionsImageOutlineWidth: 8,
     interactionsTextOutlineColor: '#12345600', interactionsTextOutlineWidth: 3 });
@@ -130,6 +130,7 @@ test('interaction designer previews a disabled layer and forwards its independen
   assert.equal(message.state.presentation.interactionsTwitch, false);
   assert.equal(message.state.presentation.interactionsPageSeconds, 12);
   assert.equal(message.state.presentation.interactionsSize, 65);
+  assert.equal(message.state.presentation.interactionsPaymentSize, 175);
   assert.equal(message.state.presentation.interactionsSpeed, 140);
   assert.equal(message.state.presentation.interactionsCardColor, '#3f2b20aa');
   assert.equal(message.state.presentation.interactionsCardNoise, 35);
