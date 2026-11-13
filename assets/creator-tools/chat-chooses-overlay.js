@@ -24,6 +24,8 @@
   let transitionEpoch = 0;
   let transitionTimer = 0;
   let sceneAnimations = [];
+  let resultDeadline = null;
+  let resultTimer = 0;
   let failedAt = 0;
 
   function text(id, value) { document.getElementById(id).textContent = value ?? ''; }
@@ -73,11 +75,26 @@
   }
   function describe(state) {
     const voting = state.phase === 'voting' || state.phase === 'reveal';
-    const final = ['result', 'loading'].includes(state.phase) ||
+    const showingResult = ['result', 'loading'].includes(state.phase);
+    const deadline = showingResult && !preview && Number.isFinite(state.resultOverlayUntil)
+      ? state.resultOverlayUntil : null;
+    const expired = deadline !== null && Date.now() >= deadline;
+    const final = (showingResult && !expired) ||
       Boolean(preview && ['active', 'completed'].includes(state.phase) && state.selected?.boss);
     const key = voting ? `round:${state.sessionId}:${state.round}:${state.stage}:${JSON.stringify(state.options.map(option => [option.number, option.id, option.image]))}` :
       final ? `result:${state.sessionId}:${state.plane}:${JSON.stringify(state.selected)}` : '';
-    return { key, voting, final };
+    return { key, voting, final, deadline, expired };
+  }
+  function setResultDeadline(deadline) {
+    if (resultDeadline === deadline) return;
+    clearTimeout(resultTimer);
+    resultDeadline = deadline;
+    if (deadline !== null) {
+      resultTimer = setTimeout(() => {
+        hide();
+        render(latestState);
+      }, deadline - Date.now());
+    }
   }
   function animateCount(entry, votes, state) {
     const label = voteCount(votes);
@@ -140,9 +157,8 @@
     document.documentElement.lang = locale;
     presentation(state);
     const scene = describe(state);
-    // Voting cancellation still wins immediately. The final selection keeps
-    // its portraits mounted until their staggered exit has finished.
-    if (!scene.key && !sceneKey.startsWith('result:')) {
+    // The live deadline caps visibility even during a staggered exit.
+    if (scene.expired || (!scene.key && !sceneKey.startsWith('result:'))) {
       hide(); return;
     }
     if (!motion(state)) {
@@ -168,11 +184,13 @@
     Promise.allSettled(sceneAnimations.map(animation => animation.finished)).then(finish);
   }
   function hide() {
+    setResultDeadline(null);
     cancelTransition(); sceneKey = ''; root.hidden = true; cards = new Map();
     options.replaceChildren(); result.hidden = true;
   }
   function commit(state, scene) {
     if (!scene.key) { hide(); return; }
+    setResultDeadline(scene.deadline);
     const { voting, final } = scene;
     const changed = sceneKey !== scene.key;
     root.hidden = false;
@@ -234,7 +252,7 @@
       render(await response.json()); failedAt = 0;
     } catch {
       if (!failedAt) failedAt = Date.now();
-      if (Date.now() - failedAt > 3000) { cancelTransition(); root.hidden = true; sceneKey = ''; }
+      if (Date.now() - failedAt > 3000) hide();
     }
     setTimeout(poll, 250);
   }

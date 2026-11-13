@@ -54,6 +54,7 @@ namespace Gilomx.CupheadBossRoulette
         private int winner = -1;
         private DateTime openedAt;
         private DateTime until;
+        private DateTime resultOverlayUntil;
         private int[] testVoteOptions = new int[0];
         private double[] testVoteOffsets = new double[0];
         private DateTime testVotesStartedAt;
@@ -279,7 +280,12 @@ namespace Gilomx.CupheadBossRoulette
             {
                 stage = NextStageLocked();
                 if (stage < Stages.Length) OpenRoundLocked();
-                else { phase = "result"; revision++; }
+                else
+                {
+                    phase = "result";
+                    resultOverlayUntil = now.AddSeconds(6);
+                    revision++;
+                }
             }
         }
 
@@ -320,12 +326,16 @@ namespace Gilomx.CupheadBossRoulette
             if (publishVoteRound != null) publishVoteRound(VoteRoundNoticeLocked());
         }
 
-        private string VoteRoundNoticeLocked()
+        private static long ToUnixMilliseconds(DateTime time)
         {
             var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            var timestamp = (openedAt.Ticks - epoch.Ticks) / TimeSpan.TicksPerMillisecond;
+            return (time.Ticks - epoch.Ticks) / TimeSpan.TicksPerMillisecond;
+        }
+
+        private string VoteRoundNoticeLocked()
+        {
             var builder = new StringBuilder("{\"openedAt\":");
-            builder.Append(timestamp.ToString(CultureInfo.InvariantCulture)).Append(",\"stage\":");
+            builder.Append(ToUnixMilliseconds(openedAt).ToString(CultureInfo.InvariantCulture)).Append(",\"stage\":");
             AppendString(builder, Stages[stage]);
             builder.Append(",\"options\":[");
             for (var i = 0; i < choices.Count; i++)
@@ -408,6 +418,8 @@ namespace Gilomx.CupheadBossRoulette
                     .Append(",\"schemaVersion\":1,\"revision\":").Append(revision)
                     .Append(",\"sessionId\":").Append(session).Append(",\"round\":").Append(round)
                     .Append(",\"phase\":"); AppendString(builder, phase);
+                if (phase == "result" || phase == "loading")
+                    builder.Append(",\"resultOverlayUntil\":").Append(ToUnixMilliseconds(resultOverlayUntil).ToString(CultureInfo.InvariantCulture));
                 builder.Append(",\"stage\":"); AppendString(builder, stage < 6 ? Stages[stage] : "result");
                 builder.Append(",\"nextStage\":"); AppendString(builder, NextStageLocked() < 6 ? Stages[NextStageLocked()] : "result");
                 builder.Append(",\"withChallenge\":").Append(withChallenge ? "true" : "false")

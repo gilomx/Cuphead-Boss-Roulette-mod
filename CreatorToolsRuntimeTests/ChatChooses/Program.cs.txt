@@ -227,8 +227,11 @@ static class Program
         c.Observe(Vote("X", "1")); c.Observe(Vote("Y", "2")); Close(c);
         Assert(State(c).GetProperty("outcome").GetString() == "tie", "tie breaker");
         Assert(new[] { 1, 2 }.Contains(State(c).GetProperty("winnerNumber").GetInt32()), "tie winner among leaders");
+        Assert(!State(c).TryGetProperty("resultOverlayUntil", out _), "final reveal has no result overlay deadline yet");
         Advance(c);
         Assert(State(c).GetProperty("phase").GetString() == "result", "result card");
+        var overlayUntil = new DateTimeOffset(now.AddSeconds(6)).ToUnixTimeMilliseconds();
+        Assert(State(c).GetProperty("resultOverlayUntil").GetInt64() == overlayUntil, "overlay expires six seconds after result");
         int[] chosen;
         Assert(c.TryGetResult(out chosen) && chosen.Length == 6, "read chosen loadout without starting game");
         chosen[0] = -999;
@@ -236,6 +239,7 @@ static class Program
         var selectedJson = State(c).GetProperty("selected").GetRawText();
         now = now.AddHours(1); c.Tick();
         Assert(State(c).GetProperty("phase").GetString() == "result", "wait indefinitely for Play without countdown");
+        Assert(State(c).GetProperty("resultOverlayUntil").GetInt64() == overlayUntil, "expired overlay deadline is retained while waiting for Play");
         Assert(State(c).GetProperty("remainingSeconds").GetInt32() == 0, "no automatic start timer");
         Assert(State(c).GetProperty("selected").GetRawText() == selectedJson, "waiting keeps every selected item");
         Assert(!c.Command("operation=play&sessionId=1&round=6"), "web cannot skip native difficulty review");
@@ -244,9 +248,11 @@ static class Program
         Assert(!c.TryBeginLoad(out chosen), "cannot play away from map");
         c.SetCatalog(null, true); c.Tick();
         Assert(c.TryBeginLoad(out chosen) && chosen.Length == 6, "explicit Play begins canonical load immediately");
+        Assert(State(c).GetProperty("resultOverlayUntil").GetInt64() == overlayUntil, "loading keeps the same overlay deadline");
         Assert(!c.TryBeginLoad(out chosen), "load once only");
         c.Loaded(true); c.ReturnedToMap();
         Assert(!c.Reserved && State(c).GetProperty("phase").GetString() == "completed", "release on return");
+        Assert(!State(c).TryGetProperty("resultOverlayUntil", out _), "completed event has no result overlay deadline");
 
         c = New(false);
         for (var i = 0; i < 5; i++) { Close(c); Advance(c); }

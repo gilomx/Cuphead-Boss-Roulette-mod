@@ -90,11 +90,13 @@ El borde se aplica en la votación y en el resultado, también a los jefes.
 **Marco de la imagen** permite cambiar su color sin recolorear la ilustración
 ni añadir brillo difuso. El tono predeterminado es el original
 `#d3af93`; los colores personalizados guardados se conservan. El resumen usa
-ese color normal sin destacar un ganador. Al iniciar la partida o detener el evento desde
-el resumen, los retratos salen uno por uno (240 ms, separados por 60 ms)
-antes de ocultar la capa. Una nueva ronda espera esa salida y entra con los
-datos más recientes. Desactivar animaciones o preferir movimiento reducido
-oculta inmediatamente; la cancelación durante las rondas mantiene prioridad.
+ese color normal sin destacar un ganador. En OBS, la capa se oculta a los seis
+segundos de que el resultado final está listo. La selección sigue disponible
+en la tarjeta del juego hasta confirmar **Jugar**. Si se inicia la partida o se
+detiene el evento antes del límite, los retratos salen uno por uno (240 ms,
+separados por 60 ms). Una nueva ronda espera esa salida y entra con los datos
+más recientes. La cancelación durante las rondas mantiene prioridad. Con las
+animaciones desactivadas o el movimiento reducido, la salida es inmediata.
 El overlay no muestra nombres de artículos ni el título del evento; durante
 la votación muestra **Votaciones** (72 px) sobre la etapa actual (48 px).
 Los retos del evento live en el panel y del overlay usan los mismos archivos

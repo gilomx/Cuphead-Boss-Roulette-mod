@@ -39,7 +39,7 @@ async function boot(search = '', reducedMotion = false) {
   vm.runInNewContext(code, { document, location: { search, origin: 'http://overlay.test' }, URLSearchParams, innerWidth: 1280, innerHeight: 720,
     getComputedStyle: () => ({ opacity: '1', transform: 'none' }),
     window: { parent, matchMedia: () => ({ matches: reducedMotion }), addEventListener: (type, callback) => { listeners[type] = callback; } }, Date: { now: () => now },
-    setTimeout: (callback, delay) => { const id = ++nextTimer; timers.push({ id, callback, delay }); return id; },
+    setTimeout: (callback, delay) => { const id = ++nextTimer; timers.push({ id, callback, delay, at: now + delay }); return id; },
     clearTimeout: id => { const index = timers.findIndex(timer => timer.id === id); if (index >= 0) timers.splice(index, 1); },
     fetch: async url => {
       fetched.push(url);
@@ -57,6 +57,14 @@ async function boot(search = '', reducedMotion = false) {
       const index = timers.findIndex(timer => timer.delay !== 250);
       assert.ok(index >= 0, 'transition fallback scheduled');
       timers.splice(index, 1)[0].callback(); await flush();
+    },
+    async advanceClock(time) {
+      now = time;
+      for (const timer of timers.filter(timer => timer.at <= now)) {
+        const index = timers.indexOf(timer);
+        if (index >= 0) timers.splice(index, 1)[0].callback();
+      }
+      await flush();
     },
     async poll(time = now) { now = time; const index = timers.findIndex(timer => timer.delay === 250); assert.ok(index >= 0, 'poll scheduled'); timers.splice(index, 1)[0].callback(); await flush(); } };
 }
@@ -244,6 +252,39 @@ test('starting gameplay staggers the final result exit and waits for its last po
   exits.at(-1).finish(); await flush();
   assert.equal(view.nodes.event.hidden, true);
   assert.equal(view.nodes.result.hidden, true);
+});
+
+test('a live result hides at six seconds without further OBS updates and cannot reopen while loading', async () => {
+  const view = await boot('?embedded=1');
+  const state = { ...finalSelection(), resultOverlayUntil: 6000 };
+  view.send(state); await view.finishAnimations();
+  assert.equal(view.nodes.event.hidden, false);
+
+  await view.advanceClock(5900);
+  view.send({ ...state, phase: 'loading' });
+  await view.advanceClock(5999);
+  assert.equal(view.nodes.event.hidden, false);
+  await view.advanceClock(6000);
+  assert.equal(view.nodes.event.hidden, true);
+  assert.equal(view.nodes.result.hidden, true);
+
+  view.send(state);
+  view.send({ ...state, phase: 'loading' });
+  assert.equal(view.nodes.event.hidden, true);
+  view.send({ ...ballot(), sessionId: 2 });
+  assert.equal(view.nodes.event.hidden, false, 'the next event can show its ballot');
+});
+
+test('the standalone source skips an expired result and the designer can hold its sample', async () => {
+  const standalone = await boot();
+  standalone.setState({ ...finalSelection(), resultOverlayUntil: 6000 });
+  await standalone.poll(6001);
+  assert.equal(standalone.nodes.event.hidden, true);
+
+  const designer = await boot('?embedded=1');
+  designer.send(finalSelection()); await designer.finishAnimations();
+  await designer.advanceClock(6001);
+  assert.equal(designer.nodes.result.hidden, false);
 });
 
 test('a new event waits for the final result exit and enters with the newest votes', async () => {
