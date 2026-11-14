@@ -54,8 +54,8 @@ namespace Gilomx.CupheadBossRoulette
         internal static void WriteCommand(Stream input, string command)
         {
             // Legacy Mono can buffer StreamWriter output or prepend an encoding
-            // preamble. The command pipe accepts only ASCII lines without BOM.
-            var bytes = Encoding.ASCII.GetBytes(command + "\n");
+            // preamble. Write UTF-8 without a BOM so reward titles keep accents.
+            var bytes = Encoding.UTF8.GetBytes(command + "\n");
             input.Write(bytes, 0, bytes.Length);
             input.Flush();
         }

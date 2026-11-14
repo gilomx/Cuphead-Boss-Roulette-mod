@@ -127,6 +127,10 @@ namespace Gilomx.CupheadBossRoulette
             {
                 var rules = scope.CreateRules(3);
                 AddPlatformRule(rules, "youtube", "jewels", 250, 2, cooldown: 4);
+                var reward = JsonNode.Parse(rules.ProcessServerCommand("action=create&name=Reward&platform=twitch&eventType=redemption" +
+                    "&rewardName=Reward&rewardId=reward-1&rewardBroadcasterId=12345&rewardCost=900&rewardManaged=true" +
+                    "&every=1&quantity=1&interaction=test_attack"));
+                Equal("created", reward["feedback"].GetValue<string>(), "bound Twitch reward created before export");
                 var settingsPath = (string)typeof(CreatorToolsStreamRulesController)
                     .GetField("settingsPath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(rules);
                 var transfer = new CreatorToolsSettingsTransfer(Path.Combine(Path.GetDirectoryName(settingsPath), "plugin.cfg"), null);
@@ -146,6 +150,11 @@ namespace Gilomx.CupheadBossRoulette
                     Equal("jewels", jewels.GetProperty("eventType").GetString(), "gem trigger survives transfer");
                     Equal(250, jewels.GetProperty("every").GetInt32(), "gem threshold survives transfer");
                     Equal(4, jewels.GetProperty("globalCooldownSeconds").GetInt32(), "gem cooldown survives transfer");
+                    var restoredReward = restored.RootElement.GetProperty("rules")[2];
+                    Equal("reward-1", restoredReward.GetProperty("rewardId").GetString(), "reward ID survives transfer");
+                    Equal("12345", restoredReward.GetProperty("rewardBroadcasterId").GetString(), "channel binding survives transfer");
+                    Equal(900L, restoredReward.GetProperty("rewardCost").GetInt64(), "reward cost survives transfer");
+                    True(restoredReward.GetProperty("rewardManaged").GetBoolean(), "managed reward ownership survives transfer");
                 }
             }
         }

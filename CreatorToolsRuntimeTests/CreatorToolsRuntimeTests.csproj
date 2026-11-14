@@ -121,6 +121,7 @@
              Link="Product\Streaming\TikFinityCompanionHost.cs" />
     <Compile Include="..\Streaming\TwitchConnectionBridge.cs"
              Link="Product\Streaming\TwitchConnectionBridge.cs" />
+    <Compile Include="..\Streaming\TwitchRewardBridge.cs" Link="Product\Streaming\TwitchRewardBridge.cs" />
     <Compile Include="..\Streaming\YouTubeConnectionBridge.cs" />
   </ItemGroup>
 </Project>

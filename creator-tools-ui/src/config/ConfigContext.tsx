@@ -25,7 +25,7 @@ import type {
   ChatChoosesState,
 } from "../model";
 import { validPacing, type PacingValues } from "../features/interactions/pacingValues";
-import type { StreamRuleGroupDraft } from "../features/interactions/streamRuleGroups";
+import { streamRuleRewardFields, type StreamRuleGroupDraft } from "../features/interactions/streamRuleGroups";
 import { startForegroundPolling } from "./foregroundPolling";
 
 interface ConfigValue {
@@ -1506,6 +1506,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         countdownSeconds: String(draft.countdownSeconds ?? 3),
       });
       if (draft.id !== undefined) query.set("id", String(draft.id));
+      const reward = streamRuleRewardFields(draft);
+      if (reward.rewardId) {
+        query.set("rewardId", reward.rewardId);
+        if (reward.rewardCost !== undefined) query.set("rewardCost", String(reward.rewardCost));
+        query.set("rewardManaged", reward.rewardManaged ? "1" : "0");
+        query.set("rewardBroadcasterId", reward.rewardBroadcasterId ?? "");
+      }
       return sendStreamRuleUpdate(query);
     },
     [sendStreamRuleUpdate],
@@ -1598,6 +1605,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         eventType: value.eventType,
         giftId: value.giftId,
         rewardName: value.rewardName.trim(),
+        ...streamRuleRewardFields(value),
         every: value.every,
       })),
     }),

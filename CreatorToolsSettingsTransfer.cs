@@ -206,7 +206,7 @@ namespace Gilomx.CupheadBossRoulette
             var allowed = new HashSet<string>(StringComparer.Ordinal);
             CollectKeys(template, allowed);
             if (suffix == ".stream-rules.json")
-                foreach (var key in new[] { "id", "name", "enabled", "platform", "eventType", "giftId", "giftName", "rewardName", "every", "interaction", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" }) allowed.Add(key);
+                foreach (var key in new[] { "id", "name", "enabled", "platform", "eventType", "giftId", "giftName", "rewardName", "rewardId", "rewardBroadcasterId", "rewardCost", "rewardManaged", "every", "interaction", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" }) allowed.Add(key);
             FilterKeys(node, allowed, importing, suffix == ".stream-rules.json");
             foreach (var key in template.ObjectValue.Keys)
                 if (node.Property(key) == null) throw new FormatException("Incomplete settings.");
@@ -341,6 +341,7 @@ namespace Gilomx.CupheadBossRoulette
                     : rule.String("platform") == "youtube" ? new[] { "jewels" }
                     : new[] { "follow", "currency", "subscription", "subscription_gift", "resubscription", "redemption" };
                 if (Array.IndexOf(allowed, eventType) < 0 || (eventType == "redemption" && rule.String("rewardName").Trim().Length == 0) || (eventType == "follow" && rule.Integer("every", 0) != 1)) throw new FormatException("Invalid rule trigger.");
+                ValidateRewardMetadata(rule, eventType);
                 RequireRange(rule, "every", 1, 1000000);
                 RequireRange(rule, "quantity", 1, 50);
                 RequireRange(rule, "userCooldownSeconds", 0, 3600);
@@ -350,6 +351,22 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        private static void ValidateRewardMetadata(CreatorToolsJsonValue rule, string eventType)
+        {
+            foreach (var key in new[] { "rewardId", "rewardBroadcasterId" })
+                if (rule.Property(key) != null && rule.Property(key).StringValue == null)
+                    throw new FormatException("Invalid reward identity.");
+            int cost = 0;
+            bool managed = false;
+            long validatedCost;
+            bool validatedManaged;
+            if ((rule.Property("rewardCost") != null && !rule.TryInteger("rewardCost", out cost)) ||
+                (rule.Property("rewardManaged") != null && !rule.TryBoolean("rewardManaged", out managed)) ||
+                !CreatorToolsStreamRulesController.TryReadRewardMetadata(eventType, rule.String("rewardId"), rule.String("rewardBroadcasterId"),
+                    cost.ToString(CultureInfo.InvariantCulture), managed ? "true" : "false", out validatedCost, out validatedManaged))
+                throw new FormatException("Invalid reward metadata.");
+        }
+
         private static string SerializeRuleSettings(CreatorToolsJsonValue node)
         {
             // The legacy settings reader uses a fixed field order. Canonicalize
@@ -357,12 +374,22 @@ namespace Gilomx.CupheadBossRoulette
             var builder = new StringBuilder("{\"version\":7,\"nextId\":");
             AppendValue(builder, node.Property("nextId")); builder.Append(",\"rules\":[");
             var rules = node.Property("rules").ArrayValue;
-            var fields = new[] { "id", "name", "enabled", "platform", "eventType", "giftId", "giftName", "rewardName", "every", "interaction", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" };
+            var fields = new[] { "id", "name", "enabled", "platform", "eventType", "giftId", "giftName", "rewardName", "rewardId", "rewardBroadcasterId", "rewardCost", "rewardManaged", "every", "interaction", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" };
             for (var index = 0; index < rules.Count; index++)
             {
                 if (index > 0) builder.Append(','); builder.Append('{');
-                for (var field = 0; field < fields.Length; field++)
-                { if (field > 0) builder.Append(','); AppendString(builder, fields[field]); builder.Append(':'); AppendValue(builder, rules[index].Property(fields[field])); }
+                var first = true;
+                foreach (var field in fields)
+                {
+                    var value = rules[index].Property(field);
+                    if (value == null) continue;
+                    if (!first) builder.Append(',');
+                    first = false;
+                    AppendString(builder, field);
+                    builder.Append(':');
+                    if (field == "rewardCost") builder.Append(rules[index].Integer(field, 0).ToString(CultureInfo.InvariantCulture));
+                    else AppendValue(builder, value);
+                }
                 builder.Append('}');
             }
             return builder.Append("]}").ToString();

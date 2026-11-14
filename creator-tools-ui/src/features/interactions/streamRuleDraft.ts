@@ -31,6 +31,10 @@ export function draftForStreamRule(rule: StreamRule): StreamRuleDraft {
     enabled: rule.enabled,
     platform: rule.platform ?? "tiktok",
     rewardName: rule.rewardName ?? "",
+    rewardId: rule.rewardId,
+    rewardCost: rule.rewardCost,
+    rewardManaged: rule.rewardManaged,
+    rewardBroadcasterId: rule.rewardBroadcasterId,
     eventType: rule.eventType,
     giftId: rule.giftId,
     every: rule.every,
@@ -53,6 +57,10 @@ export function sameStreamRuleDraft(
     left.enabled === right.enabled &&
     left.platform === right.platform &&
     left.rewardName === right.rewardName &&
+    left.rewardId === right.rewardId &&
+    left.rewardCost === right.rewardCost &&
+    left.rewardManaged === right.rewardManaged &&
+    left.rewardBroadcasterId === right.rewardBroadcasterId &&
     left.eventType === right.eventType &&
     left.giftId === right.giftId &&
     left.every === right.every &&

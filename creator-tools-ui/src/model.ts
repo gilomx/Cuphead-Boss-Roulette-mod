@@ -344,7 +344,14 @@ export type StreamRulePlatform = "tiktok" | "twitch" | "youtube";
 export type StreamRuleTrigger = "gift" | "like" | "follow" | "currency" |
   "subscription" | "subscription_gift" | "resubscription" | "redemption" | "jewels";
 
-export interface StreamRule {
+export interface StreamRuleReward {
+  rewardId?: string;
+  rewardCost?: number;
+  rewardManaged?: boolean;
+  rewardBroadcasterId?: string;
+}
+
+export interface StreamRule extends StreamRuleReward {
   durationSeconds?: number;
   countdownSeconds?: number;
   id: number;
@@ -364,7 +371,7 @@ export interface StreamRule {
   globalCooldownSeconds: number;
 }
 
-export interface StreamRuleDraft {
+export interface StreamRuleDraft extends StreamRuleReward {
   durationSeconds?: number;
   countdownSeconds?: number;
   id?: number;

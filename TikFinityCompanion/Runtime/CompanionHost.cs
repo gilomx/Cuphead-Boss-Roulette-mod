@@ -40,7 +40,7 @@ internal sealed class CompanionHost
         };
         var twitch = new TwitchConnectionService(twitchApi, new WindowsTwitchCredentialStore(),
             new TwitchEventSub(twitchApi, output), output.WriteStatusAsync,
-            new TwitchEventSub(new TwitchLocalTestApi(localHttp), output, localTest: true));
+            new TwitchEventSub(new TwitchLocalTestApi(localHttp), output, localTest: true), output.WriteTwitchRewardAsync);
         var twitchTask = twitchControl ? twitch.RunAsync(lifetimeCancellation.Token)
             : Task.Delay(Timeout.Infinite, lifetimeCancellation.Token);
         var youtubeApi = new YouTubeApi(http);
@@ -88,11 +88,14 @@ internal sealed class CompanionHost
                 {
                     var command = line.ToString().Trim(); line.Clear();
                     if (command.StartsWith("twitch:", StringComparison.Ordinal)) twitch.TryCommand(command[7..]);
-                    if (command.StartsWith("youtube:", StringComparison.Ordinal)) youtube?.TryCommand(command[8..]);
+                    else if (command.StartsWith("youtube:", StringComparison.Ordinal)) youtube?.TryCommand(command[8..]);
+                    else if (command.StartsWith('{')) await twitch.QueueRewardCommandAsync(command, cancellationToken).ConfigureAwait(false);
                 }
                 else if (value != '\r')
                 {
-                    if (line.Length >= 128) throw new InvalidDataException("Companion command too long.");
+                    // A 45-character title may occupy several hundred characters when JSON escaped.
+                    if (line.Length >= (line.Length > 0 && line[0] == '{' ? 2048 : 128))
+                        throw new InvalidDataException("Companion command too long.");
                     line.Append(value);
                 }
             }

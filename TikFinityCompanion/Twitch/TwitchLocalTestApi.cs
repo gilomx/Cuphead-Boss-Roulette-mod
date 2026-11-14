@@ -31,5 +31,7 @@ internal sealed class TwitchLocalTestApi(HttpClient http) : ITwitchApi
     public Task<TwitchTokens?> PollAuthorizationAsync(string deviceCode, CancellationToken cancellationToken) => throw new NotSupportedException();
     public Task<TwitchTokens> RefreshAsync(TwitchTokens tokens, CancellationToken cancellationToken) => throw new NotSupportedException();
     public Task<TwitchIdentity> ValidateAsync(string accessToken, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<TwitchReward[]> ListRewardsAsync(TwitchTokens tokens, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<TwitchReward> ChangeRewardAsync(TwitchTokens tokens, TwitchRewardCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
     public Task RevokeAsync(string accessToken, CancellationToken cancellationToken) => throw new NotSupportedException();
 }

@@ -63,10 +63,10 @@ misma posición de textura: las marcas no parpadean, aparecen ni se desplazan po
 su cuenta. Ambos ajustes se
 guardan por perfil y se aplican tanto a la franja como al paginado.
 
-El contenido sale de las reglas habilitadas de **Interacciones**. La cantidad
-del canje corresponde a «cada N» regalos, Bits, gemas, likes u otros eventos
-configurados. Los nombres de recompensas de Twitch se conservan sólo en las
-etiquetas de accesibilidad, sin texto visible junto al precio. Los regalos usan
+El contenido sale de las reglas habilitadas de **Interacciones**. La franja y
+el paginado muestran regalos, taps y follows de TikTok, Bits de Twitch y gemas
+de YouTube. Los espectadores encuentran las recompensas de Puntos del canal
+en el menú de Twitch. Los regalos usan
 las imágenes reales del catálogo local; Bits usa el Cheermote oficial de Twitch
 y Gemas el recurso de YouTube, sin insignias adicionales con el logotipo de la red.
 En TikTok, los eventos sin regalo muestran texto: **follow**, sin número ni icono,

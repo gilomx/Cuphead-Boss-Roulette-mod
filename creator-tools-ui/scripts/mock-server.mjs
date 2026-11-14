@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { createChatChoosesMock } from "./mock-chat-chooses.mjs";
 import { matchesOverlayPreviewLayout, validInteractionPaymentSize } from "./mock-overlay-layout.mjs";
-import { applyStreamRuleGroup } from "./mock-stream-rule-groups.mjs";
+import { applyStreamRuleGroup, mockRewardMetadata } from "./mock-stream-rule-groups.mjs";
 const chatChooses = createChatChoosesMock({ developmentTools: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0" });
 
 const configuredPort = Number(process.argv[2] ?? process.env.CREATOR_TOOLS_PORT);
@@ -58,6 +58,14 @@ const streamRuleGlobalCooldowns = new Map();
 const followedViewers = new Set();
 
 const twitchControlToken = "local-mock-twitch-control";
+const twitchBroadcasterId = "678901";
+const twitchBroadcasterLogin = "cuenta_de_prueba";
+const defaultTwitchRewardLimits = { cooldownSeconds: 0, maxPerStream: 0, maxPerUserPerStream: 0 };
+const twitchRewards = [
+  { id: "mock-existing-reward", title: "Recompensa del canal", cost: 250, enabled: true, manageable: false,
+    ...defaultTwitchRewardLimits },
+];
+let nextMockRewardId = 1;
 const youtubeControlToken = "local-mock-youtube-control";
 let youtubeAuthorizationTimer;
 let youtubeConnection = { ready: true, status: "disconnected", authorized: false, account: "",
@@ -70,6 +78,52 @@ let twitchAuthorizationTimer;
 let twitchConnection = { ready: true, status: "disconnected", authorized: false, account: "", testAvailable: process.env.CREATOR_TOOLS_DEV_TOOLS !== "0", testMode: false,
   messageCode: "not_connected", userCode: "", verificationUri: "", expiresAt: "", commandPending: false,
   controlToken: twitchControlToken };
+
+function twitchRewardCatalog() {
+  const connected = twitchConnection.authorized;
+  return { ready: connected, canManage: connected, broadcasterId: connected ? twitchBroadcasterId : "",
+    broadcasterLogin: connected ? twitchBroadcasterLogin : "",
+    rewards: connected ? twitchRewards : [], pendingRewardIds: [], ...(!connected ? { error: "not_connected" } : {}) };
+}
+
+function syncMockTwitchRewards() {
+  for (const reward of twitchRewards) {
+    if (!reward.manageable) continue;
+    reward.enabled = interactionsEnabled && streamRules.some(rule => rule.eventType === "redemption" && rule.enabled &&
+      rule.rewardId === reward.id && rule.rewardBroadcasterId === twitchBroadcasterId);
+  }
+}
+
+function mockTwitchRewardCommand(command) {
+  const fail = error => ({ ok: false, error });
+  if (!twitchConnection.authorized) return fail("not_connected");
+  if (command.broadcasterId !== twitchBroadcasterId) return fail("wrong_broadcaster");
+  if (!Number.isInteger(command.cost) || command.cost < 1 || command.cost > 1_000_000_000) return fail("invalid_request");
+  const limits = {};
+  for (const key of Object.keys(defaultTwitchRewardLimits)) {
+    const value = command[key];
+    if (value === undefined) continue;
+    const valid = Number.isInteger(value) && (value === 0 || (key === "cooldownSeconds"
+      ? value >= 60 && value <= 604_800
+      : value > 0 && value <= 2_147_483_647));
+    if (!valid) return fail("invalid_request");
+    limits[key] = value;
+  }
+  let reward;
+  if (command.operation === "create") {
+    const title = typeof command.title === "string" ? command.title.trim() : "";
+    if (!title || title.length > 45) return fail("invalid_request");
+    if (twitchRewards.some(reward => reward.title.toLowerCase() === title.toLowerCase())) return fail("reward_name_conflict");
+    reward = { id: `mock-owned-${nextMockRewardId++}`, title, cost: command.cost, enabled: false, manageable: true,
+      ...defaultTwitchRewardLimits, ...limits };
+    twitchRewards.push(reward);
+  } else if (command.operation === "update") {
+    reward = twitchRewards.find(entry => entry.id === command.id && entry.manageable);
+    if (!reward) return fail("reward_not_manageable");
+    Object.assign(reward, { cost: command.cost }, limits);
+  } else return fail("invalid_request");
+  return { ok: true, reward: { ...reward, broadcasterId: twitchBroadcasterId } };
+}
 
 function streamRuleTriggers(platform) {
   return platform === "tiktok" ? ["gift", "like", "follow"]
@@ -88,7 +142,9 @@ function streamRuleEventType(command) {
 function streamRuleMatches(rule, command) {
   return rule.enabled && (rule.platform ?? "tiktok") === command.platform && rule.eventType === streamRuleEventType(command) &&
     (rule.eventType !== "gift" || rule.giftId === command.itemId) &&
-    (rule.eventType !== "redemption" || rule.rewardName.toLowerCase() === command.itemName.trim().toLowerCase());
+    (rule.eventType !== "redemption" || (rule.rewardId
+      ? rule.rewardId === command.itemId && rule.rewardBroadcasterId === command.broadcasterId
+      : rule.rewardName.toLowerCase() === command.itemName.trim().toLowerCase()));
 }
 
 function streamRulesState() {
@@ -1321,6 +1377,20 @@ createServer((req, res) => {
     }, 1024 * 1024); return;
   }
   if (url.pathname === "/api/twitch") { json(res, twitchConnection); return; }
+  if (url.pathname === "/api/twitch/rewards") {
+    if (req.method !== "GET") { json(res, { ok: false, error: "method_not_allowed" }, 405); return; }
+    json(res, twitchRewardCatalog());
+    return;
+  }
+  if (url.pathname === "/api/twitch/rewards/set") {
+    if (req.method !== "POST") { json(res, { ok: false, error: "method_not_allowed" }, 405); return; }
+    if (req.headers["x-pichi-twitch-control"] !== twitchControlToken ||
+        ![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(req.headers.origin)) {
+      json(res, { ok: false, error: "invalid_local_control" }, 403); return;
+    }
+    readJsonBody(req, res, command => json(res, mockTwitchRewardCommand(command)));
+    return;
+  }
   if (url.pathname === "/api/youtube") { json(res, youtubeConnection); return; }
   if (["/api/youtube/connect", "/api/youtube/cancel", "/api/youtube/disconnect"].includes(url.pathname)) {
     if (req.method !== "POST") { json(res, { error: "post_required" }, 405); return; }
@@ -1847,6 +1917,13 @@ createServer((req, res) => {
       const eventType = url.searchParams.get("eventType") ?? "gift";
       const platform = url.searchParams.get("platform") ?? "tiktok";
       const rewardName = (url.searchParams.get("rewardName") ?? "").trim();
+      const rewardManaged = url.searchParams.get("rewardManaged") ?? "0";
+      const reward = ["0", "1", "false", "true"].includes(rewardManaged) ? mockRewardMetadata(eventType, {
+        rewardId: url.searchParams.get("rewardId") ?? "",
+        rewardBroadcasterId: url.searchParams.get("rewardBroadcasterId") ?? "",
+        rewardCost: Number(url.searchParams.get("rewardCost") ?? 0),
+        rewardManaged: rewardManaged === "1" || rewardManaged === "true",
+      }) : null;
       const giftId = url.searchParams.get("giftId") ?? "";
       const interaction = url.searchParams.get("interaction") ?? "";
       const every = Number(url.searchParams.get("every"));
@@ -1854,7 +1931,7 @@ createServer((req, res) => {
       const userCooldownSeconds = Number(url.searchParams.get("userCooldownSeconds") ?? 0);
       const globalCooldownSeconds = Number(url.searchParams.get("globalCooldownSeconds") ?? 0);
       const name = (url.searchParams.get("name") ?? "").trim().slice(0, 64);
-      if (!name || !streamRuleTriggers(platform).includes(eventType) ||
+      if (!name || !reward || !streamRuleTriggers(platform).includes(eventType) ||
           (eventType === "redemption" && (!rewardName || rewardName.length > 64)) ||
           (eventType === "gift" && !giftsById.has(giftId)) ||
           !interactionItems.includes(interaction) ||
@@ -1871,6 +1948,7 @@ createServer((req, res) => {
           enabled: url.searchParams.get("enabled") !== "0",
           platform,
           rewardName: eventType === "redemption" ? rewardName : "",
+          ...reward,
           eventType,
           giftId: eventType === "gift" ? giftId : "",
           every: eventType === "follow" ? 1 : every,
@@ -1895,6 +1973,7 @@ createServer((req, res) => {
       streamRulesFeedback = index < 0 ? "rule_not_found" : "invalid_action";
       streamRulesError = true;
     }
+    if (!streamRulesError) syncMockTwitchRewards();
     streamRulesRevision += 1;
     json(res, streamRulesState());
     return;
@@ -1912,6 +1991,7 @@ createServer((req, res) => {
         streamRules = result.rules;
         streamRulesNextId = result.nextId;
         streamRulesRevision = result.revision;
+        syncMockTwitchRewards();
       }
       streamRulesFeedback = result.feedback;
       streamRulesError = result.error;
@@ -1945,6 +2025,7 @@ createServer((req, res) => {
     let nextFeedback = "settings_saved";
     if (interactionsEnabledValue !== null) {
       interactionsEnabled = interactionsEnabledValue === "1";
+      syncMockTwitchRewards();
       interactionMasterRevision += 1;
       if (!interactionsEnabled) {
         interactionQueue = interactionQueue.filter((entry) =>

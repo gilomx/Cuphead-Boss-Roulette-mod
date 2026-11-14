@@ -4,7 +4,7 @@
   const networks = Object.freeze(['tiktok', 'twitch', 'youtube']);
   const triggers = Object.freeze({
     tiktok: ['gift', 'like', 'follow'],
-    twitch: ['currency', 'follow', 'subscription', 'subscription_gift', 'resubscription', 'redemption'],
+    twitch: ['currency'],
     youtube: ['jewels'],
   });
   const number = (value, fallback, min, max) => {
@@ -103,7 +103,6 @@
         image: gift?.image || '',
         fallbackImage: gift?.fallbackImage || '',
         giftName: gift?.name || String(rule.giftName || ''),
-        rewardName: rule.eventType === 'redemption' ? String(rule.rewardName || '').slice(0, 64) : '',
       };
       // An unknown gift gets a clearly labelled generic gift, never an invented catalog image.
       if (!grouped.has(key)) grouped.set(key, {
@@ -114,7 +113,7 @@
         offers: [],
       });
       const item = grouped.get(key);
-      const offerKey = JSON.stringify([offer.platform, offer.eventType, rule.giftId || '', offer.every, offer.rewardName]);
+      const offerKey = JSON.stringify([offer.platform, offer.eventType, rule.giftId || '', offer.every]);
       if (!item.offers.some(entry => entry.key === offerKey)) item.offers.push({ ...offer, key: offerKey });
     }
     return Array.from(grouped.values());

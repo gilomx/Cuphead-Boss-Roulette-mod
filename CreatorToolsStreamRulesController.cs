@@ -14,11 +14,14 @@ namespace Gilomx.CupheadBossRoulette
         private const string GiftEventType = "gift";
         private const string LikeEventType = "like";
         private const string FollowEventType = "follow";
+        private const string RedemptionEventType = "redemption";
         private const string CommunityGiftPlaceholderId = "0";
         private const string CommunityGiftPlaceholderName = "Community Gift";
         private const string CommunityGiftPlaceholderImagePath =
             "/assets/creator-tools/gifts/images/0.webp";
         private const int MaximumRules = 100;
+        private const int MaximumGroupValues = 4;
+        private const long MaximumRewardCost = 1000000000L;
         private const int MaximumCommandsPerUpdate = 64;
         private const int MaximumRuleNameLength = 64;
         private const int MaximumEvery = 1000000;
@@ -198,6 +201,35 @@ namespace Gilomx.CupheadBossRoulette
             return string.Equals(Value(ParseQuery(query), "action").Trim(), "group", StringComparison.OrdinalIgnoreCase);
         }
 
+        internal string ManagedTwitchRewardsJson()
+        {
+            lock (ruleStateLock)
+            {
+                var managed = new Dictionary<string, StreamRule>(StringComparer.Ordinal);
+                var enabled = new HashSet<string>(StringComparer.Ordinal);
+                var engineEnabled = InteractionsEnabled;
+                foreach (var rule in rules)
+                {
+                    if (rule.RewardId.Length == 0) continue;
+                    var key = rule.RewardBroadcasterId + ":" + rule.RewardId;
+                    if (rule.RewardManaged) managed[key] = rule;
+                    if (engineEnabled && rule.Enabled) enabled.Add(key);
+                }
+
+                var builder = new StringBuilder("[");
+                foreach (var pair in managed)
+                {
+                    if (builder.Length > 1) builder.Append(',');
+                    builder.Append("{\"id\":\"");
+                    AppendJson(builder, pair.Value.RewardId);
+                    builder.Append("\",\"broadcasterId\":\"");
+                    AppendJson(builder, pair.Value.RewardBroadcasterId);
+                    builder.Append("\",\"enabled\":").Append(enabled.Contains(pair.Key) ? "true}" : "false}");
+                }
+                return builder.Append(']').ToString();
+            }
+        }
+
         /// <summary>
         /// Evaluates every compatible rule independently. Gift accumulators
         /// are scoped by rule plus connection. Like accumulators also include
@@ -354,8 +386,7 @@ namespace Gilomx.CupheadBossRoulette
                 if (!rule.Enabled || rule.Platform != streamEvent.Platform || rule.EventType != eventType ||
                     (rule.EventType == GiftEventType &&
                      rule.GiftId != streamEvent.ItemId) ||
-                    (rule.EventType == "redemption" && !string.Equals(
-                        rule.RewardName, (streamEvent.ItemName ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase)))
+                    (rule.EventType == RedemptionEventType && !MatchesReward(rule, streamEvent)))
                     continue;
                 thresholdObserved = true;
                 long triggers;
@@ -747,11 +778,17 @@ namespace Gilomx.CupheadBossRoulette
                 .ToLowerInvariant();
             if (eventType.Length == 0)
                 eventType = GiftEventType;
+            var rewardId = Value(values, "rewardId").Trim();
+            var rewardBroadcasterId = Value(values, "rewardBroadcasterId").Trim();
+            long rewardCost;
+            bool rewardManaged;
             var giftId = Value(values, "giftId").Trim();
             var interaction = Value(values, "interaction").Trim();
             GiftEntry gift = null;
             if (name.Length == 0 || !IsSupportedEventType(platform, eventType) ||
-                (eventType == "redemption" && (rewardName.Length == 0 || rewardName.Length > MaximumRuleNameLength)) ||
+                (eventType == RedemptionEventType && (rewardName.Length == 0 || rewardName.Length > MaximumRuleNameLength)) ||
+                !TryReadRewardMetadata(eventType, rewardId, rewardBroadcasterId,
+                    Value(values, "rewardCost"), Value(values, "rewardManaged"), out rewardCost, out rewardManaged) ||
                 (eventType == GiftEventType &&
                  !gifts.TryGetValue(giftId, out gift)) ||
                 !IsKnownInteraction(interaction))
@@ -797,7 +834,11 @@ namespace Gilomx.CupheadBossRoulette
                 Name = name,
                 Enabled = enabled,
                 Platform = platform,
-                RewardName = eventType == "redemption" ? rewardName : string.Empty,
+                RewardName = eventType == RedemptionEventType ? rewardName : string.Empty,
+                RewardId = rewardId,
+                RewardBroadcasterId = rewardBroadcasterId,
+                RewardCost = rewardCost,
+                RewardManaged = rewardManaged,
                 EventType = eventType,
                 GiftId = eventType == GiftEventType
                     ? gift.Id
@@ -814,6 +855,28 @@ namespace Gilomx.CupheadBossRoulette
                 CountdownSeconds = countdown
             };
             return true;
+        }
+
+        private static bool MatchesReward(StreamRule rule, CreatorToolsStreamEvent streamEvent)
+        {
+            if (rule.RewardId.Length > 0)
+                return rule.RewardId == streamEvent.ItemId && rule.RewardBroadcasterId == streamEvent.BroadcasterId;
+            return string.Equals(rule.RewardName, (streamEvent.ItemName ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static bool TryReadRewardMetadata(string eventType, string rewardId, string broadcasterId,
+            string rawCost, string rawManaged, out long cost, out bool managed)
+        {
+            cost = 0;
+            managed = false;
+            if ((rawCost.Length > 0 && !long.TryParse(rawCost, NumberStyles.None, CultureInfo.InvariantCulture, out cost)) ||
+                cost < 0 || cost > MaximumRewardCost || (rawManaged.Length > 0 && !TryReadBoolean(rawManaged, out managed)))
+                return false;
+            if (rewardId.Length == 0)
+                return broadcasterId.Length == 0 && cost == 0 && !managed;
+            return eventType == RedemptionEventType && rewardId.Length <= 96 &&
+                Regex.IsMatch(rewardId, @"\A[A-Za-z0-9_-]+\z", RegexOptions.CultureInvariant) &&
+                Regex.IsMatch(broadcasterId, @"\A[0-9]{1,32}\z", RegexOptions.CultureInvariant);
         }
 
         private bool TryCommit(
@@ -859,7 +922,7 @@ namespace Gilomx.CupheadBossRoulette
             var action = root.String("action");
             var idsNode = root.Property("ruleIds");
             if ((action != "save" && action != "delete" && action != "toggle" && action != "duplicate") ||
-                idsNode == null || idsNode.ArrayValue == null || idsNode.ArrayValue.Count > 3 ||
+                idsNode == null || idsNode.ArrayValue == null || idsNode.ArrayValue.Count > MaximumGroupValues ||
                 (action != "save" && idsNode.ArrayValue.Count == 0))
             {
                 SetGroupFailure("invalid_group");
@@ -867,7 +930,7 @@ namespace Gilomx.CupheadBossRoulette
             }
             var referencedIds = new HashSet<long>();
             var referenced = new List<StreamRule>();
-            var platforms = new HashSet<string>(StringComparer.Ordinal);
+            var valueSlots = new HashSet<string>(StringComparer.Ordinal);
             foreach (var idNode in idsNode.ArrayValue)
             {
                 long id;
@@ -883,7 +946,7 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 }
                 var rule = rules[index];
-                if (!platforms.Add(rule.Platform) ||
+                if (!valueSlots.Add(GroupValueSlot(rule)) ||
                     (referenced.Count > 0 && !HaveSharedGroupSettings(referenced[0], rule)))
                 {
                     SetGroupFailure("invalid_group");
@@ -900,7 +963,7 @@ namespace Gilomx.CupheadBossRoulette
             if (action == "save")
             {
                 var values = root.Property("values");
-                if (values == null || values.ArrayValue == null || values.ArrayValue.Count < 1 || values.ArrayValue.Count > 3)
+                if (values == null || values.ArrayValue == null || values.ArrayValue.Count < 1 || values.ArrayValue.Count > MaximumGroupValues)
                 {
                     SetGroupFailure("invalid_group");
                     return;
@@ -910,7 +973,7 @@ namespace Gilomx.CupheadBossRoulette
                     SetGroupFailure("rules_limit");
                     return;
                 }
-                platforms.Clear();
+                valueSlots.Clear();
                 var suppliedIds = new HashSet<long>();
                 foreach (var value in values.ArrayValue)
                 {
@@ -930,7 +993,7 @@ namespace Gilomx.CupheadBossRoulette
                         if (!TryAllocateGroupId(ref candidateNextId, out id)) return;
                     }
                     StreamRule rule;
-                    if (!TryBuildGroupRule(root, value, id, out rule) || !platforms.Add(rule.Platform))
+                    if (!TryBuildGroupRule(root, value, id, out rule) || !valueSlots.Add(GroupValueSlot(rule)))
                     {
                         SetGroupFailure("invalid_group");
                         return;
@@ -999,12 +1062,12 @@ namespace Gilomx.CupheadBossRoulette
             rule = null;
             if (value == null || value.ObjectValue == null) return false;
             var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var key in new[] { "interaction", "name", "platform", "eventType", "giftId", "rewardName" })
+            foreach (var key in new[] { "interaction", "name", "platform", "eventType", "giftId", "rewardName", "rewardId", "rewardBroadcasterId" })
             {
                 var node = (key == "interaction" ? root : value).Property(key);
-                if (node == null && (key == "giftId" || key == "rewardName")) { fields[key] = string.Empty; continue; }
+                if (node == null && (key == "giftId" || key == "rewardName" || key == "rewardId" || key == "rewardBroadcasterId")) continue;
                 if (node == null || node.StringValue == null || node.StringValue.Length >
-                    (key == "name" ? 1024 : key == "interaction" ? 96 : MaximumRuleNameLength)) return false;
+                    (key == "name" ? 1024 : key == "interaction" || key == "rewardId" ? 96 : MaximumRuleNameLength)) return false;
                 fields[key] = node.StringValue;
             }
             if (fields["platform"] != "tiktok" && fields["platform"] != "twitch" && fields["platform"] != "youtube") return false;
@@ -1012,6 +1075,18 @@ namespace Gilomx.CupheadBossRoulette
             bool enabled;
             if (!value.TryBoolean("enabled", out enabled)) return false;
             fields["enabled"] = enabled ? "true" : "false";
+            if (value.Property("rewardManaged") != null)
+            {
+                bool managed;
+                if (!value.TryBoolean("rewardManaged", out managed)) return false;
+                fields["rewardManaged"] = managed ? "true" : "false";
+            }
+            if (value.Property("rewardCost") != null)
+            {
+                long cost;
+                if (!TryGroupId(value.Property("rewardCost"), true, out cost) || cost > MaximumRewardCost) return false;
+                fields["rewardCost"] = cost.ToString(CultureInfo.InvariantCulture);
+            }
             foreach (var key in new[] { "every", "quantity", "userCooldownSeconds", "globalCooldownSeconds", "durationSeconds", "countdownSeconds" })
             {
                 int number;
@@ -1019,6 +1094,11 @@ namespace Gilomx.CupheadBossRoulette
                 fields[key] = number.ToString(CultureInfo.InvariantCulture);
             }
             return TryBuildRule(fields, id, out rule, false);
+        }
+
+        private static string GroupValueSlot(StreamRule rule)
+        {
+            return rule.EventType == RedemptionEventType ? "twitch_redemption" : rule.Platform;
         }
 
         private bool TryAllocateGroupId(ref long candidateNextId, out long id)
@@ -1052,7 +1132,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private static bool ShouldResetRuleRuntimeState(StreamRule previous, StreamRule replacement)
         {
-            return previous.Platform != replacement.Platform || previous.RewardName != replacement.RewardName ||
+            return previous.Platform != replacement.Platform || previous.RewardId != replacement.RewardId ||
+                previous.RewardBroadcasterId != replacement.RewardBroadcasterId ||
+                (previous.RewardId.Length == 0 && previous.RewardName != replacement.RewardName) ||
                 previous.EventType != replacement.EventType || previous.GiftId != replacement.GiftId ||
                 previous.Every != replacement.Every || !HaveSharedGroupSettings(previous, replacement) ||
                 (previous.Enabled && !replacement.Enabled);
@@ -1156,7 +1238,17 @@ namespace Gilomx.CupheadBossRoulette
             AppendJson(builder, rule.GiftName);
             builder.Append("\",\"rewardName\":\"");
             AppendJson(builder, rule.RewardName);
-            builder.Append("\",\"every\":")
+            if (rule.RewardId.Length > 0)
+            {
+                builder.Append("\",\"rewardId\":\"");
+                AppendJson(builder, rule.RewardId);
+                builder.Append("\",\"rewardBroadcasterId\":\"");
+                AppendJson(builder, rule.RewardBroadcasterId);
+                builder.Append("\",\"rewardCost\":").Append(rule.RewardCost)
+                    .Append(",\"rewardManaged\":").Append(rule.RewardManaged ? "true" : "false");
+            }
+            else builder.Append('"');
+            builder.Append(",\"every\":")
                 .Append(rule.Every)
                 .Append(",\"interaction\":\"");
             AppendJson(builder, rule.Interaction);
@@ -1490,6 +1582,10 @@ namespace Gilomx.CupheadBossRoulette
                     "\\\"giftId\\\":\\\"(?<giftId>\\d*)\\\"," +
                     "\\\"giftName\\\":\\\"(?<giftName>(?:\\\\.|[^\\\"])*)\\\"," +
                     "(?:\\\"rewardName\\\":\\\"(?<rewardName>(?:\\\\.|[^\\\"])*)\\\",)?" +
+                    "(?:\\\"rewardId\\\":\\\"(?<rewardId>[A-Za-z0-9_-]*)\\\",)?" +
+                    "(?:\\\"rewardBroadcasterId\\\":\\\"(?<rewardBroadcasterId>[0-9]*)\\\",)?" +
+                    "(?:\\\"rewardCost\\\":(?<rewardCost>\\d+),)?" +
+                    "(?:\\\"rewardManaged\\\":(?<rewardManaged>true|false),)?" +
                     "\\\"every\\\":(?<every>\\d+)," +
                     "\\\"interaction\\\":\\\"(?<interaction>[^\\\"]+)\\\"," +
                     "\\\"quantity\\\":(?<quantity>\\d+)" +
@@ -1516,6 +1612,10 @@ namespace Gilomx.CupheadBossRoulette
                         matches[i].Groups["eventType"].Value;
                     var platform = matches[i].Groups["platform"].Value;
                     var rewardName = UnescapeJson(matches[i].Groups["rewardName"].Value).Trim();
+                    var rewardId = matches[i].Groups["rewardId"].Value;
+                    var rewardBroadcasterId = matches[i].Groups["rewardBroadcasterId"].Value;
+                    long rewardCost;
+                    bool rewardManaged;
                     var giftId = matches[i].Groups["giftId"].Value;
                     var interaction = matches[i].Groups["interaction"].Value;
                     if (!long.TryParse(matches[i].Groups["id"].Value,
@@ -1539,7 +1639,9 @@ namespace Gilomx.CupheadBossRoulette
                         every < 1 || every > MaximumEvery ||
                         quantity < 1 || quantity > MaximumQuantity ||
                         !IsSupportedEventType(platform, eventType) ||
-                        (eventType == "redemption" && (rewardName.Length == 0 || rewardName.Length > MaximumRuleNameLength)) ||
+                        (eventType == RedemptionEventType && (rewardName.Length == 0 || rewardName.Length > MaximumRuleNameLength)) ||
+                        !TryReadRewardMetadata(eventType, rewardId, rewardBroadcasterId, matches[i].Groups["rewardCost"].Value,
+                            matches[i].Groups["rewardManaged"].Value, out rewardCost, out rewardManaged) ||
                         (eventType == GiftEventType &&
                          !gifts.ContainsKey(giftId)) ||
                         (eventType == FollowEventType && every != 1) ||
@@ -1554,7 +1656,11 @@ namespace Gilomx.CupheadBossRoulette
                             matches[i].Groups["name"].Value)),
                         Enabled = matches[i].Groups["enabled"].Value == "true",
                         Platform = platform,
-                        RewardName = eventType == "redemption" ? rewardName : string.Empty,
+                        RewardName = eventType == RedemptionEventType ? rewardName : string.Empty,
+                        RewardId = rewardId,
+                        RewardBroadcasterId = rewardBroadcasterId,
+                        RewardCost = rewardCost,
+                        RewardManaged = rewardManaged,
                         EventType = eventType,
                         GiftId = eventType == GiftEventType
                             ? giftId
@@ -2062,6 +2168,10 @@ namespace Gilomx.CupheadBossRoulette
             internal bool Enabled;
             internal string Platform;
             internal string RewardName;
+            internal string RewardId = string.Empty;
+            internal string RewardBroadcasterId = string.Empty;
+            internal long RewardCost;
+            internal bool RewardManaged;
             internal string EventType;
             internal string GiftId;
             internal string GiftName;
@@ -2082,6 +2192,10 @@ namespace Gilomx.CupheadBossRoulette
                     Enabled = Enabled,
                     Platform = Platform,
                     RewardName = RewardName,
+                    RewardId = RewardId,
+                    RewardBroadcasterId = RewardBroadcasterId,
+                    RewardCost = RewardCost,
+                    RewardManaged = RewardManaged,
                     EventType = EventType,
                     GiftId = GiftId,
                     GiftName = GiftName,

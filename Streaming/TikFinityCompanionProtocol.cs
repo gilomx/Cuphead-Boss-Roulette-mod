@@ -91,6 +91,7 @@ namespace Gilomx.CupheadBossRoulette
                     EventId = eventId,
                     IdempotencyKey = idempotencyKey,
                     ConnectionId = connectionId,
+                    BroadcasterId = Text(CreatorToolsFlatJson.Value(values, "broadcasterId"), string.Empty, 32),
                     Platform = IdentifierOr(CreatorToolsFlatJson.Value(
                         values, "platform"), "tiktok"),
                     Connector = IdentifierOr(CreatorToolsFlatJson.Value(

@@ -35,11 +35,35 @@ test('quantity, duration and countdown distinguish effects while equivalent trig
   assert.equal(items[1].quantity, 2);
 });
 
-test('duplicate offers collapse; distinct gift quantities and redemption names stay distinct', () => {
-  const items = project([rule(), rule(), rule({ every: 2 }), rule({ platform: 'twitch', eventType: 'redemption', rewardName: '<img src=x onerror=alert(1)>' }),
-    rule({ platform: 'twitch', eventType: 'redemption', rewardName: 'Otro canje' })]);
-  assert.equal(items[0].offers.length, 4);
-  assert.match(items[0].offers[2].rewardName, /<img/);
+test('duplicate offers collapse and distinct gift quantities stay distinct', () => {
+  const items = project([rule(), rule(), rule({ every: 2 })]);
+  assert.deepEqual(plain(items[0].offers.map(offer => offer.every)), [1, 2]);
+});
+
+test('only Twitch Bits appear beside TikTok and YouTube offers, and reward-only effects are hidden', async () => {
+  const runtime = await boot();
+  const hiddenRules = [
+    rule({ platform: 'twitch', eventType: 'redemption', every: 2, rewardName: 'Zanahoria', rewardId: 'carrot', rewardCost: 2000 }),
+    rule({ platform: 'twitch', eventType: 'redemption', interaction: 'effect_1', every: 3, rewardName: 'Anterior' }),
+    ...['follow', 'subscription', 'subscription_gift', 'resubscription'].map(eventType => rule({ platform: 'twitch', eventType })),
+  ];
+  const shownRules = [
+    rule(),
+    rule({ platform: 'twitch', eventType: 'currency', every: 100 }),
+    rule({ platform: 'youtube', eventType: 'jewels', every: 300 }),
+  ];
+  const root = runtime.nodes['interactions-overlay'];
+  const content = runtime.nodes['interactions-content'];
+  for (const interactionsLayout of ['strip', 'pages']) {
+    const presentation = { interactionsLayout, motion: false };
+    runtime.send({ rules: [...hiddenRules, ...shownRules], presentation });
+    assert.equal(root.dataset.count, '1');
+    const first = content.children[0].children[0];
+    const card = interactionsLayout === 'strip' ? first : first.children[0];
+    assert.deepEqual(card.children[1].children.map(payment => payment.children[1].textContent), ['1', '100', '300']);
+    runtime.send({ rules: hiddenRules, presentation });
+    assert.equal(root.hidden, true);
+  }
 });
 
 test('ordinary gift images stay local while observed Community Gift images use the current HTTPS metadata', () => {
@@ -223,13 +247,14 @@ test('composer embedded=1 query uses the parent transport without polling real s
   assert.equal(runtime.nodes['interactions-overlay'].dataset.count, '1');
 });
 
-test('neither template creates names, categories, headings or reward labels even from old scenes', async () => {
+test('neither template creates names, categories or headings even from old scenes', async () => {
   const runtime = await boot('?embedded=1');
   for (const template of ['floating', 'cards']) {
     for (const showTitle of [false, true, false]) {
-      runtime.send({ rules: [rule({ platform: 'twitch', eventType: 'redemption', rewardName: 'canjesito' })],
+      runtime.send({ rules: [rule()],
         presentation: { interactionsLayout: 'pages', interactionsTemplate: template, showTitle, showDetails: true } });
-      assert.ok(!runtime.created.some(node => ['interaction-name', 'interaction-category', 'interaction-reward', 'interaction-brand'].includes(node.className)));
+      assert.equal(runtime.nodes['interactions-overlay'].hidden, false);
+      assert.ok(!runtime.created.some(node => ['interaction-name', 'interaction-category', 'interaction-brand'].includes(node.className)));
     }
   }
 });
@@ -266,11 +291,10 @@ test('pages slide at the configured interval despite repeated polling and keep t
   assert.equal(runtime.nodes['interactions-content'].children[0].children.length, 1);
 });
 
-test('reward names stay accessible without visible text and no data-controlled HTML is parsed', async () => {
+test('unknown gift names stay accessible without visible text and no data-controlled HTML is parsed', async () => {
   const runtime = await boot();
   const name = '<img src=x onerror=alert(1)>';
-  runtime.send({ rules: [rule({ platform: 'twitch', eventType: 'redemption', rewardName: name })], presentation: { interactionsLayout: 'pages' } });
-  assert.ok(!runtime.created.some(node => node.className === 'interaction-reward'));
+  runtime.send({ rules: [rule({ giftId: 'unknown', giftName: name })], presentation: { interactionsLayout: 'pages' } });
   assert.ok(runtime.created.some(node => node.className === 'interaction-payment' && node.attributes['aria-label'].includes(name)));
   assert.ok(!runtimeCode.includes('innerHTML'));
 });
@@ -370,8 +394,7 @@ test('TikTok taps and follow use text alongside gift and currency artwork in eve
     rule({ eventType: 'like', every: 1000000, giftName: 'Stale gift name' }),
     rule({ eventType: 'follow', every: 1, giftName: 'Stale gift name' }),
     rule({ platform: 'twitch', eventType: 'currency', every: 125 }),
-    rule({ platform: 'youtube', eventType: 'jewels', every: 400 }),
-    rule({ platform: 'twitch', eventType: 'follow', every: 1 })];
+    rule({ platform: 'youtube', eventType: 'jewels', every: 400 })];
   const visibleText = node => (node.textContent || '') + node.children.map(visibleText).join('');
   for (const profile of ['horizontal', 'vertical']) {
     const runtime = await boot(`?embedded=1&profile=${profile}`);
@@ -403,10 +426,6 @@ test('TikTok taps and follow use text alongside gift and currency artwork in eve
         assert.equal(payment.children[0].children[0].src, imagePath);
         assert.equal(visibleText(payment), value, 'gift and currency prices keep their numeric display');
       }
-      assert.notEqual(payments[6].dataset.kind, 'text', 'the TikTok text treatment does not change Twitch follow');
-      assert.deepEqual(payments[6].children.map(node => node.className), ['interaction-currency', 'interaction-cost']);
-      assert.equal(payments[6].children[0].children[0].tagName, 'svg');
-      assert.equal(visibleText(payments[6]), '1');
     }
     runtime.dispose();
   }

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LaPichiRuleta.TikFinity.Twitch;
 
 namespace LaPichiRuleta.TikFinity.Protocol;
 
@@ -48,6 +49,9 @@ internal sealed class NdjsonWriter : IAsyncDisposable
 
     internal Task WriteStatusAsync(CompanionStatus status, CancellationToken cancellationToken) =>
         WriteAsync(status, CompanionJsonContext.Default.CompanionStatus, cancellationToken);
+
+    internal Task WriteTwitchRewardAsync(TwitchRewardResult result, CancellationToken cancellationToken) =>
+        WriteAsync(result, CompanionJsonContext.Default.TwitchRewardResult, cancellationToken);
 
     internal static string Serialize(CompanionStatus status)
     {

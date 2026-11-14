@@ -1,6 +1,7 @@
-import type { StreamRule, StreamRulePlatform, StreamRuleTrigger, TikTokGift } from "../../model";
+import type { StreamRule, StreamRulePlatform, StreamRuleReward, StreamRuleTrigger, TikTokGift } from "../../model";
 import { interactionItemFor } from "./interactionCatalog";
 import { platformTriggers } from "./streamRuleDraft";
+import type { TwitchRewardEdits } from "./useTwitchRewards";
 
 export interface StreamRuleGroupShared {
   interaction: string;
@@ -11,7 +12,8 @@ export interface StreamRuleGroupShared {
   countdownSeconds: number;
 }
 
-export interface StreamRuleValueDraft {
+export interface StreamRuleValueDraft extends StreamRuleReward {
+  rewardEdits?: TwitchRewardEdits;
   id?: number;
   name: string;
   enabled: boolean;
@@ -35,6 +37,21 @@ export interface StreamRuleGroupDraft extends StreamRuleGroupShared {
   values: StreamRuleValueDraft[];
 }
 
+export function streamRuleValueSlot(platform: StreamRulePlatform, eventType: StreamRuleTrigger) {
+  return platform === "twitch" && eventType === "redemption" ? "twitch_redemption" : platform;
+}
+
+export const twitchRewardCostMax = 1_000_000_000;
+
+export function streamRuleRewardFields(rule: StreamRuleReward & { eventType: StreamRuleTrigger }): StreamRuleReward {
+  return rule.eventType === "redemption" && rule.rewardId ? {
+    rewardId: rule.rewardId,
+    rewardCost: rule.rewardCost ?? 0,
+    rewardManaged: rule.rewardManaged ?? false,
+    rewardBroadcasterId: rule.rewardBroadcasterId,
+  } : {};
+}
+
 function sharedFields(rule: StreamRule): StreamRuleGroupShared {
   return {
     interaction: rule.interaction,
@@ -46,7 +63,7 @@ function sharedFields(rule: StreamRule): StreamRuleGroupShared {
   };
 }
 
-/** Preserve every legacy rule, splitting repeated platforms into separate cohorts. */
+/** Preserve every rule, splitting repeated slots into separate cohorts. */
 export function groupStreamRules(rules: StreamRule[]): StreamRuleGroup[] {
   const result: StreamRuleGroup[] = [];
   const cohorts = new Map<string, StreamRuleGroup[]>();
@@ -54,8 +71,9 @@ export function groupStreamRules(rules: StreamRule[]): StreamRuleGroup[] {
     const shared = sharedFields(rule);
     const signature = JSON.stringify(Object.values(shared));
     const candidates = cohorts.get(signature) ?? [];
+    const slot = streamRuleValueSlot(rule.platform ?? "tiktok", rule.eventType);
     let group = candidates.find(candidate => !candidate.rules.some(value =>
-      (value.platform ?? "tiktok") === (rule.platform ?? "tiktok")));
+      streamRuleValueSlot(value.platform ?? "tiktok", value.eventType) === slot));
     if (!group) {
       group = { ...shared, id: rule.id, ruleIds: [], rules: [] };
       candidates.push(group);
@@ -72,15 +90,16 @@ export function groupStreamRules(rules: StreamRule[]): StreamRuleGroup[] {
 export function createStreamRuleValueDraft(
   gift?: TikTokGift,
   platform: StreamRulePlatform = "tiktok",
+  eventType: StreamRuleTrigger = platform === "tiktok" ? "gift" : platform === "twitch" ? "currency" : "jewels",
 ): StreamRuleValueDraft {
   return {
     name: platform === "tiktok" ? gift?.name ?? "" : "",
     enabled: true,
     platform,
-    eventType: platform === "tiktok" ? "gift" : platform === "twitch" ? "currency" : "jewels",
+    eventType,
     giftId: platform === "tiktok" ? gift?.giftId ?? "" : "",
     rewardName: "",
-    every: platform === "tiktok" ? 1 : 100,
+    every: eventType === "currency" || eventType === "jewels" ? 100 : 1,
   };
 }
 
@@ -117,6 +136,7 @@ export function draftForStreamRuleGroup(group: StreamRuleGroup): StreamRuleGroup
       eventType: rule.eventType,
       giftId: rule.giftId,
       rewardName: rule.rewardName ?? "",
+      ...streamRuleRewardFields(rule),
       every: rule.every,
     })),
   };
@@ -133,7 +153,9 @@ export function sameStreamRuleGroupDraft(
     left.ruleIds.length === right.ruleIds.length &&
     left.ruleIds.every((id, index) => id === right.ruleIds[index]) &&
     left.values.length === right.values.length &&
-    left.values.every((value, index) => valueKeys.every(key => value[key] === right.values[index][key]));
+    left.values.every((value, index) => valueKeys.every(key => value[key] === right.values[index][key]) &&
+      JSON.stringify(value.rewardEdits) === JSON.stringify(right.values[index].rewardEdits) &&
+      JSON.stringify(streamRuleRewardFields(value)) === JSON.stringify(streamRuleRewardFields(right.values[index])));
 }
 
 export interface StreamRuleGroupLimits {
@@ -154,8 +176,8 @@ export function validStreamRuleGroupDraft(
   if (!item || !integer(draft.quantity, 1, limits.maxQuantity) ||
       !integer(draft.userCooldownSeconds, 0, limits.maxCooldownSeconds) ||
       !integer(draft.globalCooldownSeconds, 0, limits.maxCooldownSeconds) ||
-      !integer(draft.values.length, 1, Math.min(3, limits.maxValues ?? 3)) ||
-      new Set(draft.values.map(value => value.platform)).size !== draft.values.length ||
+      !integer(draft.values.length, 1, Math.min(4, limits.maxValues ?? 4)) ||
+      new Set(draft.values.map(value => streamRuleValueSlot(value.platform, value.eventType))).size !== draft.values.length ||
       new Set(draft.ruleIds).size !== draft.ruleIds.length ||
       draft.ruleIds.some(id => !integer(id, 1, Number.MAX_SAFE_INTEGER)) ||
       (item.group === "challenge" && (!integer(draft.durationSeconds, 1, 120) || !integer(draft.countdownSeconds, 0, 30)))) return false;
@@ -167,5 +189,6 @@ export function validStreamRuleGroupDraft(
     platformTriggers[value.platform]?.includes(value.eventType) &&
     (value.eventType === "follow" || integer(value.every, 1, limits.maxEvery)) &&
     (value.eventType !== "gift" || gifts.some(gift => gift.giftId === value.giftId)) &&
-    (value.eventType !== "redemption" || (value.rewardName.trim().length > 0 && value.rewardName.trim().length <= 64)));
+    (value.eventType !== "redemption" || (value.rewardName.trim().length > 0 && value.rewardName.trim().length <= 64 &&
+      (!value.rewardId || (Boolean(value.rewardBroadcasterId) && integer(value.rewardCost ?? 0, 0, twitchRewardCostMax))))));
 }

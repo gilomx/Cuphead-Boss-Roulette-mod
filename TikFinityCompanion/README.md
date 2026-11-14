@@ -36,7 +36,8 @@ TikFinity y no accede al almacén de credenciales.
 Una única aplicación pública usa el Client ID incluido en `TwitchApplication`.
 El flujo [Device Code Grant](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow)
 solicita `user:read:chat`, `moderator:read:followers`,
-`channel:read:subscriptions`, `bits:read` y `channel:read:redemptions`.
+`channel:read:subscriptions`, `bits:read`, `channel:read:redemptions` y
+`channel:manage:redemptions`.
 No necesita Client Secret, servidor público ni callback local. Sólo se conecta
 el canal de la persona que autoriza; no se envían mensajes al chat.
 
@@ -55,6 +56,11 @@ no disponibles para la cuenta dejan conectado el chat con un aviso. La
 identidad de un evento usa su `message_id` para deduplicar reintentos.
 Reconexiones indicadas por Twitch transfieren el socket sin recrear
 suscripciones; una caída completa abre sesión nueva y las recrea.
+
+El companion consulta las recompensas del canal con Helix. Con el permiso
+de gestión puede crear recompensas desactivadas y modificar el precio o la
+habilitación de las creadas con el Client ID del mod. La autorización
+anterior de lectura sigue sirviendo para recibir y vincular canjes.
 
 Los estados de Twitch agregan `account`, `authorized`, `messageCode`,
 `userCode`, `verificationUri`, `expiresAt`, `controlRevision` y `testMode`. Sólo el código

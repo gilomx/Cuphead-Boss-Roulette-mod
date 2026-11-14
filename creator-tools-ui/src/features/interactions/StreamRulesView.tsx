@@ -15,6 +15,7 @@ import {
 } from "./streamRuleGroups";
 import { StreamRuleGroupForm } from "./StreamRuleGroupForm";
 import { StreamRuleGroupsTable } from "./StreamRuleGroupsTable";
+import { saveTwitchReward, useTwitchRewards } from "./useTwitchRewards";
 
 type HighlightFeedback = "created" | "updated" | "duplicated";
 
@@ -25,6 +26,7 @@ interface HighlightRequest {
   revision: number;
   closeEditor: boolean;
   submittedDraft?: StreamRuleGroupDraft;
+  confirmedRewardEdits?: boolean;
 }
 
 interface VisibleRuleFeedback {
@@ -60,6 +62,8 @@ export function StreamRulesView({
   const [draft, setDraft] = useState<StreamRuleGroupDraft | null>(null);
   const [platformFilter, setPlatformFilter] = useState<StreamRulePlatform | "all">("all");
   const [savePending, setSavePending] = useState(false);
+  const [rewardBusy, setRewardBusy] = useState(false);
+  const [rewardSaveError, setRewardSaveError] = useState("");
   const [highlightedRuleId, setHighlightedRuleId] = useState<number | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [deletingRuleId, setDeletingRuleId] = useState<number | null>(null);
@@ -77,6 +81,9 @@ export function StreamRulesView({
   const draftChanged = editorOpen &&
     !sameStreamRuleGroupDraft(draft, initialDraftRef.current);
   const rules = streamRules?.rules ?? [];
+  const watchingRewards = Boolean(draft?.values.some(value => value.eventType === "redemption") ||
+    streamRules?.rules.some(rule => rule.rewardId));
+  const rewards = useTwitchRewards(watchingRewards);
   const groups = useMemo(() => groupStreamRules(streamRules?.rules ?? []), [streamRules?.rules]);
   const canCreate = Boolean(
     catalog && streamRules?.ready && rules.length < (streamRules?.maxRules ?? 0),
@@ -117,13 +124,13 @@ export function StreamRulesView({
     if (!editorOpen) return;
     const returnOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented ||
-          event.isComposing || savePending || draftChanged) return;
+          event.isComposing || savePending || rewardBusy || draftChanged) return;
       event.preventDefault();
       setDraft(null);
     };
     window.addEventListener("keydown", returnOnEscape);
     return () => window.removeEventListener("keydown", returnOnEscape);
-  }, [draftChanged, editorOpen, savePending]);
+  }, [draftChanged, editorOpen, rewardBusy, savePending]);
 
   useEffect(() => {
     if (!testSentNotice) return;
@@ -198,6 +205,7 @@ export function StreamRulesView({
     if (streamRules.error || status === "error") {
       highlightRequestRef.current = null;
       if (request.closeEditor) setSavePending(false);
+      if (request.confirmedRewardEdits) setRewardSaveError("rule_save_failed");
       return;
     }
     if (streamRules.revision <= request.revision) return;
@@ -267,6 +275,7 @@ export function StreamRulesView({
     id?: number,
     closeEditor = false,
     submittedDraft?: StreamRuleGroupDraft,
+    confirmedRewardEdits = false,
   ) => {
     highlightRequestRef.current = {
       feedback,
@@ -275,6 +284,7 @@ export function StreamRulesView({
       revision: streamRules?.revision ?? -1,
       closeEditor,
       submittedDraft,
+      confirmedRewardEdits,
     };
   };
 
@@ -284,26 +294,59 @@ export function StreamRulesView({
       catalog?.gifts[0], platformFilter === "all" ? "tiktok" : platformFilter,
     ), expectedRevision: streamRules?.revision };
     initialDraftRef.current = nextDraft;
+    setRewardSaveError("");
     setDraft(nextDraft);
   };
 
   const beginEdit = (group: StreamRuleGroup) => {
     const nextDraft = { ...draftForStreamRuleGroup(group), expectedRevision: streamRules?.revision };
     initialDraftRef.current = nextDraft;
+    setRewardSaveError("");
     setDraft(nextDraft);
   };
 
-  const saveDraft = (nextDraft: StreamRuleGroupDraft) => {
+  const saveDraft = async (nextDraft: StreamRuleGroupDraft) => {
+    if (!streamRules?.ready || savePending || rewardBusy) return;
+    setRewardSaveError("");
+    const values = [...nextDraft.values];
+    const rewardIndex = values.findIndex(value => value.eventType === "redemption" && value.rewardId);
+    const hasRewardEdits = rewardIndex !== -1 && Boolean(values[rewardIndex].rewardEdits);
+    if (rewardIndex !== -1) {
+      const value = values[rewardIndex];
+      if (value.rewardEdits && nextDraft.expectedRevision !== undefined && nextDraft.expectedRevision !== streamRules.revision) {
+        setRewardSaveError("revision_conflict");
+        return;
+      }
+      setRewardBusy(true);
+      try {
+        const confirmed = await saveTwitchReward(value, rewards);
+        const updatedValue = { ...confirmed, name: confirmed.rewardName };
+        values[rewardIndex] = updatedValue;
+        // Keep the confirmed Twitch values if the rule save fails and is retried.
+        if (confirmed !== value) {
+          setDraft(current => current && { ...current, values: current.values.map((entry, index) =>
+            index === rewardIndex ? updatedValue : entry) });
+        }
+      } catch (failure) {
+        setRewardSaveError(failure instanceof Error ? failure.message : "unavailable");
+        return;
+      } finally {
+        setRewardBusy(false);
+      }
+    }
+    const submitted = { ...nextDraft, values };
     requestHighlight(
-      nextDraft.ruleIds.length === 0 ? "created" : "updated",
-      nextDraft.ruleIds.length ? Math.min(...nextDraft.ruleIds) : undefined,
+      submitted.ruleIds.length === 0 ? "created" : "updated",
+      submitted.ruleIds.length ? Math.min(...submitted.ruleIds) : undefined,
       true,
-      nextDraft,
+      submitted,
+      hasRewardEdits,
     );
     setSavePending(true);
-    if (!saveStreamRuleGroup(nextDraft)) {
+    if (!saveStreamRuleGroup(submitted)) {
       highlightRequestRef.current = null;
       setSavePending(false);
+      if (hasRewardEdits) setRewardSaveError("rule_save_failed");
     }
   };
 
@@ -338,7 +381,7 @@ export function StreamRulesView({
             <button
               type="button"
               className="stream-rule-back stream-rule-back--icon"
-              disabled={savePending}
+              disabled={savePending || rewardBusy}
               onClick={() => setDraft(null)}
               aria-label={t("interactions.rules.actions.back")}
               title={t("interactions.rules.actions.back")}
@@ -384,10 +427,14 @@ export function StreamRulesView({
               maxEvery={streamRules?.maxEvery ?? 1_000_000}
               maxQuantity={streamRules?.maxQuantity ?? 50}
               maxCooldownSeconds={streamRules?.maxCooldownSeconds ?? 3_600}
-              maxValues={Math.max(0, Math.min(3, (streamRules?.maxRules ?? 0) - rules.length + draft.ruleIds.length))}
+              maxValues={Math.max(0, Math.min(4, (streamRules?.maxRules ?? 0) - rules.length + draft.ruleIds.length))}
               saving={savePending}
+              rewardBusy={rewardBusy}
+              rewards={rewards}
+              rewardSaveError={rewardSaveError}
+              onRewardBusy={setRewardBusy}
               onOpenAdvancedSettings={onOpenAdvancedSettings}
-              onChange={setDraft}
+              onChange={nextDraft => { setRewardSaveError(""); setDraft(nextDraft); }}
               onCancel={() => setDraft(null)}
               onSave={saveDraft}
             />
@@ -406,6 +453,7 @@ export function StreamRulesView({
             <StreamRuleGroupsTable
               groups={groups.filter(group => platformFilter === "all" || group.rules.some(rule => rule.platform === platformFilter))}
               gifts={catalog?.gifts ?? []}
+              rewardSync={rewards.catalog}
               canCreate={canCreate}
               availableRuleSlots={Math.max(0, (streamRules?.maxRules ?? 0) - rules.length)}
               disabled={!streamRules?.ready || !catalog || deletingRuleId !== null}

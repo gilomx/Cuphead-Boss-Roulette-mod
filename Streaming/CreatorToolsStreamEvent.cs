@@ -12,6 +12,7 @@ namespace Gilomx.CupheadBossRoulette
         internal string EventId = string.Empty;
         internal string IdempotencyKey = string.Empty;
         internal string ConnectionId = string.Empty;
+        internal string BroadcasterId = string.Empty;
         internal string Platform = string.Empty;
         internal string Connector = string.Empty;
         internal string Type = string.Empty;

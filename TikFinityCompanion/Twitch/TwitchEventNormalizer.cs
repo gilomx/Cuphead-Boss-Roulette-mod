@@ -51,6 +51,8 @@ internal static class TwitchEventNormalizer
         }
         var timestamp = TwitchApi.Text(metadata, "message_timestamp");
         if (!DateTimeOffset.TryParse(timestamp, out _)) return null;
+        var channelName = TwitchApi.Text(data, "broadcaster_user_name");
+        if (channelName.Length == 0) channelName = TwitchApi.Text(data, "broadcaster_user_login");
         return new CompanionEvent {
             EventId = messageId, IdempotencyKey = "twitch:" + broadcasterId + ":" + messageId,
             ConnectionId = "twitch", Platform = "twitch", Connector = localTest ? "twitch-cli" : "twitch-eventsub",
@@ -58,6 +60,7 @@ internal static class TwitchEventNormalizer
             Type = eventType, UserId = ProtocolText.Clean(userId, 160), UserName = ProtocolText.Clean(login, 80),
             UserDisplayName = ProtocolText.Clean(name, 160), ChatText = chatText,
             ItemId = ProtocolText.Clean(itemId, 160), ItemName = ProtocolText.Clean(itemName, 160),
+            BroadcasterId = broadcasterId, ChannelName = ProtocolText.Clean(channelName, 160),
             Count = count, UnitValue = value, TotalValue = value, Unit = unit,
             // Round boundaries use the PC clock, not Twitch's server clock.
             ReceivedAt = receivedAt.ToUniversalTime(), RawEventType = type,

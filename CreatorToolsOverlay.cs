@@ -166,7 +166,8 @@ namespace Gilomx.CupheadBossRoulette
                 Path.GetDirectoryName(Info.Location) ??
                     BepInEx.Paths.PluginPath,
                 delegate(string message) { Logger.LogInfo(message); },
-                delegate(string message) { Logger.LogWarning(message); });
+                delegate(string message) { Logger.LogWarning(message); },
+                creatorToolsStreamRules.ManagedTwitchRewardsJson);
             timedChallengeInteractions = new TimedChallengeInteractionExecutor(
                 delegate { return !timedHudState.WaitingForAttempt && creatorToolsApplicationFocused && CanSpawnCreatorToolsInteraction() && PrepareTimedChallengeHud(); },
                 BaseChallengeBlocksTimedChallenge,
@@ -1425,6 +1426,8 @@ namespace Gilomx.CupheadBossRoulette
                 creatorToolsStreamWorker.ScheduleSimulation);
             creatorToolsServer.SetTwitchHandlers(creatorToolsTikFinityCompanion.GetTwitchState,
                 creatorToolsTikFinityCompanion.CommandTwitch);
+            creatorToolsServer.SetTwitchRewardHandlers(creatorToolsTikFinityCompanion.GetTwitchRewards,
+                creatorToolsTikFinityCompanion.CommandTwitchReward);
             creatorToolsServer.SetYouTubeHandlers(creatorToolsTikFinityCompanion.GetYouTubeState,
                 creatorToolsTikFinityCompanion.CommandYouTube);
             creatorToolsStreamWorker.Start();
@@ -1743,6 +1746,7 @@ namespace Gilomx.CupheadBossRoulette
             {
                 creatorToolsServer.SetDashboardSimulationHandler(null);
                 creatorToolsServer.SetTwitchHandlers(null, null);
+                creatorToolsServer.SetTwitchRewardHandlers(null, null);
                 creatorToolsServer.SetYouTubeHandlers(null, null);
                 creatorToolsServer.SetStreamRuleCommandHandler(null);
                 creatorToolsServer.SetInteractionControlObserver(null);

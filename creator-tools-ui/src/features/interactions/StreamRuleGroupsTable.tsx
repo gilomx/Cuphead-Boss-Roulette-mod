@@ -5,11 +5,13 @@ import type { StreamRule, StreamRulePlatform, TikTokGift } from "../../model";
 import { interactionItemFor } from "./interactionCatalog";
 import { StreamPlatformIcon, StreamTriggerIcon } from "./StreamRuleIcons";
 import type { StreamRuleGroup } from "./streamRuleGroups";
+import { linkedTwitchReward, type TwitchRewards } from "./useTwitchRewards";
 import "../../styles/stream-rule-group-table.css";
 
 interface StreamRuleGroupsTableProps {
   groups: StreamRuleGroup[];
   gifts: TikTokGift[];
+  rewardSync: TwitchRewards["catalog"];
   canCreate: boolean;
   availableRuleSlots: number;
   disabled: boolean;
@@ -27,10 +29,11 @@ interface StreamRuleGroupsTableProps {
 
 const platforms: StreamRulePlatform[] = ["tiktok", "twitch", "youtube"];
 
-function GroupRow({ group, giftsById, disabled, duplicateDisabled, highlighted, confirmingDelete, deleting,
+function GroupRow({ group, rewardSync, giftsById, disabled, duplicateDisabled, highlighted, confirmingDelete, deleting,
   onEdit, onToggle, onDuplicate, onRequestDelete, onCancelDelete, onConfirmDelete,
 }: {
   group: StreamRuleGroup;
+  rewardSync: StreamRuleGroupsTableProps["rewardSync"];
   giftsById: Map<string, TikTokGift>;
   disabled: boolean;
   duplicateDisabled: boolean;
@@ -62,12 +65,26 @@ function GroupRow({ group, giftsById, disabled, duplicateDisabled, highlighted, 
     const name = rule.eventType === "gift" ? gift?.name || rule.giftName || rule.name
       : rule.eventType === "redemption" ? rule.rewardName || rule.name
       : t(`interactions.rules.editor.${rule.eventType}Name`);
-    const label = `${rule.every} ${name} · ${t(rule.enabled ? "interactions.rules.list.enabled" : "interactions.rules.list.disabled")}`;
+    const rewardCost = rule.eventType === "redemption"
+      ? linkedTwitchReward(rule, rewardSync)?.cost ?? rule.rewardCost : undefined;
+    const amount = rewardCost
+      ? t("interactions.rules.twitchRewards.costDisplay").replace("{cost}", rewardCost.toLocaleString())
+      : String(rule.every);
+    const pending = rule.eventType === "redemption" && rule.rewardManaged && rule.rewardId &&
+      (!rewardSync.broadcasterId || rewardSync.broadcasterId === rule.rewardBroadcasterId) &&
+      rewardSync.pendingRewardIds?.includes(rule.rewardId);
+    const syncStatus = pending ? t("interactions.rules.twitchRewards.pending") : "";
+    const label = `${amount} ${name} · ${t(rule.enabled ? "interactions.rules.list.enabled" : "interactions.rules.list.disabled")}`;
     return <div className="stream-rule-group-cost" data-enabled={rule.enabled} key={rule.id} title={label}>
       {rule.eventType === "gift" && gift ? <img src={gift.imagePath} alt="" aria-hidden="true" onError={event => { event.currentTarget.hidden = true; }} />
         : rule.platform === "twitch" && rule.eventType === "currency" ? <img src="/assets/creator-tools/twitch/bits.png" alt="" aria-hidden="true" />
         : <StreamTriggerIcon eventType={rule.eventType} />}
-      <span><strong>{rule.every}</strong><small>{name}</small></span>
+      <span><strong>{amount}</strong><small>{name}</small>
+        {syncStatus ? <small role="status" title={rewardSync.syncError ?
+          t(`interactions.rules.twitchRewards.errors.${rewardSync.syncError}`, t("interactions.rules.twitchRewards.errors.default")) : undefined}>
+          {syncStatus}
+        </small> : null}
+      </span>
       {!rule.enabled ? <span className="stream-rule-group-cost__disabled" aria-label={t("interactions.rules.list.disabled")}>○</span> : null}
     </div>;
   };
@@ -123,7 +140,7 @@ function GroupRow({ group, giftsById, disabled, duplicateDisabled, highlighted, 
   </tr>;
 }
 
-export function StreamRuleGroupsTable({ groups, gifts, canCreate, availableRuleSlots, disabled,
+export function StreamRuleGroupsTable({ groups, gifts, rewardSync, canCreate, availableRuleSlots, disabled,
   highlightedRuleId, confirmingDeleteId, deletingRuleId, onCreate, ...actions }: StreamRuleGroupsTableProps) {
   const { t } = useLocalization();
   const giftsById = useMemo(() => new Map(gifts.map(gift => [gift.giftId, gift])), [gifts]);
@@ -138,7 +155,7 @@ export function StreamRuleGroupsTable({ groups, gifts, canCreate, availableRuleS
       <th scope="col">{t("interactions.rules.list.result")}</th>
       {platforms.map(platform => <th scope="col" key={platform}><span className="stream-rule-group-network-heading"><StreamPlatformIcon platform={platform} />{t(`dashboard.platforms.${platform}`)}</span></th>)}
       <th scope="col">{t("interactions.rules.list.actions")}</th>
-    </tr></thead><tbody>{groups.map(group => <GroupRow key={group.id} group={group} giftsById={giftsById}
+    </tr></thead><tbody>{groups.map(group => <GroupRow key={group.id} group={group} giftsById={giftsById} rewardSync={rewardSync}
       disabled={disabled} duplicateDisabled={group.ruleIds.length > availableRuleSlots}
       highlighted={highlightedRuleId !== null && group.ruleIds.includes(highlightedRuleId)}
       confirmingDelete={confirmingDeleteId === group.id} deleting={deletingRuleId === group.id} {...actions} />)}</tbody></table>

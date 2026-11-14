@@ -5,6 +5,8 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Gilomx.CupheadBossRoulette
 {
@@ -17,6 +19,11 @@ namespace Gilomx.CupheadBossRoulette
             Run("Twitch browser state allows only public fields and official activation links", TestTwitchPublicState);
             Run("Twitch HTTP controls require POST, same origin and local proof", TestTwitchHttpControls);
             Run("Twitch CLI tests are gated by Dev and preserve public authorization state", TestTwitchLocalMode);
+            Run("Twitch rewards project a safe catalog and reconcile only the linked channel", TestTwitchRewardCatalog);
+            Run("Twitch reward removal clears pending state after it is disabled", TestTwitchRewardRemoval);
+            Run("Twitch reward HTTP routes expose public data and forward only authorized mutations", TestTwitchRewardHttp);
+            Run("Twitch reward catalog exposes only valid broadcaster logins", TestTwitchRewardBroadcasterLogin);
+            Run("Twitch reward limits preserve existing settings and distinguish omission from zero", TestTwitchRewardLimits);
         }
 
         private static void TestTwitchCommandBytes()
@@ -91,6 +98,256 @@ namespace Gilomx.CupheadBossRoulette
             False(TwitchConnectionBridge.IsVerificationUri("https://www.twitch.tv:444/activate"), "nonstandard port rejected");
             fields["protocolVersion"] = "99";
             False(bridge.AcceptStatus(fields), "unsupported protocol rejected");
+        }
+
+        private static JsonElement ReadRewardPayload(string payload)
+        {
+            using (var document = JsonDocument.Parse(payload))
+                return document.RootElement.Clone();
+        }
+
+        private static JsonElement TakeRewardCommand(TwitchRewardBridge bridge, string operation, string broadcasterId, string payload = null)
+        {
+            var command = ReadRewardPayload(payload ?? bridge.TakeCommand());
+            Equal("twitch_reward_command", command.GetProperty("kind").GetString(), "companion command kind");
+            Equal(operation, command.GetProperty("operation").GetString(), "companion operation");
+            Equal(broadcasterId, command.GetProperty("broadcasterId").GetString(), "command targets the authorized channel");
+            return command;
+        }
+
+        private static void AcceptRewardResult(TwitchRewardBridge bridge, JsonElement command, string payload)
+        {
+            var operation = command.GetProperty("operation").GetString();
+            var fields = new Dictionary<string, object> {
+                { "protocolVersion", 1 }, { "kind", "twitch_reward_result" }, { "operation", operation },
+                { "requestId", command.GetProperty("requestId").GetString() },
+                { "broadcasterId", command.GetProperty("broadcasterId").GetString() }, { "ok", true },
+                { operation == "list" ? "rewardsJson" : "rewardJson", payload }, { "accessToken", "SECRET" }
+            };
+            CreatorToolsJsonValue result;
+            True(CreatorToolsJsonParser.TryParse(JsonSerializer.Serialize(fields), out result), "companion reply parses");
+            bridge.AcceptResult(result);
+        }
+
+        private static string TestReward(string id, bool enabled, bool manageable = true)
+        {
+            return JsonSerializer.Serialize(new { id, title = "Ataque RGB", cost = 900, enabled, manageable, accessToken = "SECRET" });
+        }
+
+        private static void TestTwitchRewardBroadcasterLogin()
+        {
+            var bridge = new TwitchRewardBridge();
+            foreach (var login in new[] { "a", "Creator_42", new string('x', 25) })
+            {
+                bridge.SetConnection("12345", true, login);
+                Equal(login, ReadRewardPayload(bridge.GetState()).GetProperty("broadcasterLogin").GetString(), "valid ASCII login is projected");
+            }
+            foreach (var login in new[] { "", "user-name", "user/name", "é", "a b", new string('x', 26) })
+            {
+                bridge.SetConnection("12345", true, "current_creator");
+                bridge.SetConnection("12345", true, login);
+                Equal("", ReadRewardPayload(bridge.GetState()).GetProperty("broadcasterLogin").GetString(), "invalid login clears the previous login");
+            }
+            bridge.SetConnection("12345", true, "current_creator");
+            bridge.SetConnection("", false, "current_creator");
+            Equal("", ReadRewardPayload(bridge.GetState()).GetProperty("broadcasterLogin").GetString(), "disconnect clears the login even when a valid login is supplied");
+        }
+
+        private static void TestTwitchRewardLimits()
+        {
+            var bridge = new TwitchRewardBridge(() => new DateTime(2026, 11, 13, 20, 0, 0, DateTimeKind.Utc));
+            bridge.SetConnection("12345", true);
+            bridge.GetState();
+            var oldReward = TestReward("reward-1", true);
+            var shortCooldown = oldReward.Insert(oldReward.Length - 1, ",\"cooldownSeconds\":59,\"maxPerStream\":17,\"maxPerUserPerStream\":3");
+            AcceptRewardResult(bridge, TakeRewardCommand(bridge, "list", "12345"), "[" + shortCooldown + "," + TestReward("reward-2", true) + "]");
+            var list = ReadRewardPayload(bridge.GetState()).GetProperty("rewards");
+            AssertRewardLimits(list[0], 59, 17, 3);
+            AssertRewardLimits(list[1], 0, 0, 0);
+
+            const string update = "{\"operation\":\"update\",\"broadcasterId\":\"12345\",\"id\":\"reward-1\",\"cost\":900";
+            var create = update.Replace("\"update\"", "\"create\"").Replace("\"id\":\"reward-1\"", "\"title\":\"Ataque RGB\"");
+            foreach (var fields in new[] {
+                ",\"cooldownSeconds\":-1", ",\"cooldownSeconds\":1", ",\"cooldownSeconds\":59", ",\"cooldownSeconds\":604801",
+                ",\"maxPerStream\":-1", ",\"maxPerStream\":2147483648", ",\"maxPerUserPerStream\":-1", ",\"maxPerUserPerStream\":2147483648",
+                ",\"cooldownSeconds\":null", ",\"maxPerStream\":\"12\"", ",\"maxPerUserPerStream\":1.5"
+            })
+            {
+                foreach (var request in new[] { update, create })
+                    Equal("invalid_request", ReadRewardPayload(bridge.Command(request + fields + "}")).GetProperty("error").GetString(), "invalid limit rejected before reaching Twitch");
+            }
+            Equal(null, bridge.TakeCommand(), "invalid limits queue no companion command");
+
+            foreach (var cooldown in new[] { 60, 604800 })
+            {
+                var fields = $",\"cooldownSeconds\":{cooldown},\"maxPerStream\":2147483647,\"maxPerUserPerStream\":2147483647";
+                var request = TakeUserRewardCommand(bridge, create + fields + "}", "create", out var response);
+                AssertRewardLimits(request, cooldown, int.MaxValue, int.MaxValue);
+                var newReward = TestReward("new-reward", false);
+                AcceptRewardResult(bridge, request, newReward.Insert(newReward.Length - 1, fields));
+                AssertRewardLimits(ReadRewardResponse(response), cooldown, int.MaxValue, int.MaxValue);
+            }
+
+            var command = TakeUserRewardCommand(bridge, update + "}", "update", out var result);
+            foreach (var key in new[] { "cooldownSeconds", "maxPerStream", "maxPerUserPerStream" })
+                False(command.TryGetProperty(key, out _), "an omitted limit leaves Twitch's current setting unchanged");
+            AcceptRewardResult(bridge, command, shortCooldown);
+            AssertRewardLimits(ReadRewardResponse(result), 59, 17, 3);
+
+            const string reset = ",\"cooldownSeconds\":0,\"maxPerStream\":0,\"maxPerUserPerStream\":0";
+            command = TakeUserRewardCommand(bridge, update + reset + "}", "update", out result);
+            AssertRewardLimits(command, 0, 0, 0);
+            AcceptRewardResult(bridge, command, oldReward);
+            AssertRewardLimits(ReadRewardResponse(result), 0, 0, 0);
+            AssertRewardLimits(ReadRewardPayload(bridge.GetState()).GetProperty("rewards")[0], 0, 0, 0);
+        }
+
+        private static JsonElement TakeUserRewardCommand(TwitchRewardBridge bridge, string body, string operation, out Task<string> response)
+        {
+            response = Task.Run(() => bridge.Command(body));
+            var pending = response;
+            string payload = null;
+            True(SpinWait.SpinUntil(() => (payload = bridge.TakeCommand()) != null || pending.IsCompleted, 3000), "command becomes available before timeout");
+            if (payload == null) throw new InvalidOperationException("Expected a queued command, got " + pending.GetAwaiter().GetResult());
+            return TakeRewardCommand(bridge, operation, "12345", payload);
+        }
+
+        private static JsonElement ReadRewardResponse(Task<string> pending)
+        {
+            True(pending.Wait(3000), "matching result releases the command caller");
+            var result = ReadRewardPayload(pending.GetAwaiter().GetResult());
+            True(result.GetProperty("ok").GetBoolean(), "Twitch reward command completed");
+            return result.GetProperty("reward");
+        }
+
+        private static void AssertRewardLimits(JsonElement reward, int cooldown, int maxPerStream, int maxPerUserPerStream)
+        {
+            Equal(cooldown, reward.GetProperty("cooldownSeconds").GetInt32(), "numeric cooldown seconds");
+            Equal(maxPerStream, reward.GetProperty("maxPerStream").GetInt32(), "numeric per-stream limit");
+            Equal(maxPerUserPerStream, reward.GetProperty("maxPerUserPerStream").GetInt32(), "numeric per-user limit");
+        }
+
+        private static void TestTwitchRewardCatalog()
+        {
+            var bridge = new TwitchRewardBridge();
+            var state = ReadRewardPayload(bridge.GetState());
+            Equal("not_connected", state.GetProperty("error").GetString(), "disconnected catalog reports a useful state");
+            Equal(null, bridge.TakeCommand(), "disconnected catalog does not call Twitch");
+
+            bridge.SetConnection("12345", true);
+            var list = TakeRewardCommand(bridge, "list", "12345");
+            AcceptRewardResult(bridge, list, "[" + TestReward("reward-1", false) + "," + TestReward("external-2", true, false) + "]");
+            var json = bridge.GetState();
+            False(json.Contains("SECRET"), "catalog projects public fields only");
+            state = ReadRewardPayload(json);
+            True(state.GetProperty("ready").GetBoolean(), "valid catalog is ready");
+            True(state.GetProperty("canManage").GetBoolean(), "catalog reports granted management");
+            var rewards = state.GetProperty("rewards");
+            Equal(2, rewards.GetArrayLength(), "existing rewards include entries created outside the app");
+            Equal("reward-1", rewards[0].GetProperty("id").GetString(), "catalog lists reward identity");
+            Equal("Ataque RGB", rewards[0].GetProperty("title").GetString(), "catalog lists reward title");
+            Equal(900, rewards[0].GetProperty("cost").GetInt32(), "catalog lists Twitch cost");
+            False(rewards[1].GetProperty("manageable").GetBoolean(), "read-only reward remains read-only");
+
+            const string desiredOn = "[{\"id\":\"reward-1\",\"broadcasterId\":\"12345\",\"enabled\":true}]";
+            const string desiredOff = "[{\"id\":\"reward-1\",\"broadcasterId\":\"12345\",\"enabled\":false}]";
+            bridge.SetDesired(desiredOn);
+            var sync = TakeRewardCommand(bridge, "sync", "12345");
+            True(sync.GetProperty("enabled").GetBoolean(), "active rule requests enabling its reward");
+            Equal("reward-1", ReadRewardPayload(bridge.GetState()).GetProperty("pendingRewardIds")[0].GetString(), "pending until the matching acknowledgement");
+            AcceptRewardResult(bridge, list, "[]");
+            Equal(1, ReadRewardPayload(bridge.GetState()).GetProperty("pendingRewardIds").GetArrayLength(), "old request cannot settle a pending mutation");
+            AcceptRewardResult(bridge, sync, TestReward("reward-1", true));
+            Equal(0, ReadRewardPayload(bridge.GetState()).GetProperty("pendingRewardIds").GetArrayLength(), "acknowledgement clears pending state");
+
+            bridge.SetDesired(desiredOff);
+            sync = TakeRewardCommand(bridge, "sync", "12345");
+            False(sync.GetProperty("enabled").GetBoolean(), "inactive rule requests disabling its reward");
+            AcceptRewardResult(bridge, sync, TestReward("reward-1", false));
+            bridge.SetDesired(desiredOn);
+            sync = TakeRewardCommand(bridge, "sync", "12345");
+            True(sync.GetProperty("enabled").GetBoolean(), "reactivation requests enabling again");
+            bridge.SetConnection("", false);
+            AcceptRewardResult(bridge, sync, TestReward("reward-1", true));
+            state = ReadRewardPayload(bridge.GetState());
+            Equal(0, state.GetProperty("rewards").GetArrayLength(), "late acknowledgement cannot repopulate a disconnected catalog");
+            Equal(null, bridge.TakeCommand(), "reward cannot sync while disconnected");
+
+            bridge.SetConnection("99999", true);
+            list = TakeRewardCommand(bridge, "list", "99999");
+            AcceptRewardResult(bridge, list, "[" + TestReward("reward-1", false) + "]");
+            Equal(null, bridge.TakeCommand(), "matching reward ID does not sync against another channel");
+            Equal(0, ReadRewardPayload(bridge.GetState()).GetProperty("pendingRewardIds").GetArrayLength(), "other account's desired states stay out of the UI");
+        }
+
+        private static void TestTwitchRewardRemoval()
+        {
+            var bridge = new TwitchRewardBridge();
+            bridge.SetConnection("12345", true);
+            bridge.SetDesired("[{\"id\":\"reward-1\",\"broadcasterId\":\"12345\",\"enabled\":true}]");
+            var list = TakeRewardCommand(bridge, "list", "12345");
+            AcceptRewardResult(bridge, list, "[" + TestReward("reward-1", true) + "," + TestReward("unlinked-2", true) + "]");
+
+            bridge.SetDesired("[]");
+            var sync = TakeRewardCommand(bridge, "sync", "12345");
+            Equal("reward-1", sync.GetProperty("rewardId").GetString(), "only the removed linked reward is reconciled");
+            False(sync.GetProperty("enabled").GetBoolean(), "removal requests a disable");
+            Equal(1, ReadRewardPayload(bridge.GetState()).GetProperty("pendingRewardIds").GetArrayLength(), "pending disable remains visible while in flight");
+            AcceptRewardResult(bridge, sync, TestReward("reward-1", false));
+            Equal(0, ReadRewardPayload(bridge.GetState()).GetProperty("pendingRewardIds").GetArrayLength(), "removal pending state is cleared after disable");
+            Equal(null, bridge.TakeCommand(), "unlinked reward created by the app stays untouched");
+        }
+
+        private static void TestTwitchRewardHttp()
+        {
+            using (var scope = new TestScope("twitch-reward-http"))
+            using (var server = scope.StartServer())
+            using (var client = new HttpClient())
+            {
+                var bridge = new TwitchRewardBridge();
+                bridge.SetConnection("12345", true);
+                bridge.GetState();
+                AcceptRewardResult(bridge, TakeRewardCommand(bridge, "list", "12345"), "[" + TestReward("reward-1", true) + "]");
+                var commands = new List<string>();
+                server.SetTwitchRewardHandlers(bridge.GetState, body => { commands.Add(body); return "{\"ok\":true}"; });
+                var origin = "http://127.0.0.1:" + server.Port;
+                var url = origin + "/api/twitch/rewards";
+                var json = client.GetStringAsync(url).GetAwaiter().GetResult();
+                False(json.Contains("SECRET"), "GET never exposes companion secrets");
+                var state = ReadRewardPayload(json);
+                False(state.TryGetProperty("controlToken", out _), "catalog projection does not carry control proof");
+                Equal("reward-1", state.GetProperty("rewards")[0].GetProperty("id").GetString(), "GET returns the public catalog");
+                var proof = ReadRewardPayload(client.GetStringAsync(origin + "/api/twitch").GetAwaiter().GetResult()).GetProperty("controlToken").GetString();
+                const string body = "{\"operation\":\"create\",\"broadcasterId\":\"12345\",\"title\":\"Ataque RGB\",\"cost\":900}";
+                Equal(HttpStatusCode.MethodNotAllowed, client.GetAsync(url + "/set").GetAwaiter().GetResult().StatusCode, "GET cannot mutate rewards");
+
+                using (var denied = new HttpRequestMessage(HttpMethod.Post, url + "/set"))
+                {
+                    denied.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    denied.Headers.Add("Origin", origin);
+                    Equal(HttpStatusCode.Forbidden, client.SendAsync(denied).GetAwaiter().GetResult().StatusCode, "missing control proof is rejected");
+                }
+                using (var foreign = new HttpRequestMessage(HttpMethod.Post, url + "/set"))
+                {
+                    foreign.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    foreign.Headers.Add("X-Pichi-Twitch-Control", proof);
+                    foreign.Headers.Add("Origin", "https://evil.invalid");
+                    Equal(HttpStatusCode.Forbidden, client.SendAsync(foreign).GetAwaiter().GetResult().StatusCode, "foreign origin is rejected");
+                }
+                using (var accepted = new HttpRequestMessage(HttpMethod.Post, url + "/set"))
+                {
+                    accepted.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    accepted.Headers.Add("X-Pichi-Twitch-Control", proof);
+                    accepted.Headers.Add("Origin", origin);
+                    using (var response = client.SendAsync(accepted).GetAwaiter().GetResult())
+                    {
+                        Equal(HttpStatusCode.OK, response.StatusCode, "valid local reward update is forwarded");
+                        True(ReadRewardPayload(response.Content.ReadAsStringAsync().GetAwaiter().GetResult()).GetProperty("ok").GetBoolean(), "successful companion result reaches the panel");
+                    }
+                }
+                Equal(1, commands.Count, "only the authorized request reaches the handler");
+                Equal(body, commands[0], "handler receives the expected JSON unchanged");
+            }
         }
 
         private static void TestTwitchHttpControls()

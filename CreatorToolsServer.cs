@@ -82,6 +82,8 @@ namespace Gilomx.CupheadBossRoulette
         private Func<string> dashboardStateReader;
         private Func<string> twitchStateHandler;
         private Func<string, string> twitchCommandHandler;
+        private Func<string> twitchRewardsHandler;
+        private Func<string, string> twitchRewardCommandHandler;
         private readonly string twitchControlToken = Guid.NewGuid().ToString("N");
         private Func<string> youtubeStateHandler;
         private Func<string, string> youtubeCommandHandler;
@@ -653,6 +655,11 @@ namespace Gilomx.CupheadBossRoulette
         internal void SetTwitchHandlers(Func<string> state, Func<string, string> command)
         {
             lock (dashboardLock) { twitchStateHandler = state; twitchCommandHandler = command; }
+        }
+
+        internal void SetTwitchRewardHandlers(Func<string> state, Func<string, string> command)
+        {
+            lock (dashboardLock) { twitchRewardsHandler = state; twitchRewardCommandHandler = command; }
         }
 
         internal void SetYouTubeHandlers(Func<string> state, Func<string, string> command)
@@ -1315,6 +1322,7 @@ namespace Gilomx.CupheadBossRoulette
                 path != "/api/overlay-composer/preview/set" &&
                 path != "/api/config/interactions/rules/group/set" &&
                 path != "/api/twitch/connect" && path != "/api/twitch/disconnect" && path != "/api/twitch/cancel" && path != "/api/twitch/test" &&
+                path != "/api/twitch/rewards/set" &&
                 path != "/api/youtube/connect" && path != "/api/youtube/disconnect" && path != "/api/youtube/cancel")
             {
                 WriteMethodNotAllowed(stream, "GET");
@@ -1911,7 +1919,16 @@ namespace Gilomx.CupheadBossRoulette
                 WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
                 return;
             }
+            if (path == "/api/twitch/rewards")
+            {
+                Func<string> handler;
+                lock (dashboardLock) handler = twitchRewardsHandler;
+                var json = handler == null ? "{\"ready\":false,\"canManage\":false,\"broadcasterId\":\"\",\"rewards\":[],\"error\":\"companion_unavailable\"}" : handler();
+                WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), false);
+                return;
+            }
             if (path == "/api/twitch/connect" || path == "/api/twitch/disconnect" || path == "/api/twitch/cancel" || path == "/api/twitch/test" ||
+                path == "/api/twitch/rewards/set" ||
                 path == "/api/youtube/connect" || path == "/api/youtube/disconnect" || path == "/api/youtube/cancel")
             {
                 if (request.Method != "POST") { WriteMethodNotAllowed(stream, "POST"); return; }
@@ -1927,6 +1944,14 @@ namespace Gilomx.CupheadBossRoulette
                 {
                     WriteResponse(stream, 403, "Forbidden", "application/json; charset=utf-8",
                         Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"invalid_origin\"}"), false);
+                    return;
+                }
+                if (path == "/api/twitch/rewards/set")
+                {
+                    Func<string, string> rewardHandler;
+                    lock (dashboardLock) rewardHandler = twitchRewardCommandHandler;
+                    var response = rewardHandler == null ? TwitchRewardBridge.Error("companion_unavailable") : rewardHandler(request.Body);
+                    WriteResponse(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(response), false);
                     return;
                 }
                 Func<string, string> handler;

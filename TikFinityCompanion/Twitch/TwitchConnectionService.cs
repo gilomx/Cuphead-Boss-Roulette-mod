@@ -1,13 +1,20 @@
 using System.Threading.Channels;
+using System.Text.Json;
 using LaPichiRuleta.TikFinity.Protocol;
 
 namespace LaPichiRuleta.TikFinity.Twitch;
 
 internal sealed class TwitchConnectionService(
     ITwitchApi api, ITwitchCredentialStore store, ITwitchEventReceiver receiver,
-    Func<CompanionStatus, CancellationToken, Task> publish, ITwitchEventReceiver? testReceiver = null)
+    Func<CompanionStatus, CancellationToken, Task> publish, ITwitchEventReceiver? testReceiver = null,
+    Func<TwitchRewardResult, CancellationToken, Task>? publishReward = null)
 {
+    private sealed record RewardSession(CancellationToken Cancellation, TwitchTokens Tokens, long ControlRevision);
+
     private readonly Channel<(string Action, long Revision)> commands = Channel.CreateBounded<(string, long)>(16);
+    private readonly Channel<(TwitchRewardCommand Command, RewardSession Session)> rewardCommands =
+        Channel.CreateBounded<(TwitchRewardCommand, RewardSession)>(16);
+    private RewardSession? rewardSession;
     private long controlRevision;
     private TwitchTokens? tokens;
     private TwitchTokens? pendingRevocation;
@@ -24,8 +31,20 @@ internal sealed class TwitchConnectionService(
             commands.Writer.TryWrite((parts[0], revision));
     }
 
+    internal Task QueueRewardCommandAsync(string line, CancellationToken cancellationToken)
+    {
+        if (publishReward == null || TwitchRewardCommand.Parse(line) is not { } command) return Task.CompletedTask;
+        var session = Volatile.Read(ref rewardSession);
+        var error = !command.Valid ? "invalid_request" : session == null ? "not_connected" : "";
+        if (error.Length > 0) return publishReward(RewardFailure(command, session, error), cancellationToken);
+        return rewardCommands.Writer.TryWrite((command, session!)) ? Task.CompletedTask
+            : publishReward(RewardFailure(command, session, "busy"), cancellationToken);
+    }
+
     internal async Task RunAsync(CancellationToken cancellationToken)
     {
+        using var rewardCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var rewardActivity = publishReward == null ? Task.CompletedTask : RunRewardsAsync(rewardCancellation.Token);
         try
         {
             var storageFailed = false;
@@ -65,7 +84,12 @@ internal sealed class TwitchConnectionService(
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        finally { await StopActivityAsync(); }
+        finally
+        {
+            rewardCancellation.Cancel();
+            await StopActivityAsync();
+            await rewardActivity;
+        }
     }
 
     private void StartActivity(bool authorize, CancellationToken cancellationToken)
@@ -102,14 +126,77 @@ internal sealed class TwitchConnectionService(
 
     private async Task StopActivityAsync()
     {
+        Volatile.Write(ref rewardSession, null);
         activityCancellation?.Cancel();
         if (activity != null)
         {
             try { await activity; }
             catch (OperationCanceledException) { }
         }
+        Volatile.Write(ref rewardSession, null);
         activityCancellation?.Dispose(); activityCancellation = null; activity = null;
     }
+
+    private async Task RunRewardsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var entry in rewardCommands.Reader.ReadAllAsync(cancellationToken))
+            {
+                var result = await ExecuteRewardAsync(entry.Command, entry.Session, cancellationToken);
+                await publishReward!(result, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private async Task<TwitchRewardResult> ExecuteRewardAsync(TwitchRewardCommand command, RewardSession accepted,
+        CancellationToken cancellationToken)
+    {
+        var session = Volatile.Read(ref rewardSession);
+        if (session == null || session.Cancellation != accepted.Cancellation)
+            return RewardFailure(command, accepted, "session_changed");
+        var tokens = session.Tokens;
+        if (command.BroadcasterId.Length > 0 && command.BroadcasterId != tokens.UserId)
+            return RewardFailure(command, session, "wrong_broadcaster");
+        if (command.Operation == "list" ? !tokens.CanReadRewards : !tokens.CanManageRewards)
+            return RewardFailure(command, session, command.Operation == "list" ? "read_permission_required" : "manage_permission_required");
+
+        using var request = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Cancellation);
+        request.CancelAfter(TimeSpan.FromSeconds(15));
+        try
+        {
+            request.Token.ThrowIfCancellationRequested();
+            var result = new TwitchRewardResult(command.RequestId, command.Operation, true, tokens.UserId,
+                tokens.CanManageRewards, session.ControlRevision);
+            if (command.Operation == "list")
+            {
+                var rewards = await api.ListRewardsAsync(tokens, request.Token);
+                result = result with { RewardsJson = JsonSerializer.Serialize(rewards, CompanionJsonContext.Default.TwitchRewardArray) };
+            }
+            else
+            {
+                var reward = await api.ChangeRewardAsync(tokens, command, request.Token);
+                result = result with { RewardJson = JsonSerializer.Serialize(reward, CompanionJsonContext.Default.TwitchReward) };
+            }
+            request.Token.ThrowIfCancellationRequested();
+            if (Volatile.Read(ref rewardSession)?.Cancellation != session.Cancellation)
+                return RewardFailure(command, session, "session_changed");
+            return result;
+        }
+        catch (OperationCanceledException) when (session.Cancellation.IsCancellationRequested)
+        { return RewardFailure(command, session, "session_changed"); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { return RewardFailure(command, session, "twitch_unavailable"); }
+        catch (TwitchRewardException exception)
+        { return RewardFailure(command, session, exception.Reason); }
+        catch (Exception) when (!request.IsCancellationRequested)
+        { return RewardFailure(command, session, "twitch_unavailable"); }
+    }
+
+    private TwitchRewardResult RewardFailure(TwitchRewardCommand command, RewardSession? session, string error) =>
+        new(command.RequestId, command.Operation, false, session?.Tokens.UserId ?? "",
+            session?.Tokens.CanManageRewards ?? false, session?.ControlRevision ?? Interlocked.Read(ref controlRevision), error);
 
     private async Task<bool> ForgetAsync(CancellationToken cancellationToken)
     {
@@ -178,6 +265,8 @@ internal sealed class TwitchConnectionService(
                     // Every new socket must validate, even if the last check was recent.
                     nextValidation = DateTimeOffset.MinValue;
                     await CurrentTokensAsync(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Volatile.Write(ref rewardSession, new RewardSession(cancellationToken, tokens!, controlRevision));
                     await StatusAsync("connecting", "connecting", cancellationToken);
                     await receiver.RunAsync(CurrentTokensAsync, async limited => {
                         attempts = 0;
@@ -196,6 +285,7 @@ internal sealed class TwitchConnectionService(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (TwitchAuthorizationException)
         {
+            Volatile.Write(ref rewardSession, null);
             tokens = null;
             try { store.Delete(); }
             catch { await StatusAsync("error", "storage_delete_error", cancellationToken); return; }
@@ -203,6 +293,7 @@ internal sealed class TwitchConnectionService(
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
+            Volatile.Write(ref rewardSession, null);
             tokens = null;
             await StatusAsync("error", "connection_error", cancellationToken);
         }
@@ -222,7 +313,10 @@ internal sealed class TwitchConnectionService(
             // Public-client refresh tokens rotate; persist the replacement before continuing.
             store.Write(validated);
         }
+        cancellationToken.ThrowIfCancellationRequested();
         tokens = validated;
+        if (Volatile.Read(ref rewardSession) is { } session && session.Cancellation == cancellationToken)
+            Interlocked.CompareExchange(ref rewardSession, session with { Tokens = validated }, session);
         nextValidation = DateTimeOffset.UtcNow.AddHours(1);
         return validated;
     }
@@ -234,12 +328,18 @@ internal sealed class TwitchConnectionService(
             !identity.Scopes.Contains("user:read:chat", StringComparer.Ordinal) ||
             (candidate.UserId.Length > 0 && candidate.UserId != identity.UserId))
             throw new TwitchAuthorizationException();
-        return candidate with { UserId = identity.UserId, Login = identity.Login };
+        var manage = identity.Scopes.Contains("channel:manage:redemptions", StringComparer.Ordinal);
+        return candidate with {
+            UserId = identity.UserId, Login = identity.Login, CanManageRewards = manage,
+            CanReadRewards = manage || identity.Scopes.Contains("channel:read:redemptions", StringComparer.Ordinal),
+        };
     }
 
     private Task StatusAsync(string state, string messageCode, CancellationToken cancellationToken) => publish(new CompanionStatus {
         ConnectionId = "twitch", State = state, Message = "", MessageCode = messageCode,
         Account = testing ? "twitch_cli" : tokens?.Login ?? "", Authorized = !testing && tokens != null,
+        BroadcasterId = !testing ? Volatile.Read(ref rewardSession)?.Tokens.UserId ?? "" : "",
+        CanManageRewards = !testing && Volatile.Read(ref rewardSession)?.Tokens.CanManageRewards == true,
         TestMode = testing, OccurredAt = DateTimeOffset.UtcNow,
         ControlRevision = controlRevision,
     }, cancellationToken);

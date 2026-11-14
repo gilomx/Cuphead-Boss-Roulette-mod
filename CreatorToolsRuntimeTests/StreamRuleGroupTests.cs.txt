@@ -18,6 +18,7 @@ namespace Gilomx.CupheadBossRoulette
         private static void RunStreamRuleGroupTests()
         {
             Run("Rule groups create and edit all three platforms with stable row identities", TestRuleGroupCrud);
+            Run("Rule groups keep Twitch rewards alongside Bits and reconcile shared managed rewards", TestTwitchRewardGroup);
             Run("Rule group edits preserve unchanged counters and invalidate only changed rows", TestRuleGroupRuntimeState);
             Run("Rule groups reject foreign IDs, mixed cohorts, invalid values and stale revisions atomically", TestRuleGroupValidation);
             Run("Rule groups honor the flat 100-rule limit without partial additions", TestRuleGroupLimit);
@@ -79,6 +80,67 @@ namespace Gilomx.CupheadBossRoulette
         {
             False(state["error"].GetValue<bool>(), "group command succeeds: " + state.ToJsonString());
             Equal(feedback, state["feedback"].GetValue<string>(), "group result feedback");
+        }
+
+        private static void TestTwitchRewardGroup()
+        {
+            using (var scope = new TestScope("twitch-reward-group"))
+            {
+                var rules = scope.CreateRules(1, giftId: "0");
+                var reward = RuleGroupValue("twitch");
+                reward["eventType"] = "redemption";
+                reward["rewardName"] = "Reto de Twitch";
+                reward["rewardId"] = "reward-1";
+                reward["rewardBroadcasterId"] = "12345";
+                reward["rewardCost"] = 1000000000L;
+                reward["rewardManaged"] = true;
+                var request = RuleGroupRequest(rules, values: new JsonArray(RuleGroupValue("tiktok"),
+                    RuleGroupValue("twitch"), RuleGroupValue("youtube"), reward));
+                var created = ExecuteRuleGroup(rules, request);
+                AssertRuleGroupSuccess(created, "created");
+                var ids = CreatedGroupIds(created);
+                Equal(4, ids.Length, "Twitch Bits and the reward occupy different slots in the group");
+                rules = scope.ReloadRules(rules);
+                Equal(1000000000L, RuleGroupRow(RuleGroupState(rules), ids[3])["rewardCost"].GetValue<long>(),
+                    "reward metadata survives reload at the upper bound");
+
+                var entry = PlatformRuleEvent("twitch", "redemption", value: 1000000000m);
+                entry.ItemId = "reward-1";
+                entry.ItemName = "Reto de Twitch";
+                entry.BroadcasterId = "99999";
+                Equal(0, rules.Evaluate(entry, true).MatchedRules, "a matching title and ID on another account never count");
+                entry.BroadcasterId = "12345";
+                entry.ItemId = "another-reward";
+                Equal(0, rules.Evaluate(entry, true).MatchedRules, "an ID rule does not fall back to title");
+                entry.ItemId = "reward-1";
+                entry.ItemName = "Renamed in Twitch";
+                Equal(0, rules.Evaluate(entry, true).MatchedRules, "one matching ID waits for the configured second redemption");
+                Equal(1, rules.Evaluate(entry, true).MatchedRules, "second matching ID works after Twitch renames the reward");
+
+                var duplicate = ExecuteRuleGroup(rules, RuleGroupRequest(rules, "duplicate", ids));
+                AssertRuleGroupSuccess(duplicate, "duplicated");
+                var duplicateIds = CreatedGroupIds(duplicate).Skip(4).ToArray();
+                var disabled = RuleGroupRequest(rules, "toggle", ids);
+                disabled["enabled"] = false;
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, disabled), "disabled");
+                var managed = JsonNode.Parse(rules.ManagedTwitchRewardsJson()).AsArray().Single();
+                Equal("reward-1", managed["id"].GetValue<string>(), "shared reward yields one instruction");
+                Equal("12345", managed["broadcasterId"].GetValue<string>(), "managed operation stays with the configured channel");
+                True(managed["enabled"].GetValue<bool>(), "enabled duplicate keeps the Twitch reward enabled");
+                disabled = RuleGroupRequest(rules, "toggle", duplicateIds);
+                disabled["enabled"] = false;
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, disabled), "disabled");
+                False(JsonNode.Parse(rules.ManagedTwitchRewardsJson())[0]["enabled"].GetValue<bool>(), "no enabled rule leaves the reward disabled");
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, RuleGroupRequest(rules, "delete", ids)), "deleted");
+                AssertRuleGroupSuccess(ExecuteRuleGroup(rules, RuleGroupRequest(rules, "delete", duplicateIds)), "deleted");
+                Equal("[]", rules.ManagedTwitchRewardsJson(), "deleting both links leaves no remote instruction");
+
+                var duplicateReward = RuleGroupValue("twitch");
+                duplicateReward["eventType"] = "redemption";
+                duplicateReward["rewardName"] = "Otra recompensa";
+                var invalid = RuleGroupRequest(rules, values: new JsonArray(reward.DeepClone(), duplicateReward));
+                True(ExecuteRuleGroup(rules, invalid)["error"].GetValue<bool>(), "two redemption rows cannot occupy the same slot");
+            }
         }
 
         private static void TestRuleGroupCrud()

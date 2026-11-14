@@ -29,6 +29,8 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logInfo;
         private readonly Action<string> logWarning;
         private readonly object queueLock = new object();
+        private readonly TwitchRewardBridge twitchRewards = new TwitchRewardBridge();
+        private readonly Func<string> desiredTwitchRewards;
         private readonly YouTubeConnectionBridge youtube = new YouTubeConnectionBridge();
 #if PICHI_LAUNCHER_DEV
         private readonly TwitchConnectionBridge twitch = new TwitchConnectionBridge(testAvailable: true);
@@ -55,6 +57,7 @@ namespace Gilomx.CupheadBossRoulette
         private volatile Process process;
         private LinkedListNode<LikeAccumulator> syntheticLikeAccumulator;
         private DateTime nextStartAt = DateTime.MinValue;
+        private DateTime nextRewardSyncAt = DateTime.MinValue;
         private DateTime queuePressureReportAt = DateTime.MaxValue;
         private int restartAttempt;
         private int queueHighWaterMark;
@@ -77,10 +80,12 @@ namespace Gilomx.CupheadBossRoulette
         internal TikFinityCompanionHost(
             string pluginDirectory,
             Action<string> logInfo,
-            Action<string> logWarning)
+            Action<string> logWarning,
+            Func<string> desiredTwitchRewards = null)
         {
             this.logInfo = logInfo;
             this.logWarning = logWarning;
+            this.desiredTwitchRewards = desiredTwitchRewards;
             var root = Path.GetFullPath(pluginDirectory ?? string.Empty);
             executablePath = Path.Combine(root,
                 RelativeExecutablePath.Replace('\\',
@@ -104,6 +109,7 @@ namespace Gilomx.CupheadBossRoulette
                     if (!process.HasExited)
                     {
                         SendTwitchCommand();
+                        UpdateTwitchRewards();
                         var youtubeCommand = youtube.TakeCommand();
                         if (youtubeCommand != null) TwitchConnectionBridge.WriteCommand(process.StandardInput.BaseStream, youtubeCommand);
                         return;
@@ -154,6 +160,11 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         internal string GetTwitchState() { return twitch.GetState(); }
+        internal string GetTwitchRewards() { return twitchRewards.GetState(); }
+        internal string CommandTwitchReward(string body)
+        {
+            return disposed ? TwitchRewardBridge.Error("companion_unavailable") : twitchRewards.Command(body);
+        }
         internal string GetYouTubeState() { return youtube.GetState(); }
 
         internal string CommandYouTube(string action)
@@ -180,6 +191,7 @@ namespace Gilomx.CupheadBossRoulette
             lock (queueLock)
             {
                 var result = twitch.Command(action);
+                if (result.Length == 0) twitchRewards.SetConnection(string.Empty, false);
                 // Drop pending Twitch messages before the worker observes the disconnect fence.
                 var node = pending.First;
                 while (node != null)
@@ -196,6 +208,18 @@ namespace Gilomx.CupheadBossRoulette
         private void SendTwitchCommand()
         {
             var command = twitch.TakeCommand();
+            if (command != null) TwitchConnectionBridge.WriteCommand(process.StandardInput.BaseStream, command);
+        }
+
+        private void UpdateTwitchRewards()
+        {
+            var now = DateTime.UtcNow;
+            if (desiredTwitchRewards != null && now >= nextRewardSyncAt)
+            {
+                nextRewardSyncAt = now.AddSeconds(1);
+                twitchRewards.SetDesired(desiredTwitchRewards());
+            }
+            var command = twitchRewards.TakeCommand();
             if (command != null) TwitchConnectionBridge.WriteCommand(process.StandardInput.BaseStream, command);
         }
 
@@ -265,6 +289,16 @@ namespace Gilomx.CupheadBossRoulette
             }
             if (disposed || args.Data.Length == 0)
                 return;
+            if (args.Data.IndexOf("\"twitch_reward_result\"", StringComparison.Ordinal) >= 0)
+            {
+                CreatorToolsJsonValue result;
+                if (CreatorToolsJsonParser.TryParse(args.Data, out result, 65536, 49152) &&
+                    result.String("kind") == "twitch_reward_result")
+                {
+                    twitchRewards.AcceptResult(result);
+                    return;
+                }
+            }
             Dictionary<string, string> twitchValues;
             Dictionary<string, string> youtubeValues;
             if (CreatorToolsFlatJson.TryParse(args.Data, out youtubeValues) &&
@@ -290,6 +324,10 @@ namespace Gilomx.CupheadBossRoulette
                     if (CreatorToolsFlatJson.Value(twitchValues, "kind") == "status")
                     {
                         if (!twitch.AcceptStatus(twitchValues)) return;
+                        twitchRewards.SetConnection(CreatorToolsFlatJson.Boolean(twitchValues, "authorized")
+                            ? CreatorToolsFlatJson.Value(twitchValues, "broadcasterId") : string.Empty,
+                            CreatorToolsFlatJson.Boolean(twitchValues, "canManageRewards"),
+                            CreatorToolsFlatJson.Value(twitchValues, "account"));
                     }
                     else if (!twitch.AcceptsEvents) return;
                     CreatorToolsStreamMessage twitchMessage;
@@ -335,6 +373,7 @@ namespace Gilomx.CupheadBossRoulette
         private void ScheduleRestart(string code, string message)
         {
             twitch.Restarting();
+            twitchRewards.SetConnection(string.Empty, false);
             youtube.Restarting();
             restartAttempt = Math.Min(MaximumRestarts, restartAttempt + 1);
             var delaySeconds = Math.Min(30,
@@ -929,6 +968,7 @@ namespace Gilomx.CupheadBossRoulette
             if (disposed)
                 return;
             disposed = true;
+            twitchRewards.SetConnection(string.Empty, false);
             CleanupProcess(true);
             string pressureReport;
             lock (queueLock)

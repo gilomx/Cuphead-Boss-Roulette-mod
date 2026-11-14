@@ -20,7 +20,8 @@ export function createInteractionsPreview(
 ): InteractionsPreviewSnapshot {
   const platforms = platformSettings.filter(([, key]) => presentation[key] !== false).map(([platform]) => platform);
   const configured = config?.rules.filter(rule => rule.enabled === true && platforms.includes(rule.platform) &&
-    platformTriggers[rule.platform].includes(rule.eventType) && rule.every > 0 && interactionItemFor(rule.interaction)) ?? [];
+    (rule.platform !== "twitch" || rule.eventType === "currency") && platformTriggers[rule.platform].includes(rule.eventType) &&
+    rule.every > 0 && interactionItemFor(rule.interaction)) ?? [];
   const paginated = presentation.interactionsLayout === "pages";
   if (platforms.length === 0 || (!paginated && configured.length > 0)) {
     return {

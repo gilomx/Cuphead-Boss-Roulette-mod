@@ -61,6 +61,26 @@ test("shared settings must match exactly, with legacy duration/countdown default
   assert.deepEqual(groupStreamRules([]), []);
 });
 
+test("Bits and a linked Twitch redemption share a card with TikTok and YouTube", () => {
+  const redemption = rule(4, "twitch", { eventType: "redemption", every: 1,
+    rewardName: "Extra life", rewardId: "reward-4", rewardBroadcasterId: "1234", rewardCost: 2500, rewardManaged: true });
+  const rules = [rule(1, "tiktok"), rule(2, "twitch"), rule(3, "youtube"), redemption];
+  const groups = groupStreamRules(rules);
+  assert.deepEqual(groups.map(group => group.ruleIds), [[1, 2, 3, 4]]);
+  const original = draftForStreamRuleGroup(groups[0]);
+  const draft = structuredClone(original);
+  assert.equal(validStreamRuleGroupDraft(draft, [gift], limits), true);
+  assert.equal(draft.values[3].rewardBroadcasterId, "1234");
+  assert.equal(draft.values[3].rewardCost, 2500);
+  assert.equal(draft.values[3].rewardManaged, true);
+  assert.equal(sameStreamRuleGroupDraft(original, draft), true);
+  draft.values[3].rewardCost = 5000;
+  assert.equal(sameStreamRuleGroupDraft(original, draft), false);
+  draft.values[2] = { ...draft.values[3], id: 3 };
+  assert.equal(validStreamRuleGroupDraft(draft, [gift], limits), false);
+  assert.deepEqual(groupStreamRules([...rules, { ...redemption, id: 5 }]).map(group => group.ruleIds), [[1, 2, 3, 4], [5]]);
+});
+
 test("new groups require an interaction selection and editing keeps the saved selection and row state", () => {
   for (const [platform, eventType, every] of [["tiktok", "gift", 1], ["twitch", "currency", 100], ["youtube", "jewels", 100]]) {
     const draft = createStreamRuleGroupDraft(gift, platform);

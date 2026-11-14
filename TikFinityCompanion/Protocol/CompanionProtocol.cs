@@ -44,6 +44,8 @@ internal sealed class CompanionStatus
     public string MessageCode { get; init; } = "";
     public bool Authorized { get; init; }
     public bool TestMode { get; init; }
+    public string BroadcasterId { get; init; } = "";
+    public bool CanManageRewards { get; init; }
     public string UserCode { get; init; } = "";
     public string VerificationUri { get; init; } = "";
     public string ExpiresAt { get; init; } = "";
@@ -83,6 +85,8 @@ internal sealed class CompanionEvent
     public string? ItemName { get; init; }
 
     public string? ItemImageUrl { get; init; }
+    public string? BroadcasterId { get; init; }
+    public string? ChannelName { get; init; }
 
     public bool IsCommunityGift { get; init; }
 

@@ -18,21 +18,15 @@
   const platformNames = { tiktok: 'TikTok', twitch: 'Twitch', youtube: 'YouTube' };
   const labels = {
     es: { title: 'Interacciones', attack: 'Ataque', challenge: 'Reto', help: 'Ayuda',
-      gift: 'regalos', like: 'me gusta', follow: 'seguimientos', currency: 'Bits', jewels: 'gemas',
-      subscription: 'suscripciones', subscription_gift: 'suscripciones regaladas', resubscription: 'resuscripciones', redemption: 'canjes' },
+      gift: 'regalos', like: 'me gusta', follow: 'seguimientos', currency: 'Bits', jewels: 'gemas' },
     en: { title: 'Interactions', attack: 'Attack', challenge: 'Challenge', help: 'Help',
-      gift: 'gifts', like: 'likes', follow: 'follows', currency: 'Bits', jewels: 'jewels',
-      subscription: 'subscriptions', subscription_gift: 'gift subscriptions', resubscription: 'resubscriptions', redemption: 'redemptions' },
+      gift: 'gifts', like: 'likes', follow: 'follows', currency: 'Bits', jewels: 'jewels' },
   };
   const paths = {
     gift: ['M3 8h18v4H3z', 'M5 12v9h14v-9M12 8v13', 'M12 8C4 8 5 1 8 3c2 1 4 5 4 5Zm0 0c8 0 7-7 4-5-2 1-4 5-4 5Z'],
     like: ['M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z'],
     follow: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z', 'M20 8v6M17 11h6'],
     currency: ['M12 2 3 10l9 12 9-12-9-8Z', 'M3 10h18M12 2 8 10l4 12 4-12-4-8Z'],
-    subscription: ['m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6Z'],
-    subscription_gift: ['M3 8h18v4H3zM5 12v9h14v-9M12 8v13', 'm12 1 2 3 4 .5-3 2 .5 2-3.5-1-3.5 1 .5-2-3-2L10 4l2-3Z'],
-    resubscription: ['M20 7v5h-5M4 17v-5h5', 'M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2'],
-    redemption: ['M3 5h18v4a3 3 0 0 0 0 6v4H3v-4a3 3 0 0 0 0-6V5ZM13 5v2m0 3v2m0 3v2'],
   };
   let catalog = {};
   let latestState = null;
@@ -136,7 +130,7 @@
     node.dataset.platform = offer.platform;
     const textTrigger = offer.platform === 'tiktok' && ['like', 'follow'].includes(offer.eventType);
     const denomination = (!textTrigger && offer.giftName) || labels[locale][offer.eventType];
-    node.setAttribute('aria-label', `${platformNames[offer.platform]}: ${offer.every} ${denomination}${offer.rewardName ? ` · ${offer.rewardName}` : ''}`);
+    node.setAttribute('aria-label', `${platformNames[offer.platform]}: ${offer.every} ${denomination}`);
     if (textTrigger) {
       node.dataset.kind = 'text';
       const cost = element('span', 'interaction-cost', offer.eventType === 'like' ? String(offer.every) : '');

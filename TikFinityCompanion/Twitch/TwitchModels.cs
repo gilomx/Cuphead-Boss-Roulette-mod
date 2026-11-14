@@ -7,12 +7,17 @@ internal static class TwitchApplication
     internal const string ClientId = "mvkigdcw0qjbj4j7o149qed3wu2b0z";
     internal static readonly string[] Scopes = [
         "user:read:chat", "moderator:read:followers", "channel:read:subscriptions",
-        "bits:read", "channel:read:redemptions",
+        "bits:read", "channel:read:redemptions", "channel:manage:redemptions",
     ];
 }
 
 internal sealed record TwitchTokens(string AccessToken, string RefreshToken, string UserId, string Login)
 {
+    [JsonIgnore]
+    public bool CanReadRewards { get; init; }
+    [JsonIgnore]
+    public bool CanManageRewards { get; init; }
+
     public override string ToString() => "[Twitch credentials]";
 }
 internal sealed record TwitchIdentity(string ClientId, string UserId, string Login, string[] Scopes);
@@ -34,6 +39,8 @@ internal interface ITwitchApi
     Task RevokeAsync(string accessToken, CancellationToken cancellationToken);
     Task<bool> SubscribeAsync(string type, string version, Dictionary<string, string> condition,
         string sessionId, string accessToken, CancellationToken cancellationToken);
+    Task<TwitchReward[]> ListRewardsAsync(TwitchTokens tokens, CancellationToken cancellationToken);
+    Task<TwitchReward> ChangeRewardAsync(TwitchTokens tokens, TwitchRewardCommand command, CancellationToken cancellationToken);
 }
 
 internal sealed class TwitchAuthorizationException : Exception;

@@ -341,6 +341,29 @@ test("interaction strip previews show samples when no configured rule can render
   }
 });
 
+test("only Bits replace the Twitch examples or appear as configured Twitch offers", () => {
+  const { createInteractionsPreview } = exports;
+  const reward = { id: 1, enabled: true, every: 1, interaction: "help_extra_life", platform: "twitch",
+    eventType: "redemption", rewardName: "Extra life", rewardCost: 250 };
+  const bits = { ...reward, id: 2, eventType: "currency", every: 50 };
+  const excluded = [reward, ...["follow", "subscription", "subscription_gift", "resubscription"].map((eventType, index) => ({
+    ...reward, id: index + 3, eventType,
+  }))];
+  const twitchOnly = { interactionsTikTok: false, interactionsYouTube: false };
+  for (const interactionsLayout of ["strip", "pages"]) {
+    const presentation = { ...twitchOnly, interactionsLayout };
+    const empty = createInteractionsPreview({ rules: excluded }, key => key, presentation);
+    assert.equal(empty.examples, true);
+    assert.equal(empty.rules.length, 18);
+    assert.ok(empty.rules.every(rule => rule.id < 0 && rule.eventType === "currency"));
+
+    const mixed = createInteractionsPreview({ rules: [...excluded, bits] }, key => key, presentation);
+    assert.ok(mixed.rules.includes(bits));
+    assert.ok(mixed.rules.every(rule => rule.eventType === "currency"));
+    assert.equal(mixed.rules.length, interactionsLayout === "pages" ? 18 : 1);
+  }
+});
+
 test("chat designer scenarios and votes travel to OBS independently of real events", () => {
   const { createChatSimulation, chatSimulationReducer } = exports;
   let chat = createChatSimulation("en");
