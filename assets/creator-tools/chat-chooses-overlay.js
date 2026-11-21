@@ -83,17 +83,14 @@
       Boolean(preview && ['active', 'completed'].includes(state.phase) && state.selected?.boss);
     const key = voting ? `round:${state.sessionId}:${state.round}:${state.stage}:${JSON.stringify(state.options.map(option => [option.number, option.id, option.image]))}` :
       final ? `result:${state.sessionId}:${state.plane}:${JSON.stringify(state.selected)}` : '';
-    return { key, voting, final, deadline, expired };
+    return { key, voting, final, deadline };
   }
   function setResultDeadline(deadline) {
     if (resultDeadline === deadline) return;
     clearTimeout(resultTimer);
     resultDeadline = deadline;
     if (deadline !== null) {
-      resultTimer = setTimeout(() => {
-        hide();
-        render(latestState);
-      }, deadline - Date.now());
+      resultTimer = setTimeout(() => render(latestState), deadline - Date.now());
     }
   }
   function animateCount(entry, votes, state) {
@@ -157,8 +154,8 @@
     document.documentElement.lang = locale;
     presentation(state);
     const scene = describe(state);
-    // The live deadline caps visibility even during a staggered exit.
-    if (scene.expired || (!scene.key && !sceneKey.startsWith('result:'))) {
+    // A result already on screen finishes its staggered exit after the deadline.
+    if (!scene.key && !sceneKey.startsWith('result:')) {
       hide(); return;
     }
     if (!motion(state)) {

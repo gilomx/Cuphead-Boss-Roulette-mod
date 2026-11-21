@@ -254,7 +254,7 @@ test('starting gameplay staggers the final result exit and waits for its last po
   assert.equal(view.nodes.result.hidden, true);
 });
 
-test('a live result hides at six seconds without further OBS updates and cannot reopen while loading', async () => {
+test('a live result starts its staggered exit at six seconds without further OBS updates and cannot reopen while loading', async () => {
   const view = await boot('?embedded=1');
   const state = { ...finalSelection(), resultOverlayUntil: 6000 };
   view.send(state); await view.finishAnimations();
@@ -265,6 +265,17 @@ test('a live result hides at six seconds without further OBS updates and cannot 
   await view.advanceClock(5999);
   assert.equal(view.nodes.event.hidden, false);
   await view.advanceClock(6000);
+  assert.equal(view.nodes.event.hidden, false, 'the deadline starts the exit without removing its portraits');
+  assert.equal(view.nodes.result.hidden, false);
+  const exits = view.animations().filter(animation => animation.playState === 'running');
+  assert.equal(exits.length, 6, 'boss and every selected item leave at the deadline');
+  assert.deepEqual(exits.map(animation => animation.options.delay), [0, 60, 120, 180, 240, 300]);
+  view.send(state);
+  view.send({ ...state, phase: 'loading' });
+  assert.ok(exits.every(animation => animation.playState === 'running'), 'expired state updates do not interrupt or restart the exit');
+  exits.slice(0, -1).forEach(animation => animation.finish()); await flush();
+  assert.equal(view.nodes.event.hidden, false, 'wait for the final portrait');
+  exits.at(-1).finish(); await flush();
   assert.equal(view.nodes.event.hidden, true);
   assert.equal(view.nodes.result.hidden, true);
 
@@ -273,6 +284,63 @@ test('a live result hides at six seconds without further OBS updates and cannot 
   assert.equal(view.nodes.event.hidden, true);
   view.send({ ...ballot(), sessionId: 2 });
   assert.equal(view.nodes.event.hidden, false, 'the next event can show its ballot');
+});
+
+test('the automatic result exit finishes even if OBS throttles animation completion', async () => {
+  const view = await boot('?embedded=1');
+  view.send({ ...finalSelection(), resultOverlayUntil: 6000 }); await view.finishAnimations();
+  await view.advanceClock(6000);
+  assert.equal(view.nodes.event.hidden, false);
+  await view.advanceClock(6620);
+  assert.equal(view.nodes.event.hidden, true, 'the exit fallback finishes without more state updates');
+  await view.finishAnimations();
+  assert.equal(view.nodes.event.hidden, true);
+});
+
+for (const [name, presentation, reducedMotion] of [
+  ['disabled animations', { motion: false }, false],
+  ['reduced motion', {}, true],
+]) {
+  test(`the six-second result deadline hides immediately with ${name}`, async () => {
+    const view = await boot('?embedded=1', reducedMotion);
+    view.send({ ...finalSelection(), resultOverlayUntil: 6000, presentation });
+    await view.advanceClock(5999);
+    assert.equal(view.nodes.event.hidden, false);
+    await view.advanceClock(6000);
+    assert.equal(view.nodes.event.hidden, true);
+    assert.equal(view.animations().length, 0);
+  });
+}
+
+test('the result deadline preserves an exit already started by gameplay', async () => {
+  const view = await boot('?embedded=1');
+  const state = { ...finalSelection(), resultOverlayUntil: 6000 };
+  view.send(state); await view.finishAnimations();
+  await view.advanceClock(5900);
+  view.send({ ...state, phase: 'active' });
+  const exits = view.animations().filter(animation => animation.playState === 'running');
+  await view.advanceClock(6000);
+  assert.equal(view.nodes.event.hidden, false);
+  assert.ok(exits.every(animation => animation.playState === 'running'), 'the deadline does not cancel an existing exit');
+  await view.finishAnimations();
+  assert.equal(view.nodes.event.hidden, true);
+});
+
+test('a new round arriving during the automatic result exit enters with its newest votes', async () => {
+  const view = await boot('?embedded=1');
+  view.send({ ...finalSelection(), resultOverlayUntil: 6000 }); await view.finishAnimations();
+  await view.advanceClock(6000);
+  const next = { ...ballot(), sessionId: 2 };
+  view.send(next);
+  next.options[0].votes = 9; view.send(next);
+  assert.equal(view.nodes.result.hidden, false, 'finish the old result exit first');
+  await view.finishAnimations();
+  assert.equal(view.nodes.result.hidden, true);
+  assert.equal(view.nodes.event.hidden, false);
+  assert.deepEqual(countDigits(view.nodes.options.children[0]), ['9']);
+  assert.equal(view.animations().filter(animation => animation.playState === 'running').length, 7);
+  await view.advanceClock(6620);
+  assert.equal(view.nodes.event.hidden, false, 'the old exit fallback cannot hide the new round');
 });
 
 test('the standalone source skips an expired result and the designer can hold its sample', async () => {
