@@ -405,12 +405,20 @@ try {
     $ink = $mod.Types | Where-Object Name -eq 'InkRainChallengeRuntime'
     # Compiling for net35 can still introduce framework types stripped from
     # Cuphead's legacy Mono. Even an unexecuted throw can break JIT entry into
-    # a constructor, method or iterator. Check every exception constructor in
-    # the compiled plugin against the actual game libraries, including all
-    # generated iterator/closure IL.
+    # a constructor, method or iterator. Check framework types and exception
+    # constructors against the actual game libraries, including generated IL.
     $compiledTypes = @($mod.Types | ForEach-Object { SelfAndNestedTypes $_ })
     $runtimeModules = @{}
     try {
+        foreach ($reference in $mod.GetTypeReferences()) {
+            $scope = $reference.Scope.Name
+            if ($scope -notin @('mscorlib', 'System', 'System.Core')) { continue }
+            if (!$runtimeModules.ContainsKey($scope)) {
+                $runtimeModules[$scope] = [Mono.Cecil.ModuleDefinition]::ReadModule(
+                    (Join-Path $CupheadDir "Cuphead_Data/Managed/$scope.dll"))
+            }
+            Require ($null -ne $runtimeModules[$scope].GetType($reference.FullName)) "Plugin references unavailable Cuphead runtime type $($reference.FullName)"
+        }
         foreach ($type in $compiledTypes) {
             foreach ($method in $type.Methods | Where-Object HasBody) {
                 foreach ($instruction in $method.Body.Instructions) {
@@ -430,7 +438,7 @@ try {
         }
     }
     finally { foreach ($runtimeModule in $runtimeModules.Values) { $runtimeModule.Dispose() } }
-    Write-Output 'Compiled Mono compatibility contract passed: every exception constructor, including generated bodies, exists in Cuphead legacy Mono.'
+    Write-Output 'Compiled Mono compatibility contract passed: framework types and exception constructors exist in Cuphead legacy Mono.'
     $ready = $ink.Methods | Where-Object Name -eq 'EnsureInkAssets'
     Require (@($ready.Body.Instructions | Where-Object {
         $_.Operand -is [Mono.Cecil.MethodReference]

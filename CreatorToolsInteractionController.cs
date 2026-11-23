@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using UnityEngine;
 
@@ -15,6 +16,9 @@ namespace Gilomx.CupheadBossRoulette
         private readonly Action<string> logWarning;
         private readonly CreatorToolsStartupPerformance startupPerformance;
         private bool startupDiagnosticsPaused;
+        private static readonly FieldInfo TapFarmingKingDiceField =
+            typeof(DicePalaceMainLevel).GetField("kingDice",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         private readonly List<ICreatorToolsInteractionExecutor> executors =
             new List<ICreatorToolsInteractionExecutor>();
         private readonly Func<int> getMaximumActive;
@@ -188,7 +192,8 @@ namespace Gilomx.CupheadBossRoulette
                 IsItemAvailable, DisableFreePeskyForBattle,
                 logInfo, logWarning);
             tapFarming = new CreatorToolsTapFarmingController(
-                pluginConfigPath, liveEvents, logInfo, logWarning);
+                pluginConfigPath, liveEvents, logInfo, logWarning,
+                publishBattleState: CreatorToolsOverlayReady.PublishTapFarmingBattleState);
             LevelPauseGUI.OnPauseEvent += OnStartupDiagnosticsPaused;
             LevelPauseGUI.OnUnpauseEvent += OnStartupDiagnosticsUnpaused;
         }
@@ -252,8 +257,16 @@ namespace Gilomx.CupheadBossRoulette
             startupPerformance.EndStage(timestamp, stage);
         }
 
-        private void OnStartupDiagnosticsPaused() { startupDiagnosticsPaused = true; }
-        private void OnStartupDiagnosticsUnpaused() { startupDiagnosticsPaused = false; }
+        private void OnStartupDiagnosticsPaused()
+        {
+            startupDiagnosticsPaused = true;
+            tapFarming.SetBattlePaused(true);
+        }
+        private void OnStartupDiagnosticsUnpaused()
+        {
+            startupDiagnosticsPaused = false;
+            tapFarming.SetBattlePaused(false);
+        }
 
         private void UpdateCore(
             CreatorToolsServer server, bool gameplayDispatchAllowed)
@@ -399,6 +412,7 @@ namespace Gilomx.CupheadBossRoulette
             peskyBattle.Update(
                 server, gameplayAvailable, gameplayDispatchAllowed);
             tapFarming.Update(server, gameplayLevelActive);
+            RefreshTapFarmingBattleNoticeMainThread();
             PublishLiveEventsState(server);
             startupPerformance.EndStage(stageStarted, CreatorToolsStartupStage.LiveEvents);
             stageStarted = startupPerformance.BeginStage();
@@ -636,6 +650,52 @@ namespace Gilomx.CupheadBossRoulette
         internal void TapFarmingMapEntered()
         {
             tapFarming.OnMapEntered();
+        }
+
+        private void RefreshTapFarmingBattleNoticeMainThread()
+        {
+            if (!tapFarming.Enabled) return;
+            try
+            {
+                var level = Level.Current;
+                if (SceneLoader.CurrentlyLoading)
+                {
+                    tapFarming.ObserveBattleState(-1, false, false, false);
+                    return;
+                }
+                if (level == null || level.LevelType != Level.Type.Battle)
+                {
+                    tapFarming.ObserveBattleState(-1, false, true, false);
+                    return;
+                }
+                var hasPlayer = false;
+                var hasLivingPlayer = false;
+                var players = PlayerManager.GetAllPlayers();
+                if (players != null)
+                    foreach (var player in players)
+                    {
+                        if (player == null) continue;
+                        hasPlayer = true;
+                        if (!player.IsDead) hasLivingPlayer = true;
+                    }
+                var ended = level.Ending || Level.Won || (hasPlayer && !hasLivingPlayer);
+                // King Dice's board is itself a started battle Level. Its native
+                // IsBattling flag changes only when the final card fight begins.
+                var battleStarted = level.Started && hasLivingPlayer;
+                if (battleStarted && level.CurrentLevel == Levels.DicePalaceMain)
+                {
+                    var king = TapFarmingKingDiceField == null ? null :
+                        TapFarmingKingDiceField.GetValue(level) as DicePalaceMainLevelKingDice;
+                    battleStarted = king != null && king.animator != null && king.animator.GetBool("IsBattling");
+                }
+                tapFarming.ObserveBattleState(level.GetInstanceID(), battleStarted,
+                    ended, startupDiagnosticsPaused);
+            }
+            catch
+            {
+                // A scene handoff cannot leave the external scheduler armed.
+                tapFarming.ObserveBattleState(-1, false, true, false);
+            }
         }
 
         internal bool PrepareTapFarmingBossDamage(
@@ -2248,6 +2308,7 @@ namespace Gilomx.CupheadBossRoulette
             LevelPauseGUI.OnPauseEvent -= OnStartupDiagnosticsPaused;
             LevelPauseGUI.OnUnpauseEvent -= OnStartupDiagnosticsUnpaused;
             startupPerformance.EndAttempt();
+            tapFarming.EndBattleNotice();
             peskyBattle.Dispose();
             interactionQueue.Dispose();
             peskyQueue.Dispose();

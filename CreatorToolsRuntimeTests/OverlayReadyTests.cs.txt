@@ -12,8 +12,12 @@ namespace Gilomx.CupheadBossRoulette
         private static void RunOverlayReadyTests()
         {
             Run("Overlay-ready pipe names match the Node receiver for the same Windows user", TestOverlayReadyPipeName);
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return;
             Run("Overlay readiness sends one UTF-8 notification over the local pipe", TestOverlayReadyPipe);
             Run("Overlay readiness tolerates an absent Gililili without ongoing retries", TestOverlayReadyAbsent);
+            Run("Voting rounds cross the native pipe as UTF-8 NDJSON", TestVotingPipeUnicode);
+            Run("Overlay notifications respect the timeout when the pipe is occupied", TestOverlayReadyBusy);
+            Run("Overlay notifications cancel a write when the receiver stops reading", TestOverlayReadyNonReader);
         }
 
         private static void TestOverlayReadyPipeName()
@@ -46,6 +50,58 @@ namespace Gilomx.CupheadBossRoulette
             var timer = Stopwatch.StartNew();
             True(!CreatorToolsOverlayReady.TryNotify("gililili-absent-" + Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), 18081, 20), "absent Gililili should be optional");
             True(timer.ElapsedMilliseconds < 1500, "optional notification blocked startup");
+        }
+
+        private static void TestVotingPipeUnicode()
+        {
+            string name = "gililili-voting-test-" + Guid.NewGuid().ToString("N");
+            const string frame = "{\"version\":1,\"type\":\"chat-chooses\",\"server\":\"pichi-ruleta\",\"instanceId\":\"0123456789abcdef0123456789abcdef\",\"sequence\":1,\"sentAt\":1800000000000,\"round\":{\"openedAt\":1800000000000,\"stage\":\"boss\",\"options\":[\"La raíz 🌱\",\"El dirigible\"]}}";
+            using (var server = new NamedPipeServerStream(name, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+            {
+                var received = Task.Run(async () =>
+                {
+                    await server.WaitForConnectionAsync();
+                    using (var memory = new MemoryStream())
+                    {
+                        await server.CopyToAsync(memory);
+                        return memory.ToArray();
+                    }
+                });
+                True(CreatorToolsOverlayReady.TrySend(name, frame, 250), "voting frame did not connect");
+                True(received.Wait(3000), "voting frame did not finish");
+                var expected = new UTF8Encoding(false).GetBytes(frame + "\n");
+                True(Convert.ToBase64String(received.Result) == Convert.ToBase64String(expected), "voting payload must have UTF-8, no BOM, and exactly one NDJSON newline");
+            }
+        }
+
+        private static void TestOverlayReadyBusy()
+        {
+            string name = "gililili-busy-test-" + Guid.NewGuid().ToString("N");
+            using (var server = new NamedPipeServerStream(name, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+            using (var occupant = new NamedPipeClientStream(".", name, PipeDirection.Out))
+            {
+                var connected = server.WaitForConnectionAsync();
+                occupant.Connect(1000);
+                True(connected.Wait(1000), "busy pipe fixture did not connect");
+                var timer = Stopwatch.StartNew();
+                True(!CreatorToolsOverlayReady.TrySend(name, "{}", 50), "an occupied pipe should time out");
+                True(timer.ElapsedMilliseconds < 1000, "occupied pipe exceeded the bounded notification timeout");
+            }
+        }
+
+        private static void TestOverlayReadyNonReader()
+        {
+            string name = "gililili-stalled-test-" + Guid.NewGuid().ToString("N");
+            using (var server = new NamedPipeServerStream(name, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 1, 0))
+            {
+                var connected = server.WaitForConnectionAsync();
+                var timer = Stopwatch.StartNew();
+                // Exceed the server's inbound quota so WriteFile cannot finish
+                // by merely copying the frame into the pipe's kernel buffer.
+                True(!CreatorToolsOverlayReady.TrySend(name, new string('x', 4095), 50), "stalled receiver should cancel the pending write");
+                True(timer.ElapsedMilliseconds < 1000, "stalled receiver held the sender beyond its timeout");
+                True(connected.Wait(1000), "stalled pipe fixture did not connect");
+            }
         }
     }
 }

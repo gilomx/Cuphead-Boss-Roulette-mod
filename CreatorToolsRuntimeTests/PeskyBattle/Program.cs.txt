@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Gilomx.CupheadBossRoulette;
@@ -20,10 +21,86 @@ internal static class Program
         TestPublicationCaching();
         TestTapPublicationCaching();
         TestTapPhaseTransitionPublication();
+        TestTapBattleNotices();
         TapPhaseDistributionTests.Run();
         QueueSelectionTests.Run();
         foreach (var item in CreatorToolsTimedChallenge.Items) TestChallenge(item);
         Console.WriteLine("All Pesky Battle / Tap Farming tests passed (2–5 slots, activation notices, bounded history, worker snapshots, cached publications, live heartbeat, coordinator invalidation and 12 timed challenges).");
+    }
+
+    private static void TestTapBattleNotices()
+    {
+        using (var scope = new Scope())
+        {
+            var notices = new List<Tuple<string, bool, bool>>();
+            var taps = new CreatorToolsTapFarmingController(scope.ConfigPath, scope.Coordinator, null, null,
+                publishBattleState: (id, active, paused) => notices.Add(Tuple.Create(id, active, paused)));
+            var level = new Level { CurrentLevel = Levels.Ground, Id = 81 };
+            taps.ObserveBattleState(level.Id, true, false, false);
+            taps.ProcessBackgroundCommand("action=activate");
+            taps.ObserveBattleState(level.Id, true, false, false);
+            Check(notices.Count == 0, "selecting or collecting Farmeada cannot arm external actions");
+            taps.OnLevelStarted(level);
+            taps.ObserveBattleState(-1, false, false, false);
+            taps.ObserveBattleState(-1, false, true, false);
+            taps.ObserveBattleState(level.Id, false, false, false);
+            Check(notices.Count == 0, "loading and intro do not arm or retire the prepared native attempt");
+            taps.ObserveBattleState(level.Id, true, false, false);
+            var first = notices[0].Item1;
+            Check(notices.Count == 1 && first.Length == 32 && notices[0].Item2 && !notices[0].Item3,
+                "native combat arms exactly one attempt");
+            taps.ObserveBattleState(level.Id, true, false, false);
+            taps.OnPhaseTransition();
+            taps.ObserveBattleState(level.Id, true, false, false);
+            Check(notices.Count == 1, "unchanged combat and boss phase transitions keep the attempt");
+            taps.SetBattlePaused(true);
+            taps.SetBattlePaused(true);
+            Check(notices.Count == 2 && notices[1].Item1 == first && notices[1].Item2 && notices[1].Item3,
+                "native pause preserves the active attempt and is published only once");
+            taps.SetBattlePaused(false);
+            Check(notices.Count == 3 && notices[2].Item1 == first && !notices[2].Item3,
+                "resume preserves the attempt and remaining interval");
+            taps.ObserveBattleState(level.Id, true, true, false);
+            taps.ObserveBattleState(level.Id, true, false, false);
+            Check(notices.Count == 4 && notices[3].Item1 == first && !notices[3].Item2,
+                "death disarms immediately and cannot rearm the same ended attempt");
+            taps.OnLevelDefeated(level);
+            var retry = new Level { CurrentLevel = Levels.Ground, Id = 82 };
+            taps.OnLevelStarted(retry);
+            taps.ObserveBattleState(retry.Id, true, false, false);
+            Check(notices.Count == 5 && notices[4].Item2 && notices[4].Item1 != first,
+                "retry starts a new attempt and a fresh interval");
+            taps.OnLevelPreWin(retry);
+            Check(notices.Count == 6 && !notices[5].Item2, "victory disarms before the results screen");
+            taps.OnMapEntered();
+            Check(notices.Count == 6, "returning to the map does not arm or duplicate a stop");
+            var dice = new Level { CurrentLevel = Levels.DicePalaceMain, Id = 83 };
+            taps.OnLevelStarted(dice);
+            taps.ObserveBattleState(dice.Id, false, false, false);
+            Check(notices.Count == 6, "King Dice board cannot arm external actions");
+            taps.ObserveBattleState(dice.Id, true, false, false);
+            Check(notices.Count == 7 && notices[6].Item2, "King Dice card battle arms on its native battle flag");
+            taps.ProcessBackgroundCommand("action=off");
+            Check(notices.Count == 8 && !notices[7].Item2, "background stop disarms without Unity calls");
+            taps.ProcessBackgroundCommand("action=activate");
+            var next = new Level { CurrentLevel = Levels.Ground, Id = 84 };
+            taps.OnLevelStarted(next);
+            taps.ObserveBattleState(next.Id, true, false, false);
+            taps.OnLevelEnded(next);
+            Check(notices.Count == 10 && !notices[9].Item2, "scene end disarms external actions");
+            taps.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 85 });
+            taps.ObserveBattleState(85, true, false, false);
+            taps.EndBattleNotice();
+            Check(notices.Count == 12 && !notices[11].Item2, "controller disposal disarms external actions");
+            taps.OnLevelEnded(new Level { CurrentLevel = Levels.Ground, Id = 85 });
+            taps.OnLevelStarted(new Level { CurrentLevel = Levels.Ground, Id = 86 });
+            taps.ObserveBattleState(86, true, false, false);
+            taps.OnMapEntered();
+            taps.ObserveBattleState(86, true, false, false);
+            Check(notices.Count == 14 && !notices[13].Item2,
+                "map fallback disarms even without an end hook and never rearms an old attempt");
+        }
+        Console.WriteLine("Tap Farming native battle notices passed (Started, phases, pause, defeat, retry, victory, map, King Dice, stop and disposal).");
     }
 
     private static void TestSettings()

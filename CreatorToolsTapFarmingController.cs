@@ -36,6 +36,9 @@ namespace Gilomx.CupheadBossRoulette
         private readonly CreatorToolsLiveEventsCoordinator liveEvents;
         private readonly Action<string> logInfo;
         private readonly Func<double> testClock;
+        private readonly Action<string, bool, bool> publishBattleState;
+        private string battleNoticeAttempt = string.Empty;
+        private bool battleNoticeActive, battleNoticePaused, battleNoticeClosed;
         private bool testTapsActive;
         private int testTapsQuantity = 10;
         private double testTapsIntervalSeconds = 1d;
@@ -92,12 +95,14 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsLiveEventsCoordinator liveEvents,
             Action<string> logInfo,
             Action<string> logWarning,
-            Func<double> testClock = null)
+            Func<double> testClock = null,
+            Action<string, bool, bool> publishBattleState = null)
         {
             settings = CreatorToolsTapFarmingSettings.Load(
                 pluginConfigPath, logWarning);
             this.liveEvents = liveEvents;
             this.logInfo = logInfo;
+            this.publishBattleState = publishBattleState;
             this.testClock = testClock ?? (() =>
                 (double)System.Diagnostics.Stopwatch.GetTimestamp() /
                 System.Diagnostics.Stopwatch.Frequency);
@@ -306,6 +311,73 @@ namespace Gilomx.CupheadBossRoulette
             }
         }
 
+        // Only the main-thread bridge observes native Started/death/win state.
+        // Selecting the event, collecting taps and loading a level cannot arm it.
+        internal void ObserveBattleState(int levelInstanceId, bool started, bool ended, bool paused)
+        {
+            lock (stateLock)
+            {
+                if (ended || !CountsTapsLocked() ||
+                    (phase != "active" && phase != "transition") ||
+                    levelInstanceId != activeLevelInstanceId)
+                {
+                    var wasActive = battleNoticeActive;
+                    StopBattleNoticeLocked();
+                    // Loading may expose no Level after OnLevelStarted has
+                    // prepared this instance but before native Started. Only
+                    // retire an actual combat or a terminal matching Level.
+                    if (wasActive || (ended && MatchesActiveLevelLocked(levelInstanceId)))
+                        battleNoticeClosed = true;
+                    return;
+                }
+                if (!started)
+                {
+                    StopBattleNoticeLocked();
+                    return;
+                }
+                if (battleNoticeClosed) return;
+                if (!battleNoticeActive)
+                {
+                    battleNoticeAttempt = Guid.NewGuid().ToString("N");
+                    battleNoticeActive = true;
+                    battleNoticePaused = paused;
+                    publishBattleState?.Invoke(battleNoticeAttempt, true, paused);
+                }
+                else if (battleNoticePaused != paused)
+                {
+                    battleNoticePaused = paused;
+                    publishBattleState?.Invoke(battleNoticeAttempt, true, paused);
+                }
+            }
+        }
+
+        internal void SetBattlePaused(bool paused)
+        {
+            lock (stateLock)
+            {
+                if (!battleNoticeActive || battleNoticePaused == paused) return;
+                battleNoticePaused = paused;
+                publishBattleState?.Invoke(battleNoticeAttempt, true, paused);
+            }
+        }
+
+        internal void EndBattleNotice()
+        {
+            lock (stateLock)
+            {
+                StopBattleNoticeLocked();
+                battleNoticeClosed = true;
+            }
+        }
+
+        private void StopBattleNoticeLocked()
+        {
+            if (!battleNoticeActive) return;
+            battleNoticeActive = false;
+            battleNoticePaused = false;
+            publishBattleState?.Invoke(battleNoticeAttempt, false, false);
+        }
+
         internal void OnLevelStarted(Level level)
         {
             if (level == null || level.LevelType != Level.Type.Battle)
@@ -339,6 +411,7 @@ namespace Gilomx.CupheadBossRoulette
                         dicePalaceTransitionLevelInstanceId)
                     return;
 
+                StopBattleNoticeLocked();
                 var continuesDicePalace = dicePalaceTransition &&
                     logicalLevel == "DicePalace";
                 var isDicePalace = logicalLevel == "DicePalace";
@@ -368,6 +441,7 @@ namespace Gilomx.CupheadBossRoulette
                 dicePalaceTransition = false;
                 dicePalaceTransitionLevelInstanceId = -1;
                 phase = "active";
+                battleNoticeClosed = false;
                 if (!continuesDicePalace) phaseReserve.Clear();
                 if (dicePalaceAttemptActive)
                     SetDicePalaceProjectionLocked(
@@ -391,6 +465,8 @@ namespace Gilomx.CupheadBossRoulette
                 if (!MatchesActiveLevelLocked(instanceId) ||
                     (phase != "active" && phase != "transition"))
                     return;
+                StopBattleNoticeLocked();
+                battleNoticeClosed = true;
                 phase = "collecting";
                 activeLevelInstanceId = -1;
                 dicePalaceTransition = false;
@@ -423,6 +499,8 @@ namespace Gilomx.CupheadBossRoulette
                 if (!MatchesActiveLevelLocked(instanceId) ||
                     (phase != "active" && phase != "transition"))
                     return;
+                StopBattleNoticeLocked();
+                battleNoticeClosed = true;
 
                 // Internal Dice Palace miniboss wins only hand control back
                 // to the board. Keep counting taps and preserve the virtual
@@ -482,6 +560,8 @@ namespace Gilomx.CupheadBossRoulette
                 if (!MatchesActiveLevelLocked(instanceId) ||
                     (phase != "active" && phase != "transition"))
                     return;
+                StopBattleNoticeLocked();
+                battleNoticeClosed = true;
                 phase = "collecting";
                 activeLevelInstanceId = -1;
                 if (dicePalaceTransition &&
@@ -505,6 +585,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             lock (stateLock)
             {
+                StopBattleNoticeLocked();
+                battleNoticeClosed = true;
                 if (phase != "completed")
                     return;
                 // Likes received during the results screen are already banked
@@ -708,6 +790,8 @@ namespace Gilomx.CupheadBossRoulette
             CreatorToolsLiveEventLease lease;
             lock (stateLock)
             {
+                StopBattleNoticeLocked();
+                battleNoticeClosed = true;
                 if (phase == "off")
                 {
                     SetFeedbackLocked("tap_farming_already_off", false);
