@@ -1,0 +1,75 @@
+using System;
+
+internal sealed partial class LevelProperties
+{
+    internal sealed class DicePalaceBooze : AbstractLevelProperties<DicePalaceBooze.State, DicePalaceBooze.Pattern, DicePalaceBooze.States>
+    {
+        internal enum Pattern { Main }
+        internal enum States { Main }
+        internal new State[] states = new[] { new State() };
+        internal State CurrentState { get { return states[stateIndex]; } }
+        internal sealed class State
+        {
+            internal States stateName;
+            internal float healthTrigger = 1f;
+            internal Decanter decanter = new Decanter();
+            internal Martini martini = new Martini();
+            internal Tumbler tumbler = new Tumbler();
+        }
+        internal sealed class Decanter { internal float decanterHP = 215f; }
+        internal sealed class Martini { internal float martiniHP = 215f; }
+        internal sealed class Tumbler { internal float tumblerHP = 215f; }
+        internal class Entity
+        {
+            public DicePalaceBooze properties { get; private set; }
+            internal void InitProperties(DicePalaceBooze value) { properties = value; }
+        }
+    }
+}
+
+internal sealed class DicePalaceBoozeLevel : Level
+{
+    private LevelProperties.DicePalaceBooze properties;
+    private DicePalaceBoozeLevelDecanter decanter;
+    private DicePalaceBoozeLevelMartini martini;
+    private DicePalaceBoozeLevelTumbler tumbler;
+    internal DicePalaceBoozeLevel(LevelProperties.DicePalaceBooze properties,
+        DicePalaceBoozeLevelDecanter decanter, DicePalaceBoozeLevelMartini martini, DicePalaceBoozeLevelTumbler tumbler)
+    {
+        this.properties = properties; this.decanter = decanter; this.martini = martini; this.tumbler = tumbler;
+        CurrentLevel = Levels.DicePalaceBooze;
+    }
+}
+
+internal class DicePalaceBoozeLevelBossBase : LevelProperties.DicePalaceBooze.Entity
+{
+    protected float health;
+    public bool isDead { get; private set; }
+    internal float TimelineDamage;
+    internal Action OnDeath;
+    internal void SetHealth(float value) { health = value; }
+    internal void CompleteHit(float old)
+    {
+        if (old > 0f) TimelineDamage += Math.Max(0f, Math.Min(old, old - health));
+        if (health < 0f && !isDead) { isDead = true; if (OnDeath != null) OnDeath(); }
+    }
+}
+internal sealed class DicePalaceBoozeLevelDecanter : DicePalaceBoozeLevelBossBase
+{
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { float old = health; health -= info.damage; CompleteHit(old); }
+}
+internal sealed class DicePalaceBoozeLevelMartini : DicePalaceBoozeLevelBossBase
+{
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { float old = health; health -= info.damage; CompleteHit(old); }
+}
+internal sealed class DicePalaceBoozeLevelTumbler : DicePalaceBoozeLevelBossBase
+{
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { float old = health; health -= info.damage; CompleteHit(old); }
+}
+
+// Destructible projectiles share neither the owned references nor the boss
+// base type; they must remain outside the Tap Farming bridge.
+internal sealed class DicePalaceBoozeLevelOlive : LevelProperties.DicePalaceBooze.Entity { }

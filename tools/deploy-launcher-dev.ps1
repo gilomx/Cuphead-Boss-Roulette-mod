@@ -172,6 +172,21 @@ try {
         '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
         '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
     Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_tap_farming_train_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_tap_farming_dice_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
+        (Join-Path $PSScriptRoot 'verify_native_tap_farming_booze_contract.ps1'),
+        '-CupheadDir', $CupheadDir,
+        '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),
+        '-ModPath', (Join-Path $modOutput 'Gilomx.CupheadBossRoulette.dll'))
+    Invoke-Checked (Join-Path $PSHOME 'pwsh.exe') @('-NoProfile', '-File',
         (Join-Path $PSScriptRoot 'verify_native_zeppelin_projectile_contract.ps1'),
         '-CupheadDir', $CupheadDir,
         '-CecilPath', (Join-Path $stage 'BepInEx/core/Mono.Cecil.dll'),

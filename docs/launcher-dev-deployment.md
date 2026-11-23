@@ -122,6 +122,10 @@ La publicación:
    El contrato recorre además las rutas de daño del juego y coteja los
    inventarios revisados de avances y daño no estándar. Una ruta nueva sin
    revisar o una familia de salud sin protección detiene la publicación.
+   También comprueba el tablero y la pelea final de Dado, su reserva compartida
+   y las tres rutas de daño local del trío de bebidas.
+   También comprueba los cinco pools locales del tren, sus cuatro rutas de
+   daño y el reparto real de fases y vida en Simple, Normal y Experto.
 3. Añade los assets versionados del checkout y los archivos recién compilados
    del panel. Los assets nuevos deben añadirse a Git antes de publicar. No
    recoge archivos locales sueltos, otros mods ni contenido de la instalación.

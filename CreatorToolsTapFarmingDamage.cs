@@ -12,6 +12,8 @@ namespace Gilomx.CupheadBossRoulette
         private void InstallCreatorToolsTapFarmingDamagePatches()
         {
             CreatorToolsTapFarmingDamagePatch.RobotLocalDamageEnabled = false;
+            CreatorToolsTapFarmingDamagePatch.TrainLocalDamageEnabled = false;
+            CreatorToolsTapFarmingDamagePatch.BoozeLocalDamageEnabled = false;
             var playerDamage = AccessTools.Method(
                 typeof(DamageDealer), "DealDamage",
                 new[] { typeof(GameObject) });
@@ -140,6 +142,52 @@ namespace Gilomx.CupheadBossRoulette
                 }
             }
 
+            try
+            {
+                var transpiler = AccessTools.Method(
+                    typeof(CreatorToolsTapFarmingDamagePatch), "TrainLocalDamageTranspiler");
+                var postfix = AccessTools.Method(
+                    typeof(CreatorToolsTapFarmingDamagePatch), "TrainDamagePostfix");
+                foreach (var type in CreatorToolsTapFarmingDamagePatch.TrainDamageTypes)
+                {
+                    var callback = AccessTools.Method(type, "OnDamageTaken",
+                        new[] { typeof(DamageDealer.DamageInfo) });
+                    if (callback == null || transpiler == null || postfix == null)
+                        throw new MissingMethodException("Train local-health callback was not found.");
+                    harmony.Patch(callback, transpiler: new HarmonyMethod(transpiler),
+                        postfix: new HarmonyMethod(postfix));
+                }
+                CreatorToolsTapFarmingDamagePatch.TrainLocalDamageEnabled = true;
+                Logger.LogInfo("Tap Farming local health bridge installed for Phantom Express.");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning("Could not attach Tap Farming to Train local health: " + exception.Message);
+            }
+
+            try
+            {
+                var transpiler = AccessTools.Method(
+                    typeof(CreatorToolsTapFarmingDamagePatch), "BoozeLocalDamageTranspiler");
+                var postfix = AccessTools.Method(
+                    typeof(CreatorToolsTapFarmingDamagePatch), "BoozeDamagePostfix");
+                foreach (var type in CreatorToolsTapFarmingDamagePatch.BoozeDamageTypes)
+                {
+                    var callback = AccessTools.Method(type, "OnDamageTaken",
+                        new[] { typeof(DamageDealer.DamageInfo) });
+                    if (callback == null || transpiler == null || postfix == null)
+                        throw new MissingMethodException("Tipsy Troop local-health callback was not found.");
+                    harmony.Patch(callback, transpiler: new HarmonyMethod(transpiler),
+                        postfix: new HarmonyMethod(postfix));
+                }
+                CreatorToolsTapFarmingDamagePatch.BoozeLocalDamageEnabled = true;
+                Logger.LogInfo("Tap Farming local health bridge installed for Tipsy Troop.");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning("Could not attach Tap Farming to Tipsy Troop local health: " + exception.Message);
+            }
+
             if (patched.Count == 0)
                 Logger.LogWarning(
                     "Tap Farming found no native boss health methods.");
@@ -154,12 +202,190 @@ namespace Gilomx.CupheadBossRoulette
         private static class CreatorToolsTapFarmingDamagePatch
         {
             internal static bool RobotLocalDamageEnabled;
+            internal static bool TrainLocalDamageEnabled;
+            internal static bool BoozeLocalDamageEnabled;
+            internal static readonly Type[] BoozeDamageTypes = {
+                typeof(DicePalaceBoozeLevelDecanter), typeof(DicePalaceBoozeLevelMartini),
+                typeof(DicePalaceBoozeLevelTumbler)
+            };
+            internal static readonly Type[] TrainDamageTypes = {
+                typeof(TrainLevelBlindSpecter), typeof(TrainLevelSkeleton),
+                typeof(TrainLevelLollipopGhoul), typeof(TrainLevelEngineBoss)
+            };
             [ThreadStatic]
             private static int playerDamageDepth;
             [ThreadStatic]
             private static int bossDamageDepth;
             [ThreadStatic]
             private static int nativeProgressionDepth;
+
+            private static IEnumerable<CodeInstruction> BoozeLocalDamageTranspiler(
+                IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)
+            {
+                var owner = __originalMethod.DeclaringType;
+                var body = __originalMethod.GetMethodBody();
+                var parameters = __originalMethod.GetParameters();
+                if (Array.IndexOf(BoozeDamageTypes, owner) < 0 || body == null ||
+                    __originalMethod.Name != "OnDamageTaken" || parameters.Length != 1 ||
+                    parameters[0].ParameterType != typeof(DamageDealer.DamageInfo) ||
+                    body.LocalVariables.Count == 0 || body.LocalVariables[0].LocalType != typeof(float) ||
+                    body.ExceptionHandlingClauses.Count != 0)
+                    throw new InvalidOperationException("Tipsy Troop local-health callback shape changed.");
+                var health = AccessTools.Field(typeof(DicePalaceBoozeLevelBossBase), "health");
+                var getter = typeof(DamageDealer.DamageInfo).GetProperty("damage").GetGetMethod();
+                var helper = AccessTools.Method(typeof(CreatorToolsTapFarmingDamagePatch), "ReadBoozeLocalDamage");
+                if (health == null || health.FieldType != typeof(float) || helper == null)
+                    throw new InvalidOperationException("Tipsy Troop local-health metadata changed.");
+                var source = new List<CodeInstruction>(instructions);
+                var replacement = -1;
+                for (var i = 0; i < source.Count; i++)
+                {
+                    var called = source[i].operand as MethodInfo;
+                    if (called != null && called.Name == "DealDamage" && called.DeclaringType.IsGenericType &&
+                        called.DeclaringType.GetGenericTypeDefinition().Name == "AbstractLevelProperties`3")
+                        throw new InvalidOperationException("Tipsy Troop now also forwards generic boss damage.");
+                    if ((source[i].opcode != OpCodes.Call && source[i].opcode != OpCodes.Callvirt) ||
+                        !Equals(source[i].operand, getter)) continue;
+                    if (replacement >= 0 || i < 1 || i + 2 >= source.Count ||
+                        source[i - 1].opcode != OpCodes.Ldarg_1 || source[i + 1].opcode != OpCodes.Sub ||
+                        source[i + 2].opcode != OpCodes.Stfld || !Equals(source[i + 2].operand, health) ||
+                        source[i].blocks.Count != 0)
+                        throw new InvalidOperationException("Tipsy Troop local-health subtraction changed.");
+                    replacement = i;
+                }
+                if (replacement < 0 || source.Count < 4 || source[0].opcode != OpCodes.Ldarg_0 ||
+                    source[1].opcode != OpCodes.Ldfld || !Equals(source[1].operand, health) ||
+                    source[2].opcode != OpCodes.Stloc_0)
+                    throw new InvalidOperationException("Tipsy Troop original local health was not captured.");
+                var load = new CodeInstruction(OpCodes.Ldarg_0);
+                load.labels.AddRange(source[replacement].labels);
+                source[replacement] = load;
+                source.Insert(replacement + 1, new CodeInstruction(OpCodes.Ldloc_0));
+                source.Insert(replacement + 2, new CodeInstruction(OpCodes.Call, helper));
+                return source;
+            }
+
+            private static float ReadBoozeLocalDamage(DamageDealer.DamageInfo info,
+                object actor, float previousLocalHealth)
+            {
+                var damage = info.damage;
+                if (!BoozeLocalDamageEnabled || !(previousLocalHealth >= 0f) || !(damage > 0f) ||
+                    playerDamageDepth <= 0 || bossDamageDepth > 0 || nativeProgressionDepth > 0)
+                    return damage;
+                var plugin = activeInstance;
+                if (plugin == null || plugin.creatorToolsInteractions == null) return damage;
+                bossDamageDepth++;
+                try
+                {
+                    plugin.creatorToolsInteractions.PrepareTapFarmingBoozeDamage(actor, ref damage);
+                    return damage;
+                }
+                finally { bossDamageDepth--; }
+            }
+
+            private static void BoozeDamagePostfix(object __instance)
+            {
+                if (!BoozeLocalDamageEnabled) return;
+                var plugin = activeInstance;
+                if (plugin != null && plugin.creatorToolsInteractions != null)
+                    plugin.creatorToolsInteractions.ObserveTapFarmingBoozeDamage(__instance);
+            }
+
+            private static IEnumerable<CodeInstruction> TrainLocalDamageTranspiler(
+                IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod, ILGenerator generator)
+            {
+                var owner = __originalMethod.DeclaringType;
+                var parameters = __originalMethod.GetParameters();
+                var body = __originalMethod.GetMethodBody();
+                if (Array.IndexOf(TrainDamageTypes, owner) < 0 || body == null ||
+                    __originalMethod.Name != "OnDamageTaken" || parameters.Length != 1 ||
+                    parameters[0].ParameterType != typeof(DamageDealer.DamageInfo) ||
+                    body.ExceptionHandlingClauses.Count != 0)
+                    throw new InvalidOperationException("Train local-health callback shape changed.");
+                var health = AccessTools.Field(owner, "health");
+                var damageEvent = AccessTools.Field(owner, "OnDamageTakenEvent");
+                var getter = typeof(DamageDealer.DamageInfo).GetProperty("damage").GetGetMethod();
+                var helper = AccessTools.Method(typeof(CreatorToolsTapFarmingDamagePatch), "ReadTrainLocalDamage");
+                if (health == null || health.FieldType != typeof(float) || damageEvent == null || helper == null)
+                    throw new InvalidOperationException("Train local-health metadata changed.");
+                var source = new List<CodeInstruction>(instructions);
+                var reads = new List<int>();
+                var eventStart = -1;
+                for (var i = 0; i < source.Count; i++)
+                {
+                    if (eventStart < 0 && source[i].opcode == OpCodes.Ldfld && Equals(source[i].operand, damageEvent))
+                        eventStart = i - 1;
+                    var called = source[i].operand as MethodInfo;
+                    if (called != null && called.Name == "DealDamage" && called.DeclaringType.IsGenericType &&
+                        called.DeclaringType.GetGenericTypeDefinition().Name == "AbstractLevelProperties`3")
+                        throw new InvalidOperationException("Train local damage now also forwards generic boss damage.");
+                    if ((source[i].opcode == OpCodes.Call || source[i].opcode == OpCodes.Callvirt) &&
+                        Equals(source[i].operand, getter)) reads.Add(i);
+                }
+                if (reads.Count != 2 || eventStart < 0 || eventStart >= reads[0] ||
+                    source[eventStart].opcode != OpCodes.Ldarg_0 || source[eventStart].blocks.Count != 0 ||
+                    source[reads[0] - 1].opcode != OpCodes.Ldarg_1 ||
+                    source[reads[1] - 1].opcode != OpCodes.Ldarg_1 || reads[1] + 2 >= source.Count ||
+                    source[reads[1] + 1].opcode != OpCodes.Sub || source[reads[1] + 2].opcode != OpCodes.Stfld ||
+                    !Equals(source[reads[1] + 2].operand, health))
+                    throw new InvalidOperationException("Train timeline/local-health damage reads changed.");
+
+                // Compute once after the dead-actor guard, before the optional
+                // timeline event. Both consumers receive the same remainder,
+                // even when the event has no subscribers.
+                var filteredDamage = generator.DeclareLocal(typeof(float));
+                var output = new List<CodeInstruction>();
+                for (var i = 0; i < source.Count; i++)
+                {
+                    if (i == eventStart)
+                    {
+                        var load = new CodeInstruction(OpCodes.Ldarg_1);
+                        load.labels.AddRange(source[i].labels);
+                        source[i].labels.Clear();
+                        output.Add(load);
+                        output.Add(new CodeInstruction(OpCodes.Ldarg_0));
+                        output.Add(new CodeInstruction(OpCodes.Ldarg_0));
+                        output.Add(new CodeInstruction(OpCodes.Ldfld, health));
+                        output.Add(new CodeInstruction(OpCodes.Call, helper));
+                        output.Add(new CodeInstruction(OpCodes.Stloc, filteredDamage));
+                    }
+                    if (i == reads[0] || i == reads[1])
+                    {
+                        var discardInfo = new CodeInstruction(OpCodes.Pop);
+                        discardInfo.labels.AddRange(source[i].labels);
+                        output.Add(discardInfo);
+                        output.Add(new CodeInstruction(OpCodes.Ldloc, filteredDamage));
+                    }
+                    else output.Add(source[i]);
+                }
+                return output;
+            }
+
+            private static float ReadTrainLocalDamage(DamageDealer.DamageInfo info,
+                object actor, float previousLocalHealth)
+            {
+                var damage = info.damage;
+                if (!TrainLocalDamageEnabled || !(previousLocalHealth > 0f) || !(damage > 0f) ||
+                    playerDamageDepth <= 0 || bossDamageDepth > 0 || nativeProgressionDepth > 0)
+                    return damage;
+                var plugin = activeInstance;
+                if (plugin == null || plugin.creatorToolsInteractions == null) return damage;
+                bossDamageDepth++;
+                try
+                {
+                    plugin.creatorToolsInteractions.PrepareTapFarmingTrainDamage(actor, ref damage);
+                    return damage;
+                }
+                finally { bossDamageDepth--; }
+            }
+
+            private static void TrainDamagePostfix(object __instance)
+            {
+                if (!TrainLocalDamageEnabled) return;
+                var plugin = activeInstance;
+                if (plugin != null && plugin.creatorToolsInteractions != null)
+                    plugin.creatorToolsInteractions.ObserveTapFarmingTrainDamage(__instance);
+            }
 
             private static IEnumerable<CodeInstruction> RobotLocalDamageTranspiler(
                 IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)

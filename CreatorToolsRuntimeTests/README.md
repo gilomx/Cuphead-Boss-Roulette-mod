@@ -206,6 +206,25 @@ installation failures. The native IL contract in
 call sites and helper loop, separately from the simulated phase mechanics.
 An in-game Robot fight is still needed to verify animations and hitboxes.
 
+The same harness executes the Train's local-health transpilers for the specter,
+skeleton, both ghouls and engine. It checks that reserve is consumed once per
+hit and that the same remainder reaches local HP and the optional timeline
+event, while preserving the original DamageInfo. It covers phase budgets,
+the twins' combined HP, Simple's three phases, retries, victory accounting,
+foreign actors and partial patch failures. The deployment also runs
+`tools/verify_native_tap_farming_train_contract.ps1` against the native DLL and
+compiled mod to validate the owned actors, damage branches and difficulty HP.
+
+Dice Palace integration checks keep one attempt and one shared reserve through
+the board and every miniboss, distinguish the final fight's native `IsBattling`
+flag, and retain the heart's last valid health projection during dice rolls.
+Defeat, pause retries and returning to the map terminate that continuity.
+The damage harness also executes the three Tipsy Troop local-health callbacks,
+including shared-reserve accounting, native timeline damage, secondary actors
+and difficulty totals. Deployment verifies these native and compiled contracts
+with `verify_native_tap_farming_dice_contract.ps1` and
+`verify_native_tap_farming_booze_contract.ps1`.
+
 The native contract also scans all 26 bosses in the roulette catalog (including
 DLC), all 64 native property families, and nested coroutine methods. The audited
 version has 22 named-state advance calls and 94 other generic damage calls:
@@ -231,7 +250,7 @@ unchanged; it never executes the copied assembly or starts Cuphead.
 This is an IL and policy audit, not an in-game pass for every difficulty or a
 test of Harmony rewriting all 64 generic types inside Unity's Mono. No second
 unprotected softlock was found in the reviewed damage routes. A separate
-limitation remains: Train, Root Pack and some minibosses/components use local HP
+limitation remains: Root Pack and other components use local HP
 rather than the aggregate boss pool, so the current tap reserve does not extend
 that local health. `Level.Timeline.DealDamage` records damage statistics and does
 not drive native health or phase progression.

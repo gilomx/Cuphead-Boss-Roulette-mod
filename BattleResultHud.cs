@@ -66,6 +66,9 @@ namespace Gilomx.CupheadBossRoulette
 
         private void UpdateBattleResultHud()
         {
+            if (ShouldEndBattleResultHudSession())
+                EndBattleResultHudSession();
+
             // Retry/Restart owns the external overlay until Cuphead finishes
             // loading the replacement scene. Dice Palace can keep a valid
             // battle layer throughout that load, so waiting for a missing
@@ -131,6 +134,42 @@ namespace Gilomx.CupheadBossRoulette
             UpdateBattleResultHudReveal();
         }
 
+        private bool ShouldEndBattleResultHudSession()
+        {
+            if (!battleHudPresentationActive || SceneLoader.CurrentlyLoading)
+                return false;
+
+            try
+            {
+                var level = Level.Current;
+                if (level == null)
+                    return Map.Current != null;
+
+                // A new battle can arrive even if the map-return hook did
+                // not retire the previous presentation. It cannot inherit it.
+                return level.LevelType == Level.Type.Battle &&
+                       !BattleHudMatchesLevel(level);
+            }
+            catch
+            {
+                // Static scene references can disappear during a handoff.
+                return false;
+            }
+        }
+
+        private bool BattleHudMatchesLevel(Level level)
+        {
+            var snapshot = battleHudResultSnapshot;
+            if (level == null || snapshot == null || snapshot.Boss < 0 ||
+                snapshot.Boss >= RouletteData.Bosses.Length)
+                return false;
+
+            var target = RouletteData.Bosses[snapshot.Boss].Level;
+            return level.CurrentLevel == target ||
+                   (target == Levels.DicePalaceMain &&
+                    IsDicePalaceLevel(level.CurrentLevel));
+        }
+
         private bool ShouldShowBattleResultHud()
         {
             if (!battleHudPresentationActive)
@@ -148,7 +187,8 @@ namespace Gilomx.CupheadBossRoulette
             try
             {
                 var level = Level.Current;
-                return level != null && level.LevelType == Level.Type.Battle;
+                return level != null && level.LevelType == Level.Type.Battle &&
+                       BattleHudMatchesLevel(level);
             }
             catch
             {

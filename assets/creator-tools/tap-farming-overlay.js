@@ -466,8 +466,9 @@
     const eligiblePhase = ["active", "transition"]
       .includes(snapshot.phase);
     const path = eligiblePhase ? bossImagePath(snapshot) : "";
+    const family = path === "/assets/bosses/dado.png" ? "DicePalace" : snapshot.levelId;
     const key = path
-      ? `${snapshot.levelId}|${snapshot.attempt}|${path}`
+      ? `${family}|${snapshot.sessionKey}|${snapshot.attempt}|${path}`
       : "";
     if (!path) {
       if (bossImageTimer) window.clearTimeout(bossImageTimer);

@@ -92,15 +92,17 @@ internal sealed class DamageDealer
         public DamageInfo(float damage) { this.damage = damage; }
     }
 }
-internal enum Levels { Robot, Ground, DicePalaceMain }
+internal enum Levels { Robot, Train, Ground, DicePalaceMain, DicePalaceBooze }
 internal class Level
 {
     internal enum Type { Battle }
+    internal enum Mode { Easy, Normal, Hard }
     internal static Level Current;
     internal Type LevelType;
     internal bool Ending;
     internal Levels CurrentLevel;
     internal int Id;
+    internal Mode mode = Mode.Normal;
     internal int GetInstanceID() { return Id; }
 }
 
@@ -148,9 +150,106 @@ internal class AbstractLevelProperties<TState, TName, TDifficulty>
     }
 }
 
-internal sealed class LevelProperties
+internal sealed partial class LevelProperties
 {
     internal sealed class Robot : AbstractLevelProperties<RobotState, RobotStateName, Difficulty> { }
+    internal sealed class Train : AbstractLevelProperties<Train.State, Train.Pattern, Train.States>
+    {
+        internal enum Pattern { Main }
+        internal enum States { Main }
+        internal new State[] states = new[] { new State() };
+        internal State CurrentState { get { return states[stateIndex]; } }
+        internal sealed class State
+        {
+            internal States stateName;
+            internal float healthTrigger = 1f;
+            internal BlindSpecter blindSpecter = new BlindSpecter();
+            internal Skeleton skeleton = new Skeleton();
+            internal LollipopGhouls lollipopGhouls = new LollipopGhouls();
+            internal Engine engine = new Engine();
+        }
+        internal sealed class BlindSpecter { internal int health = 100; }
+        internal sealed class Skeleton { internal float health = 200f; }
+        internal sealed class LollipopGhouls { internal float health = 150f; }
+        internal sealed class Engine { internal float health = 400f; }
+        internal class Entity
+        {
+            public Train properties { get; private set; }
+            internal void InitProperties(Train value) { properties = value; }
+        }
+    }
+}
+
+internal sealed class TrainLevel : Level
+{
+    private LevelProperties.Train properties;
+    private int currentPhase = 1;
+    private TrainLevelBlindSpecter blindSpecter;
+    private TrainLevelSkeleton skeleton;
+    private TrainLevelLollipopGhoulsManager ghouls;
+    private TrainLevelEngineBoss engine;
+    internal TrainLevel(LevelProperties.Train properties, TrainLevelBlindSpecter specter,
+        TrainLevelSkeleton skeleton, TrainLevelLollipopGhoulsManager ghouls,
+        TrainLevelEngineBoss engine)
+    {
+        this.properties = properties; blindSpecter = specter; this.skeleton = skeleton;
+        this.ghouls = ghouls; this.engine = engine; CurrentLevel = Levels.Train;
+    }
+    internal void SetPhase(int value) { currentPhase = value; }
+}
+internal sealed class TrainLevelLollipopGhoulsManager : LevelProperties.Train.Entity
+{
+    private TrainLevelLollipopGhoul ghoulLeft, ghoulRight;
+    internal TrainLevelLollipopGhoulsManager(LevelProperties.Train properties,
+        TrainLevelLollipopGhoul left, TrainLevelLollipopGhoul right)
+    { InitProperties(properties); ghoulLeft = left; ghoulRight = right; }
+}
+internal sealed class TrainLevelBlindSpecter : LevelProperties.Train.Entity
+{
+    internal delegate void OnDamageTakenHandler(float damage);
+    private float health;
+    private bool dead;
+    internal float TimelineDamage;
+    internal OnDamageTakenHandler OnDamageTakenEvent;
+    internal bool DefeatTriggered;
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { if (dead) return; if (OnDamageTakenEvent != null) OnDamageTakenEvent(info.damage); health -= info.damage; CompleteHit(); }
+    internal void CompleteHit() { if (health <= 0f) dead = DefeatTriggered = true; }
+}
+internal sealed class TrainLevelSkeleton : LevelProperties.Train.Entity
+{
+    internal delegate void OnDamageTakenHandler(float damage);
+    private float health;
+    private bool dead;
+    internal float TimelineDamage;
+    internal OnDamageTakenHandler OnDamageTakenEvent;
+    internal bool DefeatTriggered;
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { if (dead) return; if (OnDamageTakenEvent != null) OnDamageTakenEvent(info.damage); health -= info.damage; CompleteHit(); }
+    internal void CompleteHit() { if (health <= 0f) dead = DefeatTriggered = true; }
+}
+internal sealed class TrainLevelLollipopGhoul : LevelProperties.Train.Entity
+{
+    internal delegate void OnDamageTakenHandler(float damage);
+    private float health;
+    internal float TimelineDamage;
+    internal OnDamageTakenHandler OnDamageTakenEvent;
+    internal bool DefeatTriggered;
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { if (health <= 0f) return; if (OnDamageTakenEvent != null) OnDamageTakenEvent(info.damage); health -= info.damage; CompleteHit(); }
+    internal void CompleteHit() { if (health <= 0f) DefeatTriggered = true; }
+}
+internal sealed class TrainLevelEngineBoss : LevelProperties.Train.Entity
+{
+    internal delegate void OnDamageTakenHandler(float damage);
+    private float health;
+    private bool dead;
+    internal float TimelineDamage;
+    internal OnDamageTakenHandler OnDamageTakenEvent;
+    internal bool DefeatTriggered;
+    private void OnDamageTaken(DamageDealer.DamageInfo info)
+    { if (dead) return; if (OnDamageTakenEvent != null) OnDamageTakenEvent(info.damage); health -= info.damage; CompleteHit(); }
+    internal void CompleteHit() { if (health <= 0f) dead = DefeatTriggered = true; }
 }
 
 internal sealed class RobotLevel : Level
@@ -222,6 +321,14 @@ namespace Gilomx.CupheadBossRoulette
         { return Controller.PrepareBossDamage(properties, ref damage); }
         internal void ObserveTapFarmingBossDamage(object properties)
         { Controller.ObserveBossDamage(properties); }
+        internal bool PrepareTapFarmingTrainDamage(object actor, ref float damage)
+        { return Controller.PrepareTrainDamage(actor, ref damage); }
+        internal void ObserveTapFarmingTrainDamage(object actor)
+        { Controller.ObserveTrainDamage(actor); }
+        internal bool PrepareTapFarmingBoozeDamage(object actor, ref float damage)
+        { return Controller.PrepareBoozeDamage(actor, ref damage); }
+        internal void ObserveTapFarmingBoozeDamage(object actor)
+        { Controller.ObserveBoozeDamage(actor); }
     }
     internal sealed class CreatorToolsServer
     {

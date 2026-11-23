@@ -64,7 +64,11 @@ Enter/aceptar sobre **Jugar** (también F7 o el atajo de mando) inicia la carga
 habitual, con equipamiento, dificultad, HUD, reintentos y regreso al mapa.
 F6 permite cerrar y reabrir la tarjeta sin cambiar lo elegido. La navegación
 recorre únicamente dificultad y Jugar. Si el mapa no está disponible, conserva
-la selección hasta regresar. Al volver de la batalla se libera el evento.
+la selección hasta regresar. Al volver de la batalla se libera el evento y se
+retiran el HUD del juego y la presentación de la ruleta en OBS. El resultado
+anterior no vuelve a mostrarse al entrar a otro jefe desde el mapa. Los
+reintentos de la pelea elegida y los combates internos de King Dice conservan
+su presentación.
 Detener también libera la reserva inmediatamente y cancela una carga aún
 pendiente; no cierra el juego ni interrumpe una batalla ya cargada.
 

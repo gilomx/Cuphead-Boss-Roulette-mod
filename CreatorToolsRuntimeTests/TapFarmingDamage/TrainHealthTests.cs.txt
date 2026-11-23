@@ -1,0 +1,304 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text.Json;
+using Gilomx.CupheadBossRoulette;
+using HarmonyLib;
+
+internal static partial class Program
+{
+    private static void TestTrainLocalDamage()
+    {
+        using (var fixture = new TrainFixture())
+        {
+            Check(fixture.InstalledPlugin.harmony.Patches.Count(p => p.Transpiler != null &&
+                p.Original.DeclaringType.Name.StartsWith("TrainLevel")) == 4,
+                "all four Train local callbacks must be registered");
+            Check(Near(fixture.BossHealth, 1000d), "Train must project local HP rather than its unused generic pool");
+            var hitCount = 0;
+            for (var phase = 1; phase <= 4; phase++)
+            {
+                fixture.Level.SetPhase(phase);
+                var targets = phase == 3 ? new[] { fixture.Actors[2], fixture.Actors[3] } :
+                    new[] { fixture.Actors[phase == 4 ? 4 : phase - 1] };
+                foreach (var actor in targets)
+                {
+                    var original = TrainHealth(actor);
+                    var info = new DamageDealer.DamageInfo(4f);
+                    fixture.PlayerHit(actor, info);
+                    hitCount++;
+                    Check(TrainHealth(actor) == original && Near(fixture.Reserve, 1000d - hitCount * 4d),
+                        "each local hit spends reserve once and protects its actor's native health");
+                    Check(TrainTimelineDamage(actor) == 0f, "timeline and local HP use the same absorbed remainder");
+                    Check(info.damage == 4f, "Train must not modify shared DamageInfo");
+                    Check(!TrainDefeated(actor), "absorbed hits cannot trigger native actor death");
+                }
+            }
+            Check(Near(fixture.Spent, 20d), "all five owned actors contribute to the victory damage counter");
+        }
+
+        using (var fixture = new TrainFixture())
+        {
+            var specter = fixture.Actors[0];
+            fixture.PlayerHit(specter, new DamageDealer.DamageInfo(150f));
+            Check(TrainHealth(specter) == 50f && Near(fixture.Reserve, 900d) && Near(fixture.Spent, 100d),
+                "only the current phase's 100 extra HP may absorb a large hit");
+            Check(TrainTimelineDamage(specter) == 50f, "the same partial remainder reaches native timeline and health");
+            fixture.PlayerHit(specter, new DamageDealer.DamageInfo(51f));
+            Check(TrainDefeated(specter) && Near(fixture.Reserve, 900d),
+                "a lethal native remainder still ends its phase without spending future reserve");
+            fixture.Level.SetPhase(2);
+            fixture.PlayerHit(fixture.Actors[1], new DamageDealer.DamageInfo(4f));
+            Check(Near(fixture.Reserve, 896d), "native phase advancement resumes absorption in the next phase");
+            fixture.Complete();
+            using (var state = fixture.State())
+                Check(Near(state.RootElement.GetProperty("lastRound").GetProperty("spentHealth").GetDouble(), 104d),
+                    "the immutable victory summary keeps the Train reserve actually removed");
+        }
+
+        using (var fixture = new TrainFixture())
+        {
+            var specter = fixture.Actors[0];
+            AccessTools.Field(specter.GetType(), "OnDamageTakenEvent").SetValue(specter, null);
+            fixture.PlayerHit(specter, new DamageDealer.DamageInfo(4f));
+            Check(TrainHealth(specter) == 100f && Near(fixture.Reserve, 996d),
+                "a null timeline event still calculates and absorbs local damage exactly once");
+            var outsider = new TrainLevelBlindSpecter();
+            outsider.InitProperties(fixture.Properties); SetTrainHealth(outsider, 100f);
+            fixture.PlayerHit(outsider, new DamageDealer.DamageInfo(3f));
+            Check(TrainHealth(outsider) == 97f && Near(fixture.Reserve, 996d),
+                "an actor outside the current Train cannot spend its reserve even with identical properties");
+            AccessTools.Field(specter.GetType(), "dead").SetValue(specter, true);
+            fixture.PlayerHit(specter, new DamageDealer.DamageInfo(4f));
+            Check(TrainHealth(specter) == 100f && Near(fixture.Reserve, 996d),
+                "the native dead-actor guard executes before reserve preparation");
+            AccessTools.Field(specter.GetType(), "dead").SetValue(specter, false);
+            fixture.Level.SetPhase(3); SetTrainHealth(fixture.Actors[2], 0f);
+            fixture.PlayerHit(fixture.Actors[2], new DamageDealer.DamageInfo(4f));
+            Check(TrainHealth(fixture.Actors[2]) == 0f && Near(fixture.Reserve, 996d),
+                "an exhausted twin cannot consume reserve from the other living twin");
+            fixture.Level.SetPhase(1);
+            fixture.NativeHit(specter, new DamageDealer.DamageInfo(3f));
+            Check(TrainHealth(specter) == 97f && Near(fixture.Reserve, 996d), "unowned native damage is preserved");
+            fixture.Retry();
+            Check(Near(fixture.Reserve, 996d), "retry does not refund spent Train reserve");
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(4f));
+            Check(Near(fixture.Reserve, 992d), "a new Train attempt spends only the remaining bank");
+            fixture.Taps.ProcessBackgroundCommand("action=off");
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(3f));
+            Check(TrainHealth(fixture.Actors[0]) == 97f, "disabled Farmeada leaves native Train damage intact");
+        }
+
+        using (var fixture = new TrainFixture(0))
+        {
+            var specter = fixture.Actors[0];
+            fixture.PlayerHit(specter, new DamageDealer.DamageInfo(101f));
+            Check(TrainHealth(specter) == -1f && TrainDefeated(specter) && Near(fixture.Spent, 0d),
+                "zero reserve preserves the native lethal hit and trigger");
+        }
+        Console.WriteLine("PASS Train local damage across all actors, exact phase budgets, optional events, native death, retry and disabled mode.");
+    }
+
+    private static void TestTrainNativeHealthAdapter()
+    {
+        using (var fixture = new TrainFixture())
+        {
+            CreatorToolsTapFarmingTrainHealth adapter;
+            Check(CreatorToolsTapFarmingTrainHealth.TryCapture(fixture.Level, null, out adapter), "capture the current Train's owned health");
+            Check(ReferenceEquals(adapter.Properties, fixture.Properties) &&
+                adapter.OriginalHealth.SequenceEqual(new double[] { 100, 200, 300, 400 }),
+                "Train weights come from specter, skeleton, both twins and engine");
+            foreach (var actor in fixture.Actors) Check(adapter.OwnsActor(actor), "the adapter owns every native Train actor");
+            var outsider = new TrainLevelLollipopGhoul(); outsider.InitProperties(fixture.Properties);
+            Check(!adapter.OwnsActor(outsider), "sharing properties is insufficient to become an owned Train actor");
+            fixture.Level.SetPhase(0);
+            int index; double current, phaseCurrent;
+            Check(adapter.TryRead(out index, out current, out phaseCurrent) && index == 1 &&
+                Near(current, 1000d) && Near(phaseCurrent, 100d),
+                "the initialized intro at native phase zero displays the first phase and its future HP");
+            fixture.Level.SetPhase(3);
+            SetTrainHealth(fixture.Actors[2], 0f);
+            SetTrainHealth(fixture.Actors[3], 80f);
+            Check(adapter.TryRead(out index, out current, out phaseCurrent) && index == 3 &&
+                Near(phaseCurrent, 80d) && Near(current, 480d),
+                "the twins share one phase and retain only the later engine's original HP");
+            fixture.Level.SetPhase(4);
+            SetTrainHealth(fixture.Actors[4], 60f);
+            Check(adapter.TryRead(out index, out current, out phaseCurrent) && index == 4 && Near(current, 60d),
+                "the engine snapshot reads its local health");
+            Check(!CreatorToolsTapFarmingTrainHealth.TryCapture(fixture.Level, new LevelProperties.Train(), out adapter),
+                "an unrelated properties object cannot attach to the current Train");
+        }
+        using (var fixture = new TrainFixture(0, Level.Mode.Easy))
+        {
+            CreatorToolsTapFarmingTrainHealth adapter;
+            Check(CreatorToolsTapFarmingTrainHealth.TryCapture(fixture.Level, null, out adapter) &&
+                adapter.OriginalHealth.SequenceEqual(new double[] { 100, 200, 300 }),
+                "Simple Train has three real phases and no protected engine budget");
+        }
+        using (var fixture = new TrainFixture(0, Level.Mode.Hard))
+        {
+            CreatorToolsTapFarmingTrainHealth adapter;
+            Check(CreatorToolsTapFarmingTrainHealth.TryCapture(fixture.Level, null, out adapter) &&
+                adapter.OriginalHealth.SequenceEqual(new double[] { 100, 200, 300, 400 }),
+                "Expert retains all four owned phases including both twins and the engine");
+        }
+        Console.WriteLine("PASS Train owned-health adapter, twin aggregate, phase-specific reads and Simple's three phases.");
+    }
+
+    private static void TestTrainLocalPatchFailure()
+    {
+        using (var fixture = new TrainFixture())
+        {
+            var hit = CompileTrainHit(fixture.InstalledPlugin, typeof(TrainLevelBlindSpecter));
+            var failed = new Plugin();
+            failed.harmony.RejectPatch = method => method.DeclaringType == typeof(TrainLevelEngineBoss);
+            failed.InstallDamagePatches();
+            fixture.WithPlayerContext(() => hit.DynamicInvoke(fixture.Actors[0], new DamageDealer.DamageInfo(3f)));
+            Check(TrainHealth(fixture.Actors[0]) == 97f && Near(fixture.Reserve, 1000d) && failed.Logger.Warnings.Count > 0,
+                "a partial Train patch installation keeps every already-installed getter native");
+        }
+    }
+
+    private static Delegate CompileTrainHit(Plugin plugin, Type owner)
+    {
+        var patch = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == owner && p.Transpiler != null);
+        var health = AccessTools.Field(owner, "health");
+        var dead = AccessTools.Field(owner, "dead");
+        var callback = AccessTools.Field(owner, "OnDamageTakenEvent");
+        var getter = typeof(DamageDealer.DamageInfo).GetProperty("damage").GetGetMethod();
+        var dynamic = new DynamicMethod("train_local_hit", typeof(void), new[] { owner, typeof(DamageDealer.DamageInfo) }, typeof(Program).Module, true);
+        var il = dynamic.GetILGenerator();
+        var alive = il.DefineLabel();
+        var afterEvent = il.DefineLabel();
+        var input = new List<CodeInstruction> { new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldfld, dead ?? health) };
+        if (dead != null) input.Add(new CodeInstruction(OpCodes.Brfalse, alive));
+        else
+        {
+            input.Add(new CodeInstruction(OpCodes.Ldc_R4, 0f));
+            input.Add(new CodeInstruction(OpCodes.Bgt_Un, alive));
+        }
+        input.Add(new CodeInstruction(OpCodes.Ret));
+        var aliveStart = new CodeInstruction(OpCodes.Ldarg_0); aliveStart.labels.Add(alive); input.Add(aliveStart);
+        input.Add(new CodeInstruction(OpCodes.Ldfld, callback));
+        input.Add(new CodeInstruction(OpCodes.Brfalse, afterEvent));
+        input.Add(new CodeInstruction(OpCodes.Ldarg_0));
+        input.Add(new CodeInstruction(OpCodes.Ldfld, callback));
+        input.Add(new CodeInstruction(OpCodes.Ldarg_1));
+        input.Add(new CodeInstruction(OpCodes.Callvirt, getter));
+        input.Add(new CodeInstruction(OpCodes.Callvirt, callback.FieldType.GetMethod("Invoke")));
+        var healthStart = new CodeInstruction(OpCodes.Ldarg_0); healthStart.labels.Add(afterEvent); input.Add(healthStart);
+        input.Add(new CodeInstruction(OpCodes.Ldarg_0));
+        input.Add(new CodeInstruction(OpCodes.Ldfld, health));
+        input.Add(new CodeInstruction(OpCodes.Ldarg_1));
+        input.Add(new CodeInstruction(OpCodes.Callvirt, getter));
+        input.Add(new CodeInstruction(OpCodes.Sub));
+        input.Add(new CodeInstruction(OpCodes.Stfld, health));
+        input.Add(new CodeInstruction(OpCodes.Ldarg_0));
+        input.Add(new CodeInstruction(OpCodes.Call, AccessTools.Method(owner, "CompleteHit")));
+        input.Add(new CodeInstruction(OpCodes.Ret));
+        var arguments = patch.Transpiler.GetParameters().Select(parameter => parameter.ParameterType == typeof(ILGenerator) ? (object)il :
+            typeof(MethodBase).IsAssignableFrom(parameter.ParameterType) ? patch.Original : input).ToArray();
+        var output = ((IEnumerable<CodeInstruction>)patch.Transpiler.Invoke(null, arguments)).ToList();
+        Check(output.Count(instruction => instruction.operand is MethodInfo method && method.Name == "ReadTrainLocalDamage") == 1 &&
+            !output.Any(instruction => Equals(instruction.operand, getter)),
+            "one precomputed Train remainder replaces both timeline and local damage reads");
+        foreach (var instruction in output)
+        {
+            foreach (var label in instruction.labels) il.MarkLabel(label);
+            if (instruction.operand is FieldInfo field) il.Emit(instruction.opcode, field);
+            else if (instruction.operand is MethodInfo method) il.Emit(instruction.opcode, method);
+            else if (instruction.operand is Label label) il.Emit(instruction.opcode, label);
+            else if (instruction.operand is LocalBuilder local) il.Emit(instruction.opcode, local);
+            else if (instruction.operand is float value) il.Emit(instruction.opcode, value);
+            else if (instruction.operand is Type type) il.Emit(instruction.opcode, type);
+            else il.Emit(instruction.opcode);
+        }
+        return dynamic.CreateDelegate(typeof(Action<,>).MakeGenericType(owner, typeof(DamageDealer.DamageInfo)));
+    }
+
+    private static float TrainHealth(object actor) { return (float)AccessTools.Field(actor.GetType(), "health").GetValue(actor); }
+    private static void SetTrainHealth(object actor, float value) { AccessTools.Field(actor.GetType(), "health").SetValue(actor, value); }
+    private static float TrainTimelineDamage(object actor) { return (float)AccessTools.Field(actor.GetType(), "TimelineDamage").GetValue(actor); }
+    private static bool TrainDefeated(object actor) { return (bool)AccessTools.Field(actor.GetType(), "DefeatTriggered").GetValue(actor); }
+
+    private sealed class TrainFixture : IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "pichi-train-" + Guid.NewGuid().ToString("N"));
+        private readonly global::Level previousLevel = global::Level.Current;
+        private readonly Plugin previousPlugin = Plugin.activeInstance;
+        private readonly CreatorToolsServer server = new CreatorToolsServer();
+        private readonly PatchRecord player;
+        private readonly global::Level.Mode mode;
+        internal readonly CreatorToolsTapFarmingController Taps;
+        internal readonly LevelProperties.Train Properties = new LevelProperties.Train();
+        internal readonly Plugin InstalledPlugin;
+        internal TrainLevel Level;
+        internal object[] Actors;
+
+        internal TrainFixture(int reserve = 1000, global::Level.Mode mode = global::Level.Mode.Normal)
+        {
+            this.mode = mode;
+            Directory.CreateDirectory(directory);
+            Taps = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"), new CreatorToolsLiveEventsCoordinator(), null, null);
+            Taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=1&healthPointsPerConversion=1");
+            StartLevel(91);
+            Taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = reserve });
+            InstalledPlugin = new Plugin { creatorToolsInteractions = new CreatorToolsInteractionController { Controller = Taps } };
+            Plugin.activeInstance = InstalledPlugin;
+            InstalledPlugin.InstallDamagePatches();
+            player = InstalledPlugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(DamageDealer));
+        }
+        private void StartLevel(int id)
+        {
+            Actors = new object[] { new TrainLevelBlindSpecter(), new TrainLevelSkeleton(), new TrainLevelLollipopGhoul(), new TrainLevelLollipopGhoul(), new TrainLevelEngineBoss() };
+            var health = new[] { 100f, 200f, 150f, 150f, 400f };
+            for (var index = 0; index < Actors.Length; index++)
+            {
+                var actor = Actors[index];
+                ((LevelProperties.Train.Entity)actor).InitProperties(Properties);
+                SetTrainHealth(actor, health[index]);
+                var callback = AccessTools.Field(actor.GetType(), "OnDamageTakenEvent");
+                Action<float> handler = damage => AccessTools.Field(actor.GetType(), "TimelineDamage").SetValue(actor, TrainTimelineDamage(actor) + damage);
+                callback.SetValue(actor, Delegate.CreateDelegate(callback.FieldType, handler.Target, handler.Method));
+            }
+            var manager = new TrainLevelLollipopGhoulsManager(Properties, (TrainLevelLollipopGhoul)Actors[2], (TrainLevelLollipopGhoul)Actors[3]);
+            Level = new TrainLevel(Properties, (TrainLevelBlindSpecter)Actors[0], (TrainLevelSkeleton)Actors[1], manager, (TrainLevelEngineBoss)Actors[4]) { Id = id, mode = mode };
+            global::Level.Current = Level;
+            Taps.OnLevelStarted(Level);
+            Taps.Update(server, true);
+        }
+        internal JsonDocument State() { Taps.PublishState(server); return JsonDocument.Parse(server.State); }
+        internal double Reserve { get { using (var state = State()) return state.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble(); } }
+        internal double Spent { get { using (var state = State()) return state.RootElement.GetProperty("counters").GetProperty("spentHealth").GetDouble(); } }
+        internal double BossHealth { get { using (var state = State()) return state.RootElement.GetProperty("boss").GetProperty("currentHealth").GetDouble(); } }
+        internal void Complete() { Taps.OnLevelPreWin(Level); }
+        internal void Retry() { Taps.OnLevelDefeated(Level); StartLevel(Level.Id + 1); }
+        internal void PlayerHit(object actor, DamageDealer.DamageInfo info) { WithPlayerContext(() => NativeHit(actor, info)); }
+        internal void NativeHit(object actor, DamageDealer.DamageInfo info)
+        {
+            CompileTrainHit(InstalledPlugin, actor.GetType()).DynamicInvoke(actor, info);
+            var patch = InstalledPlugin.harmony.Patches.Single(p => p.Original.DeclaringType == actor.GetType() && p.Transpiler != null);
+            patch.Postfix?.Invoke(null, new[] { actor });
+        }
+        internal void WithPlayerContext(Action action)
+        {
+            var arguments = new object[] { new UnityEngine.GameObject(), PlayerId.PlayerOne, false };
+            player.Prefix.Invoke(null, arguments);
+            var state = new object[] { arguments[2] };
+            try { action(); player.Postfix.Invoke(null, state); }
+            finally { player.Finalizer.Invoke(null, new object[] { null, state[0] }); }
+        }
+        public void Dispose()
+        {
+            Taps.ProcessBackgroundCommand("action=off");
+            global::Level.Current = previousLevel;
+            Plugin.activeInstance = previousPlugin;
+            Check(Path.GetFullPath(directory).StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase), "temporary test path must stay under Temp");
+            Directory.Delete(directory, true);
+        }
+    }
+}

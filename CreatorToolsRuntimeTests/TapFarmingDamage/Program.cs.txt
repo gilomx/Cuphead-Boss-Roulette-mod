@@ -23,10 +23,16 @@ internal static partial class Program
         TestThreadIsolation();
         TestRobotLocalTranspilers();
         TestRobotLocalPatchFailure();
+        TestTrainLocalDamage();
+        TestTrainNativeHealthAdapter();
+        TestTrainLocalPatchFailure();
+        TestBoozeLocalDamage();
+        TestBoozeNativeHealthAdapter();
+        TestBoozeLocalPatchFailure();
         TestRobotNativeHealthAdapter();
         TestTapGenerator();
         TestRobotRetryKeepsOnlyUnspentReserve();
-        Console.WriteLine("All Tap Farming damage bridge tests passed (scope guards, Robot local IL full/partial/zero damage, future reserve, partial-install failure, native health adapter, exception cleanup and thread isolation).");
+        Console.WriteLine("All Tap Farming damage bridge tests passed (scope guards, Robot/Train/Tipsy Troop local IL full/partial/zero damage, shared Dice reserve, future reserve, partial-install failure, native health adapters, exception cleanup and thread isolation).");
     }
 
     private static void TestPatchRegistration()
@@ -207,8 +213,8 @@ internal static partial class Program
             InstalledPlugin = plugin;
             plugin.InstallDamagePatches();
             player = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(DamageDealer));
-            boss = plugin.harmony.Patches.Single(p => p.Original.DeclaringType != typeof(DamageDealer) && p.Original.Name == "DealDamage");
-            progression = plugin.harmony.Patches.Single(p => p.Original.Name == "DealDamageToNextNamedState");
+            boss = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(LevelProperties.Robot).BaseType && p.Original.Name == "DealDamage");
+            progression = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(LevelProperties.Robot).BaseType && p.Original.Name == "DealDamageToNextNamedState");
             Properties.RouteDamage = BossHit;
         }
 

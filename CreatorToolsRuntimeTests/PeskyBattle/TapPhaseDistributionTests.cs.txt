@@ -10,7 +10,9 @@ internal static class TapPhaseDistributionTests
     public static void Run()
     {
         TestGenericDistribution();
-        TestDicePalaceHandoffsAndProtectedMain();
+        TestDicePalaceSharedReserveAndBoardLifecycle();
+        TestDicePalaceMapAndDefeatStartNewAttempts();
+        TestDicePalaceNativeRetryStartsNewAttempt();
         TestFailedReaderPreservesNativeDamage();
         TestVictoryStartsNewBalance();
     }
@@ -58,71 +60,185 @@ internal static class TapPhaseDistributionTests
         }
     }
 
-    private static void TestDicePalaceHandoffsAndProtectedMain()
+    private static void TestDicePalaceSharedReserveAndBoardLifecycle()
     {
         using (var fixture = new Fixture())
         {
-            var first = fixture.Start(Levels.DicePalaceBooze, 500);
+            var board = fixture.Start(Levels.DicePalaceMain, 500);
             Deposit(fixture.Taps, 400);
-            // Native subphases must not replace the logical four-arena split.
-            var properties = new Properties();
-            Hit(fixture.Taps, properties, 50, 0);
-            AssertBalances(fixture, 350, 50, 100, 100, 100);
-            properties.stateIndex = 1; properties.CurrentHealth = 800;
-            Hit(fixture.Taps, properties, 50, 0);
-            properties.stateIndex = 2; properties.CurrentHealth = 400;
-            Hit(fixture.Taps, properties, 1, 1);
-            AssertBalances(fixture, 300, 0, 100, 100, 100);
+            AssertLifecycle(fixture, "transition", 1);
+            AssertDiceReserve(fixture, 400);
+            AssertEffective(fixture, false, 400);
+            fixture.MainState(board, false);
+            fixture.Taps.ObserveBossDamage(Arena(900));
+            AssertLifecycle(fixture, "transition", 1);
+            AssertDiceReserve(fixture, 400);
+            AssertEffective(fixture, false, 400);
 
-            fixture.Handoff(first);
-            var second = fixture.Start(Levels.DicePalaceBooze, 501);
+            // Leaving the board has no miniboss PreWin notification.
+            fixture.LeaveBoard(board);
+            var first = fixture.Start(Levels.DicePalaceChips, 501);
+            var properties = Arena(1000);
+            Hit(fixture.Taps, properties, 150, 0);
+            AssertDiceReserve(fixture, 250); // More than the old 100-per-arena budget.
+            AssertAttemptAndArena(fixture, 1, 1000);
+            AssertEffective(fixture, true, 1250, 1000, 1.25);
+            fixture.Handoff(first, endedFirst: true);
+            AssertEffective(fixture, true, 1250, 1000, 1.25);
+            board = fixture.Start(Levels.DicePalaceMain, 502);
+            AssertLifecycle(fixture, "transition", 1);
+            fixture.MainState(board, false);
+            fixture.Taps.ObserveBossDamage(Arena(900));
+            AssertDiceReserve(fixture, 250);
+            AssertEffective(fixture, true, 1250, 1000, 1.25);
+            Deposit(fixture.Taps, 40);
+            AssertDiceReserve(fixture, 290);
+            AssertEffective(fixture, true, 1290, 1000, 1.29);
+
+            fixture.LeaveBoard(board);
+            var second = fixture.Start(Levels.DicePalaceChips, 503);
             properties = Arena(500);
-            Hit(fixture.Taps, properties, 101, 1);
-            AssertBalances(fixture, 200, 0, 0, 100, 100);
+            Hit(fixture.Taps, properties, 291, 1);
+            fixture.Refresh(properties);
+            AssertDiceReserve(fixture, 0);
             AssertAttemptAndArena(fixture, 1, 500);
+            AssertEffective(fixture, true, 499, 500, .998);
 
             fixture.Handoff(second);
-            var third = fixture.Start(Levels.DicePalaceBooze, 502);
+            board = fixture.Start(Levels.DicePalaceMain, 504);
+            AssertLifecycle(fixture, "transition", 1);
+            AssertEffective(fixture, true, 499, 500, .998);
+            fixture.LeaveBoard(board);
+            var third = fixture.Start(Levels.DicePalaceChips, 505);
             properties = Arena(700);
-            Hit(fixture.Taps, properties, 100, 0);
-            AssertBalances(fixture, 100, 0, 0, 0, 100);
+            Deposit(fixture.Taps, 60);
+            Hit(fixture.Taps, properties, 60, 0);
+            AssertDiceReserve(fixture, 0);
 
             fixture.Handoff(third);
-            var extra = fixture.Start(Levels.DicePalaceBooze, 503);
-            properties = Arena(400);
-            Hit(fixture.Taps, properties, 10, 10);
-            AssertBalances(fixture, 100, 0, 0, 0, 100);
+            board = fixture.Start(Levels.DicePalaceMain, 506);
+            fixture.MainState(board, false);
+            AssertLifecycle(fixture, "transition", 1);
             Deposit(fixture.Taps, 40);
-            Hit(fixture.Taps, properties, 10, 10);
-            AssertBalances(fixture, 140, 0, 0, 0, 140);
-            UnityEngine.Time.realtimeSinceStartup += 0.2f;
-            fixture.Taps.ObserveBossDamage(properties);
-            using (var state = fixture.State())
-            {
-                Near(380, state.RootElement.GetProperty("effectiveHealth").GetProperty("current").GetDouble());
-                Near(400, state.RootElement.GetProperty("effectiveHealth").GetProperty("total").GetDouble());
-            }
+            AssertDiceReserve(fixture, 40);
+            AssertEffective(fixture, true, 740, 700, 1.0571);
+            fixture.Taps.ObserveBossDamage(Arena(900));
+            AssertDiceReserve(fixture, 40);
+            AssertEffective(fixture, true, 740, 700, 1.0571);
+
+            // An extra miniboss spends new taps from that same shared balance.
+            fixture.LeaveBoard(board);
+            var extra = fixture.Start(Levels.DicePalaceChips, 507);
+            properties = Arena(400);
+            Hit(fixture.Taps, properties, 41, 1);
+            fixture.Refresh(properties);
+            AssertDiceReserve(fixture, 0);
+            AssertEffective(fixture, true, 399, 400, .9975);
 
             fixture.Handoff(extra);
-            var main = fixture.Start(Levels.DicePalaceMain, 504);
-            properties = Arena(900);
-            Hit(fixture.Taps, properties, 100, 0);
-            AssertBalances(fixture, 40, 0, 0, 0, 40);
-            AssertAttemptAndArena(fixture, 1, 900);
-            Hit(fixture.Taps, properties, 41, 1);
-            AssertBalances(fixture, 0, 0, 0, 0, 0);
-            Near(899, properties.CurrentHealth);
+            var main = fixture.Start(Levels.DicePalaceMain, 508);
+            AssertLifecycle(fixture, "transition", 1);
+            fixture.MainState(main, false);
+            fixture.Taps.ObserveBossDamage(Arena(900));
+            AssertDiceReserve(fixture, 0);
+            AssertEffective(fixture, true, 399, 400, .9975);
+            fixture.MainState(board, true); // A stale board instance cannot activate Main.
+            AssertLifecycle(fixture, "transition", 1);
 
-            // A real defeat is a new logical attempt; an internal scene swap
-            // was not. Repartition the unspent 80, never restore spent HP.
-            Deposit(fixture.Taps, 80);
-            fixture.Taps.OnLevelDefeated(main);
-            fixture.Start(Levels.DicePalaceBooze, 505);
-            properties = Arena(600);
-            Hit(fixture.Taps, properties, 21, 1);
-            AssertBalances(fixture, 60, 0, 20, 20, 20);
+            // Main becomes the final arena in this same Level instance only
+            // when its native state reports Battling.
+            fixture.MainState(main, true);
+            AssertLifecycle(fixture, "active", 1);
+            properties = Arena(900);
+            Hit(fixture.Taps, properties, 100, 100);
+            AssertDiceReserve(fixture, 0); // Nothing was protected for the final.
+            AssertAttemptAndArena(fixture, 1, 900);
+            Deposit(fixture.Taps, 25);
+            Hit(fixture.Taps, properties, 26, 1);
+            fixture.Refresh(properties);
+            AssertDiceReserve(fixture, 0);
+            Near(799, properties.CurrentHealth);
+            fixture.MainState(main, true);
+            AssertLifecycle(fixture, "active", 1);
+            AssertEffective(fixture, true, 799, 900, .8878);
+
+            fixture.Taps.OnLevelPreWin(main);
+            AssertLifecycle(fixture, "completed", 0);
+            using (var state = fixture.State())
+            {
+                Near(565, state.RootElement.GetProperty("lastRound").GetProperty("spentHealth").GetDouble());
+                Near(1, state.RootElement.GetProperty("lastRound").GetProperty("attempts").GetInt32());
+            }
+            Console.WriteLine("PASS Dice Palace shared reserve, board health retention, native Ended-before-PreWin, extra arenas and final Battling marker");
+        }
+    }
+
+    private static void TestDicePalaceMapAndDefeatStartNewAttempts()
+    {
+        using (var fixture = new Fixture())
+        {
+            var board = fixture.Start(Levels.DicePalaceMain, 800);
+            Deposit(fixture.Taps, 400);
+            fixture.LeaveBoard(board);
+            var first = fixture.Start(Levels.DicePalaceChips, 801);
+            Hit(fixture.Taps, Arena(1000), 125, 0);
+            fixture.Handoff(first);
+            board = fixture.Start(Levels.DicePalaceMain, 802);
+            fixture.Taps.OnMapEntered();
+            AssertLifecycle(fixture, "collecting", 1);
+            Near(275, Reserve(fixture.Taps, fixture.Server));
+
+            var retryBoard = fixture.Start(Levels.DicePalaceMain, 803);
+            AssertLifecycle(fixture, "transition", 2);
+            AssertEffective(fixture, false, 275);
+            fixture.MainState(board, true);
+            AssertLifecycle(fixture, "transition", 2);
+            fixture.LeaveBoard(retryBoard);
+            var retry = fixture.Start(Levels.DicePalaceChips, 804);
+            Hit(fixture.Taps, Arena(600), 300, 25);
+            AssertDiceReserve(fixture, 0);
             AssertAttemptAndArena(fixture, 2, 600);
-            Console.WriteLine("PASS Dice Palace four protected budgets, internal handoffs, extra arenas, Main and legitimate retry conservation");
+
+            Deposit(fixture.Taps, 80);
+            fixture.Taps.OnLevelDefeated(retry);
+            fixture.Taps.OnLevelEnded(retry);
+            fixture.Taps.OnLevelPreWin(retry);
+            AssertLifecycle(fixture, "collecting", 2);
+            Near(80, Reserve(fixture.Taps, fixture.Server));
+            retryBoard = fixture.Start(Levels.DicePalaceMain, 805);
+            AssertLifecycle(fixture, "transition", 3);
+            AssertEffective(fixture, false, 80);
+            fixture.LeaveBoard(retryBoard);
+            fixture.Start(Levels.DicePalaceChips, 806);
+            Hit(fixture.Taps, Arena(600), 81, 1);
+            AssertDiceReserve(fixture, 0);
+            AssertAttemptAndArena(fixture, 3, 600);
+            Console.WriteLine("PASS map exit and actual Dice Palace defeat close the chain; new attempts keep only unspent shared reserve");
+        }
+    }
+
+    private static void TestDicePalaceNativeRetryStartsNewAttempt()
+    {
+        using (var fixture = new Fixture())
+        {
+            var board = fixture.Start(Levels.DicePalaceMain, 900);
+            Deposit(fixture.Taps, 400);
+            fixture.LeaveBoard(board);
+            var first = fixture.Start(Levels.DicePalaceChips, 901);
+            Hit(fixture.Taps, Arena(1000), 150, 0);
+            // Native CleanUpRetry returns from a miniboss to Main without a
+            // win marker. This differs from Main sending the player to a mini.
+            fixture.Taps.OnLevelEnded(first);
+            board = fixture.Start(Levels.DicePalaceMain, 902);
+            AssertLifecycle(fixture, "transition", 2);
+            AssertDiceReserve(fixture, 250);
+            AssertEffective(fixture, false, 250);
+            fixture.LeaveBoard(board);
+            fixture.Start(Levels.DicePalaceChips, 903);
+            Hit(fixture.Taps, Arena(600), 251, 1);
+            AssertDiceReserve(fixture, 0);
+            AssertAttemptAndArena(fixture, 2, 600);
+            Console.WriteLine("PASS a native miniboss retry without PreWin starts a fresh attempt and never refunds shared reserve");
         }
     }
 
@@ -236,6 +352,36 @@ internal static class TapPhaseDistributionTests
         }
     }
 
+    private static void AssertLifecycle(Fixture fixture, string phase, int attempt)
+    {
+        using (var state = fixture.State())
+        {
+            Check(state.RootElement.GetProperty("phase").GetString() == phase,
+                "Expected lifecycle " + phase + ", got " + state.RootElement.GetProperty("phase").GetString());
+            Near(attempt, state.RootElement.GetProperty("attempt").GetInt32());
+        }
+    }
+
+    private static void AssertDiceReserve(Fixture fixture, double reserve)
+    {
+        // Dice's four route phases describe progress, never independent HP budgets.
+        AssertBalances(fixture, reserve, 0, 0, 0, 0);
+    }
+
+    private static void AssertEffective(Fixture fixture, bool available,
+        double current = 0, double total = 0, double ratio = 0)
+    {
+        using (var state = fixture.State())
+        {
+            var effective = state.RootElement.GetProperty("effectiveHealth");
+            Check(effective.GetProperty("available").GetBoolean() == available,
+                "effective HP availability changed during a board handoff");
+            Near(current, effective.GetProperty("current").GetDouble());
+            Near(total, effective.GetProperty("total").GetDouble());
+            Near(ratio, effective.GetProperty("ratio").GetDouble());
+        }
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string directory = Path.Combine(Path.GetTempPath(), "pichi-phase-integration-" + Guid.NewGuid().ToString("N"));
@@ -259,10 +405,42 @@ internal static class TapPhaseDistributionTests
             Taps.OnLevelStarted(level);
             return level;
         }
-        internal void Handoff(Level previous)
+        internal void Handoff(Level previous, bool endedFirst = false)
         {
+            int currentAttempt;
+            using (var state = State())
+                currentAttempt = state.RootElement.GetProperty("attempt").GetInt32();
+            if (endedFirst)
+            {
+                Taps.OnLevelEnded(previous);
+                AssertLifecycle(this, "transition", currentAttempt);
+            }
             Taps.OnLevelPreWin(previous);
+            AssertLifecycle(this, "transition", currentAttempt);
+            int completedPhaseIndex;
+            using (var state = State())
+                completedPhaseIndex = state.RootElement.GetProperty("phaseIndex").GetInt32();
+            // The overlay bridge calls PreWin then Ended; native PreWin can
+            // subsequently report the same win again.
             Taps.OnLevelEnded(previous);
+            Taps.OnLevelPreWin(previous);
+            AssertLifecycle(this, "transition", currentAttempt);
+            using (var state = State())
+                Near(completedPhaseIndex, state.RootElement.GetProperty("phaseIndex").GetInt32());
+        }
+        internal void LeaveBoard(Level previous)
+        {
+            MainState(previous, false);
+            Taps.OnLevelEnded(previous);
+        }
+        internal void MainState(Level main, bool battling)
+        {
+            Taps.ObserveDicePalaceMainState(main.GetInstanceID(), battling);
+        }
+        internal void Refresh(object properties)
+        {
+            UnityEngine.Time.realtimeSinceStartup += 0.2f;
+            Taps.ObserveBossDamage(properties);
         }
         internal JsonDocument State()
         {
@@ -332,6 +510,29 @@ internal static class TapPhaseDistributionTests
 
 namespace Gilomx.CupheadBossRoulette
 {
+    internal sealed class CreatorToolsTapFarmingBoozeHealth
+    {
+        internal object Properties { get { return null; } }
+        internal double OriginalHealth { get { return 0; } }
+        internal static bool TryCapture(Level level, out CreatorToolsTapFarmingBoozeHealth adapter)
+        { adapter = null; return false; }
+        internal bool OwnsActor(object actor) { return false; }
+        internal bool ContainsActor(object actor) { return false; }
+        internal bool TryRead(out double current, out double total)
+        { current = total = 0; return false; }
+    }
+
+    internal sealed class CreatorToolsTapFarmingTrainHealth
+    {
+        internal object Properties { get { return null; } }
+        internal double[] OriginalHealth { get { return null; } }
+        internal static bool TryCapture(Level level, object properties, out CreatorToolsTapFarmingTrainHealth adapter)
+        { adapter = null; return false; }
+        internal bool TryRead(out int index, out double current, out double phaseCurrent)
+        { index = 0; current = phaseCurrent = 0; return false; }
+        internal bool OwnsActor(object actor) { return false; }
+    }
+
     internal sealed class CreatorToolsTapFarmingRobotHealth
     {
         internal object Properties { get { return null; } }

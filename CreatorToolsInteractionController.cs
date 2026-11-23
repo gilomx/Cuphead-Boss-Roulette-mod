@@ -682,11 +682,13 @@ namespace Gilomx.CupheadBossRoulette
                 // King Dice's board is itself a started battle Level. Its native
                 // IsBattling flag changes only when the final card fight begins.
                 var battleStarted = level.Started && hasLivingPlayer;
-                if (battleStarted && level.CurrentLevel == Levels.DicePalaceMain)
+                if (level.CurrentLevel == Levels.DicePalaceMain)
                 {
                     var king = TapFarmingKingDiceField == null ? null :
                         TapFarmingKingDiceField.GetValue(level) as DicePalaceMainLevelKingDice;
-                    battleStarted = king != null && king.animator != null && king.animator.GetBool("IsBattling");
+                    var battling = king != null && king.animator != null && king.animator.GetBool("IsBattling");
+                    tapFarming.ObserveDicePalaceMainState(level.GetInstanceID(), battling);
+                    battleStarted = battleStarted && battling;
                 }
                 tapFarming.ObserveBattleState(level.GetInstanceID(), battleStarted,
                     ended, startupDiagnosticsPaused);
@@ -707,6 +709,26 @@ namespace Gilomx.CupheadBossRoulette
         internal void ObserveTapFarmingBossDamage(object properties)
         {
             tapFarming.ObserveBossDamage(properties);
+        }
+
+        internal bool PrepareTapFarmingTrainDamage(object actor, ref float damage)
+        {
+            return tapFarming.PrepareTrainDamage(actor, ref damage);
+        }
+
+        internal void ObserveTapFarmingTrainDamage(object actor)
+        {
+            tapFarming.ObserveTrainDamage(actor);
+        }
+
+        internal bool PrepareTapFarmingBoozeDamage(object actor, ref float damage)
+        {
+            return tapFarming.PrepareBoozeDamage(actor, ref damage);
+        }
+
+        internal void ObserveTapFarmingBoozeDamage(object actor)
+        {
+            tapFarming.ObserveBoozeDamage(actor);
         }
 
         /// <summary>

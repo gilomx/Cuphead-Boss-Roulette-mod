@@ -23,7 +23,7 @@ namespace UnityEngine
     }
 }
 
-internal enum Levels { Ground, Plane, DicePalaceMain, DicePalaceBooze }
+internal enum Levels { Ground, Plane, DicePalaceMain, DicePalaceBooze, DicePalaceChips }
 internal sealed class Level
 {
     internal enum Type { Battle }

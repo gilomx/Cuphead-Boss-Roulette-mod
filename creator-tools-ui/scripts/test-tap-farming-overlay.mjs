@@ -183,6 +183,95 @@ test("heart entry starts empty, fills once, reveals content, and survives live u
   assert.equal(view.timers(1350), 0);
 });
 
+test("Dice Palace board and miniboss handoffs keep the heart and portrait in one entrance", () => {
+  const view = overlay({ motion: true });
+  const state = snapshot();
+  state.levelId = "DicePalaceMain";
+  state.bossName = "King Dice";
+  state.presentation.motion = true;
+  state.effectiveHealth.scope = "arena";
+  state.phase = "collecting";
+  view.render(state);
+  state.phase = "active";
+  view.render(state);
+  assert.equal(view.node("tap-farming").dataset.heartEntering, "true");
+  assert.equal(view.timers(620), 1);
+
+  state.phase = "transition";
+  state.levelId = "DicePalaceBooze";
+  view.render(state);
+  assert.equal(view.node("tap-farming").dataset.phase, "transition");
+  assert.equal(view.timers(340), 1, "loading a miniboss preserves the pending heart fill");
+  assert.equal(view.timers(620), 1, "loading a miniboss preserves the pending portrait reveal");
+  assert.equal(view.timers(300), 0, "the shared Dice portrait cannot restart its reveal");
+  view.flush(340);
+  view.flush(620);
+  view.flush(1350);
+
+  for (const [phase, levelId] of [
+    ["active", "DicePalaceBooze"],
+    ["transition", "DicePalaceMain"],
+    ["active", "DicePalaceChips"],
+    ["transition", "DicePalaceMain"],
+    ["active", "DicePalaceMain"],
+  ]) {
+    state.phase = phase;
+    state.levelId = levelId;
+    view.render(state);
+    assert.equal(view.node("tap-farming").dataset.phase, phase, `${levelId} stays in a heart display phase`);
+    assert.equal(view.node("tap-farming").dataset.heartEntering, "false", "handoffs cannot repeat the heart entry");
+    assert.equal(view.node("tap-farming").dataset.healthPending, "false");
+    assert.equal(view.node("tap-percent").textContent, "150%", "transition retains the supplied effective percentage");
+    assert.equal(view.node("tap-boss-image").dataset.visible, "true", "the Dice portrait remains visible on the board and in minibosses");
+    assert.equal(view.node("tap-boss-image").getAttribute("href"), "/assets/bosses/dado.png");
+    for (const delay of [300, 340, 620, 1350]) assert.equal(view.timers(delay), 0);
+  }
+});
+
+test("Dice Palace defeat and off leave heart phases; a retry and a new session re-arm the portrait", () => {
+  const view = overlay({ motion: true });
+  const state = snapshot();
+  state.levelId = "DicePalaceBooze";
+  state.presentation.motion = true;
+  view.render(state);
+  view.flush(340);
+  view.flush(620);
+  view.flush(1350);
+  assert.equal(view.node("tap-boss-image").dataset.visible, "true");
+
+  state.phase = "collecting";
+  view.render(state);
+  assert.equal(view.node("tap-farming").dataset.phase, "collecting", "available health cannot override an actual defeat");
+  assert.equal(view.node("tap-farming").dataset.heartEntering, "false");
+  assert.equal(view.node("tap-boss-image").dataset.visible, "false");
+  assert.equal(view.node("tap-boss-image").getAttribute("href"), undefined);
+
+  state.phase = "active";
+  state.levelId = "DicePalaceMain";
+  state.attempt++;
+  view.render(state);
+  assert.equal(view.node("tap-farming").dataset.heartEntering, "true", "a retry repeats the heart entrance");
+  assert.equal(view.node("tap-liquid-level").style.transform, "translateY(258px)");
+  assert.equal(view.timers(340), 1);
+  assert.equal(view.timers(620), 1, "a retry re-arms the portrait reveal");
+  view.flush(340);
+  view.flush(620);
+  view.flush(1350);
+
+  state.sessionId++;
+  view.render(state);
+  assert.equal(view.node("tap-boss-image").dataset.visible, "false", "the same level and attempt in a new session get a fresh portrait reveal");
+  assert.equal(view.timers(300), 1);
+  state.phase = "off";
+  view.render(state);
+  assert.equal(view.node("tap-farming").dataset.phase, "off");
+  assert.equal(view.node("tap-farming").dataset.visible, "false");
+  assert.equal(view.node("tap-farming").dataset.heartEntering, "false");
+  assert.equal(view.node("tap-boss-image").dataset.visible, "false");
+  assert.equal(view.node("tap-boss-image").getAttribute("href"), undefined);
+  for (const delay of [300, 340, 620, 1350]) assert.equal(view.timers(delay), 0);
+});
+
 test("panel retains raw percentage and accessible value above 100% while its bar stays within bounds", () => {
   for (const [ratio, percent, width] of [[1.5, 150, "100%"], [2.5, 250, "100%"], [0.4, 40, "40%"]]) {
     const state = snapshot();
@@ -267,7 +356,7 @@ test("standalone preview and unified OBS preview use original HP as their fixed 
   assert.equal(view.node("tap-health-remaining").textContent, "6,900 PV");
 });
 
-test("arena scope labels only the current arena and never substitutes the global reserve into its percentage", () => {
+test("arena scope identifies the current native denominator and uses the projected effective health", () => {
   const state = snapshot();
   state.levelId = "DicePalaceMain";
   state.counters.reserveHealth = 5000;

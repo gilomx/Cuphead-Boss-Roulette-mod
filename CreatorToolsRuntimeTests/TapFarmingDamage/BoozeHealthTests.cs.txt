@@ -1,0 +1,245 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text.Json;
+using Gilomx.CupheadBossRoulette;
+using HarmonyLib;
+
+internal static partial class Program
+{
+    private static void TestBoozeLocalDamage()
+    {
+        using (var fixture = new BoozeFixture())
+        {
+            Check(fixture.Plugin.harmony.Patches.Count(p => p.Transpiler != null &&
+                p.Original.DeclaringType.Name.StartsWith("DicePalaceBooze")) == 3,
+                "only the three owned Tipsy Troop boss callbacks are registered");
+            Check(Near(fixture.BossHealth, 645d), "Tipsy Troop projects its three real HP pools");
+            foreach (var actor in fixture.Actors)
+            {
+                var info = new DamageDealer.DamageInfo(4f);
+                fixture.PlayerHit(actor, info);
+                Check(BoozeHealth(actor) == 215f && actor.TimelineDamage == 0f && !actor.isDead,
+                    "fully absorbed damage preserves the local HP, timeline and native death guard");
+                Check(info.damage == 4f, "Tipsy Troop leaves the shared DamageInfo immutable");
+            }
+            Check(Near(fixture.Reserve, 988d) && Near(fixture.Spent, 12d),
+                "all three Tipsy Troop actors spend the same route reserve once per hit");
+            var outsider = new DicePalaceBoozeLevelDecanter();
+            outsider.InitProperties(fixture.Properties); outsider.SetHealth(215f);
+            fixture.PlayerHit(outsider, new DamageDealer.DamageInfo(3f));
+            Check(BoozeHealth(outsider) == 212f && Near(fixture.Reserve, 988d),
+                "sharing properties cannot make an unowned actor spend reserve");
+            fixture.NativeHit(fixture.Actors[0], new DamageDealer.DamageInfo(3f));
+            Check(BoozeHealth(fixture.Actors[0]) == 212f && Near(fixture.Reserve, 988d),
+                "native damage outside the player scope remains unchanged");
+            fixture.Actors[0].SetHealth(-1f);
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(3f));
+            Check(Near(fixture.Reserve, 988d) && fixture.Actors[0].isDead,
+                "an exhausted actor cannot spend reserve when native death finally fires");
+            fixture.Actors[0].SetHealth(200f);
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(3f));
+            Check(BoozeHealth(fixture.Actors[0]) == 197f && Near(fixture.Reserve, 988d),
+                "an actor already flagged dead cannot spend reserve even with stale positive HP");
+            fixture.WithProgression(() => fixture.PlayerHit(fixture.Actors[1], new DamageDealer.DamageInfo(2f)));
+            Check(BoozeHealth(fixture.Actors[1]) == 213f && Near(fixture.Reserve, 988d),
+                "native scripted progression cannot consume the player reserve");
+            fixture.Taps.ProcessBackgroundCommand("action=off");
+            fixture.PlayerHit(fixture.Actors[2], new DamageDealer.DamageInfo(3f));
+            Check(BoozeHealth(fixture.Actors[2]) == 212f, "disabled Farmeada preserves native Tipsy Troop damage");
+        }
+        using (var fixture = new BoozeFixture(5))
+        {
+            var info = new DamageDealer.DamageInfo(8f);
+            fixture.PlayerHit(fixture.Actors[0], info);
+            Check(BoozeHealth(fixture.Actors[0]) == 212f && fixture.Actors[0].TimelineDamage == 3f &&
+                Near(fixture.Reserve, 0d) && Near(fixture.Spent, 5d) && info.damage == 8f,
+                "a partial hit spends the remaining shared reserve and applies exactly one native remainder");
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(213f));
+            Check(fixture.Actors[0].isDead && fixture.Actors[0].TimelineDamage == 215f &&
+                Near(fixture.BossHealth, 430d) && Near(fixture.Spent, 5d),
+                "the lethal remainder triggers native death, caps timeline damage and refreshes the aggregate HP");
+            fixture.PlayerHit(fixture.Actors[1], new DamageDealer.DamageInfo(216f));
+            fixture.PlayerHit(fixture.Actors[2], new DamageDealer.DamageInfo(216f));
+            Check(fixture.Actors.All(actor => actor.isDead) && Near(fixture.BossHealth, 0d) && Near(fixture.Spent, 5d),
+                "all three native deaths complete without double-counting reserve removal");
+        }
+        using (var fixture = new BoozeFixture(0))
+        {
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(215f));
+            Check(BoozeHealth(fixture.Actors[0]) == 0f && !fixture.Actors[0].isDead,
+                "native Tipsy Troop death requires negative HP, so exact zero remains alive");
+            fixture.Taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = 5 });
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(3f));
+            Check(BoozeHealth(fixture.Actors[0]) == 0f && !fixture.Actors[0].isDead &&
+                Near(fixture.Reserve, 2d) && Near(fixture.Spent, 3d),
+                "new taps protect a still-living zero-HP actor before its native lethal hit");
+        }
+        using (var fixture = new BoozeFixture(0))
+        {
+            fixture.PlayerHit(fixture.Actors[0], new DamageDealer.DamageInfo(216f));
+            Check(BoozeHealth(fixture.Actors[0]) == -1f && fixture.Actors[0].isDead && Near(fixture.Spent, 0d),
+                "zero reserve preserves the original lethal hit and death trigger");
+        }
+        Console.WriteLine("PASS Tipsy Troop local damage: three actors, shared reserve, exact remainder/timeline, native death, disabled mode and immutable DamageInfo.");
+    }
+
+    private static void TestBoozeNativeHealthAdapter()
+    {
+        foreach (var mode in new[] { global::Level.Mode.Easy, global::Level.Mode.Normal, global::Level.Mode.Hard })
+        using (var fixture = new BoozeFixture(0, mode))
+        {
+            CreatorToolsTapFarmingBoozeHealth adapter;
+            var total = mode == global::Level.Mode.Hard ? 795d : 645d;
+            double current, original;
+            Check(CreatorToolsTapFarmingBoozeHealth.TryCapture(fixture.Level, out adapter) &&
+                ReferenceEquals(adapter.Properties, fixture.Properties) && Near(adapter.OriginalHealth, total) &&
+                adapter.TryRead(out current, out original) && Near(current, total) && Near(original, total),
+                "Tipsy Troop reads the real 645/795 HP totals from its owned native actors");
+            foreach (var actor in fixture.Actors)
+                Check(adapter.ContainsActor(actor) && adapter.OwnsActor(actor), "all three living boss actors are owned");
+            var secondary = new DicePalaceBoozeLevelOlive(); secondary.InitProperties(fixture.Properties);
+            Check(!adapter.ContainsActor(secondary) && !adapter.OwnsActor(secondary),
+                "destructible olives never join the three boss HP pools");
+            fixture.Actors[0].SetHealth(-5f);
+            Check(adapter.ContainsActor(fixture.Actors[0]) && !adapter.OwnsActor(fixture.Actors[0]) &&
+                adapter.TryRead(out current, out original) && Near(current, total * 2d / 3d),
+                "the adapter keeps defeated ownership for postfix observation and clamps negative HP to zero");
+            fixture.Actors[1].SetHealth(float.NaN);
+            Check(!adapter.TryRead(out current, out original), "a non-finite local HP snapshot is rejected");
+            global::Level.Current = new Level { Id = fixture.Level.Id + 1 };
+            Check(!adapter.ContainsActor(fixture.Actors[2]) && !adapter.TryRead(out current, out original),
+                "an adapter from a previous scene cannot attach to a new level");
+        }
+        Console.WriteLine("PASS Tipsy Troop owned-health adapter, native 645/795 totals, defeated/secondary/foreign actor isolation and invalid snapshots.");
+    }
+
+    private static void TestBoozeLocalPatchFailure()
+    {
+        using (var fixture = new BoozeFixture())
+        {
+            var hit = CompileBoozeHit(fixture.Plugin, typeof(DicePalaceBoozeLevelDecanter));
+            var failed = new Plugin();
+            failed.harmony.RejectPatch = method => method.DeclaringType == typeof(DicePalaceBoozeLevelTumbler);
+            failed.InstallDamagePatches();
+            fixture.WithPlayerContext(() => hit.DynamicInvoke(fixture.Actors[0], new DamageDealer.DamageInfo(3f)));
+            Check(BoozeHealth(fixture.Actors[0]) == 212f && Near(fixture.Reserve, 1000d) && failed.Logger.Warnings.Count > 0,
+                "partial Tipsy Troop patch installation keeps every already-installed local getter native");
+        }
+    }
+
+    private static Delegate CompileBoozeHit(Plugin plugin, Type owner)
+    {
+        var patch = plugin.harmony.Patches.Single(p => p.Original.DeclaringType == owner && p.Transpiler != null);
+        var health = AccessTools.Field(typeof(DicePalaceBoozeLevelBossBase), "health");
+        var getter = typeof(DamageDealer.DamageInfo).GetProperty("damage").GetGetMethod();
+        var dynamic = new DynamicMethod("booze_local_hit", typeof(void),
+            new[] { owner, typeof(DamageDealer.DamageInfo) }, typeof(Program).Module, true);
+        var il = dynamic.GetILGenerator();
+        il.DeclareLocal(typeof(float));
+        var input = new List<CodeInstruction> {
+            new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldfld, health), new CodeInstruction(OpCodes.Stloc_0),
+            new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Dup), new CodeInstruction(OpCodes.Ldfld, health),
+            new CodeInstruction(OpCodes.Ldarg_1), new CodeInstruction(OpCodes.Callvirt, getter), new CodeInstruction(OpCodes.Sub),
+            new CodeInstruction(OpCodes.Stfld, health), new CodeInstruction(OpCodes.Ldarg_0), new CodeInstruction(OpCodes.Ldloc_0),
+            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(DicePalaceBoozeLevelBossBase), "CompleteHit")),
+            new CodeInstruction(OpCodes.Ret)
+        };
+        var output = ((IEnumerable<CodeInstruction>)patch.Transpiler.Invoke(null, new object[] { input, patch.Original })).ToList();
+        Check(output.Count(instruction => instruction.operand is MethodInfo method && method.Name == "ReadBoozeLocalDamage") == 1 &&
+            !output.Any(instruction => Equals(instruction.operand, getter)),
+            "one filtered Tipsy Troop getter supplies the original local-HP subtraction and native timeline");
+        foreach (var instruction in output)
+        {
+            foreach (var label in instruction.labels) il.MarkLabel(label);
+            if (instruction.operand is FieldInfo field) il.Emit(instruction.opcode, field);
+            else if (instruction.operand is MethodInfo method) il.Emit(instruction.opcode, method);
+            else il.Emit(instruction.opcode);
+        }
+        return dynamic.CreateDelegate(typeof(Action<,>).MakeGenericType(owner, typeof(DamageDealer.DamageInfo)));
+    }
+
+    private static float BoozeHealth(DicePalaceBoozeLevelBossBase actor)
+    { return (float)AccessTools.Field(typeof(DicePalaceBoozeLevelBossBase), "health").GetValue(actor); }
+
+    private sealed class BoozeFixture : IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "pichi-booze-" + Guid.NewGuid().ToString("N"));
+        private readonly global::Level previousLevel = global::Level.Current;
+        private readonly Plugin previousPlugin = Plugin.activeInstance;
+        private readonly CreatorToolsServer server = new CreatorToolsServer();
+        private readonly PatchRecord player, progression;
+        internal readonly CreatorToolsTapFarmingController Taps;
+        internal readonly LevelProperties.DicePalaceBooze Properties = new LevelProperties.DicePalaceBooze();
+        internal readonly DicePalaceBoozeLevelBossBase[] Actors;
+        internal readonly DicePalaceBoozeLevel Level;
+        internal readonly Plugin Plugin;
+
+        internal BoozeFixture(int reserve = 1000, global::Level.Mode mode = global::Level.Mode.Normal)
+        {
+            Directory.CreateDirectory(directory);
+            Taps = new CreatorToolsTapFarmingController(Path.Combine(directory, "plugin.cfg"), new CreatorToolsLiveEventsCoordinator(), null, null);
+            Taps.ProcessBackgroundCommand("action=activate&tapsPerConversion=1&healthPointsPerConversion=1");
+            var hp = mode == global::Level.Mode.Hard ? 265f : 215f;
+            Properties.CurrentState.decanter.decanterHP = hp;
+            Properties.CurrentState.martini.martiniHP = hp;
+            Properties.CurrentState.tumbler.tumblerHP = hp;
+            Actors = new DicePalaceBoozeLevelBossBase[] {
+                new DicePalaceBoozeLevelDecanter(), new DicePalaceBoozeLevelMartini(), new DicePalaceBoozeLevelTumbler()
+            };
+            foreach (var actor in Actors) { actor.InitProperties(Properties); actor.SetHealth(hp); }
+            Level = new DicePalaceBoozeLevel(Properties, (DicePalaceBoozeLevelDecanter)Actors[0],
+                (DicePalaceBoozeLevelMartini)Actors[1], (DicePalaceBoozeLevelTumbler)Actors[2]) { Id = 191, mode = mode };
+            global::Level.Current = Level;
+            Taps.OnLevelStarted(Level);
+            Taps.Update(server, true);
+            Taps.ObserveStreamEvent(new CreatorToolsStreamEvent { Platform = "tiktok", Type = "like", Count = reserve });
+            Plugin = new Plugin { creatorToolsInteractions = new CreatorToolsInteractionController { Controller = Taps } };
+            global::Gilomx.CupheadBossRoulette.Plugin.activeInstance = Plugin;
+            Plugin.InstallDamagePatches();
+            player = Plugin.harmony.Patches.Single(p => p.Original.DeclaringType == typeof(DamageDealer));
+            progression = Plugin.harmony.Patches.Single(p => p.Original.Name == "DealDamageToNextNamedState" &&
+                p.Original.DeclaringType.GetGenericArguments()[0] == typeof(LevelProperties.DicePalaceBooze.State));
+        }
+        private JsonDocument State() { Taps.PublishState(server); return JsonDocument.Parse(server.State); }
+        internal double Reserve { get { using (var state = State()) return state.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble(); } }
+        internal double Spent { get { using (var state = State()) return state.RootElement.GetProperty("counters").GetProperty("spentHealth").GetDouble(); } }
+        internal double BossHealth { get { using (var state = State()) return state.RootElement.GetProperty("boss").GetProperty("currentHealth").GetDouble(); } }
+        internal void PlayerHit(DicePalaceBoozeLevelBossBase actor, DamageDealer.DamageInfo info)
+        { WithPlayerContext(() => NativeHit(actor, info)); }
+        internal void NativeHit(DicePalaceBoozeLevelBossBase actor, DamageDealer.DamageInfo info)
+        {
+            CompileBoozeHit(Plugin, actor.GetType()).DynamicInvoke(actor, info);
+            var patch = Plugin.harmony.Patches.Single(p => p.Original.DeclaringType == actor.GetType() && p.Transpiler != null);
+            patch.Postfix.Invoke(null, new object[] { actor });
+        }
+        internal void WithPlayerContext(Action action)
+        {
+            var args = new object[] { new UnityEngine.GameObject(), PlayerId.PlayerOne, false };
+            player.Prefix.Invoke(null, args);
+            var state = new object[] { args[2] };
+            try { action(); player.Postfix.Invoke(null, state); }
+            finally { player.Finalizer.Invoke(null, new object[] { null, state[0] }); }
+        }
+        internal void WithProgression(Action action)
+        {
+            var args = new object[] { false };
+            progression.Prefix.Invoke(null, args);
+            var state = new object[] { Properties, args[0] };
+            try { action(); progression.Postfix.Invoke(null, state); }
+            finally { progression.Finalizer.Invoke(null, new object[] { null, state[1] }); }
+        }
+        public void Dispose()
+        {
+            Taps.ProcessBackgroundCommand("action=off");
+            global::Level.Current = previousLevel;
+            global::Gilomx.CupheadBossRoulette.Plugin.activeInstance = previousPlugin;
+            Check(Path.GetFullPath(directory).StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase),
+                "temporary Tipsy Troop test files must remain under Temp");
+            Directory.Delete(directory, true);
+        }
+    }
+}

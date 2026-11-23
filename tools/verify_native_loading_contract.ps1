@@ -393,6 +393,65 @@ try {
     }).Count -eq 1) 'Plane chat result must derive its internal equipment from the player loadout'
     Require (@(Calls $chatProjection $plugin.FullName 'RandomNonEmptyPoolIndex').Count -eq 0) 'Plane result must never invent a random ground weapon'
     Write-Output 'Compiled focus and plane contract passed: focus delay guards opening/Play and both players preserve weapons, super and switch flags.'
+
+    # A chat-selected loadout uses the same native/broadcast HUD session as
+    # roulette. A map return or another boss must retire both displays even
+    # when no explicit SceneLoader.LoadLastMap callback was observed.
+    $hudUpdate = $plugin.Methods | Where-Object Name -eq 'UpdateBattleResultHud'
+    $hudShouldEnd = $plugin.Methods | Where-Object Name -eq 'ShouldEndBattleResultHudSession'
+    $hudMatches = $plugin.Methods | Where-Object Name -eq 'BattleHudMatchesLevel'
+    $hudShouldShow = $plugin.Methods | Where-Object Name -eq 'ShouldShowBattleResultHud'
+    $hudEnd = $plugin.Methods | Where-Object Name -eq 'EndBattleResultHudSession'
+    $broadcastEnd = $plugin.Methods | Where-Object Name -eq 'EndCreatorToolsBattleSession'
+    Require ($null -ne $hudShouldEnd -and $null -ne $hudMatches) 'Battle HUD must detect a returned map or a battle outside its owned result.'
+    $hudEndCheck = @(Calls $hudUpdate $plugin.FullName 'ShouldEndBattleResultHudSession')
+    $hudEndCall = @(Calls $hudUpdate $plugin.FullName 'EndBattleResultHudSession')
+    $hudShowCheck = @(Calls $hudUpdate $plugin.FullName 'ShouldShowBattleResultHud')
+    $restartRead = @($hudUpdate.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'battleHudExplicitRestartRequested'
+    })
+    Require ($hudEndCheck.Count -eq 1 -and $hudEndCall.Count -eq 1 -and $hudShowCheck.Count -eq 1 -and
+        $restartRead.Count -ge 1 -and $hudEndCheck[0].Offset -lt $hudEndCall[0].Offset -and
+        $hudEndCall[0].Offset -lt $restartRead[0].Offset -and $hudEndCall[0].Offset -lt $hudShowCheck[0].Offset) 'Definitive HUD session cleanup must precede retry and visibility gates.'
+    $hudLoading = @(Calls $hudShouldEnd 'SceneLoader' 'get_CurrentlyLoading')
+    $hudCurrentLevel = @(Calls $hudShouldEnd 'Level' 'get_Current')
+    $hudActiveRead = @($hudShouldEnd.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'battleHudPresentationActive'
+    })
+    Require ($hudActiveRead.Count -eq 1 -and $hudLoading.Count -eq 1 -and $hudCurrentLevel.Count -eq 1 -and
+        $hudActiveRead[0].Offset -lt $hudLoading[0].Offset -and $hudLoading[0].Offset -lt $hudCurrentLevel[0].Offset -and
+        @(Calls $hudShouldEnd 'Map' 'get_Current').Count -eq 1 -and
+        @(Calls $hudShouldEnd 'Level' 'get_LevelType').Count -eq 1 -and
+        @(Calls $hudShouldEnd $plugin.FullName 'BattleHudMatchesLevel').Count -eq 1) 'HUD lifetime must account for activity, covered loading, the current map and current battle ownership.'
+    Require (@(Calls $hudShouldShow $plugin.FullName 'BattleHudMatchesLevel').Count -eq 1 -and
+        @($hudMatches.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'battleHudResultSnapshot'
+        }).Count -ge 1 -and
+        @(Calls $hudMatches 'Level' 'get_CurrentLevel').Count -ge 1 -and
+        @(Calls $hudMatches $plugin.FullName 'IsDicePalaceLevel').Count -eq 1 -and
+        @($hudMatches.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'result'
+        }).Count -eq 0) 'HUD visibility must use the owned battle snapshot while retaining the Dice Palace chain.'
+    foreach ($field in @('battleHudPresentationActive','battleHudFollowNativeVictoryLayer',
+        'battleHudHoldOverlayThroughVictory','battleHudExplicitRestartRequested')) {
+        Require (@($hudEnd.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq $field -and
+            $_.Previous.OpCode.Code -eq 'Ldc_I4_0'
+        }).Count -eq 1) "Ending the HUD session must clear $field."
+    }
+    Require (@($hudEnd.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'battleHudResultSnapshot' -and
+        $_.Previous.OpCode.Code -eq 'Ldnull'
+    }).Count -eq 1 -and @(Calls $hudEnd $plugin.FullName 'EndCreatorToolsBattleSession').Count -eq 1) 'Ending the native HUD must discard the old result and close the same broadcast session.'
+    foreach ($field in @('creatorToolsBattleSessionActive','creatorToolsBattleCompleted','creatorToolsBattleVisible')) {
+        Require (@($broadcastEnd.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq $field -and
+            $_.Previous.OpCode.Code -eq 'Ldc_I4_0'
+        }).Count -eq 1) "Ending the broadcast session must clear $field."
+    }
+    Require (@(Calls $broadcastEnd $plugin.FullName 'PublishCreatorToolsState').Count -eq 1) 'Definitive HUD cleanup must publish its empty broadcast state.'
+    Write-Output 'Compiled battle HUD lifetime contract passed: map/foreign-boss cleanup precedes retry, shared native/broadcast shutdown, snapshot ownership and Dice Palace continuity.'
+
     $preload = $plugin.Methods | Where-Object Name -eq 'CanPreloadNativeInteractionAssets'
     Require (@(Calls $preload 'SceneLoader' 'get_CurrentlyLoading').Count -eq 1) 'Native catalog must require a loading screen'
     Require (@($preload.Body.Instructions | Where-Object {

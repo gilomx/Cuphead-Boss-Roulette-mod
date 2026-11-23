@@ -55,6 +55,7 @@ namespace Gilomx.CupheadBossRoulette
         private int dicePalaceTransitionLevelInstanceId = -1;
         private bool dicePalaceAttemptActive;
         private bool dicePalaceMainActive;
+        private int dicePalaceLastMiniWinInstanceId = -1;
         private int dicePalaceCompletedSegments;
         private float dicePalaceCurrentSegmentProgress;
         private bool gameplayAvailable;
@@ -87,6 +88,8 @@ namespace Gilomx.CupheadBossRoulette
         // into it; worker projections use the copied primitive fields above.
         private object bossPropertiesMainThread;
         private CreatorToolsTapFarmingRobotHealth robotHealthMainThread;
+        private CreatorToolsTapFarmingTrainHealth trainHealthMainThread;
+        private CreatorToolsTapFarmingBoozeHealth boozeHealthMainThread;
         private int[] nativeStatePhasesMainThread;
         private float nextBossSnapshotAtMainThread;
 
@@ -412,9 +415,13 @@ namespace Gilomx.CupheadBossRoulette
                     return;
 
                 StopBattleNoticeLocked();
-                var continuesDicePalace = dicePalaceTransition &&
-                    logicalLevel == "DicePalace";
                 var isDicePalace = logicalLevel == "DicePalace";
+                var continuesDicePalace = isDicePalace && dicePalaceAttemptActive &&
+                    (phase == "active" || phase == "transition") &&
+                    ((levelId == "DicePalaceMain" && !dicePalaceMainActive &&
+                        !isDicePalaceMain) ||
+                     (dicePalaceLastMiniWinInstanceId == activeLevelInstanceId &&
+                        isDicePalaceMain));
                 activeLevelInstanceId = levelInstanceId;
                 levelId = currentLevel.ToString();
                 bossName = levelId;
@@ -425,35 +432,60 @@ namespace Gilomx.CupheadBossRoulette
                         attempt = 1;
                     spentHealthAtAttemptStart = spentHealth;
                     dicePalaceAttemptActive = isDicePalace;
-                    dicePalaceMainActive = isDicePalaceMain;
+                    dicePalaceMainActive = false;
+                    dicePalaceLastMiniWinInstanceId = -1;
                     dicePalaceCompletedSegments = 0;
                     dicePalaceCurrentSegmentProgress = 0f;
                 }
                 else
                 {
                     dicePalaceAttemptActive = true;
-                    dicePalaceMainActive = isDicePalaceMain;
-                    if (isDicePalaceMain ||
+                    dicePalaceMainActive = false;
+                    if (!isDicePalaceMain &&
                         dicePalaceCompletedSegments <
                             DicePalaceProgressSegmentCount - 1)
                         dicePalaceCurrentSegmentProgress = 0f;
                 }
                 dicePalaceTransition = false;
                 dicePalaceTransitionLevelInstanceId = -1;
-                phase = "active";
+                phase = isDicePalaceMain ? "transition" : "active";
                 battleNoticeClosed = false;
                 if (!continuesDicePalace) phaseReserve.Clear();
                 if (dicePalaceAttemptActive)
                     SetDicePalaceProjectionLocked(
-                        dicePalaceCurrentSegmentProgress, true);
+                        dicePalaceCurrentSegmentProgress, !isDicePalaceMain,
+                        continuesDicePalace && isDicePalaceMain);
                 else
                     ClearBossProjectionLocked(false);
                 SetFeedbackLocked("tap_farming_battle_started", false);
             }
             bossPropertiesMainThread = null;
             robotHealthMainThread = null;
+            trainHealthMainThread = null;
+            boozeHealthMainThread = null;
             nativeStatePhasesMainThread = null;
-            TryBindLevelPropertiesMainThread(level);
+            if (!isDicePalaceMain) TryBindLevelPropertiesMainThread(level);
+            nextBossSnapshotAtMainThread = 0f;
+        }
+
+        // Main is also the dice board. Native Started/properties exist there,
+        // but IsBattling changes only when the final card fight actually starts.
+        internal void ObserveDicePalaceMainState(int levelInstanceId, bool battling)
+        {
+            lock (stateLock)
+            {
+                if (!battling || !dicePalaceAttemptActive || dicePalaceMainActive ||
+                    levelId != "DicePalaceMain" ||
+                    !MatchesActiveLevelLocked(levelInstanceId) ||
+                    (phase != "active" && phase != "transition")) return;
+                dicePalaceMainActive = true;
+                dicePalaceCompletedSegments = DicePalaceProgressSegmentCount - 1;
+                dicePalaceCurrentSegmentProgress = 0f;
+                phase = "active";
+                battleNoticeClosed = false;
+                SetDicePalaceProjectionLocked(0f, true);
+            }
+            TryBindLevelPropertiesMainThread(Level.Current);
             nextBossSnapshotAtMainThread = 0f;
         }
 
@@ -472,6 +504,7 @@ namespace Gilomx.CupheadBossRoulette
                 dicePalaceTransition = false;
                 dicePalaceTransitionLevelInstanceId = -1;
                 dicePalaceMainActive = false;
+                dicePalaceLastMiniWinInstanceId = -1;
                 if (dicePalaceAttemptActive)
                 {
                     dicePalaceCompletedSegments = 0;
@@ -485,6 +518,8 @@ namespace Gilomx.CupheadBossRoulette
             }
             bossPropertiesMainThread = null;
             robotHealthMainThread = null;
+            trainHealthMainThread = null;
+            boozeHealthMainThread = null;
             nativeStatePhasesMainThread = null;
         }
 
@@ -509,6 +544,8 @@ namespace Gilomx.CupheadBossRoulette
                 if (LogicalLevel(level.CurrentLevel) == "DicePalace" &&
                     currentLevel != "DicePalaceMain")
                 {
+                    if (dicePalaceLastMiniWinInstanceId == instanceId) return;
+                    dicePalaceLastMiniWinInstanceId = instanceId;
                     dicePalaceAttemptActive = true;
                     dicePalaceMainActive = false;
                     var advancedSegment =
@@ -524,7 +561,7 @@ namespace Gilomx.CupheadBossRoulette
                     phase = "transition";
                     SetDicePalaceProjectionLocked(
                         dicePalaceCurrentSegmentProgress,
-                        !advancedSegment);
+                        !advancedSegment, true);
                     SetFeedbackLocked(
                         "tap_farming_waiting_for_boss", false);
                     return;
@@ -549,6 +586,8 @@ namespace Gilomx.CupheadBossRoulette
             }
             bossPropertiesMainThread = null;
             robotHealthMainThread = null;
+            trainHealthMainThread = null;
+            boozeHealthMainThread = null;
             nativeStatePhasesMainThread = null;
         }
 
@@ -562,22 +601,30 @@ namespace Gilomx.CupheadBossRoulette
                     return;
                 StopBattleNoticeLocked();
                 battleNoticeClosed = true;
-                phase = "collecting";
-                activeLevelInstanceId = -1;
-                if (dicePalaceTransition &&
-                    dicePalaceAttemptActive)
+                if (dicePalaceAttemptActive)
+                {
+                    dicePalaceTransition = true;
+                    dicePalaceTransitionLevelInstanceId = instanceId;
+                    phase = "transition";
                     SetDicePalaceProjectionLocked(
                         dicePalaceCurrentSegmentProgress,
                         dicePalaceCompletedSegments >=
                             DicePalaceProgressSegmentCount - 1 &&
-                        dicePalaceCurrentSegmentProgress > 0f);
+                        dicePalaceCurrentSegmentProgress > 0f, true);
+                }
                 else
+                {
+                    phase = "collecting";
+                    activeLevelInstanceId = -1;
                     ClearBossProjectionLocked(false);
+                }
                 SetFeedbackLocked(
                     "tap_farming_waiting_for_boss", false);
             }
             bossPropertiesMainThread = null;
             robotHealthMainThread = null;
+            trainHealthMainThread = null;
+            boozeHealthMainThread = null;
             nativeStatePhasesMainThread = null;
         }
 
@@ -587,11 +634,18 @@ namespace Gilomx.CupheadBossRoulette
             {
                 StopBattleNoticeLocked();
                 battleNoticeClosed = true;
-                if (phase != "completed")
+                if (phase != "completed" && !dicePalaceAttemptActive)
                     return;
                 // Likes received during the results screen are already banked
                 // for the next boss. Entering the map must not clear them again.
                 ClearBossProjectionLocked(true);
+                dicePalaceAttemptActive = false;
+                dicePalaceMainActive = false;
+                dicePalaceLastMiniWinInstanceId = -1;
+                dicePalaceTransition = false;
+                dicePalaceTransitionLevelInstanceId = -1;
+                activeLevelInstanceId = -1;
+                phaseReserve.Clear();
                 phase = "collecting";
                 SetFeedbackLocked(
                     "tap_farming_waiting_for_boss", false);
@@ -621,6 +675,11 @@ namespace Gilomx.CupheadBossRoulette
             if (properties == null || damage <= 0f ||
                 float.IsNaN(damage) || float.IsInfinity(damage))
                 return true;
+            lock (stateLock)
+                if (dicePalaceAttemptActive &&
+                    ((levelId == "DicePalaceMain" && !dicePalaceMainActive) ||
+                     (dicePalaceTransition && activeLevelInstanceId ==
+                        dicePalaceTransitionLevelInstanceId))) return true;
             if (robotHealthMainThread != null &&
                 !ReferenceEquals(properties, robotHealthMainThread.Properties))
                 return true;
@@ -639,9 +698,6 @@ namespace Gilomx.CupheadBossRoulette
             {
                 if (phase != "active" && phase != "transition")
                     return true;
-                if (dicePalaceAttemptActive && !dicePalaceMainActive &&
-                    dicePalaceCompletedSegments >= DicePalaceProgressSegmentCount - 1)
-                    return true;
                 if (phase == "transition")
                 {
                     phase = "active";
@@ -651,8 +707,9 @@ namespace Gilomx.CupheadBossRoulette
 
                 // If metadata is unavailable, preserve native damage instead
                 // of spending a future phase's protected reserve.
-                var absorbed = phaseReserve.IsInitialized
-                    ? phaseReserve.Absorb(damage) : 0d;
+                var absorbed = dicePalaceAttemptActive
+                    ? Math.Min(reserveHealth, damage)
+                    : phaseReserve.IsInitialized ? phaseReserve.Absorb(damage) : 0d;
                 if (absorbed > 0d)
                 {
                     reserveHealth = Math.Max(0d,
@@ -665,6 +722,43 @@ namespace Gilomx.CupheadBossRoulette
                 }
                 return damage > 0.00001f;
             }
+        }
+
+        internal bool PrepareTrainDamage(object actor, ref float damage)
+        {
+            lock (stateLock)
+                if (phase != "active" && phase != "transition") return true;
+            if (trainHealthMainThread == null)
+                TryBindLevelPropertiesMainThread(Level.Current);
+            var train = trainHealthMainThread;
+            if (train == null || !train.OwnsActor(actor)) return true;
+            return PrepareBossDamage(train.Properties, ref damage);
+        }
+
+        internal bool PrepareBoozeDamage(object actor, ref float damage)
+        {
+            lock (stateLock)
+                if (phase != "active" && phase != "transition") return true;
+            if (boozeHealthMainThread == null)
+                TryBindLevelPropertiesMainThread(Level.Current);
+            var booze = boozeHealthMainThread;
+            if (booze == null || !booze.OwnsActor(actor)) return true;
+            return PrepareBossDamage(booze.Properties, ref damage);
+        }
+
+        internal void ObserveBoozeDamage(object actor)
+        {
+            var booze = boozeHealthMainThread;
+            if (booze == null || !booze.ContainsActor(actor)) return;
+            nextBossSnapshotAtMainThread = 0f;
+            ObserveBossDamage(booze.Properties);
+        }
+
+        internal void ObserveTrainDamage(object actor)
+        {
+            var train = trainHealthMainThread;
+            if (train == null || !train.OwnsActor(actor)) return;
+            ObserveBossDamage(train.Properties);
         }
 
         internal void ObserveBossDamage(object properties)
@@ -814,6 +908,8 @@ namespace Gilomx.CupheadBossRoulette
             {
                 bossPropertiesMainThread = null;
                 robotHealthMainThread = null;
+                trainHealthMainThread = null;
+                boozeHealthMainThread = null;
                 nativeStatePhasesMainThread = null;
                 nextBossSnapshotAtMainThread = 0f;
                 if (ReferenceEquals(liveEventLease, lease) &&
@@ -836,6 +932,12 @@ namespace Gilomx.CupheadBossRoulette
 
         private void RefreshBossSnapshotMainThread()
         {
+            lock (stateLock)
+                if ((phase != "active" && phase != "transition") ||
+                    (dicePalaceAttemptActive && levelId == "DicePalaceMain" &&
+                        !dicePalaceMainActive) ||
+                    (dicePalaceTransition && activeLevelInstanceId ==
+                        dicePalaceTransitionLevelInstanceId)) return;
             var properties = bossPropertiesMainThread;
             if (properties == null)
             {
@@ -857,6 +959,21 @@ namespace Gilomx.CupheadBossRoulette
                         Level.Current, properties, out robot)) return;
                 robotHealthMainThread = robot;
             }
+            if (trainHealthMainThread == null && levelId == "Train")
+            {
+                CreatorToolsTapFarmingTrainHealth train;
+                if (!CreatorToolsTapFarmingTrainHealth.TryCapture(
+                        Level.Current, properties, out train)) return;
+                trainHealthMainThread = train;
+            }
+            if (boozeHealthMainThread == null && levelId == "DicePalaceBooze")
+            {
+                CreatorToolsTapFarmingBoozeHealth booze;
+                if (!CreatorToolsTapFarmingBoozeHealth.TryCapture(
+                        Level.Current, out booze)) return;
+                boozeHealthMainThread = booze;
+                properties = bossPropertiesMainThread = booze.Properties;
+            }
             BossProgressSnapshot snapshot;
             if (!BossProgressReader.TryRead(properties, out snapshot))
                 return;
@@ -868,8 +985,24 @@ namespace Gilomx.CupheadBossRoulette
                 if (!robotHealthMainThread.TryRead(out robotPhase,
                         out nativeCurrent, out phaseCurrent))
                     return;
-                snapshot = BuildRobotSnapshot(robotHealthMainThread,
+                snapshot = BuildLocalHealthSnapshot(robotHealthMainThread.OriginalHealth,
                     robotPhase, nativeCurrent, phaseCurrent);
+            }
+            else if (trainHealthMainThread != null)
+            {
+                int trainPhase;
+                double nativeCurrent;
+                double phaseCurrent;
+                if (!trainHealthMainThread.TryRead(out trainPhase,
+                        out nativeCurrent, out phaseCurrent)) return;
+                snapshot = BuildLocalHealthSnapshot(trainHealthMainThread.OriginalHealth,
+                    trainPhase, nativeCurrent, phaseCurrent);
+            }
+            else if (boozeHealthMainThread != null)
+            {
+                double current, total;
+                if (!boozeHealthMainThread.TryRead(out current, out total)) return;
+                snapshot = BuildLocalHealthSnapshot(new[] { total }, 1, current, current);
             }
             nativeStatePhasesMainThread = snapshot.StatePhases;
             lock (stateLock)
@@ -884,6 +1017,21 @@ namespace Gilomx.CupheadBossRoulette
 
         private void TryBindLevelPropertiesMainThread(Level level)
         {
+            if (level == null) return;
+            CreatorToolsTapFarmingBoozeHealth booze;
+            if (CreatorToolsTapFarmingBoozeHealth.TryCapture(level, out booze))
+            {
+                boozeHealthMainThread = booze;
+                bossPropertiesMainThread = booze.Properties;
+                return;
+            }
+            CreatorToolsTapFarmingTrainHealth train;
+            if (CreatorToolsTapFarmingTrainHealth.TryCapture(level, null, out train))
+            {
+                trainHealthMainThread = train;
+                bossPropertiesMainThread = train.Properties;
+                return;
+            }
             CreatorToolsTapFarmingRobotHealth robot;
             if (CreatorToolsTapFarmingRobotHealth.TryCapture(level, null,
                     out robot))
@@ -919,9 +1067,6 @@ namespace Gilomx.CupheadBossRoulette
             lock (stateLock)
                 if (dicePalaceAttemptActive)
                 {
-                    if (!phaseReserve.IsInitialized) return false;
-                    advanced = phaseReserve.AdvanceTo(dicePalaceMainActive ? 3 :
-                        Math.Min(3, dicePalaceCompletedSegments));
                     return true;
                 }
             int currentPhase;
@@ -930,6 +1075,13 @@ namespace Gilomx.CupheadBossRoulette
                 double current;
                 double phaseCurrent;
                 if (!robotHealthMainThread.TryRead(out currentPhase,
+                        out current, out phaseCurrent)) return false;
+            }
+            else if (trainHealthMainThread != null)
+            {
+                double current;
+                double phaseCurrent;
+                if (!trainHealthMainThread.TryRead(out currentPhase,
                         out current, out phaseCurrent)) return false;
             }
             else if (!BossProgressReader.TryReadPhaseIndex(properties,
@@ -948,14 +1100,8 @@ namespace Gilomx.CupheadBossRoulette
         {
             if (dicePalaceAttemptActive)
             {
-                // The route is chosen during play. Four equal budgets guard
-                // the three setup fights and Main without guessing future HP.
-                var index = dicePalaceMainActive ? 3 :
-                    Math.Min(3, dicePalaceCompletedSegments);
-                if (!phaseReserve.IsInitialized)
-                    phaseReserve.BeginAttempt(new double[] { 1, 1, 1, 1 },
-                        reserveHealth, index);
-                else phaseReserve.AdvanceTo(index);
+                // The route is chosen during play. All arenas draw from the
+                // same reserve; progress segments never protect future taps.
                 return;
             }
             if (!phaseReserve.IsInitialized)
@@ -965,11 +1111,10 @@ namespace Gilomx.CupheadBossRoulette
                 phaseReserve.AdvanceTo(snapshot.PhaseIndex - 1);
         }
 
-        private static BossProgressSnapshot BuildRobotSnapshot(
-            CreatorToolsTapFarmingRobotHealth robot, int index,
+        private static BossProgressSnapshot BuildLocalHealthSnapshot(
+            double[] weights, int index,
             double current, double phaseCurrent)
         {
-            var weights = robot.OriginalHealth;
             var total = 0d;
             for (var i = 0; i < weights.Length; i++) total += weights[i];
             var phaseTotal = weights[index - 1];
@@ -995,8 +1140,7 @@ namespace Gilomx.CupheadBossRoulette
             if (!levelAvailable)
                 return;
             lock (stateLock)
-                if (phase != "collecting")
-                    return;
+                if (phase != "collecting" && !dicePalaceAttemptActive) return;
             try
             {
                 var level = Level.Current;
@@ -1091,15 +1235,18 @@ namespace Gilomx.CupheadBossRoulette
         }
 
         private void SetDicePalaceProjectionLocked(
-            float progress, bool activeSegment)
+            float progress, bool activeSegment, bool preserveHealth = false)
         {
             progress = Mathf.Clamp01(progress);
             dicePalaceCurrentSegmentProgress = progress;
             var completed = Math.Max(0, Math.Min(
                 DicePalaceProgressSegmentCount - 1,
                 dicePalaceCompletedSegments));
-            bossCurrentHealth = 0f;
-            bossTotalHealth = 0f;
+            if (!preserveHealth)
+            {
+                bossCurrentHealth = 0f;
+                bossTotalHealth = 0f;
+            }
             currentPhaseProgress = progress;
             overallProgress = Mathf.Clamp01(
                 (completed + progress) /
@@ -1123,7 +1270,9 @@ namespace Gilomx.CupheadBossRoulette
             for (var i = 0; i < phases.Length; i++)
             {
                 var isComplete = i < completed;
-                var isActive = activeSegment && i == completed;
+                var isActive = activeSegment && i == completed &&
+                    (dicePalaceMainActive ||
+                     completed < DicePalaceProgressSegmentCount - 1);
                 phases[i] = new PhaseProgress(
                     i + 1,
                     isComplete ? "complete" :
@@ -1174,9 +1323,7 @@ namespace Gilomx.CupheadBossRoulette
             var effectiveHealth =
                 CreatorToolsTapFarmingEffectiveHealth.Calculate(
                     phase, bossCurrentHealth, bossTotalHealth,
-                    dicePalaceAttemptActive ?
-                        ((!dicePalaceMainActive && dicePalaceCompletedSegments >= 3)
-                            ? 0d : phaseReserve.CurrentRemaining) : reserveHealth,
+                    reserveHealth,
                     spentDuringAttempt);
 
             var builder = new StringBuilder(3072);
@@ -1296,6 +1443,7 @@ namespace Gilomx.CupheadBossRoulette
             dicePalaceTransitionLevelInstanceId = -1;
             dicePalaceAttemptActive = false;
             dicePalaceMainActive = false;
+            dicePalaceLastMiniWinInstanceId = -1;
             dicePalaceCompletedSegments = 0;
             dicePalaceCurrentSegmentProgress = 0f;
             levelId = string.Empty;

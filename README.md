@@ -479,13 +479,22 @@ incluso durante los resultados, y no se borran al volver al mapa.
 
 El robot incluye los PV locales de las tres piezas y el corazón, además de
 sus fases posteriores. Los avances internos de fase no gastan reserva.
-Otros jefes con PV locales (por ejemplo, componentes de Train o Veggies)
+El tren incluye la vida local del espectro, el esqueleto, ambos gemelos y el
+motor. Sus golpes consumen la reserva de la fase actual y el daño restante se
+aplica por igual a su vida nativa y a la línea de progreso del juego. En Simple
+termina con los gemelos y reparte la reserva entre tres fases; Normal y Experto
+incluyen el motor como cuarta fase. La victoria registra los PV de reserva
+consumidos durante esa pelea.
+Otros jefes con PV locales (por ejemplo, componentes de Veggies)
 requieren un puente específico antes de poder alargar esos componentes;
 sus eventos nativos siguen pasando sin gastar la reserva a posteriori.
-En Dice Palace, la ruta futura es variable: se protegen cuatro presupuestos
-iguales para tres combates y Main; combates adicionales no gastan el de Main.
-El porcentaje indica la **arena actual**, con su vida original y su presupuesto,
-en lugar de atribuir una vida total inventada a toda la ruta.
+En Dice Palace, todos los minijefes y el combate final consumen una sola reserva
+compartida desde el primer golpe, sin apartar taps para Dado. El trío de bebidas
+incluye la vida local de sus tres integrantes. El tablero conserva el corazón,
+el último porcentaje disponible y el mismo intento durante las tiradas; sólo
+activa el combate final cuando Dado comienza a pelear. El porcentaje usa la vida
+original de la **arena actual** más toda la reserva restante, porque la ruta
+futura se elige durante la partida y no tiene una vida total nativa conocida.
 
 En el panel de **Farmeando taps**, **Prueba de taps** permite activar y detener
 un envío continuo a la reserva real: por defecto, 10 taps cada segundo. Cantidad
