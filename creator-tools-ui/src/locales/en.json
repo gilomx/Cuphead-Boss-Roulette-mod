@@ -358,6 +358,9 @@
         "collected": "The community has collected {value} health points for the next boss.",
         "healthPointsShort": "HP",
         "currentArenaHealth": "Current arena health",
+        "globalProgress": "Overall progress",
+        "estimatedGlobalProgress": "Estimated overall progress",
+        "reservePoints": "RESERVE: {value} HP",
         "reserveEquivalent": "The current reserve equals {value}× this boss's full health.",
         "reservePercent": "The current reserve equals {value} of this boss's full health.",
         "converted": "The community has converted {value} health points."

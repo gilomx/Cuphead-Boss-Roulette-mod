@@ -217,8 +217,14 @@ compiled mod to validate the owned actors, damage branches and difficulty HP.
 
 Dice Palace integration checks keep one attempt and one shared reserve through
 the board and every miniboss, distinguish the final fight's native `IsBattling`
-flag, and retain the heart's last valid health projection during dice rolls.
+flag, and retain the heart's global progress during dice rolls.
 Defeat, pause retries and returning to the map terminate that continuity.
+Its global progress tests follow the estimated route from 0% through 25/50/75%
+milestones, extra minibosses capped at 75%, and the final fight activated in the
+same Main level instance. New taps change the shared reserve in HP separately;
+absorbed hits leave native progress unchanged. The tests reserve 100% for an
+actual victory, preserve that result while new taps arrive, and reset progress
+on defeat, retries and map entry without losing the next reserve.
 The damage harness also executes the three Tipsy Troop local-health callbacks,
 including shared-reserve accounting, native timeline damage, secondary actors
 and difficulty totals. Deployment verifies these native and compiled contracts

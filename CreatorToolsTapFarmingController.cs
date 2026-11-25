@@ -54,6 +54,7 @@ namespace Gilomx.CupheadBossRoulette
         private bool dicePalaceTransition;
         private int dicePalaceTransitionLevelInstanceId = -1;
         private bool dicePalaceAttemptActive;
+        private bool completedDicePalaceRound;
         private bool dicePalaceMainActive;
         private int dicePalaceLastMiniWinInstanceId = -1;
         private int dicePalaceCompletedSegments;
@@ -415,6 +416,7 @@ namespace Gilomx.CupheadBossRoulette
                     return;
 
                 StopBattleNoticeLocked();
+                completedDicePalaceRound = false;
                 var isDicePalace = logicalLevel == "DicePalace";
                 var continuesDicePalace = isDicePalace && dicePalaceAttemptActive &&
                     (phase == "active" || phase == "transition") &&
@@ -572,7 +574,9 @@ namespace Gilomx.CupheadBossRoulette
                 var roundTaps = totalTaps;
                 var roundSpent = spentHealth;
                 var roundAttempts = attempt;
+                var wasDicePalace = dicePalaceAttemptActive;
                 ResetSessionCountersLocked();
+                completedDicePalaceRound = wasDicePalace;
                 completedRoundTaps = roundTaps;
                 completedRoundSpentHealth = roundSpent;
                 completedRoundAttempts = roundAttempts;
@@ -639,6 +643,7 @@ namespace Gilomx.CupheadBossRoulette
                 // Likes received during the results screen are already banked
                 // for the next boss. Entering the map must not clear them again.
                 ClearBossProjectionLocked(true);
+                completedDicePalaceRound = false;
                 dicePalaceAttemptActive = false;
                 dicePalaceMainActive = false;
                 dicePalaceLastMiniWinInstanceId = -1;
@@ -1325,6 +1330,14 @@ namespace Gilomx.CupheadBossRoulette
                     phase, bossCurrentHealth, bossTotalHealth,
                     reserveHealth,
                     spentDuringAttempt);
+            // Dice's future route has no fixed native HP total. Expose its
+            // estimated encounter progress separately from actual arena HP
+            // and the single, real reserve measured in health points.
+            var encounterProgress = dicePalaceAttemptActive || completedDicePalaceRound;
+            var progressAvailable = encounterProgress &&
+                (phase == "active" || phase == "transition" || phase == "completed");
+            var battleProgressRatio = !progressAvailable ? 0d : phase == "completed"
+                ? 1d : Math.Min(0.99d, Mathf.Clamp01(overallProgress));
 
             var builder = new StringBuilder(3072);
             builder.Append("{\"ready\":true,\"schemaVersion\":")
@@ -1382,6 +1395,14 @@ namespace Gilomx.CupheadBossRoulette
                 .Append(",\"scope\":\"")
                 .Append(dicePalaceAttemptActive ? "arena" : "boss")
                 .Append('"')
+                .Append("},\"battleProgress\":{\"scope\":\"")
+                .Append(encounterProgress ? "encounter" : "boss")
+                .Append("\",\"available\":")
+                .Append(progressAvailable ? "true" : "false")
+                .Append(",\"ratio\":")
+                .Append(FormatNumber(battleProgressRatio, "0.####"))
+                .Append(",\"estimated\":")
+                .Append(encounterProgress ? "true" : "false")
                 .Append("},\"phaseIndex\":").Append(phaseIndex)
                 .Append(",\"phaseCount\":").Append(phaseCount)
                 .Append(",\"overallProgress\":")
@@ -1442,6 +1463,7 @@ namespace Gilomx.CupheadBossRoulette
             dicePalaceTransition = false;
             dicePalaceTransitionLevelInstanceId = -1;
             dicePalaceAttemptActive = false;
+            completedDicePalaceRound = false;
             dicePalaceMainActive = false;
             dicePalaceLastMiniWinInstanceId = -1;
             dicePalaceCompletedSegments = 0;

@@ -491,10 +491,15 @@ sus eventos nativos siguen pasando sin gastar la reserva a posteriori.
 En Dice Palace, todos los minijefes y el combate final consumen una sola reserva
 compartida desde el primer golpe, sin apartar taps para Dado. El trío de bebidas
 incluye la vida local de sus tres integrantes. El tablero conserva el corazón,
-el último porcentaje disponible y el mismo intento durante las tiradas; sólo
-activa el combate final cuando Dado comienza a pelear. El porcentaje usa la vida
-original de la **arena actual** más toda la reserva restante, porque la ruta
-futura se elige durante la partida y no tiene una vida total nativa conocida.
+el porcentaje global y el mismo intento durante las tiradas; sólo activa el
+combate final cuando Dado comienza a pelear. En Dado el corazón muestra
+**avance global estimado**, de 0% a 100%, y presenta aparte la **reserva en PV**
+reales que comparten todos los combates. Los taps no se convierten en porcentaje
+de avance. La estimación considera tres tramos previos y el combate final:
+25%, 50%, 75% y victoria al 100%. Si la ruta añade minijefes, el avance conserva
+75% hasta empezar la pelea final. Se reinicia al reintentar la batalla completa.
+La ruta futura se elige durante la partida y no tiene una vida total nativa
+conocida; la estimación no representa una suma de los PV de toda la ruta.
 
 En el panel de **Farmeando taps**, **Prueba de taps** permite activar y detener
 un envío continuo a la reserva real: por defecto, 10 taps cada segundo. Cantidad

@@ -82,15 +82,26 @@ export function TapFarmingPanel() {
   const healthRatio = healthAvailable && effectiveTotal > 0
     ? normalized(effectiveHealth?.ratio ?? effectiveCurrent / effectiveTotal)
     : 0;
-  const healthBarRatio = Math.min(1, healthRatio);
-  const healthPercent = Math.round(healthRatio * 100);
-  const healthMetric = healthAvailable
+  const battleProgress = tapFarming?.battleProgress;
+  const encounterProgress = battleProgress?.scope === "encounter" && battleProgress.available;
+  const progressAvailable = encounterProgress || healthAvailable;
+  const displayRatio = encounterProgress ? Math.min(1, normalized(battleProgress.ratio)) : healthRatio;
+  const healthBarRatio = Math.min(1, displayRatio);
+  const healthPercent = Math.round(displayRatio * 100);
+  const healthMetric = progressAvailable
     ? `${healthPercent}%`
     : `+${reserveHealth.toLocaleString(numberLocale)} ${t("dashboard.tapFarming.progress.healthPointsShort")}`;
-  const arenaHealth = healthAvailable && effectiveHealth?.scope === "arena";
+  const arenaHealth = !encounterProgress && healthAvailable && effectiveHealth?.scope === "arena";
   const arenaHealthLabel = t("dashboard.tapFarming.progress.currentArenaHealth");
+  const progressLabel = encounterProgress
+    ? t(battleProgress.estimated ? "dashboard.tapFarming.progress.estimatedGlobalProgress" : "dashboard.tapFarming.progress.globalProgress")
+    : arenaHealth ? arenaHealthLabel : t("dashboard.tapFarming.progress.battle");
+  const reserveLine = t("dashboard.tapFarming.progress.reservePoints")
+    .replace("{value}", reserveHealth.toLocaleString(numberLocale));
   const reserveEquivalent = bossTotalHealth > 0 ? reserveHealth / bossTotalHealth : 0;
-  const reserveDescription = !healthAvailable
+  const reserveDescription = encounterProgress
+    ? reserveLine
+    : !healthAvailable
     ? t("dashboard.tapFarming.progress.collected")
       .replace("{value}", reserveHealth.toLocaleString(numberLocale))
     : reserveEquivalent >= 1
@@ -232,24 +243,25 @@ export function TapFarmingPanel() {
                   .replace("{phase}", String(Math.max(1, phaseIndex)))
                   .replace("{count}", String(phaseCount))
                 : t("dashboard.tapFarming.progress.noBoss")}</small>
-              {arenaHealth ? <small>{arenaHealthLabel}</small> : null}
+              {encounterProgress || arenaHealth ? <small>{progressLabel}</small> : null}
             </div>
-            <span data-mode={healthAvailable ? "percent" : "points"}>{healthMetric}</span>
+            <span data-mode={progressAvailable ? "percent" : "points"}>{healthMetric}</span>
           </div>
 
           <div
             className="dashboard-tap-farming__battle-progress"
-            data-mode={healthAvailable ? "percent" : "points"}
-            role={healthAvailable ? "progressbar" : "status"}
-            aria-label={healthAvailable
-              ? arenaHealth ? arenaHealthLabel : t("dashboard.tapFarming.progress.battle")
+            data-mode={progressAvailable ? "percent" : "points"}
+            role={progressAvailable ? "progressbar" : "status"}
+            aria-label={progressAvailable
+              ? progressLabel
               : t("dashboard.tapFarming.progress.collected")
                 .replace("{value}", reserveHealth.toLocaleString(numberLocale))}
-            aria-valuemin={healthAvailable ? 0 : undefined}
-            aria-valuemax={healthAvailable ? Math.max(100, healthPercent) : undefined}
-            aria-valuenow={healthAvailable ? healthPercent : undefined}
-            aria-valuetext={healthAvailable
-              ? arenaHealth ? `${healthMetric} · ${arenaHealthLabel}` : healthMetric
+            aria-valuemin={progressAvailable ? 0 : undefined}
+            aria-valuemax={progressAvailable ? Math.max(100, healthPercent) : undefined}
+            aria-valuenow={progressAvailable ? healthPercent : undefined}
+            aria-valuetext={progressAvailable
+              ? encounterProgress ? `${healthMetric} · ${progressLabel} · ${reserveLine}`
+                : arenaHealth ? `${healthMetric} · ${arenaHealthLabel}` : healthMetric
               : undefined}
           >
             <i style={{ width: `${healthBarRatio * 100}%` }} />

@@ -102,6 +102,7 @@ function panel(state, locale = "es") {
   return {
     progress: nodes.find(node => node.props.className === "dashboard-tap-farming__battle-progress"),
     metric: nodes.find(node => node.type === "span" && node.props["data-mode"]),
+    reserveNote: nodes.find(node => node.props.className === "dashboard-tap-farming__reserve-note"),
     labels: nodes.filter(node => node.type === "small").map(node => node.props.children),
   };
 }
@@ -190,6 +191,7 @@ test("Dice Palace board and miniboss handoffs keep the heart and portrait in one
   state.bossName = "King Dice";
   state.presentation.motion = true;
   state.effectiveHealth.scope = "arena";
+  state.battleProgress = { scope: "encounter", available: true, ratio: .625, estimated: true };
   state.phase = "collecting";
   view.render(state);
   state.phase = "active";
@@ -221,7 +223,8 @@ test("Dice Palace board and miniboss handoffs keep the heart and portrait in one
     assert.equal(view.node("tap-farming").dataset.phase, phase, `${levelId} stays in a heart display phase`);
     assert.equal(view.node("tap-farming").dataset.heartEntering, "false", "handoffs cannot repeat the heart entry");
     assert.equal(view.node("tap-farming").dataset.healthPending, "false");
-    assert.equal(view.node("tap-percent").textContent, "150%", "transition retains the supplied effective percentage");
+    assert.equal(view.node("tap-percent").textContent, "63%", "transition retains the supplied encounter progress");
+    assert.equal(view.node("tap-health-remaining").textContent, "500 PV");
     assert.equal(view.node("tap-boss-image").dataset.visible, "true", "the Dice portrait remains visible on the board and in minibosses");
     assert.equal(view.node("tap-boss-image").getAttribute("href"), "/assets/bosses/dado.png");
     for (const delay of [300, 340, 620, 1350]) assert.equal(view.timers(delay), 0);
@@ -283,6 +286,69 @@ test("panel retains raw percentage and accessible value above 100% while its bar
     assert.equal(view.progress.props["aria-valuetext"], percent + "%");
     assert.equal(view.progress.props.children.props.style.width, width);
   }
+});
+
+test("Dice Palace displays global progress independently of native HP and tap reserve", () => {
+  const view = overlay();
+  const state = snapshot();
+  state.levelId = "DicePalaceMain";
+  state.phase = "transition";
+  state.counters.reserveHealth = 0;
+  state.effectiveHealth = { available: false, current: 0, total: 0, ratio: 0, scope: "arena" };
+  state.battleProgress = { scope: "encounter", available: true, ratio: 0, estimated: true };
+  view.render(state);
+  assert.equal(view.node("tap-percent").textContent, "0%", "the first board begins the route at zero");
+  assert.equal(view.node("tap-farming").dataset.healthPending, "false", "the global route does not wait for native arena HP");
+  assert.equal(view.node("tap-health-remaining").textContent, "0 PV");
+  assert.match(view.node("tap-heart-label").textContent, /^Avance global estimado: 0%; reserva disponible: 0 PV$/);
+
+  state.phase = "active";
+  state.levelId = "DicePalaceBooze";
+  state.battleProgress.ratio = .25;
+  state.effectiveHealth = { available: true, current: 645, total: 645, ratio: 1, scope: "arena" };
+  view.render(state);
+  assert.equal(view.node("tap-percent").textContent, "25%", "native damage advances the route even without taps");
+  state.counters.reserveHealth = 9000;
+  state.effectiveHealth.current = 9645;
+  state.effectiveHealth.ratio = 9645 / 645;
+  view.render(state);
+  assert.equal(view.node("tap-percent").textContent, "25%", "adding reserve cannot change the completed route");
+  assert.equal(view.node("tap-health-remaining").textContent, "9,000 PV");
+  assert.equal(view.node("tap-liquid-level").style.transform, "translateY(196.75px)");
+
+  for (const [locale, label, reserve, overlayReserve] of [
+    ["es", "Avance global estimado", "RESERVA: 9,000 PV", "9,000 PV"],
+    ["en", "Estimated overall progress", "RESERVE: 9,000 HP", "9,000 HP"],
+  ]) {
+    state.locale = locale;
+    view.render(state);
+    const result = panel(state, locale);
+    assert.equal(result.metric.props.children, "25%");
+    assert.ok(result.labels.includes(label));
+    assert.equal(result.progress.props["aria-label"], label);
+    assert.equal(result.progress.props["aria-valuenow"], 25);
+    assert.equal(result.progress.props["aria-valuemax"], 100);
+    assert.equal(result.progress.props.children.props.style.width, "25%");
+    assert.equal(result.reserveNote.props.children, reserve);
+    assert.equal(result.progress.props["aria-valuetext"], `25% · ${label} · ${reserve}`);
+    assert.equal(view.node("tap-health-remaining").textContent, overlayReserve);
+    assert.ok(view.node("tap-heart-label").textContent.startsWith(label + ": 25%"));
+    assert.doesNotMatch(view.node("tap-heart-label").textContent, /9645|9,645|645|arena/i);
+  }
+
+  state.phase = "completed";
+  state.effectiveHealth.available = false;
+  state.battleProgress.ratio = 1;
+  view.render(state);
+  assert.equal(view.node("tap-percent").textContent, "100%");
+  assert.equal(panel(state).metric.props.children, "100%", "the closed encounter remains complete without native HP");
+  state.phase = "transition";
+  state.attempt++;
+  state.battleProgress.ratio = 0;
+  view.render(state);
+  assert.equal(view.node("tap-percent").textContent, "0%", "a retry restarts route progress while retaining the reserve");
+  assert.equal(view.node("tap-health-remaining").textContent, "9,000 HP");
+  assert.equal(panel(state).metric.props.children, "0%");
 });
 
 test("missing ratios derive from original total; negative/invalid inputs and native fallbacks stay bounded", () => {
@@ -351,9 +417,26 @@ test("standalone preview and unified OBS preview use original HP as their fixed 
   assert.equal(project({ ...input, phase: "completed" }).effectiveHealth.current, 0);
   assert.equal(project({ ...input, levelId: "DicePalaceMain" }).effectiveHealth.scope, "arena");
   assert.equal(project({ ...input, levelId: "Robot" }).effectiveHealth.scope, "boss");
+  assert.equal(project({ ...input, levelId: "Robot" }).battleProgress.available, false);
   view.render(first);
   assert.equal(view.node("tap-percent").textContent, "230%");
   assert.equal(view.node("tap-health-remaining").textContent, "6,900 PV");
+
+  const dice = project({ ...input, levelId: "DicePalaceMain", overallProgress: .625 });
+  assert.equal(dice.battleProgress.scope, "encounter");
+  assert.equal(dice.battleProgress.available, true);
+  assert.equal(dice.battleProgress.ratio, .625);
+  assert.equal(dice.counters.reserveHealth, 5000);
+  view.render(dice);
+  assert.equal(view.node("tap-percent").textContent, "63%");
+  assert.equal(view.node("tap-health-remaining").textContent, "5,000 PV");
+  for (const [phase, overallProgress, ratio] of [
+    ["transition", 0, 0], ["active", 1, .99], ["completed", .5, 1],
+  ]) {
+    const projected = project({ ...input, levelId: "DicePalaceMain", phase, overallProgress });
+    assert.equal(projected.battleProgress.ratio, ratio);
+    assert.equal(projected.battleProgress.available, true);
+  }
 });
 
 test("arena scope identifies the current native denominator and uses the projected effective health", () => {

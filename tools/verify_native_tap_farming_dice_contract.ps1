@@ -179,6 +179,102 @@ try {
                 [string]$observe[0].Previous.OpCode.Code -like 'Ldloc*' -and
                 (Dice-LocalKey $observe[0].Previous) -eq $nativeLocal) 'Compiled Dice observer must receive the raw IsBattling value before battle-notice/player gating.'
             Write-Output 'PASS Compiled Dice lifecycle: raw native IsBattling observer, board/final classification, pre-win before end, destruction handoff and map reset.'
+
+            # The encounter percentage is progress, not a fabricated total HP
+            # pool. Its JSON channel and completed-round lifetime are distinct
+            # from the existing effective arena health and real tap reserve.
+            $completedScope = $controller.Fields | Where-Object Name -eq 'completedDicePalaceRound'
+            Require ($null -ne $completedScope -and !$completedScope.IsStatic -and
+                $completedScope.FieldType.FullName -eq 'System.Boolean') 'Compiled Dice completed encounter scope is missing.'
+            $preWinController = $controller.Methods | Where-Object Name -eq 'OnLevelPreWin'
+            $reset = @(Calls $preWinController 'ResetSessionCountersLocked')
+            $scopeRestore = @($preWinController.Body.Instructions | Where-Object {
+                $_.OpCode.Code -eq 'Stfld' -and $_.Operand.FullName -eq $completedScope.FullName
+            })
+            $scopeCapture = @($preWinController.Body.Instructions | Where-Object {
+                $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.Name -eq 'dicePalaceAttemptActive' -and
+                $reset.Count -eq 1 -and $_.Offset -lt $reset[0].Offset
+            })
+            Require ($reset.Count -eq 1 -and $scopeCapture.Count -eq 1 -and $scopeRestore.Count -eq 1 -and
+                [string]$scopeCapture[0].Next.OpCode.Code -like 'Stloc*' -and
+                [string]$scopeRestore[0].Previous.OpCode.Code -like 'Ldloc*' -and
+                (Dice-LocalKey $scopeCapture[0].Next) -eq (Dice-LocalKey $scopeRestore[0].Previous) -and
+                $scopeRestore[0].Offset -gt $reset[0].Offset -and
+                @($preWinController.Body.Instructions | Where-Object {
+                    $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'overallProgress' -and
+                    $_.Previous.OpCode.Code -eq 'Ldc_R4' -and [float]$_.Previous.Operand -eq [float]1 -and
+                    $_.Offset -gt $scopeRestore[0].Offset
+                }).Count -eq 1) 'Compiled Dice victory must preserve encounter scope across ledger reset and then finish at full progress.'
+            foreach ($name in @('OnLevelStarted', 'OnMapEntered', 'ResetSessionCountersLocked')) {
+                $method = $controller.Methods | Where-Object Name -eq $name
+                Require (@($method.Body.Instructions | Where-Object {
+                    $_.OpCode.Code -eq 'Stfld' -and $_.Operand.FullName -eq $completedScope.FullName -and
+                    $_.Previous.OpCode.Code -eq 'Ldc_I4_0'
+                }).Count -eq 1) "Compiled Dice completed encounter scope must clear on $name."
+            }
+
+            $state = $controller.Methods | Where-Object Name -eq 'BuildStateLocked'
+            $progressMarker = @($state.Body.Instructions | Where-Object {
+                $_.OpCode.Code -eq 'Ldstr' -and $_.Operand -eq '},"battleProgress":{"scope":"'
+            })
+            $nextMarker = @($state.Body.Instructions | Where-Object {
+                $_.OpCode.Code -eq 'Ldstr' -and $_.Operand -eq '},"phaseIndex":'
+            })
+            Require ($progressMarker.Count -eq 1 -and $nextMarker.Count -eq 1 -and
+                $progressMarker[0].Offset -lt $nextMarker[0].Offset) 'Compiled Dice encounter progress must be a separate battleProgress JSON object.'
+            $progressJson = @($state.Body.Instructions | Where-Object {
+                $_.Offset -gt $progressMarker[0].Offset -and $_.Offset -lt $nextMarker[0].Offset
+            })
+            foreach ($literal in @('encounter', 'boss', '","available":', ',"ratio":', ',"estimated":')) {
+                Require (@($progressJson | Where-Object {
+                    $_.OpCode.Code -eq 'Ldstr' -and $_.Operand -eq $literal
+                }).Count -eq 1) "Compiled Dice progress JSON is missing its $literal contract."
+            }
+            $completedScopeRead = @($state.Body.Instructions | Where-Object {
+                $_.OpCode.Code -eq 'Ldfld' -and $_.Operand.FullName -eq $completedScope.FullName
+            })
+            Require ($completedScopeRead.Count -eq 1 -and
+                $completedScopeRead[0].Next.OpCode.Code -in @('Br', 'Br_S')) 'Compiled Dice progress must keep its encounter scope while displaying the completed round.'
+            $encounterStore = $completedScopeRead[0].Next.Operand
+            $estimatedMarker = $progressJson | Where-Object {
+                $_.OpCode.Code -eq 'Ldstr' -and $_.Operand -eq ',"estimated":'
+            }
+            Require ([string]$encounterStore.OpCode.Code -like 'Stloc*' -and
+                [string]$progressMarker[0].Next.Next.OpCode.Code -like 'Ldloc*' -and
+                [string]$estimatedMarker.Next.Next.OpCode.Code -like 'Ldloc*' -and
+                (Dice-LocalKey $encounterStore) -eq (Dice-LocalKey $progressMarker[0].Next.Next) -and
+                (Dice-LocalKey $encounterStore) -eq (Dice-LocalKey $estimatedMarker.Next.Next)) 'Compiled Dice encounter scope and estimated marker must use the same active/completed-round projection.'
+            $ratioFormat = @($progressJson | Where-Object {
+                $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -eq 'FormatNumber'
+            })
+            $progressClamp = @(Calls $state 'Clamp01' | Where-Object {
+                $_.Previous.OpCode.Code -eq 'Ldfld' -and $_.Previous.Operand.Name -eq 'overallProgress'
+            })
+            Require ($ratioFormat.Count -eq 1 -and $progressClamp.Count -eq 1 -and
+                $progressClamp[0].Next.OpCode.Code -eq 'Conv_R8' -and
+                $progressClamp[0].Next.Next.Operand -is [Mono.Cecil.MethodReference] -and
+                $progressClamp[0].Next.Next.Operand.DeclaringType.FullName -eq 'System.Math' -and
+                $progressClamp[0].Next.Next.Operand.Name -eq 'Min' -and
+                $progressClamp[0].Previous.Previous.Previous.OpCode.Code -eq 'Ldc_R8' -and
+                [double]$progressClamp[0].Previous.Previous.Previous.Operand -eq [double]0.99) 'Compiled Dice progress must derive from bounded encounter progress and reserve 100 percent for victory.'
+            $progressStore = $progressClamp[0].Next.Next.Next
+            if ($progressStore.OpCode.Code -in @('Br', 'Br_S')) { $progressStore = $progressStore.Operand }
+            Require ([string]$progressStore.OpCode.Code -like 'Stloc*' -and
+                [string]$ratioFormat[0].Previous.Previous.OpCode.Code -like 'Ldloc*' -and
+                (Dice-LocalKey $progressStore) -eq (Dice-LocalKey $ratioFormat[0].Previous.Previous) -and
+                @(Calls $state 'Calculate' | Where-Object {
+                    $_.Operand.DeclaringType.Name -eq 'CreatorToolsTapFarmingEffectiveHealth'
+                }).Count -eq 1 -and @($progressJson | Where-Object {
+                    $_.OpCode.Code -in @('Ldfld', 'Ldflda') -and
+                    $_.Operand.Name -in @('reserveHealth', 'bossCurrentHealth', 'bossTotalHealth', 'Ratio')
+                }).Count -eq 0) 'Compiled Dice progress serialization must use its own normalized ratio without reusing arena HP or tap reserve.'
+            foreach ($name in @('PrepareBossDamage', 'SynchronizePhaseReserveLocked', 'CountTapsLocked')) {
+                $method = $controller.Methods | Where-Object Name -eq $name
+                Require (@($method.Body.Instructions | Where-Object {
+                    $_.Operand -is [Mono.Cecil.FieldReference] -and $_.Operand.FullName -eq $completedScope.FullName
+                }).Count -eq 0) "Compiled Dice presentation scope must not change real tap reserve or damage routing in $name."
+            }
+            Write-Output 'PASS Compiled Dice progress: separate estimated encounter JSON, native progress rather than PV/reserve, victory scope preservation and map/new-attempt cleanup.'
         }
         finally { $compiled.Dispose() }
     }

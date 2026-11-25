@@ -208,6 +208,12 @@ export interface TapFarmingPreviewSnapshot {
     ratio: number;
     scope?: "boss" | "arena";
   };
+  battleProgress?: {
+    scope: "encounter" | "boss";
+    available: boolean;
+    ratio: number;
+    estimated: boolean;
+  };
   phaseIndex: number;
   phaseCount: number;
   overallProgress: number;

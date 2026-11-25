@@ -87,6 +87,9 @@
       heartPendingAria: "100% de vida; esperando datos del jefe; {reserve} de reserva",
       healthPointsShort: "PV",
       currentArenaHealth: "Vida de la arena actual",
+      globalProgress: "Avance global",
+      estimatedGlobalProgress: "Avance global estimado",
+      globalProgressAria: "{label}: {percent}%; reserva disponible: {reserve} PV",
     },
     en: {
       title: "Tap Farming",
@@ -103,6 +106,9 @@
       heartPendingAria: "100% health; waiting for boss data; {reserve} reserve",
       healthPointsShort: "HP",
       currentArenaHealth: "Current arena health",
+      globalProgress: "Overall progress",
+      estimatedGlobalProgress: "Estimated overall progress",
+      globalProgressAria: "{label}: {percent}%; available reserve: {reserve} HP",
     },
   };
 
@@ -282,6 +288,7 @@
     const counters = objectValue(state.counters);
     const boss = objectValue(state.boss);
     const effectiveHealth = objectValue(state.effectiveHealth);
+    const battleProgress = objectValue(state.battleProgress);
     const conversion = objectValue(state.conversion);
     const lastRound = objectValue(state.lastRound);
     const rawPhases = Array.isArray(state.phases) ? state.phases : [];
@@ -343,6 +350,9 @@
       currentHealth,
       effectiveAvailable,
       effectiveRatio,
+      encounterProgress: battleProgress.scope === "encounter" && battleProgress.available === true,
+      battleProgressRatio: clamp(firstNumber(battleProgress.ratio), 0, 1),
+      battleProgressEstimated: battleProgress.estimated === true,
       healthScope: effectiveHealth.scope === "arena" ? "arena" : "boss",
       reserveHealth,
       convertedHealth: nonnegative(
@@ -533,8 +543,10 @@
     const presentation = snapshot.presentation;
     const visible = snapshot.phase !== "off";
     const heartPhase = ["active", "transition"].includes(snapshot.phase);
-    const pendingBossHealth = heartPhase && !snapshot.effectiveAvailable;
-    const healthRatio = pendingBossHealth ? 1 : snapshot.effectiveRatio;
+    const pendingBossHealth = heartPhase && !snapshot.encounterProgress && !snapshot.effectiveAvailable;
+    const healthRatio = snapshot.encounterProgress
+      ? snapshot.battleProgressRatio
+      : pendingBossHealth ? 1 : snapshot.effectiveRatio;
     const healthPercent = Math.round(healthRatio * 100);
     const collectedPoints = format(snapshot.reserveHealth);
     const metricValue = `${healthPercent}%`;
@@ -543,6 +555,7 @@
 
     root.dataset.phase = snapshot.phase;
     root.dataset.valueMode = "percent";
+    root.dataset.progressScope = snapshot.encounterProgress ? "encounter" : "boss";
     root.dataset.healthPending = String(pendingBossHealth);
     root.dataset.visible = String(visible);
     root.dataset.variant = presentation.variant;
@@ -558,9 +571,11 @@
     percent.setAttribute("y", hasBossImage ? "191" : "161");
     percent.textContent = metricValue;
     healthRemaining.setAttribute("y", hasBossImage ? "217" : "187");
-    healthRemaining.textContent = pendingBossHealth
-      ? ""
-      : `${format(snapshot.currentHealth)} ${text.healthPointsShort}`;
+    const globalProgressLabel = snapshot.battleProgressEstimated
+      ? text.estimatedGlobalProgress : text.globalProgress;
+    healthRemaining.textContent = snapshot.encounterProgress
+      ? `${collectedPoints} ${text.healthPointsShort}`
+      : pendingBossHealth ? "" : `${format(snapshot.currentHealth)} ${text.healthPointsShort}`;
     collectingTotal.textContent = format(snapshot.bankedTaps);
     collectingHealth.textContent = format(snapshot.reserveHealth);
     collectingConversion.textContent = message(text.conversion, {
@@ -572,7 +587,11 @@
     victoryTaps.textContent = format(snapshot.victoryTaps);
     victoryAttempts.textContent = format(snapshot.victoryAttempts);
     victoryAbsorbed.textContent = `${format(snapshot.victorySpent)} ${text.healthPointsShort}`;
-    heartLabel.textContent = pendingBossHealth
+    heartLabel.textContent = snapshot.encounterProgress
+      ? message(text.globalProgressAria, {
+        label: globalProgressLabel, percent: healthPercent, reserve: collectedPoints,
+      })
+      : pendingBossHealth
       ? message(text.heartPendingAria, { reserve: collectedPoints })
       : message(text.heartAria, {
         percent: healthPercent,
@@ -580,7 +599,7 @@
         total: format(snapshot.totalHealth),
         reserve: collectedPoints,
       });
-    if (snapshot.effectiveAvailable && snapshot.healthScope === "arena")
+    if (!snapshot.encounterProgress && snapshot.effectiveAvailable && snapshot.healthScope === "arena")
       heartLabel.textContent = `${text.currentArenaHealth}. ${heartLabel.textContent}`;
     updateTapDelta(snapshot);
     ensureAnimation();

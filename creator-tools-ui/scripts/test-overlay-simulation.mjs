@@ -63,6 +63,37 @@ test("tap previews grow above original boss health without raising their denomin
   assert.equal(collecting.effectiveHealth.total, 0);
 });
 
+test("Dice previews keep one estimated route progress while taps remain a shared HP balance", () => {
+  const { createTapSimulation, tapSimulationReducer } = exports;
+  let state = createTapSimulation("active");
+  assert.equal(state.battleProgress.scope, "encounter");
+  assert.equal(state.battleProgress.available, true);
+  assert.equal(state.battleProgress.estimated, true);
+  assert.equal(state.battleProgress.ratio, state.overallProgress);
+  const progress = state.battleProgress.ratio;
+  state = tapSimulationReducer(state, { type: "add_taps", amount: 6000 });
+  assert.equal(state.counters.reserveHealth, 4842);
+  assert.equal(state.battleProgress.ratio, progress, "new taps add HP without advancing the route");
+  state = tapSimulationReducer(state, { type: "damage", amount: 1000 });
+  assert.equal(state.counters.reserveHealth, 3842);
+  assert.equal(state.battleProgress.ratio, progress, "absorbing a hit uses shared HP without inventing route progress");
+  state = tapSimulationReducer(state, { type: "retry" });
+  assert.equal(state.battleProgress.ratio, 0);
+  assert.equal(state.counters.reserveHealth, 3842, "retry preserves only the unspent reserve");
+  state = { ...state, counters: { ...state.counters, reserveHealth: 0 } };
+  state = tapSimulationReducer(state, { type: "damage", amount: 300 });
+  assert.ok(Math.abs(state.battleProgress.ratio - .025) < 1e-10, "native damage advances a route with no taps");
+  state = tapSimulationReducer(state, { type: "next_phase" });
+  assert.equal(state.battleProgress.ratio, .25);
+  state = tapSimulationReducer({ ...state, levelId: "DicePalaceChips" }, { type: "add_taps", amount: 40 });
+  assert.equal(state.battleProgress.ratio, .25, "a miniboss scene change cannot reset the route");
+  assert.equal(state.counters.reserveHealth, 20);
+  const completed = createTapSimulation("completed");
+  assert.equal(completed.battleProgress.ratio, 1);
+  assert.equal(completed.battleProgress.available, true);
+  assert.equal(createTapSimulation("collecting").battleProgress.available, false);
+});
+
 test("designer history retains ten edits, including redo, and branches after a new edit", () => {
   const { createEditHistory, recordEdit, undoEdit, redoEdit } = exports;
   let history = createEditHistory(0);

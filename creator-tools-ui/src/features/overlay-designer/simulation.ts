@@ -89,6 +89,7 @@ function withTapProgress(state: TapFarmingPreviewSnapshot) {
     : effectiveAvailable
       ? current + state.counters.reserveHealth
       : state.counters.reserveHealth;
+  const overallProgress = completed ? 1 : clamp(((phaseIndex - 1) + progress) / phaseCount, 0, 1);
   return {
     ...state,
     revision: state.revision + 1,
@@ -102,11 +103,15 @@ function withTapProgress(state: TapFarmingPreviewSnapshot) {
         : 0,
       scope: healthScope,
     },
+    battleProgress: {
+      scope: healthScope === "arena" ? "encounter" as const : "boss" as const,
+      available: healthScope === "arena" && state.phase !== "collecting",
+      ratio: completed ? 1 : Math.min(0.99, overallProgress),
+      estimated: healthScope === "arena",
+    },
     phaseIndex,
     phaseCount,
-    overallProgress: completed
-      ? 1
-      : clamp(((phaseIndex - 1) + progress) / phaseCount, 0, 1),
+    overallProgress,
     phases: tapPhases(phaseCount, phaseIndex, progress, completed),
   };
 }
@@ -142,7 +147,7 @@ export function createTapSimulation(
     boss: { currentHealth: 1900, totalHealth: 3000, progress: 0 },
     effectiveHealth: { available: true, current: 0, total: 0, ratio: 0 },
     phaseIndex: 2,
-    phaseCount: 3,
+    phaseCount: 4,
     overallProgress: 0,
     phases: [],
     tapDelta: 0,

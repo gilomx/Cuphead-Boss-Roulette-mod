@@ -13,6 +13,9 @@ internal static class TapPhaseDistributionTests
         TestDicePalaceSharedReserveAndBoardLifecycle();
         TestDicePalaceMapAndDefeatStartNewAttempts();
         TestDicePalaceNativeRetryStartsNewAttempt();
+        TestDicePalaceGlobalProgressAndIndependentTapReserve();
+        TestDicePalaceGlobalProgressResets();
+        TestDicePalaceVictoryProgressPersistsUntilMap();
         TestFailedReaderPreservesNativeDamage();
         TestVictoryStartsNewBalance();
     }
@@ -242,6 +245,180 @@ internal static class TapPhaseDistributionTests
         }
     }
 
+    private static void TestDicePalaceGlobalProgressAndIndependentTapReserve()
+    {
+        using (var fixture = new Fixture())
+        {
+            var board = fixture.Start(Levels.DicePalaceMain, 1000);
+            AssertBattleProgress(fixture, "encounter", true, 0, true);
+            fixture.MainState(board, false);
+            fixture.LeaveBoard(board);
+            var first = fixture.Start(Levels.DicePalaceChips, 1001);
+            var properties = Arena(1000);
+            Hit(fixture.Taps, properties, 400, 400);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .1, true);
+            Near(600, properties.CurrentHealth);
+            fixture.Handoff(first, endedFirst: true);
+            AssertBattleProgress(fixture, "encounter", true, .25, true);
+
+            board = fixture.Start(Levels.DicePalaceMain, 1002);
+            fixture.MainState(board, false);
+            fixture.Taps.ObserveBossDamage(Arena(900));
+            AssertBattleProgress(fixture, "encounter", true, .25, true);
+            Deposit(fixture.Taps, 50);
+            AssertDiceReserve(fixture, 50);
+            AssertBattleProgress(fixture, "encounter", true, .25, true);
+
+            fixture.LeaveBoard(board);
+            var second = fixture.Start(Levels.DicePalaceChips, 1003);
+            properties = Arena(500);
+            // The first 50 damage is real reserve absorption. Only the native
+            // 250 remainder advances the second segment halfway to 50%.
+            Hit(fixture.Taps, properties, 300, 250);
+            fixture.Refresh(properties);
+            AssertDiceReserve(fixture, 0);
+            AssertBattleProgress(fixture, "encounter", true, .375, true);
+            Deposit(fixture.Taps, 20);
+            AssertBattleProgress(fixture, "encounter", true, .375, true);
+            Hit(fixture.Taps, properties, 20, 0);
+            fixture.Refresh(properties);
+            AssertDiceReserve(fixture, 0);
+            Near(250, properties.CurrentHealth);
+            AssertBattleProgress(fixture, "encounter", true, .375, true);
+            fixture.Handoff(second);
+            AssertBattleProgress(fixture, "encounter", true, .5, true);
+
+            board = fixture.Start(Levels.DicePalaceMain, 1004);
+            fixture.MainState(board, false);
+            AssertBattleProgress(fixture, "encounter", true, .5, true);
+            fixture.LeaveBoard(board);
+            var third = fixture.Start(Levels.DicePalaceChips, 1005);
+            properties = Arena(700);
+            Hit(fixture.Taps, properties, 350, 350);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .625, true);
+            fixture.Handoff(third);
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+
+            board = fixture.Start(Levels.DicePalaceMain, 1006);
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+            fixture.LeaveBoard(board);
+            var extra = fixture.Start(Levels.DicePalaceChips, 1007);
+            properties = Arena(400);
+            Hit(fixture.Taps, properties, 399, 399);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+            fixture.Handoff(extra);
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+
+            var main = fixture.Start(Levels.DicePalaceMain, 1008);
+            fixture.MainState(main, false);
+            fixture.Taps.ObserveBossDamage(Arena(900));
+            AssertLifecycle(fixture, "transition", 1);
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+            // The board and final fight use this same native Level instance.
+            fixture.MainState(main, true);
+            AssertLifecycle(fixture, "active", 1);
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+            properties = Arena(900);
+            Hit(fixture.Taps, properties, 450, 450);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .875, true);
+            Hit(fixture.Taps, properties, 450, 450);
+            fixture.Refresh(properties);
+            using (var state = fixture.State())
+            {
+                var progress = state.RootElement.GetProperty("battleProgress").GetProperty("ratio").GetDouble();
+                Near(.99, progress);
+            }
+            fixture.Taps.OnLevelPreWin(main);
+            AssertBattleProgress(fixture, "encounter", true, 1, true);
+            using (var state = fixture.State())
+            {
+                Near(70, state.RootElement.GetProperty("lastRound").GetProperty("totalTaps").GetInt64());
+                Near(70, state.RootElement.GetProperty("lastRound").GetProperty("spentHealth").GetDouble());
+            }
+            Console.WriteLine("PASS Dice Palace global 0-100% progress, 25/50/75 route milestones, extra-arena cap, same-instance final activation and independent shared tap HP");
+        }
+    }
+
+    private static void TestDicePalaceGlobalProgressResets()
+    {
+        using (var fixture = new Fixture())
+        {
+            var board = fixture.Start(Levels.DicePalaceMain, 1100);
+            fixture.LeaveBoard(board);
+            var first = fixture.Start(Levels.DicePalaceChips, 1101);
+            var properties = Arena(1000);
+            Hit(fixture.Taps, properties, 400, 400);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .1, true);
+            fixture.Taps.OnLevelDefeated(first);
+            AssertLifecycle(fixture, "collecting", 1);
+            AssertBattleProgress(fixture, "encounter", false, 0, true);
+
+            board = fixture.Start(Levels.DicePalaceMain, 1102);
+            AssertLifecycle(fixture, "transition", 2);
+            AssertBattleProgress(fixture, "encounter", true, 0, true);
+            fixture.LeaveBoard(board);
+            var second = fixture.Start(Levels.DicePalaceChips, 1103);
+            properties = Arena(600);
+            Hit(fixture.Taps, properties, 300, 300);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .125, true);
+            fixture.Taps.OnMapEntered();
+            AssertLifecycle(fixture, "collecting", 2);
+            AssertBattleProgress(fixture, "boss", false, 0, false);
+
+            board = fixture.Start(Levels.DicePalaceMain, 1104);
+            AssertLifecycle(fixture, "transition", 3);
+            AssertBattleProgress(fixture, "encounter", true, 0, true);
+            fixture.LeaveBoard(board);
+            var retry = fixture.Start(Levels.DicePalaceChips, 1105);
+            properties = Arena(800);
+            Hit(fixture.Taps, properties, 400, 400);
+            fixture.Refresh(properties);
+            AssertBattleProgress(fixture, "encounter", true, .125, true);
+            // Native retry has Ended without a miniboss win before Main.
+            fixture.Taps.OnLevelEnded(retry);
+            board = fixture.Start(Levels.DicePalaceMain, 1106);
+            AssertLifecycle(fixture, "transition", 4);
+            AssertBattleProgress(fixture, "encounter", true, 0, true);
+            Console.WriteLine("PASS Dice Palace global progress resets on defeat, map exit and native retry while fresh boards start at zero");
+        }
+    }
+
+    private static void TestDicePalaceVictoryProgressPersistsUntilMap()
+    {
+        using (var fixture = new Fixture())
+        {
+            var main = fixture.Start(Levels.DicePalaceMain, 1200);
+            fixture.MainState(main, true);
+            fixture.Refresh(Arena(900));
+            AssertBattleProgress(fixture, "encounter", true, .75, true);
+            fixture.Taps.OnLevelPreWin(main);
+            AssertLifecycle(fixture, "completed", 0);
+            AssertBattleProgress(fixture, "encounter", true, 1, true);
+            Deposit(fixture.Taps, 9);
+            AssertBattleProgress(fixture, "encounter", true, 1, true);
+            using (var state = fixture.State())
+            {
+                Near(9, state.RootElement.GetProperty("counters").GetProperty("reserveHealth").GetDouble());
+                Near(0, state.RootElement.GetProperty("lastRound").GetProperty("totalTaps").GetInt64());
+            }
+            fixture.Taps.OnMapEntered();
+            fixture.Taps.Update(fixture.Server, true); // Ending native Level may still be exposed.
+            AssertLifecycle(fixture, "collecting", 0);
+            AssertBattleProgress(fixture, "boss", false, 0, false);
+            Near(9, Reserve(fixture.Taps, fixture.Server));
+            fixture.Start(Levels.Ground, 1201);
+            fixture.Refresh(Arena(1000));
+            AssertBattleProgress(fixture, "boss", false, 0, false);
+            Console.WriteLine("PASS completed Dice Palace keeps encounter 100% during results-screen taps, then clears on the map without losing the next reserve");
+        }
+    }
+
     private static void TestFailedReaderPreservesNativeDamage()
     {
         using (var fixture = new Fixture())
@@ -379,6 +556,23 @@ internal static class TapPhaseDistributionTests
             Near(current, effective.GetProperty("current").GetDouble());
             Near(total, effective.GetProperty("total").GetDouble());
             Near(ratio, effective.GetProperty("ratio").GetDouble());
+        }
+    }
+
+    private static void AssertBattleProgress(Fixture fixture, string scope,
+        bool available, double ratio, bool estimated)
+    {
+        using (var state = fixture.State())
+        {
+            var progress = state.RootElement.GetProperty("battleProgress");
+            Check(progress.GetProperty("scope").GetString() == scope,
+                "battle progress scope must distinguish a whole Dice Palace encounter from one boss");
+            Check(progress.GetProperty("available").GetBoolean() == available,
+                "battle progress must remain visible across Dice Palace handoffs and clear while collecting");
+            Near(ratio, progress.GetProperty("ratio").GetDouble());
+            Check(progress.GetProperty("estimated").GetBoolean() == estimated,
+                "Dice Palace's four route segments must identify their global progress as an estimate");
+            Near(ratio, state.RootElement.GetProperty("overallProgress").GetDouble());
         }
     }
 

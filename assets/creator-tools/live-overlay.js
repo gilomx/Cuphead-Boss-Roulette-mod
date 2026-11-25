@@ -387,6 +387,7 @@
       : effectiveAvailable
         ? currentHealth + reserveHealth
         : reserveHealth;
+    const encounter = /^DicePalace/i.test(String(preview.levelId || ""));
     return {
       ready: true,
       schemaVersion: 1,
@@ -432,7 +433,13 @@
         ratio: effectiveAvailable && effectiveTotal > 0
           ? effectiveCurrent / effectiveTotal
           : 0,
-        scope: /^DicePalace/i.test(String(preview.levelId || "")) ? "arena" : "boss",
+        scope: encounter ? "arena" : "boss",
+      },
+      battleProgress: {
+        scope: encounter ? "encounter" : "boss",
+        available: encounter && ["active", "transition", "completed"].includes(phase),
+        ratio: phase === "completed" ? 1 : Math.min(0.99, overall),
+        estimated: encounter,
       },
       phaseIndex,
       phaseCount,

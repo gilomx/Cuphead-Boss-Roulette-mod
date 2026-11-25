@@ -358,6 +358,9 @@
         "collected": "La comunidad ha reunido {value} puntos de vida para el próximo jefe.",
         "healthPointsShort": "PV",
         "currentArenaHealth": "Vida de la arena actual",
+        "globalProgress": "Avance global",
+        "estimatedGlobalProgress": "Avance global estimado",
+        "reservePoints": "RESERVA: {value} PV",
         "reserveEquivalent": "La reserva actual equivale a {value}× la vida completa de este jefe.",
         "reservePercent": "La reserva actual equivale al {value} de la vida completa de este jefe.",
         "converted": "La comunidad ha convertido {value} puntos de vida."
